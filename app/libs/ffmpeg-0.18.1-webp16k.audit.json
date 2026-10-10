@@ -1,0 +1,192 @@
+[
+  {
+    "abi": "arm64-v8a",
+    "library": "libsharpyuv.so",
+    "soname": [
+      "libsharpyuv.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libm.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libm.so"
+    ],
+    "original_exports": 7,
+    "exports": 7,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "arm64-v8a",
+    "library": "libwebp.so",
+    "soname": [
+      "libwebp.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libm.so",
+      "libsharpyuv.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libm.so",
+      "libsharpyuv.so"
+    ],
+    "original_exports": 86,
+    "exports": 86,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "arm64-v8a",
+    "library": "libwebpdecoder.so",
+    "soname": [
+      "libwebpdecoder.so"
+    ],
+    "original_needed": [
+      "libc.so"
+    ],
+    "needed": [
+      "libc.so"
+    ],
+    "original_exports": 46,
+    "exports": 46,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "arm64-v8a",
+    "library": "libwebpdemux.so",
+    "soname": [
+      "libwebpdemux.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "original_exports": 20,
+    "exports": 20,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "arm64-v8a",
+    "library": "libwebpmux.so",
+    "soname": [
+      "libwebpmux.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "original_exports": 27,
+    "exports": 27,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "x86_64",
+    "library": "libsharpyuv.so",
+    "soname": [
+      "libsharpyuv.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libm.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libm.so"
+    ],
+    "original_exports": 7,
+    "exports": 7,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "x86_64",
+    "library": "libwebp.so",
+    "soname": [
+      "libwebp.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libm.so",
+      "libsharpyuv.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libm.so",
+      "libsharpyuv.so"
+    ],
+    "original_exports": 86,
+    "exports": 86,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "x86_64",
+    "library": "libwebpdecoder.so",
+    "soname": [
+      "libwebpdecoder.so"
+    ],
+    "original_needed": [
+      "libc.so"
+    ],
+    "needed": [
+      "libc.so"
+    ],
+    "original_exports": 46,
+    "exports": 46,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "x86_64",
+    "library": "libwebpdemux.so",
+    "soname": [
+      "libwebpdemux.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "original_exports": 20,
+    "exports": 20,
+    "missing_exports": [],
+    "aligned_16kb": true
+  },
+  {
+    "abi": "x86_64",
+    "library": "libwebpmux.so",
+    "soname": [
+      "libwebpmux.so"
+    ],
+    "original_needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "needed": [
+      "libc.so",
+      "libwebp.so"
+    ],
+    "original_exports": 27,
+    "exports": 27,
+    "missing_exports": [],
+    "aligned_16kb": true
+  }
+]

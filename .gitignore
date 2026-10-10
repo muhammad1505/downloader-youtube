@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+release-signing.env
+keystore.properties
+.idea/
+*.iml
+__pycache__/
+*.pyc
+app/libs/*.aar
+.freebuff/
