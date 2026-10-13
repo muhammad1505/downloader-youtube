@@ -505,9 +505,10 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 AsyncImage(
                     model = meta.thumbnail,
                     contentDescription = "Thumbnail video",
-                    modifier = Modifier.fillMaxWidth().height(176.dp),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f),
                     contentScale = ContentScale.Crop,
                 )
+                Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Black.copy(alpha=0.6f)))))
                 Surface(
                     color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.68f),
                     shape = MaterialTheme.shapes.small,

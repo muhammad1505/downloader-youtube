@@ -11,3 +11,8 @@
 -keep class * implements org.apache.commons.compress.archivers.zip.ZipExtraField {
     public <init>();
 }
+
+# AndroidViewModel's factory invokes this Application constructor reflectively.
+-keepclassmembers class id.local.tubeflow.core.PlayerViewModel {
+    public <init>(android.app.Application);
+}

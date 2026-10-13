@@ -65,6 +65,18 @@ class LyricsFetchTest {
         assertEquals(LyricStatus.NO_MATCH, outcome.status)
     }
 
+    @Test fun collaborationLookupUsesLeadArtistButKeepsFullValidationGate() {
+        respond = { path ->
+            if (path.contains("artist_name=Denny+Caknan") && !path.contains("Happy")) {
+                200 to """{"trackName":"Song","artistName":"Denny Caknan","duration":200,"syncedLyrics":"[00:01.00]line"}"""
+            } else if (path.startsWith("/api/get")) 404 to "" else 200 to "[]"
+        }
+        assertEquals(LyricStatus.SAVED,Lyrics.fetch(SongIdentity("Song","Denny Caknan x Happy Asmara"),200).status)
+        assertTrue(requests.any { it.contains("artist_name=Denny+Caknan") && !it.contains("Happy") })
+        Lyrics.clearCache()
+        assertEquals(LyricStatus.NO_MATCH,Lyrics.fetch(SongIdentity("Song","Denny Caknan x Happy Asmara"),220).status)
+    }
+
     @Test
     fun nameParsesAsTitleFirstArtistSecond() {
         // Nama konsisten "Judul - Artis" (judul dulu): track = segmen pertama, artis = sisanya.

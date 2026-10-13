@@ -3,6 +3,9 @@ package id.local.tubeflow.ui
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -25,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MediaLibraryScreen(model: MediaLibraryViewModel, history: @Composable () -> Unit) {
+fun MediaLibraryScreen(model: MediaLibraryViewModel, onPlay: (MediaItem) -> Unit, history: @Composable () -> Unit) {
     LaunchedEffect(Unit) { model.validateAvailability() }
     val media by model.items.collectAsStateWithLifecycle()
     val filter by model.selectedFilter.collectAsStateWithLifecycle()
@@ -72,12 +75,14 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, history: @Composable () -> 
             } }
             openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
             if (media.isEmpty() && !busy) item { EmptyState(Icons.Outlined.Folder, "Belum ada media yang cocok", "Pindai folder TubeFlow atau pilih file lewat Impor file. File tidak disalin.") }
-            items(media, key = { it.uri }) { item -> Card(Modifier.fillMaxWidth()) {
+            items(media, key = { it.uri }) { item ->
+                val accent=rememberCoverAccent(item.coverPath)
+                Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=0.06f).compositeOver(MaterialTheme.colorScheme.surface)),border=BorderStroke(1.dp,accent.copy(alpha=0.18f))) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(52.dp))
+                        CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                            Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                             if (item.displayName.substringBeforeLast('.') != item.title) Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
                             if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall)
                             Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall)
@@ -88,7 +93,7 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, history: @Composable () -> 
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { open(item) }, enabled = item.availability == "AVAILABLE") { Text("Putar") }
+                        OutlinedButton(onClick = { if (item.kind == "AUDIO") onPlay(item) else open(item) }, enabled = item.availability == "AVAILABLE") { Text("Putar") }
                         TextButton(onClick = { detail = item }) { Text("Detail") }
                         TextButton(onClick = { rename = item }, enabled = !busy && item.availability == "AVAILABLE") { Text("Ubah nama") }
                         IconButton(onClick = { delete = item }, enabled = !busy && item.availability == "AVAILABLE") { Icon(Icons.Outlined.Delete, "Hapus media") }
@@ -120,7 +125,7 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, history: @Composable () -> 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nama file") }, singleLine = true, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false))
                 Text("Ekstensi tetap sama. File lain tidak akan ditimpa.", style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { name = SmartMedia.fileName(TitleSplit.identify(item.title, metadataArtist = item.artist, metadataTrack = item.title), item.title, item.displayName.substringAfterLast('.'), true) }) { Text("Gunakan nama standar") }
+                TextButton(onClick = { name = SmartMedia.fileName(TitleSplit.identify(item.title, metadataArtist = item.artist, metadataTrack = item.title, recognizeCollaboration=item.kind == "AUDIO"), item.title, item.displayName.substringAfterLast('.'), true) }) { Text("Gunakan nama standar") }
             }
         }, confirmButton = { TextButton(onClick = { model.rename(item, name); rename = null }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = { rename = null }) { Text("Batal") } })
     }

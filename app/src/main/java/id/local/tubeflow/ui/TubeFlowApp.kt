@@ -1,5 +1,6 @@
 package id.local.tubeflow.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,7 +27,10 @@ import id.local.tubeflow.core.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
+    val playback by player.state.collectAsStateWithLifecycle()
+    var fullPlayer by rememberSaveable { mutableStateOf(false) }
+    var previousTab by rememberSaveable { mutableIntStateOf(2) }
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val metadata by model.metadata.collectAsStateWithLifecycle()
     val playlist by model.playlist.collectAsStateWithLifecycle()
@@ -58,17 +63,23 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
     LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it); model.clearError() } }
     // Info "Terpakai …" di Pengaturan ikut terbaru tiap tab dibuka, bukan cuma pas aplikasi start.
     LaunchedEffect(tab) { if (tab == 4) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
-    LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); library.clearMessage() } }
+    LaunchedEffect(libraryMessage) { libraryMessage?.let { if (it.startsWith("Waktu lirik disimpan.")) player.reloadLyrics(); snackbar.showSnackbar(it); library.clearMessage() } }
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
     val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
 
+    BackHandler(enabled=tab == 4 && !fullPlayer) { tab=previousTab }
+    LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false }
+    val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
+        ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
+    AccentTheme(accentCover, SettingsStore.artworkAccent) {
+    if (fullPlayer && playback.track != null) FullPlayer(playback,player) { fullPlayer=false }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text(if (tab == 4) "Pengaturan" else "TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         Text(
                             if (activeCount > 0) "$activeCount unduhan sedang berjalan" else "Simpan momen. Putar kapan saja.",
                             style = MaterialTheme.typography.labelMedium,
@@ -76,7 +87,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
                         )
                     }
                 },
-                actions = { },
+                navigationIcon = { if (tab == 4) IconButton(onClick={ tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Kembali") } },
+                actions = { if (tab != 4) IconButton(onClick={ previousTab=tab; tab=4 }) { Icon(Icons.Outlined.Settings,"Pengaturan") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -86,9 +98,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
         },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
+            Column {
+            if (playback.track != null) MiniPlayer(playback,player) { fullPlayer=true }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val tabs = listOf("Ringkasan", "Koleksi", "Download", "Antrean", "Pengaturan")
-                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.LibraryMusic, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.Settings)
+                val tabs = listOf("Ringkasan", "Koleksi", "Download", "Antrean")
+                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.LibraryMusic, Icons.Outlined.Download, Icons.Outlined.Queue)
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
@@ -110,6 +124,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
                         ),
                     )
                 }
+            }
             }
         },
     ) { padding ->
@@ -167,13 +182,14 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 1 }, downloads = { tab = 2 })
-                1 -> MediaLibraryScreen(library) {
+                1 -> MediaLibraryScreen(library, onPlay={ player.play(it) }) {
                     HistoryScreen(
                     jobs = jobs,
                     listState = historyList,
                     onRetry = { model.retry(it) },
                     onDeleteFile = { model.removeFile(it) },
                     onRefetchLyrics = { model.refetchLyrics(it) },
+                    onPlay = { player.play(it) },
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
@@ -193,5 +209,6 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
             }
             }
         }
+    }
     }
 }

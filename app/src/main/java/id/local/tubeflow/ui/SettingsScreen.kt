@@ -129,6 +129,13 @@ fun SettingsScreen(
                     selected = themeMode,
                     onSelect = onThemeMode,
                 )
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Aksen dari sampul",style=MaterialTheme.typography.bodyLarge)
+                        Text("Ikuti sampul lagu yang diputar atau unduhan terbaru.",style=MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(SettingsStore.artworkAccent,onCheckedChange={ SettingsStore.setArtworkAccent(context,it) })
+                }
                 if (Build.VERSION.SDK_INT >= 31) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

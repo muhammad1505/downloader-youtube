@@ -62,9 +62,17 @@ class FormatTest {
         assertEquals("1,5 MB", Format.bytes(1536L * 1024))
         assertEquals("2,0 GB", Format.bytes(2L * 1024 * 1024 * 1024))
     }
+ @Test fun filesystemNameAvoidsPipeAndLocalizesMeasuredSpeed() {
+  assertEquals("Song (Live)",Format.musicLabel(SongIdentity("Song","Artist","Live")))
+  assertEquals("Song (Live) - Artist",Format.musicFileName(SongIdentity("Song","Artist","Live")))
+  assertFalse(Format.musicFileName(SongIdentity("Song","Artist","Live")).contains('|'))
+  assertEquals("2,5 MB/s",Format.speedLabel("2.5MB/s"))
+  assertEquals("2,6 MB/s",Format.speedLabel("at 2.5MiB/s ETA 00:20"))
+  assertNull(Format.speedLabel("Unknown")); assertNull(Format.speedLabel("NaN MB/s"))
+ }
  @Test fun musicFileNamePreservesVersionCreditAndUtf8Budget() {
   val name = Format.musicFileName(SongIdentity("歌".repeat(100),"Artis","Live Remix"))
-  assertTrue(name.endsWith(" | Live Remix - Artis"))
+  assertTrue(name.endsWith(" (Live Remix) - Artis"))
   assertTrue(name.toByteArray(Charsets.UTF_8).size < 220)
  }
 

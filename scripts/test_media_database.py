@@ -25,6 +25,28 @@ class MediaDatabaseTest(unittest.TestCase):
             self.db.execute(json.loads('"' + sql + '"'))
         self.queries = re.findall(r'@Query\("""(.*?)"""\)', MEDIA, re.S)
 
+    def test_worker_sidecar_mutations_reject_replaced_generations(self):
+        self.db.execute("UPDATE downloads SET generation=2,state='RUNNING',sidecarPending='new-pending',sidecarUris='new-sidecar',lyricStatus='new-status' WHERE id='old'")
+        names = ('sidecarPendingOwned', 'sidecarsOwned', 'commitSidecarOwned', 'lyricStatusOwned')
+        for name in names:
+            pattern = r'@Query\("([^\n]+)"\) suspend fun ' + name + r'\('
+            sql = json.loads('"' + re.search(pattern, SOURCE).group(1) + '"')
+            params = dict(id='old', gen=1, uris='stale', line='stale', pending='stale', status='stale')
+            self.assertEqual(0, self.db.execute(sql, params).rowcount, name)
+        row = self.db.execute("SELECT sidecarPending,sidecarUris,lyricStatus FROM downloads WHERE id='old'").fetchone()
+        self.assertEqual(('new-pending','new-sidecar','new-status'),tuple(row))
+
+    def test_sidecar_commit_and_lyric_status_require_running_owner(self):
+        for state in ('PAUSED','FAILED','CANCELLED','COMPLETED'):
+            self.db.execute("UPDATE downloads SET generation=2,state=? WHERE id='old'",(state,))
+            for name in ('commitSidecarOwned','lyricStatusOwned'):
+                sql=json.loads('"'+re.search(r'@Query\("([^\n]+)"\) suspend fun '+name+r'\(', SOURCE).group(1)+'"')
+                self.assertEqual(0,self.db.execute(sql,dict(id='old',gen=2,line='stale',pending='stale',status='stale')).rowcount)
+        self.db.execute("UPDATE downloads SET state='RUNNING' WHERE id='old'")
+        sql=json.loads('"'+re.search(r'@Query\("([^\n]+)"\) suspend fun commitSidecarOwned\(',SOURCE).group(1)+'"')
+        self.assertEqual(1,self.db.execute(sql,dict(id='old',gen=2,line='sub|actual',pending=None)).rowcount)
+        self.assertEqual(('sub|actual',None),tuple(self.db.execute("SELECT sidecarUris,sidecarPending FROM downloads WHERE id='old'").fetchone()))
+
     def tearDown(self):
         self.db.close()
 

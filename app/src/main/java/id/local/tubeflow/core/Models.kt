@@ -21,7 +21,7 @@ data class DownloadOptions(
 )
 data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "")
 data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "")
-data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "")
+data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "", val seedMetadata: VideoMetadata? = null)
 @Entity(tableName = "downloads")
 data class DownloadJob(
  @PrimaryKey val id: String,
@@ -93,8 +93,12 @@ fun DownloadJob.songIdentity(): SongIdentity = if (trackTitle.isNotBlank())
 else TitleSplit.identify(rawTitle.ifBlank { title })
 
 fun DownloadJob.withMetadata(meta: VideoMetadata): DownloadJob {
-    val identity = TitleSplit.identify(meta.title, meta.uploader, meta.artist, meta.track, meta.creator).let {
-        if (meta.artistEvidence.isBlank()) it else it.copy(evidence=meta.artistEvidence)
+    val retained = meta.artist.isBlank() && !TitleSplit.isRemixTitle(meta.title) && "cover" !in LyricMatch.versionSet(meta.title) && artistEvidence.startsWith("collection_") && artist.isNotBlank() &&
+        (TitleSplit.segments(meta.title).any { TitleSplit.creditKey(it) == TitleSplit.creditKey(artist) } ||
+            (artistEvidence == "collection_album_credit" && rawTitle == meta.title && Selection.identity(url)?.let { it == Selection.identity(meta.url) } == true))
+    val resolvedMeta = if (retained) meta.copy(artist=artist, artistEvidence=artistEvidence) else meta
+    val identity = TitleSplit.identify(resolvedMeta.title, resolvedMeta.uploader, resolvedMeta.artist, resolvedMeta.track, resolvedMeta.creator, recognizeCollaboration=mode == MediaMode.AUDIO).let {
+        if (resolvedMeta.artistEvidence.isBlank()) it else it.copy(evidence=resolvedMeta.artistEvidence)
     }
     return copy(rawTitle = meta.title, trackTitle = identity.title, title = TitleSplit.display(identity),
         artist = identity.artist.orEmpty(), creator = identity.creator, remixer = identity.remixer,
@@ -182,6 +186,11 @@ class Converters {
  @Query("UPDATE downloads SET sidecarPending = :uris WHERE id = :id") suspend fun sidecarPending(id: String, uris: String?): Int
  /** Satu transaksi per sidecar: baris terbit langsung tercatat dan jurnal dilepas — jendela proses mati tertutup (BUG-008/R2). */
  @Query("UPDATE downloads SET sidecarUris = CASE WHEN sidecarUris IS NULL OR sidecarUris = '' THEN :line ELSE sidecarUris || char(10) || :line END, sidecarPending = :pending WHERE id = :id") suspend fun commitSidecar(id: String, line: String, pending: String?): Int
+ /** Worker mutations never overwrite journals/status belonging to a newer generation. */
+ @Query("UPDATE downloads SET sidecarPending = :uris WHERE id = :id AND generation = :gen") suspend fun sidecarPendingOwned(id: String, gen: Int, uris: String?): Int
+ @Query("UPDATE downloads SET sidecarUris = :uris WHERE id = :id AND generation = :gen") suspend fun sidecarsOwned(id: String, gen: Int, uris: String?): Int
+ @Query("UPDATE downloads SET sidecarUris = CASE WHEN sidecarUris IS NULL OR sidecarUris = '' THEN :line ELSE sidecarUris || char(10) || :line END, sidecarPending = :pending WHERE id = :id AND generation = :gen AND state = 'RUNNING'") suspend fun commitSidecarOwned(id: String, gen: Int, line: String, pending: String?): Int
+ @Query("UPDATE downloads SET lyricStatus = :status WHERE id = :id AND generation = :gen AND state = 'RUNNING'") suspend fun lyricStatusOwned(id: String, gen: Int, status: String): Int
  /** Status lirik terakhir untuk ditampilkan di Riwayat (BUG-014). */
  @Query("UPDATE downloads SET processingNotice = :notice WHERE id = :id AND generation = :gen") suspend fun processingNotice(id: String, gen: Int, notice: String): Int
  @Query("UPDATE downloads SET outputUri = :uri WHERE id = :id AND state = 'COMPLETED'") suspend fun renamedOutput(id: String, uri: String)

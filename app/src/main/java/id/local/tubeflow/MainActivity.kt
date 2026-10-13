@@ -15,10 +15,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.mutableStateOf
 import id.local.tubeflow.core.DownloadViewModel
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.PlayerViewModel
 import id.local.tubeflow.ui.TubeFlowApp
 import id.local.tubeflow.ui.theme.TubeFlowTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var player: PlayerViewModel
     private val incomingUrl = mutableStateOf("")
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,13 +31,16 @@ class MainActivity : ComponentActivity() {
         SettingsStore.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
+        player = ViewModelProvider(this)[PlayerViewModel::class.java]
         setContent {
             TubeFlowTheme(
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
-            ) { TubeFlowApp(model, library, incomingUrl.value, ::requestDownloadNotifications) }
+            ) { TubeFlowApp(model, library, player, incomingUrl.value, ::requestDownloadNotifications) }
         }
     }
+    override fun onStart() { super.onStart(); if (::player.isInitialized) player.setForeground(true) }
+    override fun onStop() { if (::player.isInitialized && !isChangingConfigurations) player.setForeground(false); super.onStop() }
     private fun requestDownloadNotifications() {
         val preferences = getSharedPreferences("permissions", MODE_PRIVATE)
         if (Build.VERSION.SDK_INT >= 33 &&

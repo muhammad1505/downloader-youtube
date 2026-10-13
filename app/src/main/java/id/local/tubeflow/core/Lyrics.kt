@@ -184,6 +184,8 @@ object Lyrics {
         val pairs = linkedSetOf<Pair<String, String>>()
         if (rawTrack.isNotBlank()) {
             pairs += rawTrack to rawArtist
+            val lead = TitleSplit.primaryArtist(rawArtist)
+            if (lead.isNotBlank() && lead != rawArtist) pairs += rawTrack to lead
             pairs += rawTrack to ""
             pairs += tidy(rawTrack) to rawArtist
             if (identity.title != rawTrack) {

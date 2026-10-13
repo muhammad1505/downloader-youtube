@@ -130,6 +130,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Jenis inspeksi terakhir — retry harus mengulang operasi yang sama, bukan yang lain (BUG-006/R6). */
  private var lastInspectPlaylist=false
  private val recovery = viewModelScope.launch(Dispatchers.IO) {
+   StalePublicationCleanup.recover(application)
    dao.observe().first().filter {
     it.state in setOf(JobState.RUNNING,JobState.QUEUED,JobState.FAILED,JobState.CANCELLED) ||
      it.pendingUri != null || it.sidecarPending != null
@@ -196,7 +197,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      Engine.inspect(getApplication(), "https://www.youtube.com/watch?v=${Selection.videoId(canonical)}", id)
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { null } else null
-    _playlist.value=result.copy(folderName=Selection.collectionFolder(result, seed))
+    _playlist.value=result.copy(folderName=Selection.collectionFolder(result, seed), seedMetadata=seed)
    }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
@@ -218,13 +219,14 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions) { if(submitting) return; submitting=true; viewModelScope.launch {
   try {
    val folder = Selection.safeFolder(playlist.folderName) ?: Selection.collectionFolder(playlist)
+   val credits=CollectionCredit.learn(playlist)
    var queued=0; var skipped=0
    entries.forEach { entry ->
     try {
      val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
        artist = entry.artist, track = entry.track, creator = entry.uploader,
        platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
-     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=meta, autoFolder="collection")
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=if (options.mode == MediaMode.AUDIO) credits.apply(meta) else meta, autoFolder="collection")
      queued++
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { skipped++ }

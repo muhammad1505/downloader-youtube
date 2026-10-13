@@ -204,3 +204,8 @@ Sampel kedua dariMixRDrEjSkBl47OY (SATRU2duet) juga selesai lewat pickerplaylist
 ## Release1.1.3 — pemasangan, playlist dan cleanup
 
 160 Kotlin/76 Python/lint0 serta build/audit final lulus. ARM64 terpasang via update-r; version1.1.3/code17 dan SHA256 `c767ac27c705a2adeba408c05ab7c51b7603885bb4085b20cbd80e2b86d35e7a` base.apk cocok. Pengguna akan menguji sendiri karena waktu kerja; skenario runtime playlist/cleanup1.1.3 belum dijalankan. Baseline pengguna setelah reset:0file/5subfolder kosong. [Checklist dan cakupan](COLLECTION_CLEANUP_2026-10-13.md).
+
+
+## Release 1.1.4 — Android 10 fisik
+
+Realme RMX1821, Android 10/API29, ARM64, halaman memori 4 KB. Update-r berhasil; hash base.apk cocok dengan ARM64 final `61e39a4849db7410982a92840d32b76d94bf94893b0086c0bbfc785953bf56ed`. Factory player release minify, mini/full player, pause, seek ±10 detik dan seek baris LRC unik (3:38) diuji. Sinkronisasi auditori memerlukan konfirmasi pengguna. Detail Mix, integritas file, risiko dan skenario belum diuji ada pada [laporan](UPGRADE_1_1_4_2026-10-14.md).

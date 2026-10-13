@@ -22,6 +22,13 @@ object SettingsStore {
     var dynamicColor by mutableStateOf(true)
         private set
 
+    var artworkAccent by mutableStateOf(true); private set
+
+    fun setArtworkAccent(context: Context, enabled: Boolean) {
+        artworkAccent=enabled
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putBoolean("artwork_accent", enabled) }
+    }
+
     var storageFolder by mutableStateOf(DEFAULT_FOLDER)
         private set
 
@@ -64,6 +71,7 @@ object SettingsStore {
         }
         themeMode = prefs.getString("theme", MODE_SYSTEM)?.takeIf { it in supported } ?: MODE_SYSTEM
         dynamicColor = prefs.getBoolean("dynamic", true)
+        artworkAccent = prefs.getBoolean("artwork_accent", true)
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER
         storageTree = prefs.getString("tree", "")?.takeIf { it.isNotBlank() }
         maxConcurrent = prefs.getInt("concurrent", 1).coerceIn(1, 4)

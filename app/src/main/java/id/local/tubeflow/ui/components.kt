@@ -7,6 +7,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.compositeOver
+import id.local.tubeflow.core.songIdentity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -42,7 +45,7 @@ import java.util.Locale
 @Composable
 fun PageHeading(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -158,15 +161,21 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
-    Card(modifier.fillMaxWidth()) {
+    val accent=rememberCoverAccent(job.coverPath)
+    val song=job.songIdentity()
+    Card(modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=0.06f).compositeOver(MaterialTheme.colorScheme.surface)), border=BorderStroke(1.dp,accent.copy(alpha=0.18f))) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(42.dp))
+                CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(56.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(job.title.ifBlank { job.url }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(Format.musicLabel(song), style = MaterialTheme.typography.titleMedium, fontWeight=FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val credit=song.artist.orEmpty().ifBlank { song.remixer }
+                    if (credit.isNotBlank()) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Outlined.Person,null,Modifier.size(14.dp)); Text(credit,style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
                     // Platform asal tautan (mis. SoundCloud, TikTok) + ikonnya — dikirim oleh Antrean & Riwayat (P2).
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         PlatformIcon(job.sourcePlatform, Modifier.size(13.dp))
@@ -184,13 +193,13 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     if (job.progress >= 0f) {
                         LinearProgressIndicator(
                             progress = { (job.progress / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent,
                         )
                     } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp),color=accent)
                     }
                     val transferring = DownloadPhase.isTransfer(job.phase)
-                    val speed = if (transferring) Format.speed(job.speed) else null
+                    val speed = if (transferring) Format.speedLabel(job.speed) else null
                     val eta = if (transferring) Format.eta(job.eta) else ""
                     val parts = listOfNotNull(
                         DownloadPhase.label(job.phase),
@@ -220,7 +229,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     if (job.progress >= 0f) {
                         LinearProgressIndicator(
                             progress = { (job.progress / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent,
                         )
                     }
                     val position = if (job.progress >= 0f) " · ${job.progress.toInt()}%" else ""
@@ -262,7 +271,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
             }
             openError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 when (job.state) {
                     JobState.QUEUED, JobState.RUNNING -> {
                         pause?.let { onClick -> TextButton(onClick = onClick) { Icon(Icons.Outlined.Pause, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Jeda") } }
@@ -277,6 +286,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         remove?.let { TextButton(onClick = it) { Icon(Icons.Outlined.Delete, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hapus") } }
                     }
                     JobState.COMPLETED -> {
+                        if (job.mode == MediaMode.AUDIO && play != null) OutlinedButton(onClick=play,enabled=job.outputUri != null) { Text("Putar") }
                         OutlinedButton(onClick = { openError = launchFile(context, job, false) }, enabled = job.outputUri != null) { Text("Buka") }
                         TextButton(onClick = { openError = launchFile(context, job, true) }, enabled = job.outputUri != null) { Icon(Icons.Outlined.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Bagikan") }
                         TextButton(onClick = retry) { Icon(Icons.Outlined.Download, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Unduh lagi") }

@@ -79,21 +79,24 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   val jobId = inputData.getString("jobId") ?: return@withContext Result.failure()
   var job = dao.get(jobId) ?: return@withContext Result.failure()
   if(job.state !in setOf(JobState.QUEUED, JobState.RUNNING) || job.generation != generation) return@withContext Result.success()
-  job.pendingUri?.let { raw -> runCatching { StorageUris.delete(applicationContext, raw) } }
+  StalePublicationCleanup.recover(applicationContext)
+  job.pendingUri?.let { raw -> check(StalePublicationCleanup.delete(applicationContext, raw)) { "File parsial lama belum dapat dihapus; periksa akses folder." } }
   // Sisa publikasi sidecar dari run sebelumnya yang mati di tengah jalan — bersihkan sekarang (BUG-008).
   if(job.sidecarPending != null) {
-   job.sidecarPending.lines().filter { it.isNotBlank() }.forEach { raw -> StorageUris.delete(applicationContext, raw) }
-   dao.sidecarPending(jobId, null)
+   job.sidecarPending.lines().filter { it.isNotBlank() }.forEach { raw -> check(StalePublicationCleanup.delete(applicationContext, raw)) { "File pendukung lama belum dapat dihapus." } }
+   dao.sidecarPendingOwned(jobId, generation, null)
   }
   // Sidecar terbit dari finalisasi yang terputus: media tidak pernah terbit (outputUri null), jadi berkas
   // pendamping di folder tujuan yatim — buang sekarang agar run ini menerbitkan pengganti tanpa ganda (R2).
   if(job.outputUri == null && job.sidecarUris != null) {
-   job.sidecarUris.lines().mapNotNull { line -> line.substringAfter('|',"").takeIf { it.isNotBlank() } }.forEach { raw -> StorageUris.delete(applicationContext, raw) }
-   dao.sidecars(jobId, null)
+   job.sidecarUris.lines().mapNotNull { line -> line.substringAfter('|',"").takeIf { it.isNotBlank() } }.forEach { raw -> check(StalePublicationCleanup.delete(applicationContext, raw)) { "File pendukung lama belum dapat dihapus." } }
+   dao.sidecarsOwned(jobId, generation, null)
   }
   val directory = File(applicationContext.noBackupFilesDir,"downloads/$jobId").apply { mkdirs() }
   dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, "")
   var pending: Uri? = null
+  val ownSidecars=mutableListOf<Uri>()
+  var completed=false
   // Auto-folder playlist/Mix: subfolder satu segmen yang divalidasi (nama kosong/tak aman = folder utama).
 
   try {
@@ -211,7 +214,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     // BUG-010: provider boleh mengganti nama saat tabrakan (mis. "Judul (1).mp3") — sidecar wajib ikut nama itu.
     val publishedStem = displayNameOf(resolver, published)?.substringBeforeLast('.') ?: Format.tidyFileName(job.title)
     // Baris sidecar sudah dicatat atomik per file di dalam publishSidecars — jangan ditulis ulang dari sini (R2).
-    val sidecarLines = publishSidecars(directory,result,job,resolver,relativePath,parentDoc,publishedStem)
+    val sidecarLines = publishSidecars(directory,result,job,resolver,relativePath,parentDoc,publishedStem,ownSidecars)
     // Status lirik: lirik ditemukan tetapi .lrc gagal terbit = gagal disimpan (BUG-014).
     // Kebenaran dinilai dari nama tampilan aktual, bukan akhiran URI — provider bisa mengganti nama (BUG-015).
     val lyricStatus = when {
@@ -231,11 +234,12 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
       // Jurnal hanya dilepas bila penghapusan benar-benar berhasil — gagal = jejak tetap ada (R2).
       if (!goodName && raw.isNotBlank() && StorageUris.delete(applicationContext, raw.toUri())) kept = kept - line
      }
-     if (kept.size != lines.size) dao.sidecars(jobId, kept.joinToString("\n").ifBlank { null })
+     if (kept.size != lines.size) dao.sidecarsOwned(jobId, generation, kept.joinToString("\n").ifBlank { null })
     }
-    if (lyricStatus.isNotEmpty()) dao.lyricStatus(jobId, lyricStatus)
+    if (lyricStatus.isNotEmpty() && dao.lyricStatusOwned(jobId, generation, lyricStatus) == 0) throw CancellationException()
     // Completed only after media, requested sidecars and their outcomes are recorded.
     if(dao.finish(jobId,generation,published.toString(),System.currentTimeMillis()) == 0) throw CancellationException()
+    completed=true
     pending=null
     dao.get(jobId)?.processingNotice?.takeIf { it.isNotBlank() }?.let {
      DownloadDatabase.get(applicationContext).media().event(MediaEvent(jobId = jobId, action = "PROCESSING_FAILED", kind = job.mode.name, platformId = job.platformId, at = System.currentTimeMillis()))
@@ -266,10 +270,11 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    withContext(NonCancellable) {
     val takenOver = takenOverByOther()
     if (!takenOver) Engine.cancel(jobId)
-    pending?.let { uri -> runCatching { StorageUris.delete(applicationContext, uri) } }
+    if (!completed) ownSidecars.forEach { uri -> runCatching { StalePublicationCleanup.delete(applicationContext, uri.toString()) } }
+    val pendingDeleted=pending?.let { uri -> runCatching { StalePublicationCleanup.delete(applicationContext, uri.toString()) }.getOrDefault(false) } ?: true
     val current = dao.get(jobId)
     if (!takenOver && current != null && current.generation == generation) {
-     dao.clearPendingOwned(jobId, generation)
+     if (pendingDeleted) dao.clearPendingOwned(jobId, generation)
      dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, dao.get(jobId)?.resumeNotice.orEmpty())
     // Jeda (PAUSED), putus koneksi (kembali QUEUED), maupun Gagal (FAILED) menyimpan parsial —
     // "Lanjutkan"/"Coba lagi" lanjut dari file .part, bukan dari nol (BUG-004/BUG-025/P1 resume).
@@ -293,7 +298,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
  /** Menyalin berkas pendamping di samping media ke folder tujuan; mengembalikan baris "kind|uri".
   * Gagal satu berkas tidak menggagalkan job, tetapi URI parsial yang terlanjur dibuat ikut dihapus (BUG-008)
   * dan nama keluaran mengikuti nama media yang benar-benar diterbitkan (BUG-010). */
- private suspend fun publishSidecars(directory: File, main: File, job: DownloadJob, resolver: android.content.ContentResolver, relativePath: String, parentDoc: Uri?, publishedStem: String): String? {
+ private suspend fun publishSidecars(directory: File, main: File, job: DownloadJob, resolver: android.content.ContentResolver, relativePath: String, parentDoc: Uri?, publishedStem: String, ownSidecars: MutableList<Uri>): String? {
   val mediaExtensions = setOf("srt","vtt","ass","lrc","ttml","srv1","srv2","srv3","jpg","jpeg","png","webp","gif")
   val recorded = mutableListOf<String>()
   val inFlight = mutableListOf<String>()
@@ -315,7 +320,9 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    val tempStem = main.nameWithoutExtension
    val suffix = file.nameWithoutExtension.removePrefix(tempStem).ifBlank { "" }
    var created: Uri? = null
+   suspend fun stillOwned(): Boolean = dao.get(job.id)?.let { it.generation == job.generation && it.state == JobState.RUNNING } == true
    try {
+    if (!stillOwned()) throw CancellationException()
     val mime = when {
      lyric && parentDoc == null -> "text/*" // MediaStore tidak boleh menebak ekstensi (dulu jadi ".lrc.txt")
      lyric -> "text/plain" // path SAF butuh mime nyata
@@ -337,26 +344,29 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
      resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values) ?: error("Tidak dapat membuat file pendukung di Downloads.")
     }
     created = uri
+    ownSidecars += uri
     // Catat sebelum menulis: bila proses mati di tengah penulisan, recovery tahu URI mana yang harus dibersihkan.
     inFlight += uri.toString()
-    dao.sidecarPending(job.id, inFlight.joinToString("\n"))
+    if (dao.sidecarPendingOwned(job.id, job.generation, inFlight.joinToString("\n")) == 0 || !stillOwned()) throw CancellationException()
     resolver.openOutputStream(uri, if (parentDoc != null) "wt" else "w")?.use { output ->
      if (content != null) output.write(content.toByteArray(Charsets.UTF_8))
      else file.inputStream().use { input -> input.copyTo(output) }
     } ?: error("Tidak dapat menyimpan file pendukung.")
     // Publikasi wajib berhasil sebelum dicatat; baris MediaStore yang gagal terbit tetap URI parsial.
     if (parentDoc == null) require(resolver.update(uri,ContentValues().apply { put(MediaStore.Downloads.IS_PENDING,0) },null,null) > 0) { "Tidak dapat menerbitkan file pendukung." }
-    recorded += "$kind|$uri"
+    if (!stillOwned()) throw CancellationException()
     inFlight -= uri.toString()
     // Satu transaksi atomik per sidecar: baris terbit langsung tercatat dan jurnal dilepas — proses mati
     // di antara keduanya tidak lagi meninggalkan file terbit tanpa jejak (BUG-008/R2).
-    dao.commitSidecar(job.id, "$kind|$uri", inFlight.joinToString("\n").ifBlank { null })
+    if (dao.commitSidecarOwned(job.id, job.generation, "$kind|$uri", inFlight.joinToString("\n").ifBlank { null }) == 0) throw CancellationException()
+    recorded += "$kind|$uri"
    } catch (failure: Exception) {
     // Setiap jalur kegagalan membersihkan URI yang baru dibuat — jangan tinggalkan dokumen/parsial (BUG-008).
     // Jurnal pending hanya dilepas bila penghapusan terbukti berhasil; kalau provider menolak, URI tetap
     // tercatat supaya recovery bisa mencoba lagi (BUG-003/R2).
-    created?.let { gone -> if (StorageUris.delete(applicationContext, gone)) inFlight -= gone.toString() }
-    dao.sidecarPending(job.id, inFlight.joinToString("\n").ifBlank { null })
+    created?.let { gone -> if (StalePublicationCleanup.delete(applicationContext, gone.toString())) { inFlight -= gone.toString(); ownSidecars -= gone } }
+    dao.sidecarPendingOwned(job.id, job.generation, inFlight.joinToString("\n").ifBlank { null })
+    if (failure is CancellationException || !stillOwned()) throw CancellationException()
    }
   }
   return recorded.takeIf { it.isNotEmpty() }?.joinToString("\n")

@@ -52,7 +52,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { collection("AUDIO") }) { Text("Musik") }
             OutlinedButton(onClick = { collection("VIDEO") }) { Text("Video") }
-            TextButton(onClick = downloads) { Text("Download") }
+            OutlinedButton(onClick = downloads) { Text("Download") }
         } }
         if (totals == null) item { LinearProgressIndicator(Modifier.fillMaxWidth()) } else totals?.let { t ->
             item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -60,7 +60,14 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
                 StatPill("Video tersedia", t.video.toString(), Icons.Outlined.Videocam, Modifier.weight(1f))
             } }
             item { DashboardCard("Komposisi koleksi") {
-                CollectionDonut(t.audio, t.video)
+                if (t.audio + t.video == 0L) {
+                    Text("Koleksi masih kosong",style=MaterialTheme.typography.titleMedium)
+                    Text("Download media baru atau pindai folder yang sudah berisi file.")
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Button(onClick=downloads) { Text("Mulai download") }
+                        OutlinedButton(onClick=model::scan,enabled=!busy) { Text("Pindai folder") }
+                    }
+                } else CollectionDonut(t.audio, t.video)
                 Text("Hanya media tersedia. ${t.unavailable} file tidak dapat diakses tidak masuk grafik.", style = MaterialTheme.typography.bodySmall)
             } }
             item { DashboardCard("Koleksi dan penyimpanan") {

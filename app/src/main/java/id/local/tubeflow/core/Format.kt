@@ -32,6 +32,21 @@ object Format {
     /** Pulls the transfer rate out of a yt-dlp progress line, e.g. "... at 1.23MiB/s ETA 00:45". */
     fun speed(line: String?): String? = line?.let { speedPattern.find(it)?.groupValues?.get(1) }
 
+    /** Localized measured rate; invalid/unknown input remains absent rather than invented. */
+    fun speedLabel(raw: String?): String? {
+        val value = speed(raw) ?: raw?.trim() ?: return null
+        val match = Regex("(?i)^([0-9]+(?:[.,][0-9]+)?)\\s*(B|[KMGT]i?B)/s$").matchEntire(value) ?: return null
+        val number = match.groupValues[1].replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+        val unit = match.groupValues[2].uppercase(Locale.ROOT)
+        val powers = mapOf("B" to 0, "KB" to 1, "KIB" to 1, "MB" to 2, "MIB" to 2, "GB" to 3, "GIB" to 3, "TB" to 4, "TIB" to 4)
+        val power = powers[unit] ?: return null
+        val bytes = number * Math.pow(if (unit.contains("I")) 1024.0 else 1000.0, power.toDouble())
+        var amount = bytes; var index = 0
+        val labels = listOf("B", "KB", "MB", "GB", "TB")
+        while (amount >= 1000 && index < labels.lastIndex) { amount /= 1000; index++ }
+        return String.format(Locale.forLanguageTag("id"), "%.1f %s/s", amount, labels[index])
+    }
+
     private val emoji = Regex("""[\p{So}\p{Cn}\uFE0F\u200D]+""")
     private val illegal = Regex("""[\\/:*?"<>|\p{Cntrl}]""")
     private val spaces = Regex("""\s+""")
@@ -49,6 +64,9 @@ object Format {
         }
         return cleaned.take(60).trimEnd(' ', '.', '-', '_')
     }
+
+    fun musicLabel(identity: SongIdentity): String = identity.title.ifBlank { "Tanpa judul" } +
+        identity.versionTag.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
 
     /** Keep version and credit when the main title is long; reserve bytes for extension/provider suffix. */
     fun musicFileName(identity: SongIdentity): String {
@@ -69,7 +87,7 @@ object Format {
         val main = component(identity.title,100).ifBlank { "TubeFlow" }
         val version = component(identity.versionTag,60)
         val credit = component(identity.artist.orEmpty().ifBlank { identity.remixer },50)
-        return main + (if (version.isBlank()) "" else " | $version") + (if (credit.isBlank()) "" else " - $credit")
+        return main + (if (version.isBlank()) "" else " ($version)") + (if (credit.isBlank()) "" else " - $credit")
     }
 
     /**

@@ -71,7 +71,7 @@ Hasil [audit ulang 9 Oktober 2026](docs/REVIEW_2026-10-09.md): build dan tes hos
 
 Usulan fitur dan optimasi berikutnya tersedia di [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md), termasuk peningkatan pencocokan lirik, cari ulang lirik, koreksi waktu, cache, progres, dan diagnostik.
 
-Validasi terbaru **1.1.3 (17)**: satu folder per Mix/album dan pembersihan file+subfolder melalui akses root SAF;160 tes Kotlin/76 Python lulus, lint0. Signed APK×3/AAB dan audit paket lulus; ARM64 terpasang di Realme Android10 dengan hash terverifikasi. Pengujian pemakaian playlist/cleanup versi ini diserahkan ke pengelola. [Perubahan dan checklist](docs/COLLECTION_CLEANUP_2026-10-13.md).
+Validasi terbaru **1.1.4 (18)**: kredit judul/artis koleksi, versi nama file dalam kurung, publikasi sidecar berbasis generasi, navigasi empat tab, aksen sampul dan pemutar audio foreground dengan LRC. **175 tes Kotlin/78 Python lulus; lint debug/release 0 masalah.** Signed APK×3/AAB dan audit paket lulus; ARM64 terpasang di Realme Android 10 dengan hash terverifikasi. Room 9 dan kunci produksi dipertahankan. [Perubahan, hasil perangkat dan batas pengujian](docs/UPGRADE_1_1_4_2026-10-14.md).
 
 Validasi sebelumnya **13 Oktober 2026 — 1.1.2 (16), Room9**:149 tes Kotlin dan76 tes Python lulus, lint debug/release0masalah; signed APK×3/AAB, audit native/ZIP/alignment/signature dan bundletool lulus. Kredit judul/penyanyi eksplisit berlabel Title/Voc kini divalidasi; job playlist baru memakai folder artis/remixer teridentifikasi, dengan fallback aman. APK ARM64 final terpasang pada RealmeAndroid10 dan57file sebelum update tetap identik. Distribusi `app/build/outputs/distribution/1.1.2/`; [perubahan, hasil perangkat dan batas](docs/SOURCE_REVIEW_2026-10-13.md).
 

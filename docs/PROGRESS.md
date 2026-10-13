@@ -292,3 +292,8 @@ Pengelola memilih folder perartis/remixer diTubeFlow. Jobplaylistbaru memakai po
 ## Checkpoint 13 Oktober 2026 — koleksi dan cleanup1.1.3
 
 Pilihan terbaru menggantikan folder per artis: satu folder untuk semua pilihan Mix/album. Policy collection mempertahankan snapshot folder melalui metadata/retry. Cleanup SAF bottom-up menjaga root dan melaporkan kegagalan; grant root tepat diminta sebelum pembersihan lengkap. 160 Kotlin/76 Python/lint0 lulus; signed build10m8s, audit APK×3/AAB dan bundletool lulus. ARM64 terpasang update-r pada RMX1821Android10, version/code/hash sesuai release. Pengelola meminta install segera dan tes pemakaian sendiri; runtime playlist/cleanup1.1.3 belum diklaim. Lihat [laporan](COLLECTION_CLEANUP_2026-10-13.md).
+
+
+## Checkpoint 14 Oktober 2026 — upgrade 1.1.4
+
+Diterapkan dari baseline 1.1.3 karena source perangkat lain belum dipush. Kredit koleksi hanya menggunakan identitas terverifikasi; versi filename memakai kurung. Mutasi sidecar dibatasi generation dan cleanup gagal dijurnal privat. UI empat tab, aksen sampul, satu MediaPlayer foreground dan timeline LRC nyata. 175 Kotlin/78 Python/lint 0, build signed APK×3/AAB dan audit lulus; update ARM64 ke HP Android 10 berhasil tanpa reset. Room 9, dependensi dan engine tidak berubah. Cakupan runtime dan backlog: [laporan](UPGRADE_1_1_4_2026-10-14.md).

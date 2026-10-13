@@ -27,9 +27,11 @@ private val DarkPalette = darkColorScheme(
     primaryContainer = Color(0xFF3C305F), onPrimaryContainer = Color(0xFFE9DDFF),
     secondary = Color(0xFFACDCCE), onSecondary = Color(0xFF12392E),
     secondaryContainer = Color(0xFF2F4A41), onSecondaryContainer = Color(0xFFCFF2E5),
-    background = Color(0xFF10131C), onBackground = Color(0xFFF0EDF4),
-    surface = Color(0xFF171B27), onSurface = Color(0xFFF0EDF4),
-    surfaceVariant = Color(0xFF252A39), onSurfaceVariant = Color(0xFFBFC3D0),
+    background = Color(0xFF000000), onBackground = Color(0xFFF0EDF4),
+    surface = Color(0xFF111113), onSurface = Color(0xFFF0EDF4),
+    surfaceVariant = Color(0xFF252528), onSurfaceVariant = Color(0xFFBFC3D0),
+    surfaceContainerLowest=Color(0xFF000000), surfaceContainerLow=Color(0xFF0D0D0F),
+    surfaceContainer=Color(0xFF171719), surfaceContainerHigh=Color(0xFF212124), surfaceContainerHighest=Color(0xFF2B2B2E),
     outline = Color(0xFF858B9D), outlineVariant = Color(0xFF3B404F),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
@@ -49,7 +51,8 @@ private val LightPalette = lightColorScheme(
 )
 
 private val AppTypography = Typography(
-    headlineSmall = TextStyle(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp, letterSpacing = 0.sp),
+    headlineLarge = TextStyle(fontWeight=FontWeight.ExtraBold,fontSize=32.sp,lineHeight=40.sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, lineHeight = 32.sp, letterSpacing = 0.sp),
     titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp, letterSpacing = 0.sp),
     titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.1.sp),
     titleSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
@@ -62,8 +65,8 @@ private val AppTypography = Typography(
 
 private val AppShapes = Shapes(
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(24.dp),
     extraLarge = RoundedCornerShape(28.dp),
 )
 

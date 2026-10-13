@@ -491,3 +491,21 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Solusi:** akses baca/tulis tepat pada root lewat pemilih Android, tanpa mengganti default MediaStore. Traversal terbatas bottom-up memakai ID dokumen anak, menghitung file/folder terpisah, memverifikasi kosong sebelum menghapus induk, mempertahankan root/riwayat dan menolak laporan bersih bila gagal. Root lain tidak dihapus; job aktif/dijeda memblokir cleanup.
 - **Status:** implementasi1.1.3, regresi host/build lulus dan APK terpasang; operasi Hapus semua di HP menunggu pengelola.
 - **Validasi:** tes kegagalan/rekursi/siklus/batas traversal dan HP tercatat dalam [laporan](COLLECTION_CLEANUP_2026-10-13.md).
+
+## BUG-042 — P1: Kredit judul/artis tidak konsisten antar entri koleksi
+
+- **Akar:** alias channel dan kredit kolaborasi tidak dicocokkan; metadata refresh kehilangan credit hasil koleksi.
+- **Solusi1.1.4:** TitleSplit dan CollectionCredit berbagi kredit yang sudah terverifikasi melalui segmen lengkap, seed, dan album OLAK terkoroborasi; creator/remixer tetap terpisah. Frekuensi/urutan saja tidak dipakai sebagai bukti artis. DJ/remix tidak dipaksa memakai artis koleksi.
+- **Status:** 175 Kotlin/78 Python dan Gradle/lint final lulus; satu output Mix fisik terverifikasi Judul (Live) - Artis, 25 entri awal dan satu folder. Batch25/album OLAK belum diuji fisik. File lama tidak di-rename otomatis. [Laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+## BUG-043 — P2: Pipe versi filename diubah menjadi underscore provider
+
+- **Akar:** Format.musicFileName menambahkan pipe setelah sanitasi komponen, sehingga karakter terlarang mencapai MediaStore/SAF.
+- **Solusi1.1.4:** versi ditulis dalam kurung, mempertahankan identitas/remixer serta batas UTF-8; promosi DC MUSIK tidak menjadi versi.
+- **Status:** regresi Format/credit dan build final lulus; MP3 fisik SATRU 2 menggunakan kurung tanpa pipe/underscore tambahan. Format/provider lain belum diuji fisik pada sesi ini. [Laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+## BUG-044 — P2: Mutasi jurnal/sidecar/lirik worker lama mengenai generasi baru
+
+- **Akar:** pending/commit/sidecars/lyricStatus worker memakai query tanpa generation; loop NonCancellable dapat terus menerbitkan setelah pause/resume.
+- **Solusi1.1.4:** query owned dengan gen, commit/status hanya RUNNING; stale owner berhenti, URI yang dibuatnya dibersihkan tanpa menimpa jurnal baru. URI gagal hapus masuk AtomicFile privat untuk recovery. Media finish tetap mensyaratkan gen/state yang sama.
+- **Status:** SQL guard stale gen/paused lulus; race publikasi/proses mati/provider menolak masih memerlukan uji runtime. Bukan penutupan semua backlog BUG-002/004/008. [Laporan](UPGRADE_1_1_4_2026-10-14.md).

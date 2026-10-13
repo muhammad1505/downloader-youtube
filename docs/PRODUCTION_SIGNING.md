@@ -136,3 +136,8 @@ Kunci produksi lama dipertahankan; signed APK×3/AAB berhasil,160 Kotlin/76 Pyth
 | `TubeFlow-1.1.3-release.aab` | 210244266 | `68a0bd23206cec1c6bee6b4893e6f7c5d60ef28b19cf6b52e1bf154af021579e` |
 
 Distribusi lokal `app/build/outputs/distribution/1.1.3/`; source/tes/dokumentasi dipush ke main. Tidak ada publikasi toko atau backup baru keystore.
+
+
+## Release 1.1.4 — kredit koleksi dan player
+
+Kunci produksi lama dipertahankan. 175 Kotlin/78 Python/lint debug+release 0; signed APK×3/AAB, signature/native/alignment/refleksi ZIP/manifest/bundletool lulus. ARM64 final 63.135.471 byte (+103.492 byte dari 1.1.3), SHA256 `61e39a4849db7410982a92840d32b76d94bf94893b0086c0bbfc785953bf56ed`. Terpasang pada RMX1821 Android 10 tanpa uninstall/clear data; hash APK terpasang cocok. Distribusi lokal `app/build/outputs/distribution/1.1.4/` memuat manifest/checksum dan sertifikat publik. Tidak ada publikasi toko atau pengukuran benchmark performa. [Laporan](UPGRADE_1_1_4_2026-10-14.md).

@@ -87,6 +87,6 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun correct(item: MediaItem, preview: LyricEditor.Preview, offset: Long) = operation {
         lyricEditor.apply(item, preview, offset)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "LYRIC_TIMING", kind = "AUDIO", platformId = item.platformId, at = System.currentTimeMillis()))
-        "Waktu lirik disimpan. Buka ulang lagu/lirik di pemutar agar perubahan terbaca."
+        "Waktu lirik disimpan. Pemutar TubeFlow memperbarui lirik; buka ulang lirik jika memakai pemutar lain."
     }
 }
