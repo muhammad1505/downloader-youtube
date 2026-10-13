@@ -122,3 +122,17 @@ Distribusi `app/build/outputs/distribution/1.1.1/` memuat APK per ABI, AAB, sert
 VersionCode16, Room9, kunci produksi sama. Build final11m11s;149 Kotlin/76 Python lulus, lint debug/release0masalah. Audit tiga APK:signature/certificate,16KBzipalign/native,reflectiveZIP danmanifest; AAB signing/native/bundletool validate lulus. Distribusi `app/build/outputs/distribution/1.1.2/` mempertahankan versi sebelumnya. ARM64 63.025.815byte,SHA256 `d7210fba3fe44419144629a7c41335296733be6da79fe31b73b2ad0dfd7a093a`.
 
 Update-r berhasil di RealmeAndroid10, hash base.apk cocok;57file publik sebelum/sesudah update identik. Tidak membuat ulang keystore atau memublikasikan ke toko. Perbaikan mengambil kredit judul/penyanyi eksplisit dan folder perartis/remixer untukjobplaylistbaru. [Bukti, cakupan danbatas](SOURCE_REVIEW_2026-10-13.md).
+
+
+## Release1.1.3 — folder koleksi dan cleanup
+
+Kunci produksi lama dipertahankan; signed APK×3/AAB berhasil,160 Kotlin/76 Python/lint0, audit final dan bundletool lulus. ARM64 diupdate ke HP RMX1821Android10 tanpa uninstall/clear data; version1.1.3/code17 dan hash base.apk terverifikasi. Pengujian pemakaian diserahkan ke pengelola. [Laporan](COLLECTION_CLEANUP_2026-10-13.md).
+
+| Artefak | Byte | SHA256 |
+| --- | ---: | --- |
+| `TubeFlow-1.1.3-arm64-v8a-release.apk` | 63031979 | `c767ac27c705a2adeba408c05ab7c51b7603885bb4085b20cbd80e2b86d35e7a` |
+| `TubeFlow-1.1.3-armeabi-v7a-release.apk` | 55368673 | `4454b23460fa1726b81b5b097463470dc54769ca3143b5f75e81ae5a44a06cc2` |
+| `TubeFlow-1.1.3-x86_64-release.apk` | 66164414 | `acccfec5245e48e5c3124940c1a5322d5fba86513af1de7cb488df6eb421644d` |
+| `TubeFlow-1.1.3-release.aab` | 210244266 | `68a0bd23206cec1c6bee6b4893e6f7c5d60ef28b19cf6b52e1bf154af021579e` |
+
+Distribusi lokal `app/build/outputs/distribution/1.1.3/`; source/tes/dokumentasi dipush ke main. Tidak ada publikasi toko atau backup baru keystore.

@@ -201,6 +201,6 @@ Mix RD3J1Opi7MVHw menampilkan25entri. Hanya seed dipilih, opsiAudioAuto+lirik+sa
 Sampel kedua dariMixRDrEjSkBl47OY (SATRU2duet) juga selesai lewat pickerplaylist: `TubeFlow/denny-caknan-ft-happy-asmara/SATRU 2 _ Live - DENNY CAKNAN FT HAPPY ASMARA.opus`,6.693.911byte/393,980s, tag title/artis/creator benar, cover800×450, decode penuh exit0.57file lama dan sampelMix pertama utuh. LRC baru tidak terbit pada kedua sampel; tidak ada klaim auditori baru.
 
 
-## Kandidat1.1.3 — playlist dan cleanup
+## Release1.1.3 — pemasangan, playlist dan cleanup
 
-160 Kotlin/76 Python/lint0 lulus. Pengguna meminta APK dipasang segera setelah build dan akan menguji sendiri karena waktu kerja; skenario runtime1.1.3 belum dijalankan. Baseline pengguna setelah reset:0file/5subfolder kosong. [Checklist dan cakupan](COLLECTION_CLEANUP_2026-10-13.md).
+160 Kotlin/76 Python/lint0 serta build/audit final lulus. ARM64 terpasang via update-r; version1.1.3/code17 dan SHA256 `c767ac27c705a2adeba408c05ab7c51b7603885bb4085b20cbd80e2b86d35e7a` base.apk cocok. Pengguna akan menguji sendiri karena waktu kerja; skenario runtime playlist/cleanup1.1.3 belum dijalankan. Baseline pengguna setelah reset:0file/5subfolder kosong. [Checklist dan cakupan](COLLECTION_CLEANUP_2026-10-13.md).

@@ -1,6 +1,6 @@
 # Satu folder koleksi dan pembersihan root TubeFlow
 
-Checkpoint implementasi 13 Oktober 2026, kandidat1.1.3/code17, Room9. Aturan ini menggantikan pilihan folder per artis pada laporan1.1.2; hasil historis sebelumnya tetap berlaku untuk build sebelumnya.
+Checkpoint implementasi 13 Oktober 2026, release1.1.3/code17, Room9. Aturan ini menggantikan pilihan folder per artis pada laporan1.1.2; hasil historis sebelumnya tetap berlaku untuk build sebelumnya.
 
 ## Akar masalah dan perubahan
 
@@ -17,8 +17,8 @@ Diubah: Models, DownloadViewModel, DownloadWorker, DownloadScreen, SettingsScree
 ## Verifikasi
 
 - 160 tes Kotlin lulus, termasuk11 regresi baru untuk folder koleksi dan cleanup. 76 tes Python lulus.
-- Lint debug/release:0 masalah. Build signed1.1.3 sedang menyelesaikan optimasi/paket; checkpoint ini belum mengklaim build final terpasang.
-- Baseline HP Android10 setelah reset pengguna:0 file,5 direktori kosong; root tetap Download/TubeFlow.
+- Lint debug/release:0 masalah. Build signed1.1.3 berhasil dalam10m8s; APK ketiga ABI dan AAB lolos signature/certificate/native, APK lolos alignment16KB/refleksiZIP/manifest, dan AAB lolos bundletool validate. Pin engine/bootstrap paket sesuai sumber. Deprecation Gradle dan warning JAR tetap terpisah dari lint.
+- APK ARM64 terpasang melalui `adb install -r` pada Realme RMX1821 Android10/API29. versionName1.1.3/code17 dan hash base.apk yang ditarik dari HP cocok dengan release. Tidak menjalankan uninstall atau clear data. Root sebelum/sesudah pemasangan tetap Download/TubeFlow:0file/5subfolder lama. Pemasangan belum menguji operasi cleanup/playlist.
 - Pengguna meminta pemasangan segera lalu akan melaporkan kendala sendiri karena harus bekerja. Pengujian runtime tombol cleanup dan batch playlist pada1.1.3 ditunda; tes host tidak membuktikan hasil fisik.
 - Fixture sementara untuk rencana tes nested/outside-root dibersihkan oleh agent sebelum serah-terima; lima folder lama pengguna tidak dihapus lewat shell. Ini bukan bukti cleanup aplikasi.
 
@@ -29,3 +29,10 @@ Diubah: Models, DownloadViewModel, DownloadWorker, DownloadScreen, SettingsScree
 3. Pengaturan → Hapus semua file → konfirmasi. Jika pemilih Android muncul, pilih tepat `Download/TubeFlow` dan izinkan akses. Folder lain ditolak, batal tidak menghapus.
 4. Pastikan semua file dan subfolder hilang, root TubeFlow tetap ada, ukuran0; riwayat tetap tercatat dengan file tidak tersedia.
 5. Ulangi setelah restart; unduhan berjalan/dijeda harus memblokir cleanup. Gangguan akses tidak boleh dilaporkan sebagai bersih.
+
+
+## Artefak dan pemeliharaan
+
+Distribusi lokal `app/build/outputs/distribution/1.1.3/` memuat APK×3/AAB, sertifikat publik, release.json dan SHA256SUMS. ARM64 63.031.979byte, SHA256 `c767ac27c705a2adeba408c05ab7c51b7603885bb4085b20cbd80e2b86d35e7a`; naik6164byte dari1.1.2. Performa runtime belum diukur ulang. Log privat `build/reports/collection-cleanup-2026-10-13/` menyimpan tes/build/audit dan bukti pemasangan; tidak mengandung keystore dalam distribusi.
+
+Source, tes, skill dan laporan disimpan ke Git. Tidak ada migrasi/format media baru. Android membatasi direktori lewat SAF; bila grant dibatalkan/ditolak, cleanup tidak boleh mengklaim root bersih. Traversal yang melampaui4000 entri/depth8 dilaporkan belum lengkap. Provider SD card/opaque, worker SAF paralel, batch25 download fisik, dan kegagalan izin runtime belum diverifikasi pada release ini.

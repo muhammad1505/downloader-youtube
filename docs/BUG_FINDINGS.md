@@ -481,6 +481,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Akar penyebab:** policy `performer` menentukan folder ulang dari artis/remixer setiap entri saat metadata sumber/native diperbarui. Ini bertentangan dengan pilihan terbaru: satu folder per koleksi.
 - **Solusi:** inspeksi menyimpan snapshot folder koleksi; Mix memakai artis utama seed yang terbukti atau remixer, bukan pemilik playlist. Album/playlist statis memakai judul playlist. Fallback Mix adalah ID seed. Seluruh pilihan memakai `autoFolder=collection` dan `subfolder` yang sama, termasuk retry/resume. Nama/tag tiap lagu tetap mengikuti identitasnya sendiri.
 - **Contoh:** SATRU2 seed `rEjSkBl47OY` → `TubeFlow/mix-denny-caknan/`; seed DJ `3J1Opi7MVHw` → `TubeFlow/mix-maman-fvndy-rmx/`.
+- **Status:** implementasi1.1.3, regresi host/build lulus dan APK terpasang; uji batch download fisik menunggu pengelola.
 - **Validasi:** lihat [laporan koleksi dan cleanup](COLLECTION_CLEANUP_2026-10-13.md). Jumlah entri mengikuti snapshot server, bukan angka25 yang dipaksakan.
 
 ## BUG-041 — P2: Hapus semua file meninggalkan subfolder dan mengaku bersih
@@ -488,4 +489,5 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Bukti awal:** setelah reset pengguna, root TubeFlow berisi0 file tetapi5 subfolder kosong.
 - **Akar penyebab:** MediaStore tidak mencatat direktori kosong; pruning dilewati ketika grant SAF belum ada. `clearTree` juga menggunakan ID root pada rekursi anak; pembacaan gagal pada pruning tidak dicatat sebagai kegagalan.
 - **Solusi:** akses baca/tulis tepat pada root lewat pemilih Android, tanpa mengganti default MediaStore. Traversal terbatas bottom-up memakai ID dokumen anak, menghitung file/folder terpisah, memverifikasi kosong sebelum menghapus induk, mempertahankan root/riwayat dan menolak laporan bersih bila gagal. Root lain tidak dihapus; job aktif/dijeda memblokir cleanup.
+- **Status:** implementasi1.1.3, regresi host/build lulus dan APK terpasang; operasi Hapus semua di HP menunggu pengelola.
 - **Validasi:** tes kegagalan/rekursi/siklus/batas traversal dan HP tercatat dalam [laporan](COLLECTION_CLEANUP_2026-10-13.md).
