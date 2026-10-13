@@ -8,6 +8,14 @@ object MediaFileOperations {
 /** A per-recording translation, never a synthesized timeline or a global offset. */
 object LrcTiming {
     const val LIMIT_MS = 30_000L
+    /** Signed decimal seconds; reject rounding, exponent notation and invalid bounds. */
+    fun parseSeconds(value: String): Long? {
+        val normalized=value.trim().replace(',', '.').replace('−', '-')
+        if (!Regex("[+-]?[0-9]+(?:\\.[0-9]{1,3})?").matches(normalized)) return null
+        return runCatching { java.math.BigDecimal(normalized).movePointRight(3).longValueExact() }
+            .getOrNull()?.takeIf { it in -LIMIT_MS..LIMIT_MS }
+    }
+    fun secondsLabel(ms: Long): String = java.math.BigDecimal.valueOf(ms,3).stripTrailingZeros().toPlainString().replace('.', ',')
     private val time = Regex("""\[(\d+):(\d{2})(?:\.(\d{1,3}))?\]""")
     private val metadata = Regex("""\[(?:ar|ti|al|by|re|ve|length|offset):[^\]]*\]""", RegexOption.IGNORE_CASE)
     fun shift(original: String, deltaMs: Long, durationMs: Long?): String {
@@ -30,7 +38,7 @@ object LrcTiming {
                     val value = minutes * 60_000 + seconds * 1000 + fraction
                     val shifted = (value + deltaMs).coerceAtLeast(0)
                     require(durationMs == null || shifted <= durationMs + 2000) { "Koreksi melewati akhir audio." }
-                    val precision = maxOf(2, match.groupValues[3].length)
+                    val precision = maxOf(2, match.groupValues[3].length, if (deltaMs % 10 != 0L) 3 else 2)
                     val decimals = if (precision == 3) "%03d".format(java.util.Locale.ROOT, shifted % 1000) else "%02d".format(java.util.Locale.ROOT, shifted % 1000 / 10)
                     prefix.append("[%02d:%02d.%s]".format(java.util.Locale.ROOT, shifted / 60_000, shifted / 1000 % 60, decimals))
                     cursor = match.range.last + 1

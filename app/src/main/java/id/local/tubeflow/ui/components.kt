@@ -161,7 +161,7 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
     val accent=rememberCoverAccent(job.coverPath)
@@ -286,6 +286,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         remove?.let { TextButton(onClick = it) { Icon(Icons.Outlined.Delete, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hapus") } }
                     }
                     JobState.COMPLETED -> {
+                        if (job.mode == MediaMode.AUDIO && searchLyrics != null) TextButton(onClick={ searchLyrics(job.id) },enabled=job.outputUri != null) { Text("Cari lirik") }
                         if (job.mode == MediaMode.AUDIO && play != null) OutlinedButton(onClick=play,enabled=job.outputUri != null) { Text("Putar") }
                         OutlinedButton(onClick = { openError = launchFile(context, job, false) }, enabled = job.outputUri != null) { Text("Buka") }
                         TextButton(onClick = { openError = launchFile(context, job, true) }, enabled = job.outputUri != null) { Icon(Icons.Outlined.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Bagikan") }

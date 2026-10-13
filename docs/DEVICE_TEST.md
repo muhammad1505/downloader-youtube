@@ -209,3 +209,8 @@ Sampel kedua dariMixRDrEjSkBl47OY (SATRU2duet) juga selesai lewat pickerplaylist
 ## Release 1.1.4 — Android 10 fisik
 
 Realme RMX1821, Android 10/API29, ARM64, halaman memori 4 KB. Update-r berhasil; hash base.apk cocok dengan ARM64 final `61e39a4849db7410982a92840d32b76d94bf94893b0086c0bbfc785953bf56ed`. Factory player release minify, mini/full player, pause, seek ±10 detik dan seek baris LRC unik (3:38) diuji. Sinkronisasi auditori memerlukan konfirmasi pengguna. Detail Mix, integritas file, risiko dan skenario belum diuji ada pada [laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+
+## Release1.1.5 — Android10 fisik
+
+Final ARM64/code19 terpasang update-r tanpa reset, SHA256 `c4aea0927af8bac992036805986fc1e59982e324760ed37a99d800b544154828` cocok. 61file sebelum/sesudah update memiliki hash sama. Candidate menampilkan17hasil SATRU2; pengelola mengonfirmasi seleksi/simpan, LRC10455242 terbit sesuai stem dan payload. UI kolom detik terlihat; penyimpanan offset custom/rename→search/LR auditori belum diklaim. [Bukti dan cakupan](MANUAL_LYRICS_1_1_5_2026-10-14.md).

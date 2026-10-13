@@ -253,4 +253,43 @@ class LyricsFetchTest {
         assertEquals(null,Lyrics.resolveIdentity(SongIdentity("Song",null,"Remix"),200).artist)
     }
 
+    @Test fun manualSearchExposesDifferentRecordingWithoutWeakeningAutomaticGate() {
+        respond={ path -> if (path.startsWith("/api/search")) 200 to
+            """[{"id":12,"trackName":"Song","artistName":"Other Artist","albumName":"Studio","duration":180,"syncedLyrics":"[00:01.00]fixture"}]""" else 404 to "" }
+        val results=Lyrics.search("Song (Live)","Artist")
+        assertEquals(1,results.choices.size)
+        val choice=results.choices.single()
+        assertTrue(!choice.automaticMatch(LyricMatch.Query("Song (Live)","Artist",200)))
+        assertEquals("[re:TubeFlow / LRCLIB #12]\n[00:01.00]fixture",Lyrics.selectedText(choice,200000))
+        assertEquals(LyricStatus.NO_MATCH,Lyrics.fetch(SongIdentity("Song", "Artist", "Live"),200).status)
+    }
+    @Test fun manualSearchReportsPartialFailureAndDisablesMalformedTimedText() {
+        respond={ path -> if (path.contains("track_name=")) 200 to
+            """[{"id":13,"trackName":"Song","artistName":"Artist","duration":200,"syncedLyrics":"[00:90.00]bad"},{"id":14,"trackName":"Song","artistName":"Artist","duration":200,"syncedLyrics":"[00:01.00]fixture"}]""" else 503 to "" }
+        val results=Lyrics.search("Song","Artist")
+        assertTrue(results.incomplete)
+        assertTrue(!results.choices.first().hasSyncedLyrics)
+        assertTrue(results.choices.last().hasSyncedLyrics)
+    }
+    @Test(expected=IllegalArgumentException::class) fun selectedLyricsCannotRunPastAudioEnd() {
+        Lyrics.selectedText(Lyrics.Choice(1,"Song","Artist","",300,"[04:00.00]fixture"),200000)
+    }
+
+    @Test fun manualFallbackCanExposeStudioChoiceForLiveCollaborationWithoutAutoAccepting() {
+        respond={ path -> if (path == "/api/search?track_name=Song&artist_name=Denny+Caknan") 200 to
+            """[{"id":25,"trackName":"Song","artistName":"Denny Caknan","duration":200,"syncedLyrics":"[00:01.00]fixture"}]""" else 200 to "[]" }
+        val result=Lyrics.search("Song | Live","Denny Caknan FT Happy Asmara")
+        assertEquals(1,result.choices.size)
+        assertTrue(!result.choices.single().automaticMatch(LyricMatch.Query("Song | Live","Denny Caknan FT Happy Asmara",200)))
+        assertTrue(requests.size <= 3)
+    }
+
+    @Test fun nullableProviderMetadataDoesNotBecomeFictionalArtistOrAlbum() {
+        respond={ 200 to """[{"id":26,"trackName":"Song","artistName":null,"albumName":"null","duration":200,"syncedLyrics":"[00:01.00]fixture"}]""" }
+        val result=Lyrics.search("Song","").choices.single()
+        assertEquals("",result.artist)
+        assertEquals("",result.album)
+        assertTrue(result.hasSyncedLyrics)
+    }
+
 }

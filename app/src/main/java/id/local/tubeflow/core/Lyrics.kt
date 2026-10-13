@@ -139,6 +139,59 @@ object LyricMatch {
  * agar pengguna bisa membedakan "tidak ada" dengan "gagal" (BUG-014).
  */
 object Lyrics {
+    data class Choice(val id: Long, val title: String, val artist: String, val album: String,
+                      val durationSeconds: Long, val text: String?) {
+        val hasSyncedLyrics: Boolean get() = !text.isNullOrBlank()
+        fun automaticMatch(query: LyricMatch.Query): Boolean = LyricMatch.acceptsTimedLyrics(query,
+            LyricMatch.Candidate(title,artist,durationSeconds,syncedLyrics=text))
+    }
+    data class Search(val choices: List<Choice>, val incomplete: Boolean = false)
+
+    /** Explicit search exposes alternatives without weakening automatic download matching. */
+    fun search(title: String, artist: String): Search {
+        require(title.isNotBlank() && title.length <= 200 && artist.length <= 200) { "Judul wajib diisi, maksimal 200 karakter." }
+        val paths=linkedSetOf("/api/search?track_name=${enc(title.trim())}" +
+            artist.trim().takeIf { it.isNotEmpty() }?.let { "&artist_name=${enc(it)}" }.orEmpty(),
+            "/api/search?q=${enc(listOf(title.trim(),artist.trim()).filter { it.isNotEmpty() }.joinToString(" "))}")
+        val simpleTitle=TitleSplit.identify(title,recognizeCollaboration=false).title
+        val lead=TitleSplit.primaryArtist(artist)
+        paths += "/api/search?track_name=${enc(simpleTitle)}" + lead.takeIf { it.isNotBlank() }?.let { "&artist_name=${enc(it)}" }.orEmpty()
+        val found=linkedMapOf<Long,Choice>()
+        var failed=false
+        for ((index,path) in paths.withIndex()) {
+            if (index >= 2 && found.values.any { it.hasSyncedLyrics }) break
+            when (val response=get(path)) {
+                is Res.Body -> {
+                    val records=runCatching { org.json.JSONArray(response.text) }.getOrNull()
+                    if (records == null) { failed=true; continue }
+                    for (i in 0 until minOf(records.length(),200)) {
+                        val record=records.optJSONObject(i) ?: continue
+                        val id=record.optLong("id",-1)
+                        fun field(key: String) = if (record.isNull(key)) "" else record.optString(key).trim().takeUnless { it == "null" }.orEmpty()
+                        val track=field("trackName")
+                        if (id <= 0 || track.isBlank() || record.optBoolean("instrumental")) continue
+                        val raw=record.optString("syncedLyrics").takeIf { !record.isNull("syncedLyrics") && it.isNotBlank() }
+                        val text=raw?.trimStart('\uFEFF')?.takeIf { value -> value.toByteArray().size <= 512*1024 &&
+                            runCatching { LrcTiming.shift(value,0,null); LrcLines.parse(value).any { it.text.isNotBlank() } }.getOrDefault(false) }
+                        found.putIfAbsent(id,Choice(id,track,field("artistName"),field("albumName"),record.optLong("duration",-1),text))
+                        if (found.size >= 50) break
+                    }
+                }
+                Res.Fail -> failed=true
+                else -> Unit
+            }
+        }
+        return Search(found.values.take(50),failed)
+    }
+
+    fun selectedText(choice: Choice, durationMs: Long?): String {
+        val text=choice.text ?: error("Hasil ini tidak mempunyai lirik bertimestamp.")
+        LrcTiming.shift(text,0,durationMs)
+        val tagged="[re:TubeFlow / LRCLIB #${choice.id}]\n$text"
+        require(tagged.toByteArray().size <= 512*1024) { "LRC terlalu besar." }
+        return tagged
+    }
+
 
     /**
      * Cari lirik untuk nama konsisten "Judul - Artis" (judul dulu — urutan yang dipakai nama file)

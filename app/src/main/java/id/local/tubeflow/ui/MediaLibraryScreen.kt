@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.core.*
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +99,7 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, onPlay: (MediaItem) -> Unit
                         TextButton(onClick = { rename = item }, enabled = !busy && item.availability == "AVAILABLE") { Text("Ubah nama") }
                         IconButton(onClick = { delete = item }, enabled = !busy && item.availability == "AVAILABLE") { Icon(Icons.Outlined.Delete, "Hapus media") }
                     }
+                    if (item.kind == "AUDIO") TextButton(onClick={ model.openLyrics(item) }, enabled=!busy && item.availability == "AVAILABLE") { Text("Cari lirik") }
                     if (item.kind == "AUDIO" && item.lyricUri != null) TextButton(onClick = { timing = item }, enabled = !busy && item.availability == "AVAILABLE") { Text("Atur waktu lirik") }
                 }
             } }
@@ -121,13 +123,15 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, onPlay: (MediaItem) -> Unit
     }, confirmButton = { TextButton(onClick = { detail = null }) { Text("Tutup") } }) }
     rename?.let { item ->
         var name by remember(item.uri) { mutableStateOf(item.displayName) }
+        var searchAfter by remember(item.uri) { mutableStateOf(item.kind == "AUDIO") }
         AlertDialog(onDismissRequest = { rename = null }, title = { Text("Ubah nama file") }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nama file") }, singleLine = true, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false))
+                if (item.kind == "AUDIO") Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(searchAfter,{ searchAfter=it }); Text("Cari lirik dengan nama baru") }
                 Text("Ekstensi tetap sama. File lain tidak akan ditimpa.", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { name = SmartMedia.fileName(TitleSplit.identify(item.title, metadataArtist = item.artist, metadataTrack = item.title, recognizeCollaboration=item.kind == "AUDIO"), item.title, item.displayName.substringAfterLast('.'), true) }) { Text("Gunakan nama standar") }
             }
-        }, confirmButton = { TextButton(onClick = { model.rename(item, name); rename = null }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = { rename = null }) { Text("Batal") } })
+        }, confirmButton = { TextButton(onClick = { model.rename(item, name, searchAfter); rename = null }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = { rename = null }) { Text("Batal") } })
     }
     delete?.let { item -> AlertDialog(onDismissRequest = { delete = null }, title = { Text("Hapus file permanen?") }, text = { Text("${item.displayName} dan file pendamping yang tercatat akan dihapus dari penyimpanan.") }, confirmButton = { TextButton(onClick = { model.delete(item); delete = null }) { Text("Hapus file") } }, dismissButton = { TextButton(onClick = { delete = null }) { Text("Batal") } }) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
@@ -147,33 +151,35 @@ private fun ChoiceMenu(label: String, choices: List<Pair<String, String>>, selec
 @Composable
 private fun LyricTimingDialog(item: MediaItem, model: MediaLibraryViewModel, dismiss: () -> Unit) {
     var preview by remember { mutableStateOf<LyricEditor.Preview?>(null) }
-    var offset by remember { mutableLongStateOf(0) }
+    var seconds by remember { mutableStateOf("0") }
+    val offset=LrcTiming.parseSeconds(seconds)
     var text by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val busy by model.busy.collectAsStateWithLifecycle()
     LaunchedEffect(item.uri) {
-        try { preview = model.lyricEditor.preview(item).also { offset = it.offsetMs } }
+        try { preview = model.lyricEditor.preview(item).also { seconds = LrcTiming.secondsLabel(it.offsetMs) } }
         catch (failure: Exception) { error = failure.message }
     }
     LaunchedEffect(preview, offset) { preview?.let { original ->
+        if (offset == null) { error="Masukkan angka −30 sampai 30 detik, maksimal tiga desimal."; return@LaunchedEffect }
         try { text = withContext(Dispatchers.IO) { LrcTiming.shift(original.original, offset, item.durationMs).lineSequence().take(8).joinToString("\n") }; error = null }
         catch (failure: Exception) { error = failure.message }
     } }
     AlertDialog(onDismissRequest = dismiss, title = { Text("Waktu lirik · ${item.title}") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Sorotan terlambat: majukan lirik. Koreksi hanya lagu ini; perubahan tersimpan pada LRC.")
-            Text(if (offset == 0L) "Waktu asli" else "${if (offset < 0) "Dimajukan" else "Dimundurkan"} ${kotlin.math.abs(offset) / 1000.0} detik")
+            OutlinedTextField(seconds, { seconds=it }, label={ Text("Koreksi waktu (detik)") }, supportingText={ Text("Negatif = majukan, positif = mundurkan. Contoh: −2 atau 0,5. Total dari waktu asli.") }, keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text), singleLine=true, isError=offset == null, enabled=preview != null)
             Column {
-                TextButton(onClick = { offset = (offset - 500).coerceAtLeast(-LrcTiming.LIMIT_MS) }, enabled = preview != null) { Text("Majukan 0,5 detik") }
-                TextButton(onClick = { offset = (offset + 500).coerceAtMost(LrcTiming.LIMIT_MS) }, enabled = preview != null) { Text("Mundurkan 0,5 detik") }
+                TextButton(onClick = { seconds = LrcTiming.secondsLabel(((offset ?: 0) - 500).coerceAtLeast(-LrcTiming.LIMIT_MS)) }, enabled = preview != null) { Text("Majukan 0,5 detik") }
+                TextButton(onClick = { seconds = LrcTiming.secondsLabel(((offset ?: 0) + 500).coerceAtMost(LrcTiming.LIMIT_MS)) }, enabled = preview != null) { Text("Mundurkan 0,5 detik") }
             }
-            TextButton(onClick = { offset = 0 }, enabled = preview != null) { Text("Reset ke asli") }
+            TextButton(onClick = { seconds = "0" }, enabled = preview != null) { Text("Reset ke asli") }
             if (preview == null && error == null) CircularProgressIndicator(Modifier.size(24.dp))
             Text(text, style = MaterialTheme.typography.bodySmall)
             Text("Preview timestamp. Buka ulang lirik di pemutar setelah simpan. Selisih yang makin berubah memerlukan rekaman lirik lain.", style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-    }, confirmButton = { TextButton(enabled = preview != null && error == null && !busy, onClick = { preview?.let { model.correct(item, it, offset) }; dismiss() }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Batal") } })
+    }, confirmButton = { TextButton(enabled = preview != null && offset != null && error == null && !busy, onClick = { preview?.let { offset?.let { value -> model.correct(item, it, value) } }; dismiss() }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Batal") } })
 }
 
 fun duration(ms: Long) = "%d:%02d".format(java.util.Locale.ROOT, ms / 60000, ms / 1000 % 60)

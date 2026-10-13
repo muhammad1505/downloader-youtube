@@ -297,3 +297,8 @@ Pilihan terbaru menggantikan folder per artis: satu folder untuk semua pilihan M
 ## Checkpoint 14 Oktober 2026 — upgrade 1.1.4
 
 Diterapkan dari baseline 1.1.3 karena source perangkat lain belum dipush. Kredit koleksi hanya menggunakan identitas terverifikasi; versi filename memakai kurung. Mutasi sidecar dibatasi generation dan cleanup gagal dijurnal privat. UI empat tab, aksen sampul, satu MediaPlayer foreground dan timeline LRC nyata. 175 Kotlin/78 Python/lint 0, build signed APK×3/AAB dan audit lulus; update ARM64 ke HP Android 10 berhasil tanpa reset. Room 9, dependensi dan engine tidak berubah. Cakupan runtime dan backlog: [laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+
+## Checkpoint 14 Oktober 2026 — lirik manual1.1.5
+
+Input detik absolut per lagu, pemilihan ID LRCLIB/preview/peringatan, pencarian setelah rename, publisher bersama refetch, urutan tab baru, rata tengah dan kontrol kanal diterapkan. 184 Kotlin/78 Python/lint0 serta signed build/audit/bundletool lulus. Pengelola memilih/simpan SATRU2; payload LRC10455242 cocok sumber. Final ARM64 terpasang, hash cocok, 61file dipertahankan saat update. Karaoke AI masih kajian. [Laporan](MANUAL_LYRICS_1_1_5_2026-10-14.md).

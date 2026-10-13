@@ -64,3 +64,5 @@ Pada pencarian fallback, skor identitas lebih kuat tetap prioritas; tie memakai 
 ## Player lokal
 
 Satu MediaPlayer on-device, semua metode pada HandlerThread/Looper yang sama. File/LRC/artwork dibaca di luar main thread, token track membatasi callback lama. Player foreground-only dijeda saat app masuk background sampai service/MediaSession diimplementasikan; jangan mengklaim kontrol notifikasi. LRC memakai timestamp asli+offset, bukan interpolasi/offset global. Source informasi platform tidak berasal dari warna artwork. Rujuk laporan upgrade terbaru untuk cakupan runtime dan minify.
+
+Pilihan lirik manual memerlukan preview, ID/atribusi, pemeriksaan snapshot sebelum simpan dan pengakuan ketika berbeda dari identitas audio aktual. Parameter pencarian/filename edit bukan metadata artis terverifikasi. Gunakan LyricPublisher bersama refetch, jangan menyalin publikasi URI. Input waktu adalah offset total dari cadangan asli per lagu. L/R player hanya memilih volume kanal sumber, bukan pemisahan vokal; jangan mengklaim karaoke universal atau merutekan kanal tunggal ke kedua speaker.

@@ -141,3 +141,8 @@ Distribusi lokal `app/build/outputs/distribution/1.1.3/`; source/tes/dokumentasi
 ## Release 1.1.4 — kredit koleksi dan player
 
 Kunci produksi lama dipertahankan. 175 Kotlin/78 Python/lint debug+release 0; signed APK×3/AAB, signature/native/alignment/refleksi ZIP/manifest/bundletool lulus. ARM64 final 63.135.471 byte (+103.492 byte dari 1.1.3), SHA256 `61e39a4849db7410982a92840d32b76d94bf94893b0086c0bbfc785953bf56ed`. Terpasang pada RMX1821 Android 10 tanpa uninstall/clear data; hash APK terpasang cocok. Distribusi lokal `app/build/outputs/distribution/1.1.4/` memuat manifest/checksum dan sertifikat publik. Tidak ada publikasi toko atau pengukuran benchmark performa. [Laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+
+## Release1.1.5 — pilihan lirik manual
+
+Kunci produksi/Room9 dipertahankan, tanpa dependensi baru. 184 Kotlin/78 Python/lint0, signed APK×3/AAB, audit signature/cert/native/alignment16KB/refleksiZIP/manifest dan bundletool validate lulus. ARM64 63.172.747byte, SHA256 `c4aea0927af8bac992036805986fc1e59982e324760ed37a99d800b544154828`; terpasang dan hash base.apk cocok. Distribusi lokal `app/build/outputs/distribution/1.1.5/`; tidak ada publikasi toko. [Laporan](MANUAL_LYRICS_1_1_5_2026-10-14.md).

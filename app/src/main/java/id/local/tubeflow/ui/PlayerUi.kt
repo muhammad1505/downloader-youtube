@@ -16,6 +16,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -36,6 +39,7 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
                         Text(track.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                 }
+                TextButton(onClick=player::cycleChannel, modifier=Modifier.widthIn(min=48.dp).semantics { contentDescription="Kanal audio ${state.channel.label}. Ganti kanal" }) { Text(state.channel.label) }
                 if (state.loading) CircularProgressIndicator(Modifier.size(24.dp)) else IconButton(onClick=player::toggle) {
                     Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio")
                 }
@@ -71,12 +75,14 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, dismiss: (
                             itemsIndexed(state.lines) { index,line ->
                                 Text(line.text.ifBlank { "♪" },Modifier.fillMaxWidth().clickable(onClickLabel="Putar dari baris lirik") { player.seek(line.atMs) }.padding(vertical=14.dp,horizontal=8.dp),
                                     style=MaterialTheme.typography.titleLarge,fontWeight=if (index==active) FontWeight.ExtraBold else FontWeight.Medium,
-                                    color=if (index==active) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    color=if (index==active) accent else MaterialTheme.colorScheme.onSurfaceVariant, textAlign=TextAlign.Center)
                             }
                         }
                     } else CoverThumb(track.cover,"",MediaMode.AUDIO,Modifier.fillMaxWidth().widthIn(max=400.dp).aspectRatio(1f).shadow(24.dp,MaterialTheme.shapes.large,ambientColor=accent,spotColor=accent))
                 }
-                Spacer(Modifier.height(16.dp))
+                TextButton(onClick=player::cycleChannel, modifier=Modifier.align(Alignment.CenterHorizontally)) { Text("Kanal audio: ${state.channel.label}") }
+                Text("L/R memilih kanal kiri/kanan. Karaoke hanya jika vokal dan musik terpisah pada sumber.", style=MaterialTheme.typography.labelSmall, textAlign=TextAlign.Center, modifier=Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
                 Text(track.title,style=MaterialTheme.typography.headlineSmall,maxLines=2,overflow=TextOverflow.Ellipsis)
                 Text(track.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }

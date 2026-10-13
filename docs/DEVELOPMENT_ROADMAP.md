@@ -8,10 +8,10 @@ Tabel ini menggantikan status historis9–13Oktober di bawah. Pemeriksaan mencoc
 
 | ID | Status aktual | Yang masih perlu dikerjakan atau dibuktikan |
 | --- | --- | --- |
-| OPT-001 | Sebagian; pencocokan terstruktur/versi/durasi±2detik, status tidak cocok dan tie durasi tersedia | Persistensi record ID/atribusi belum ada; pratinjau/pemilihan kandidat belum ada. Lamunan pernah dikonfirmasi sinkron, uji auditori terbaru menunggu |
+| OPT-001 | Sebagian; pencocokan terstruktur/versi/durasi±2detik, status tidak cocok dan tie durasi tersedia | Record ID/atribusi, preview/pemilihan manual tersedia1.1.5; jalur pemilihan otomatis belum menyimpan record ID. Lamunan pernah dikonfirmasi sinkron, uji auditori terbaru menunggu |
 | OPT-002 | Sebagian; pengamanan refetch diperkuat dan ikut rilis 1.1.1 (terpasang di HP) | Backup wajib/read-back/rollback+jurnal persisten melalui `JournaledTextReplacement`, mutex bersama edit/refetch/rename/delete dan stale snapshot guard; stem audio diverifikasi penuh. Uji fault injection Android/provider/process death serta refetch live tetap perlu; lihat [laporan](DASHBOARD_LYRICS_2026-10-13.md) |
-| OPT-003 | Belum diimplementasikan | Daftar kandidat, preview, pilih/cancel dengan record ID dan atribusi persisten |
-| OPT-004 | Implementasi tersedia dan teruji terbatas | `LrcTiming`/`LyricEditor`, ±30detik/langkah0,5detik, baseline/reset/jurnal/read-back/rollback; Ya Sudahlah−2detik dikonfirmasi pengguna. Fault injection Android/process death/provider berbeda dan interaksi refetch belum terbukti; tidak menjamin semua lagu sinkron |
+| OPT-003 | Implementasi1.1.5, regresi host dan seleksi/simpan oleh pengguna di HP terbukti | Preview, maksimum50 kandidat, record ID/atribusi di LRC, pengakuan hasil berbeda gerbang otomatis; MediaStore SATRU2 terverifikasi. Cancel/rename→search penuh, SAF/provider/crash dan sinkron auditori belum diuji lengkap |
+| OPT-004 | Implementasi tersedia dan teruji terbatas | `LrcTiming`/`LyricEditor`, ±30detik/langkah0,5detik dan input detik1.1.5 (presisi1ms), baseline/reset/jurnal/read-back/rollback; Ya Sudahlah−2detik dikonfirmasi pengguna. Fault injection Android/process death/provider berbeda dan interaksi refetch belum terbukti; tidak menjamin semua lagu sinkron |
 | OPT-005 | Sebagian, bukan belum dimulai | Cache respons LRCLIB10MiB/200entry, positif24jam/4041jam, clear/refresh dan regresi TTL/error tersedia. `extractor-cache` yt-dlp bukan cache snapshot metadata app berdasarkan engine/TTL. Snapshot metadata, benchmark request/waktu, serta tes permintaan bersamaan/coalescing belum lengkap |
 | OPT-006 | Diterapkan; progres per tahap telah diuji host/Realme | Cakupan callback terlambat/stop-resume cepat dan proses mati tetap terkait BUG-002/008; bukan kembali ke heartbeat lama |
 | OPT-007 | Belum diimplementasikan | UI Salin detail error, kategori/persistensi, versi/tahap/waktu/HTTP dan redaksi rahasia; pesan error biasa bukan fitur ini |
@@ -134,3 +134,10 @@ Lanjutan OPT-001/BUG-013 pada 1.0.10 memakai gerbang durasi ±2 detik pada exact
 
 
 Tes akhir SoundCloud Ya Sudahlah 1.0.11 mengungkap delay auditori ±0,5 detik (BUG-033). Prioritaskan tie-break selisih durasi untuk kandidat dengan skor identitas sama, penyimpanan record ID/atribusi, dan OPT-003/004 dengan pratinjau serta backup. Kandidat berdurasi lebih dekat bukan bukti timing lebih tepat; pengguna mengonfirmasi sorotan terlambat 0,5 detik dengan selisih tetap, sehingga koreksi per lagu perlu memajukan lirik. Audio jangan diunduh ulang untuk mengganti lirik.
+
+
+## Pembaruan 14 Oktober 2026 — 1.1.5
+
+OPT-003 diterapkan; OPT-004 menerima input signed decimal seconds. 184 Kotlin/78 Python/lint0 dan build/audit lulus; seleksi/simpan lirik oleh pengelola serta artefak fisik diperiksa. [Laporan dan cakupan](MANUAL_LYRICS_1_1_5_2026-10-14.md). Status historis belum-diimplementasikan di bagian lama digantikan pembaruan ini; kriteria fault injection/provider tetap terbuka.
+
+**Usulan karaoke AI:** [kajian awal](KARAOKE_FEASIBILITY_2026-10-14.md). Belum ada engine/tombol Karaoke tanpa vokal; L/R hanya memilih kanal. Model, runtime, lisensi, RAM/waktu dan kualitas wajib dibuktikan pada HP sebelum implementasi dinyatakan selesai.

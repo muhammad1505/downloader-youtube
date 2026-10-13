@@ -7,6 +7,8 @@ import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.withLock
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
@@ -40,6 +42,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "covers"), 32L * 1024 * 1024)
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "library-covers"), 24L * 1024 * 1024)
+            MediaFileOperations.mutex.withLock { runCatching { LyricPublisher(app).recover() } }
             repository.validateRecent()
             database.downloads().observe().map { list -> list.filter { it.state == JobState.COMPLETED && it.autoLibrary }.map { it.id to it.outputUri } }.distinctUntilChanged().collect { jobs ->
                 for ((id, _) in jobs.take(200)) runCatching { repository.indexDownload(id) }
@@ -82,11 +85,103 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
         "$count file pilihan diperiksa; $failed gagal/tidak didukung."
     }
-    fun rename(item: MediaItem, name: String) = operation { repository.rename(item, name); "Nama file diperbarui." }
+    fun rename(item: MediaItem, name: String, searchAfter: Boolean = false) = operation {
+        val changed=repository.rename(item, name)
+        if (searchAfter && changed.kind == "AUDIO") withContext(Dispatchers.Main.immediate) { openLyrics(changed, ManualLyricQuery.fromFilename(changed.displayName)) }
+        "Nama file diperbarui."
+    }
     fun delete(item: MediaItem) = operation { repository.delete(item); "File dihapus." }
     fun correct(item: MediaItem, preview: LyricEditor.Preview, offset: Long) = operation {
         lyricEditor.apply(item, preview, offset)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "LYRIC_TIMING", kind = "AUDIO", platformId = item.platformId, at = System.currentTimeMillis()))
         "Waktu lirik disimpan. Pemutar TubeFlow memperbarui lirik; buka ulang lirik jika memakai pemutar lain."
     }
+    data class LyricsState(val item: MediaItem, val title: String, val artist: String,
+        val choices: List<Lyrics.Choice> = emptyList(), val loading: Boolean = false,
+        val saving: Boolean = false, val searched: Boolean = false, val error: String? = null) {
+        val query get() = LyricMatch.Query(TitleSplit.identify(item.title,metadataArtist=item.artist,recognizeCollaboration=false).lyricTitle,item.artist,(item.durationMs ?: 0)/1000)
+    }
+    private val _lyrics=MutableStateFlow<LyricsState?>(null)
+    val lyrics=_lyrics.asStateFlow()
+    private var lyricsSession=0L
+    private var lyricsRequest: Job?=null
+    private var expectedLyrics: Map<String,ByteArray> = emptyMap()
+    private var expectedJob: DownloadJob?=null
+
+    fun openLyrics(jobId: String) { viewModelScope.launch {
+        try {
+            val item=withContext(Dispatchers.IO) {
+                repository.indexDownload(jobId, manual=true)
+                database.downloads().get(jobId)?.outputUri?.let { dao.getByAccess(it) ?: dao.get(it) }
+            } ?: error("File belum tersedia di koleksi.")
+            openLyrics(item)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { _message.value=failure.message }
+    } }
+    fun openLyrics(item: MediaItem, query: ManualLyricQuery? = null) {
+        if (_lyrics.value?.saving == true || item.kind != "AUDIO") return
+        closeLyrics()
+        val identity=TitleSplit.identify(item.title,metadataArtist=item.artist,recognizeCollaboration=false)
+        _lyrics.value=LyricsState(item,query?.title ?: identity.lyricTitle,query?.artist ?: item.artist)
+        searchLyrics(_lyrics.value!!.title,_lyrics.value!!.artist)
+    }
+    fun closeLyrics() {
+        if (_lyrics.value?.saving == true) return
+        lyricsSession++; lyricsRequest?.cancel(); _lyrics.value=null
+        expectedLyrics=emptyMap(); expectedJob=null
+    }
+    private fun displayName(raw: String): String? = getApplication<Application>().contentResolver.query(raw.toUri(),
+        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use { if (it.moveToFirst()) it.getString(0) else null }
+    fun searchLyrics(title: String, artist: String) {
+        val previous=_lyrics.value ?: return
+        if (previous.loading || previous.saving) return
+        val session=++lyricsSession
+        _lyrics.value=previous.copy(title=title.trim(),artist=artist.trim(),loading=true,choices=emptyList(),error=null,searched=false)
+        lyricsRequest=viewModelScope.launch {
+            try {
+                val captured=withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
+                    val current=dao.get(previous.item.uri) ?: error("Media telah dihapus; buka ulang pencarian.")
+                    require(current.availability == "AVAILABLE" && displayName(current.location) == current.displayName) { "Nama/lokasi media berubah; buka ulang pencarian." }
+                    val job=current.jobId?.let { database.downloads().get(it) }
+                    val bytes=current.lyricUri?.let { mapOf(it to lyricEditor.captureForRefetch(it)) }.orEmpty()
+                    Triple(current,bytes,job)
+                } }
+                val result=withContext(Dispatchers.IO) { Lyrics.search(title,artist) }
+                if (session != lyricsSession) return@launch
+                expectedLyrics=captured.second; expectedJob=captured.third
+                _lyrics.value=_lyrics.value?.copy(item=captured.first,choices=result.choices,loading=false,searched=true,
+                    error=if (result.incomplete) "Sebagian pencarian gagal. Coba lagi jika hasil belum sesuai." else null)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(loading=false,error=failure.message ?: "Pencarian gagal.") }
+        }
+    }
+    fun saveLyrics(choice: Lyrics.Choice, acknowledgedMismatch: Boolean) {
+        val current=_lyrics.value ?: return
+        if (current.loading || current.saving || !current.choices.contains(choice) || !choice.hasSyncedLyrics) return
+        if (!choice.automaticMatch(current.query) && !acknowledgedMismatch) return
+        _lyrics.value=current.copy(saving=true,error=null)
+        val session=lyricsSession
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
+                    val item=dao.get(current.item.uri) ?: error("Media telah dihapus.")
+                    require(item.location == current.item.location && item.displayName == current.item.displayName &&
+                        item.lyricUri == current.item.lyricUri && displayName(item.location) == current.item.displayName) { "Media/lirik berubah selama pencarian; buka ulang." }
+                    expectedJob?.let { old -> database.downloads().get(old.id)?.let { job ->
+                        require(job.state == JobState.COMPLETED && job.generation == old.generation &&
+                            job.outputUri == old.outputUri && job.sidecarUris == old.sidecarUris) { "Download berubah; lirik tidak diganti." }
+                    } }
+                    val text=Lyrics.selectedText(choice,item.durationMs)
+                    val uri=LyricPublisher(getApplication()).publish(item,text,expectedLyrics)
+                    dao.put(item.copy(lyricUri=uri,lyricStatus=LyricStatus.SAVED))
+                    item.jobId?.let { database.downloads().lyricStatus(it,LyricStatus.SAVED) }
+                    dao.event(MediaEvent(jobId=item.jobId.orEmpty(),action="LYRICS_SELECTED",kind="AUDIO",platformId=item.platformId,at=System.currentTimeMillis()))
+                } }
+                if (session == lyricsSession) { _lyrics.value=null; expectedLyrics=emptyMap(); expectedJob=null }
+                _message.value="Lirik pilihan disimpan. Cek kecocokan vokal; koreksi waktu bila perlu."
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(saving=false,error=failure.message ?: "Lirik gagal disimpan.") }
+        }
+    }
+
 }

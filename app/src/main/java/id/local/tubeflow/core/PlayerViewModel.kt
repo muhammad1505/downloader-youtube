@@ -30,7 +30,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     data class Track(val uri: String, val title: String, val artist: String = "", val cover: String = "", val lyricUri: String? = null)
     data class State(val track: Track? = null, val loading: Boolean = false, val playing: Boolean = false,
                      val positionMs: Long = 0, val durationMs: Long = 0, val lines: List<LrcLines.Line> = emptyList(),
-                     val error: String? = null, val lyricError: String? = null)
+                     val error: String? = null, val lyricError: String? = null, val channel: AudioChannel = AudioChannel.STEREO)
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
     private val thread = HandlerThread("TubeFlow-audio").apply { start() }
@@ -88,6 +88,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 current.setOnPreparedListener { ready ->
                     if (media !== ready || token.get() != id) return@setOnPreparedListener
                     prepared = true
+                    applyChannel()
                     updateEngine { it.copy(loading=false, durationMs=ready.duration.toLong().coerceAtLeast(0)) }
                     if (autoplay && foreground) start(id)
                 }
@@ -107,6 +108,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 current.setDataSource(getApplication<Application>(), track.uri.toUri())
                 current.prepareAsync()
             } catch (_: Exception) { if (token.get() == id) fail("File audio tidak tersedia atau aksesnya berubah.") else release() }
+        }
+    }
+    fun cycleChannel() { val id=token.get(); handler.post {
+        if (id != token.get()) return@post
+        updateEngine { it.copy(channel=it.channel.next()) }
+        applyChannel()
+    } }
+    private fun applyChannel() { val (left,right)=_state.value.channel.volumes
+        media?.setVolume(left,right)
+    }
+    /** A replacement can have a new URI; reload the persisted catalogue reference. */
+    fun refreshLyrics() {
+        val track=_state.value.track ?: return
+        val id=token.get()
+        viewModelScope.launch {
+            val item=withContext(Dispatchers.IO) { DownloadDatabase.get(getApplication()).media().let { it.getByAccess(track.uri) ?: it.get(track.uri) } }
+            if (id != token.get()) return@launch
+            val updated=track.copy(lyricUri=item?.lyricUri ?: track.lyricUri)
+            _state.update { if (id == token.get()) it.copy(track=updated) else it }
+            loadLyrics(updated,id)
         }
     }
     fun reloadLyrics() { _state.value.track?.let { loadLyrics(it,token.get()) } }

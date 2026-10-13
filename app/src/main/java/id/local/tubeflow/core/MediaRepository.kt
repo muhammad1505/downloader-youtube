@@ -85,11 +85,11 @@ class MediaRepository(private val context: Context) {
         return media.toString()
     }
 
-    suspend fun indexDownload(id: String) = withContext(Dispatchers.IO) {
+    suspend fun indexDownload(id: String, manual: Boolean = false) = withContext(Dispatchers.IO) {
         operations.withLock {
             recoverRename()
             val job = database.downloads().get(id) ?: return@withLock
-            if (job.state != JobState.COMPLETED || !job.autoLibrary || job.outputUri == null) return@withLock
+            if (job.state != JobState.COMPLETED || (!job.autoLibrary && !manual) || job.outputUri == null) return@withLock
             index(job.outputUri, job, job.subfolder.ifBlank { "Downloads/${SettingsStore.storageFolder}" })
         }
     }

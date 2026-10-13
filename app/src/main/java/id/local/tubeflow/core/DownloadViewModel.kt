@@ -548,90 +548,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   * Nama mengikuti nama audio yang benar-benar tersimpan (BUG-010); kegagalan menulis selalu gagal total,
   * tidak meninggalkan dokumen parsial (BUG-008).
   */
- private suspend fun writeLyricBesideAudio(job: DownloadJob, text: String, expected: Map<String, ByteArray>): Boolean {
-  val app=getApplication<Application>()
-  val resolver=app.contentResolver
-  val bytes=text.toByteArray(Charsets.UTF_8)
-  val output=(job.outputUri ?: return false).toUri()
-  fun writeTo(target: android.net.Uri, mode: String): Boolean = runCatching {
-   val stream=resolver.openOutputStream(target, mode) ?: return@runCatching false
-   stream.use { it.write(bytes) }
-   require(LyricEditor(app).captureForRefetch(target.toString()).contentEquals(bytes)) { "Verifikasi lirik gagal." }
-   true
-  }.getOrDefault(false)
-  /** Lepas jurnal pending setelah penghapusan terbukti berhasil; gagal = jejak tetap untuk recovery (BUG-008/R2). */
-  suspend fun dropJournal(target: android.net.Uri) {
-   if(StorageUris.delete(app, target)) dao.sidecarPending(job.id, null)
-  }
-  // Sidecar lama dinilai dari NAMA TAMPILAN aktual, bukan akhiran URI — provider bisa menyisipkan
-  // ekstensi mime ("X.lrc.txt"). Yang benar .lrc jadi target timpa; yang salah ekstensi dibuang
-  // setelah pengganti terbit (BUG-015).
-  val subs=job.sidecarUris?.lines()?.filter { it.startsWith("sub|") }?.map { it.substringAfter('|') }
-   .orEmpty().filter { it.isNotBlank() }.map { it.toUri() }
-  val stem=displayNameOf(output)?.substringBeforeLast('.') ?: return false
-  val requested="$stem.lrc"
-  val validOld=subs.filter { displayNameOf(it)?.endsWith(".lrc", true) == true }
-  require(validOld.map { it.toString() }.toSet() == expected.keys) { "Lirik berubah selama pencarian; coba lagi." }
-  require(validOld.size <= 1) { "Beberapa file lirik tercatat; penggantian dibatalkan." }
-  val stale=subs.filter { displayNameOf(it)?.endsWith(".lrc", true) != true }
-  suspend fun dropStale() {
-   if(stale.isEmpty()) return
-   val staleRaw=stale.filter { StorageUris.delete(app, it) }.map { it.toString() }.toSet()
-   val kept=job.sidecarUris?.lines()?.filter { it.isNotBlank() && it.substringAfter('|',"") !in staleRaw }.orEmpty()
-   dao.sidecars(job.id, kept.joinToString("\n").ifBlank { null })
-  }
-  if(validOld.isNotEmpty()) {
-   val old=validOld.first()
-   require(displayNameOf(old) == requested) { "Nama lirik tidak sesuai audio; file lama tidak diubah." }
-   LyricEditor(app).replaceForRefetch(old.toString(), text, requireNotNull(expected[old.toString()]), job.durationSeconds.takeIf { it > 0 }?.times(1000))
-   dropStale()
-   return true
-  }
-  val uri = if(android.provider.DocumentsContract.isDocumentUri(app, output)) {
-   // Verify the actual parent; opaque providers without parent information fail closed.
-   // ExternalStorageProvider document IDs supply a path fallback, not an arbitrary tree root.
-   val parentId=runCatching {
-    resolver.query(output, arrayOf("parent_document_id"), null, null, null)?.use { c -> if(c.moveToFirst()) c.getString(0) else null }
-   }.getOrNull()
-   // Fail closed for opaque providers rather than publishing beside the wrong audio.
-   val documentId = android.provider.DocumentsContract.getDocumentId(output)
-   val pathParent = if (output.authority == "com.android.externalstorage.documents" && documentId.contains('/')) documentId.substringBeforeLast('/') else null
-   val resolvedParent = parentId ?: pathParent ?: error("Induk audio tidak dapat diverifikasi; file tidak diubah.")
-   val parent=android.provider.DocumentsContract.buildDocumentUriUsingTree(output, resolvedParent)
-   // BUG-015: paksa kembali nama yang diminta bila provider menyisipkan ekstensi mime.
-   val made=runCatching { android.provider.DocumentsContract.createDocument(resolver, parent, "text/plain", requested) }.getOrNull() ?: return false
-   // Jurnal sebelum menulis: proses mati di tengah penulisan tetap terlacak (BUG-008/R2).
-   dao.sidecarPending(job.id, made.toString())
-   val actual=displayNameOf(made)
-   val final=if(actual != null && actual != requested) runCatching { android.provider.DocumentsContract.renameDocument(resolver, made, requested) }.getOrNull() ?: made else made
-   // Setelah rename document ID bisa berubah — jurnal ikut diperbarui (R2).
-   dao.sidecarPending(job.id, final.toString())
-   if(!writeTo(final, "wt")) { dropJournal(final); return false }
-   // R5: verifikasi nama tampilan akhir — rename yang ditolak provider tidak boleh dilaporkan sukses ("X.lrc.txt").
-   if(displayNameOf(final) != requested) { dropJournal(final); return false }
-   final
-  } else {
-   val relative=runCatching {
-    resolver.query(output, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)?.use { c -> if(c.moveToFirst()) c.getString(0) else null }
-   }.getOrNull() ?: return false
-   val created=resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, ContentValues().apply {
-    put(MediaStore.Downloads.DISPLAY_NAME, "$stem.lrc")
-    put(MediaStore.Downloads.MIME_TYPE, "text/*") // sengaja wildcard seperti worker: ekstensi ikut DISPLAY_NAME, bukan tebakan provider
-    put(MediaStore.Downloads.RELATIVE_PATH, relative)
-    put(MediaStore.Downloads.IS_PENDING, 1)
-   }) ?: return false
-   dao.sidecarPending(job.id, created.toString())
-   if(!writeTo(created, "w")) { dropJournal(created); return false }
-   if(resolver.update(created, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null) <= 0) { dropJournal(created); return false }
-   // Nama MediaStore ikut DISPLAY_NAME; verifikasi sama seperti jalur SAF (R5).
-   if(displayNameOf(created) != requested) { dropJournal(created); return false }
-   created
-  }
-  // Perbarui daftar sidecar: buang baris lirik lama/salah ekstensi dan catat pengganti baru.
-  dropStale()
-  dao.commitSidecar(job.id, "sub|$uri", null)
-  return true
- }
+ private suspend fun writeLyricBesideAudio(job: DownloadJob, text: String, expected: Map<String, ByteArray>): Boolean =
+  LyricPublisher(getApplication()).publish(job, text, expected)
+
  fun clearCompleted() { viewModelScope.launch {
   val ids=dao.observe().first().filter { it.state == JobState.COMPLETED }.map { it.id }
   val n=MediaFileOperations.mutex.withLock { dao.clearCompleted() }; ids.forEach(::cancelResultNotification)

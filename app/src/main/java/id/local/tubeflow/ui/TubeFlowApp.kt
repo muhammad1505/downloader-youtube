@@ -30,7 +30,7 @@ import id.local.tubeflow.core.*
 fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
-    var previousTab by rememberSaveable { mutableIntStateOf(2) }
+    var previousTab by rememberSaveable { mutableIntStateOf(1) }
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val metadata by model.metadata.collectAsStateWithLifecycle()
     val playlist by model.playlist.collectAsStateWithLifecycle()
@@ -43,7 +43,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val storageFolderAccess by model.storageFolderAccess.collectAsStateWithLifecycle()
     val clearingFiles by model.clearing.collectAsStateWithLifecycle()
     val libraryMessage by library.message.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableIntStateOf(2) }
+    var tab by rememberSaveable { mutableIntStateOf(1) }
     var url by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -55,7 +55,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
             url = incomingUrl
-            tab = 2
+            tab = 1
             // Inspeksi diserahkan ke efek DownloadScreen (video vs playlist) — memanggil inspect langsung di sini
             // membuat tautan playlist murni memunculkan "tautan tidak valid" sesaat dan video diperiksa dua kali (BUG-022).
         }
@@ -63,7 +63,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it); model.clearError() } }
     // Info "Terpakai …" di Pengaturan ikut terbaru tiap tab dibuka, bukan cuma pas aplikasi start.
     LaunchedEffect(tab) { if (tab == 4) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
-    LaunchedEffect(libraryMessage) { libraryMessage?.let { if (it.startsWith("Waktu lirik disimpan.")) player.reloadLyrics(); snackbar.showSnackbar(it); library.clearMessage() } }
+    LaunchedEffect(libraryMessage) { libraryMessage?.let { if (it.startsWith("Waktu lirik disimpan.") || it.startsWith("Lirik pilihan disimpan.")) player.refreshLyrics(); snackbar.showSnackbar(it); library.clearMessage() } }
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
     val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
@@ -73,6 +73,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
         ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
     AccentTheme(accentCover, SettingsStore.artworkAccent) {
+    LyricsSearchDialog(library)
     if (fullPlayer && playback.track != null) FullPlayer(playback,player) { fullPlayer=false }
     Scaffold(
         topBar = {
@@ -101,14 +102,14 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             Column {
             if (playback.track != null) MiniPlayer(playback,player) { fullPlayer=true }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val tabs = listOf("Ringkasan", "Koleksi", "Download", "Antrean")
-                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.LibraryMusic, Icons.Outlined.Download, Icons.Outlined.Queue)
+                val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi")
+                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic)
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
                         onClick = { tab = index },
                         icon = {
-                            if (index == 3 && activeCount > 0) {
+                            if (index == 2 && activeCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (activeCount > 99) "99+" else "$activeCount") } }) {
                                     Icon(icons[index], contentDescription = null)
                                 }
@@ -139,7 +140,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         ) { current ->
             screenState.SaveableStateProvider("screen-$current") {
             when (current) {
-                2 -> DownloadScreen(
+                1 -> DownloadScreen(
                     url = url,
                     onUrl = { url = it },
                     metadata = metadata,
@@ -156,7 +157,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         model.enqueue(opts.copy(url = url.trim()))
                         url = ""
                         model.clearPlaylist()
-                        tab = 3
+                        tab = 2
                     },
                     downloadPlaylist = { entries, opts ->
                         requestNotifications()
@@ -164,10 +165,10 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         playlist?.let { model.queuePlaylist(it, entries, opts) }
                         url = ""
                         model.clearPlaylist()
-                        tab = 3
+                        tab = 2
                     },
                 )
-                3 -> QueueScreen(
+                2 -> QueueScreen(
                     jobs = jobs,
                     listState = queueList,
                     onCancel = { model.cancel(it) },
@@ -181,14 +182,15 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onCancelAll = { model.cancelAll() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
-                0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 1 }, downloads = { tab = 2 })
-                1 -> MediaLibraryScreen(library, onPlay={ player.play(it) }) {
+                0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 3 }, downloads = { tab = 1 })
+                3 -> MediaLibraryScreen(library, onPlay={ player.play(it) }) {
                     HistoryScreen(
                     jobs = jobs,
                     listState = historyList,
                     onRetry = { model.retry(it) },
                     onDeleteFile = { model.removeFile(it) },
                     onRefetchLyrics = { model.refetchLyrics(it) },
+                    onSearchLyrics = { library.openLyrics(it) },
                     onPlay = { player.play(it) },
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
