@@ -314,7 +314,7 @@ fun DownloadScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (shownPlaylist != null) Text(
-                        "Auto Folder mengikuti artis yang teridentifikasi untuk setiap lagu. Jika artis belum pasti, file masuk folder utama.",
+                        "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 

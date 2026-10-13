@@ -146,7 +146,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomi
                     downloadPlaylist = { entries, opts ->
                         requestNotifications()
                         // Judul playlist ikut diambil SEBELUM panel dibersihkan — jadi nama subfolder otomatis.
-                        model.queuePlaylist(entries, opts, playlist?.title, playlist?.channel)
+                        playlist?.let { model.queuePlaylist(it, entries, opts) }
                         url = ""
                         model.clearPlaylist()
                         tab = 3

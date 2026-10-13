@@ -29,7 +29,7 @@ def stat_fields(pid):
 def live(pid):
     try:
         return stat_fields(pid)[0] not in ("Z", "X")
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
 
 

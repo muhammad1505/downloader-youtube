@@ -103,10 +103,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   return total
  }
  /** Grant SAF tersimpan yang menunjuk folder bawaan (pernah dipilih lewat pemilihan folder) — dipakai mengukur ukuran folder penuh dan membersihkan folder kosong. */
- private fun defaultTreeGrant(): android.net.Uri? {
+ private fun defaultTreeGrant(requireWrite: Boolean = false): android.net.Uri? {
   val resolver=getApplication<Application>().contentResolver
   return resolver.persistedUriPermissions.firstOrNull { permission ->
-   permission.isReadPermission && runCatching {
+   permission.isReadPermission && (!requireWrite || permission.isWritePermission) && runCatching {
     StorageFolderAccess.matchesDefault(permission.uri.authority,
      android.provider.DocumentsContract.getTreeDocumentId(permission.uri), SettingsStore.storageFolder)
    }.getOrDefault(false)
@@ -187,9 +187,17 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   // identitas metadata tetap URL asli agar cocok dengan input pengguna di layar.
   val original=url.trim()
   val canonical=Selection.playlistInspectionUrl(original) ?: original
+  val cachedSeed=_metadata.value?.takeIf { Selection.videoId(it.url) == Selection.videoId(canonical) }
   inspection=viewModelScope.launch {
    _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null
-   try { _playlist.value=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original) }
+   try {
+    val result=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original)
+    val seed=if (Selection.isMix(original)) cachedSeed ?: try {
+     Engine.inspect(getApplication(), "https://www.youtube.com/watch?v=${Selection.videoId(canonical)}", id)
+    } catch(cancelled: CancellationException) { throw cancelled }
+    catch(_: Exception) { null } else null
+    _playlist.value=result.copy(folderName=Selection.collectionFolder(result, seed))
+   }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
     val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca playlist.")
@@ -207,21 +215,21 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang
   * playlist, bukan inspeksi video (BUG-006/R6). */
  fun retryInspect(url: String) { if(lastInspectPlaylist) inspectPlaylist(url) else inspect(url) }
- /** Each playlist item shares output options; its own proven artist determines the automatic subfolder. */ fun queuePlaylist(entries: List<PlaylistEntry>, options: DownloadOptions, folderTitle: String? = null, folderChannel: String? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
+ /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions) { if(submitting) return; submitting=true; viewModelScope.launch {
   try {
-   val folderMode = if (folderTitle?.startsWith("Mix - ", ignoreCase = true) == true) "mix" else "artist"
+   val folder = Selection.safeFolder(playlist.folderName) ?: Selection.collectionFolder(playlist)
    var queued=0; var skipped=0
    entries.forEach { entry ->
     try {
      val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
        artist = entry.artist, track = entry.track, creator = entry.uploader,
        platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
-     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, entryMetadata=meta, autoFolder=folderMode)
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=meta, autoFolder="collection")
      queued++
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { skipped++ }
    }
-   _notice.value="Playlist: $queued video diantrekan; folder mengikuti artis teridentifikasi." + if(skipped > 0) " $skipped dilewati." else ""
+   _notice.value="Playlist: $queued video diantrekan; semua file masuk folder $folder." + if(skipped > 0) " $skipped dilewati." else ""
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
@@ -256,6 +264,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  } }
  private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null, entryMetadata: VideoMetadata? = null, autoFolder: String = "") {
    recovery.join()
+   check(!_clearing.value) { "Tunggu pembersihan folder selesai sebelum mengunduh." }
    Selection.validate(options)
    val url=options.url.trim()
    // Cek duplikat memakai SELURUH opsi keluaran (BUG-005): bitrate/lirik/sematkan ikut dibandingkan.
@@ -429,109 +438,49 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    else -> "File dan entri riwayat dihapus."
   }
  } }
- /**
- * Hapus SEMUA berkas di folder tujuan (aksi eksplisit pengguna lewat dialog konfirmasi Pengaturan —
- * berbeda dari "bersihkan cache" OPT-008 yang tidak boleh menyentuh media hasil download):
- * (1) berkas yang tercatat di riwayat dihapus via StorageUris (jujur); (2) folder ditelusuri agar
- * berkas yatim tak tercatat ikut hilang; (3) parsial semua job non-aktif dibuang. Riwayat Room TIDAK
- * dihapus — baris tanpa file terbaca "file tidak ada" lewat outputStillExists. Diblokir selama ada
- * unduhan QUEUED/RUNNING/PAUSED agar parsial yang masih dipakai tidak ikut terhapus.
- */
+ /** Clear the selected root's contents only; keep the root and download history. */
  fun clearStorageFolder() { if(_clearing.value) return; _clearing.value=true; viewModelScope.launch(Dispatchers.IO) {
   try {
-   val rows=dao.observe().first()
-   if(rows.any { it.state in setOf(JobState.QUEUED,JobState.RUNNING,JobState.PAUSED) }) {
-    _notice.value="Masih ada unduhan berjalan atau dijeda — batalkan dulu sebelum menghapus semua file."; return@launch
-   }
    val app=getApplication<Application>()
-   var files=0; var failed=0
-   MediaFileOperations.mutex.withLock {
-   // 1) Berkas tercatat di riwayat — penghapusan jujur lewat helper bersama (BUG-003).
-   rows.forEach { job ->
-    job.outputUri?.let { raw -> if(StorageUris.delete(app, raw)) files++ else failed++ }
-    job.sidecarUris?.lines()?.forEach { line ->
-     val raw=line.substringAfter('|',"")
-     if(raw.isNotBlank()) { if(StorageUris.delete(app, raw)) files++ else failed++ }
+   val root=SettingsStore.storageTree?.toUri() ?: defaultTreeGrant(requireWrite=true)
+    ?: error("Akses folder diperlukan. Pilih Download/${SettingsStore.storageFolder} agar file dan subfolder dapat dibersihkan.")
+   val result=MediaFileOperations.mutex.withLock {
+    val rows=dao.observe().first()
+    check(rows.none { it.state in setOf(JobState.QUEUED,JobState.RUNNING,JobState.PAUSED) } && !submitting) {
+     "Masih ada unduhan berjalan atau dijeda — batalkan dulu sebelum menghapus semua file."
     }
-   }
-   // 2) Telusuri folder tujuan — berkas yatim yang tak tercatat ikut terhapus.
-   val tree=SettingsStore.storageTree
-   val swept=if(tree != null) clearTree(tree.toUri(), 0) else clearMediaStoreFolder()
-   files+=swept.first; failed+=swept.second
-   // Jalur MediaStore tak menyimpan direktori — folder playlist yang kini kosong ikut dihapus lewat
-   // grant SAF folder bawaan bila pernah diberikan (tanpa izin, direktori memang tak bisa dihapus Android).
-   if(tree == null) defaultTreeGrant()?.let { root -> val pruned=pruneEmptyFolders(root); files+=pruned.first; failed+=pruned.second }
-   // 3) Parsial sementara (noBackupFilesDir) semua job — sudah dipastikan tidak ada yang berjalan/dijeda.
-   rows.forEach { deleteJobDir(it.id); cancelResultNotification(it.id) }
+    val swept=clearTree(root)
+    rows.forEach { deleteJobDir(it.id); cancelResultNotification(it.id) }
+    swept
    }
    MediaRepository(app).refreshAllAvailability()
-   _notice.value=when {
-    files == 0 && failed == 0 -> "Folder sudah bersih — tidak ada file untuk dihapus."
-    failed > 0 -> "$files file dihapus · $failed file gagal dihapus."
-    else -> "$files file dihapus dari penyimpanan."
+   _notice.value=if(result.clean) {
+    "Folder bersih — ${result.files} file dan ${result.folders} subfolder dihapus. Folder utama tetap tersedia."
+   } else {
+    "${result.files} file dan ${result.folders} subfolder dihapus; pembersihan belum lengkap (${result.failures} kegagalan). Periksa akses folder lalu coba lagi."
    }
   } catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { _error.value=error.message ?: "Pembersihan folder gagal." }
   finally { _clearing.value=false; refreshStorage() }
  } }
- /** Telusuri & hapus semua dokumen di bawah root tree; daftar anak dibaca dulu agar kursor tidak basi saat dihapus. */
- private fun clearTree(root: android.net.Uri, depth: Int): Pair<Int,Int> {
-  if(depth > 8) return 0 to 1 // folder terlalu dalam — hentikan, jangan berjalan tanpa batas.
+ /** Use child document IDs at every level; never delete the granted root. */
+ private fun clearTree(root: android.net.Uri): FolderCleanup.Result {
   val app=getApplication<Application>()
-  val children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(root, android.provider.DocumentsContract.getTreeDocumentId(root))
-  val entries=mutableListOf<Pair<String,String>>()
-  app.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
-   while(c.moveToNext()) entries += (c.getString(0) to (c.getString(1) ?: ""))
-  } ?: return 0 to 1 // folder tidak terbaca = gagal, bukan "sudah bersih".
-  var deleted=0; var failed=0
-  entries.forEach { (id, mime) ->
-   val uri=android.provider.DocumentsContract.buildDocumentUriUsingTree(root, id)
-   if(mime == android.provider.DocumentsContract.Document.MIME_TYPE_DIR) {
-    val nested=clearTree(uri, depth+1)
-    deleted+=nested.first; failed+=nested.second
-    if(StorageUris.delete(app, uri)) deleted++ else failed++ // direktori kosong ikut dihapus.
-   } else  if(StorageUris.delete(app, uri)) deleted++ else failed++
-  }
-  return deleted to failed
- }
- /** Hapus direktori KOSONG bottom-up di bawah root tree — jalur file MediaStore tak meninggalkan jejak direktori sehingga folder playlist kosong tertinggal. */
- private fun pruneEmptyFolders(root: android.net.Uri): Pair<Int,Int> {
-  val app=getApplication<Application>()
-  var deleted=0; var failed=0
-  fun walk(docId: String): Boolean {
-   val children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(root, docId)
-   val entries=mutableListOf<Pair<String,String>>()
-   app.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
-    while(c.moveToNext()) entries += (c.getString(0) to (c.getString(1) ?: ""))
-   } ?: return false // folder tak terbaca = berhenti, jangan nebak kosong.
-   var empty=true
-   entries.forEach { (id, mime) ->
-    if(mime != android.provider.DocumentsContract.Document.MIME_TYPE_DIR) { empty=false; return@forEach }
-    if(!walk(id)) { empty=false; return@forEach }
-    // Hanya direktori yang terbukti kosong (semua anaknya sudah terhapus) yang ikut dihapus.
-    if(StorageUris.delete(app, android.provider.DocumentsContract.buildDocumentUriUsingTree(root, id))) deleted++ else { failed++; empty=false }
+  val resolver=app.contentResolver
+  return FolderCleanup.clear(android.provider.DocumentsContract.getTreeDocumentId(root), list={ id ->
+   val children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(root, id)
+   val entries=mutableListOf<FolderCleanup.Entry>()
+   val cursor=resolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
+    ?: error("Folder belum dapat dibaca.")
+   cursor.use { c ->
+    while(c.moveToNext()) {
+     require(entries.size < 4000) { "Folder terlalu besar untuk dibersihkan sekaligus." }
+     entries += FolderCleanup.Entry(c.getString(0) ?: error("Identitas dokumen tidak tersedia."),
+      (c.getString(1) ?: error("Jenis dokumen tidak tersedia.")) == android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
+    }
    }
-   return empty
-  }
-  walk(android.provider.DocumentsContract.getTreeDocumentId(root)) // root tree sendiri tidak dihapus.
-  return deleted to failed
- }
- /** Baris MediaStore di bawah folder tujuan (termasuk subfolder playlist) — escape % dan _ agar batas berhenti di folder ini (BUG-012). */
- private fun clearMediaStoreFolder(): Pair<Int,Int> {
-  val app=getApplication<Application>()
-  val folder="Download/${SettingsStore.storageFolder}"
-  val escaped=folder.replace("\\","\\\\").replace("%","\\%").replace("_","\\_")
-  val selection="${MediaStore.Downloads.RELATIVE_PATH} = ? OR ${MediaStore.Downloads.RELATIVE_PATH} LIKE ? ESCAPE '\\'"
-  val ids=mutableListOf<Long>()
-  app.contentResolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.Downloads._ID), selection, arrayOf("$folder/","$escaped/%"), null)?.use { c ->
-   while(c.moveToNext()) ids += c.getLong(0)
-  } ?: return 0 to 1
-  var deleted=0; var failed=0
-  ids.forEach { id ->
-   val uri=android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id)
-   if(StorageUris.delete(app, uri)) deleted++ else failed++
-  }
-  return deleted to failed
+   entries
+  }, delete={ id -> StorageUris.delete(app, android.provider.DocumentsContract.buildDocumentUriUsingTree(root, id)) })
  }
  /** Matches the tag used by DownloadWorker.notifyResult so stale result notifications disappear with the entry. */
  private fun cancelResultNotification(id: String) { runCatching {

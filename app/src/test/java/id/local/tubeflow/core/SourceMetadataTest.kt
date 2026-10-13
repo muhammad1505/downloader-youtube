@@ -5,6 +5,62 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SourceMetadataTest {
+    @Test fun mixGroupsByProvenRemixerWithoutPromotingUploaderToArtist() {
+        val raw = "DJ JAUH KO PERGI | SA CERITAKAN PADA BINTANG BINTANG SLOW VIRAL TIKTOK FULL SONG MAMAN FVNDY 2026"
+        val meta = SourceMetadata.parse(JSONObject().put("title", raw).put("uploader", "Maman Fvndy Rmx"),
+            "https://www.youtube.com/watch?v=3J1Opi7MVHw")
+        val job = DownloadJob("id", meta.url, "Video", MediaMode.AUDIO, "mp3", 0, 128, autoFolder = "performer").withMetadata(meta)
+        assertEquals("", job.artist)
+        assertEquals("Maman Fvndy Rmx", job.remixer)
+        assertEquals("maman-fvndy-rmx", job.subfolder)
+        assertTrue(job.title.endsWith(" - Maman Fvndy Rmx"))
+        assertEquals("", job.songIdentity().artist.orEmpty())
+        assertEquals(job.subfolder, job.withNativeAudioMetadata("", "", false).subfolder)
+    }
+
+    @Test fun playlistUsesPerItemIdentityAndUnknownCreditKeepsRoot() {
+        fun job(raw: String, channel: String, artist: String = "") = DownloadJob("id", "https://youtu.be/example", "Video",
+            MediaMode.AUDIO, "mp3", 0, 128, autoFolder = "performer")
+            .withMetadata(VideoMetadata(raw, channel, 200, "", "https://youtu.be/example", artist = artist))
+        assertEquals("artist-a", job("Song A", "Playlist owner", "Artist A").subfolder)
+        assertEquals("artist-b", job("Song B", "Playlist owner", "Artist B").subfolder)
+        assertEquals("", job("DJ CURI CURI PANDANG", "Maman Fvndy Rmx").subfolder)
+        val remix = job("DJ Song - CREATOR RMX", "CREATOR RMX")
+        assertEquals("creator-rmx", remix.subfolder)
+        assertEquals("performer", remix.copy(state = JobState.PAUSED).autoFolder)
+        assertEquals("creator-rmx", remix.withNativeAudioMetadata("", "", false).subfolder)
+        assertEquals("recorded-artist", remix.withNativeAudioMetadata("", "Recorded Artist", false).subfolder)
+    }
+
+    @Test fun explicitIndonesianDuetCreditUsesPerformersAndKeepsLiveVersion() {
+        val raw = "DENNY CAKNAN X HAPPY ASMARA - SATRU 2 ( Offical Live Music ) DC MUSIK"
+        val meta = SourceMetadata.parse(JSONObject().put("title", raw).put("uploader", "DC. PRODUCTION")
+            .put("description", "Title: SATRU 2\nVoc : DENNY CAKNAN FT HAPPY ASMARA\nCipt : DENNY CAKNAN\nProd. Denny caknan"),
+            "https://www.youtube.com/watch?v=rEjSkBl47OY")
+        val job = DownloadJob("id", meta.url, "Video", MediaMode.AUDIO, "mp3", 0, 128, autoFolder = "artist").withMetadata(meta)
+        assertEquals("DENNY CAKNAN FT HAPPY ASMARA", job.artist)
+        assertEquals("SATRU 2", job.trackTitle)
+        assertEquals("Live", job.versionTag)
+        assertEquals("SATRU 2 | Live - DENNY CAKNAN FT HAPPY ASMARA", job.title)
+        assertFalse(job.title.contains("DC MUSIK"))
+        assertEquals("DC. PRODUCTION", job.creator)
+        assertEquals("source_description_credit", job.artistEvidence)
+        assertEquals("denny-caknan-ft-happy-asmara", job.subfolder)
+        assertEquals(raw, job.rawTitle)
+    }
+
+    @Test fun labelledCreditsRejectIncompleteNamesAmbiguityAndNonPerformers() {
+        fun parse(title: String, description: String) = SourceMetadata.parse(
+            JSONObject().put("title", title).put("description", description), "https://youtu.be/example")
+        assertEquals("", parse("Artist - Song", "Title: Song\nCipt: Artist\nProducer: Artist").artist)
+        assertEquals("", parse("Artist - Songbook", "Title: Song\nVoc: Artist").artist)
+        assertEquals("", parse("Artist - Song", "Title: Song\nVoc: Artist Extended").artist)
+        assertEquals("", parse("A X B - Song", "Title: Song\nVoc: A FT C").artist)
+        assertEquals("", parse("Artist - Song - Other", "Title: Song\nTitle: Other\nVoc: Artist").artist)
+        assertEquals("", parse("A - Song - B", "Title: Song\nVoc: A\nVocal: B").artist)
+        assertEquals("Artist", parse("Song - Artist", "Judul Lagu: Song\nPenyanyi: Artist").artist)
+    }
+
     @Test fun soundcloudStructuredTrackDoesNotRepeatSlowedVersionOrPromoteUploader() {
         val meta = SourceMetadata.parse(JSONObject().put("title", "Hysteria-MUSE (slowed)")
             .put("track", "Hysteria-MUSE (slowed)").put("uploader", "sleep_shady").put("duration", 280.183),

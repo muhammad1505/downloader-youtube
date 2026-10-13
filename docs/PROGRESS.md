@@ -278,3 +278,17 @@ Permintaan pengelola: lanjutkan perbaikan Cari ulang lirik dan tambah grafik don
 - **Refetch lirik:** fault injection host lulus, tetapi kegagalan provider Android, refetch live di perangkat, dan proses mati belum diuji; **Lamunan tidak di-refetch** (file audio/LRC-nya tidak diubah, baseline sinkron sebelumnya tetap berlaku).
 - Periode 30/90 hari tercatat diperiksa via UIAutomator menurut `release.json`, tetapi screenshot tersimpan hanya untuk 7 hari. Tidak ada benchmark FPS/daya/kecepatan, tidak ada uji unduhan live pada batch ini, dan tidak ada sinkronisasi lirik baru yang didengarkan.
 - Temuan terbuka pada [rekonsiliasi](#rekonsiliasi-backlog-bug-roadmap-dan-release--13-oktober-2026) — BUG-008/003 (create→journal, proses mati), generation guard sidecar/status lirik, serta matriks perangkat/lisensi — **tetap terbuka**; batch ini hanya memperkuat jalur refetch (BUG-016/OPT-002) di tingkat host. Checklist historis tidak dicentang massal.
+
+
+## Pemeriksaan perubahan pengguna, kredit penyanyi dan Auto Folder1.1.2 — 13 Oktober2026
+
+Commit2415049/02ce4ed serta APK1.1.1 diverifikasi. Dashboard koleksi nyata50audio/259.937.411byte/7LRC cocok;43metadata parsial mengungkap sisa penamaan yang belum tuntas. LinkrEjSkBl47OY yang disebutPINGAL sebenarnyaSATRU2live dengan labelTitle/Voc. SourceMetadata kini memakai kredit performer eksplisit yang cocok dengan rawtitle; Cipt/produser/channel bukanartis (BUG-038).
+
+Pengelola memilih folder perartis/remixer diTubeFlow. Jobplaylistbaru memakai policyperformer danhelperfolderbersama sumber/nativeprobe; remixerteridentifikasi boleh menjadi folder ketika artistasli belum pasti, tetapi tidak menjadi artistmetadata/LRCLIB (BUG-039). Legacy artist/mix dan schema9 dipertahankan. Panduan skill invariants diperbarui; filelama tidak dipindahkan otomatis.
+
+149Kotlin/76Python, lint0, signedAPK×3/AAB serta audit/bundletool lulus. SuitePython pertama menemukan raceESRCH padahelper /proc tes proses; helper diperbaiki dan suiteulangOK. Buildfinal11m11s, ARM64 63.025.815byte/SHA256d7210fba…, terpasang update-r diRealmeAndroid10;57file lama nama/hash sama. Mixuser25entri; seeddipilih sendiri menghasilkan Opus4.114.238byte/247,800s dancover800×450 diTubeFlow/maman-fvndy-rmx, judul/version/remixer benar, decode penuh exit0. Antrean kosong dan57filelama utuh. Uji sumberduet final juga lulus: SATRU2Live terbit dengan tag/folder DennyCaknanFTHappyAsmara, creatorDC.PRODUCTION terpisah, decode penuh dan hash filelama lulus; [laporan rinci](SOURCE_REVIEW_2026-10-13.md).
+
+
+## Checkpoint 13 Oktober 2026 — koleksi dan cleanup1.1.3
+
+Pilihan terbaru menggantikan folder per artis: satu folder untuk semua pilihan Mix/album. Policy collection mempertahankan snapshot folder melalui metadata/retry. Cleanup SAF bottom-up menjaga root dan melaporkan kegagalan; grant root tepat diminta sebelum pembersihan lengkap. 160 Kotlin/76 Python/lint0 lulus; build signed sedang berjalan. Pengelola meminta install segera dan tes pemakaian sendiri; runtime1.1.3 belum diklaim. Lihat [laporan](COLLECTION_CLEANUP_2026-10-13.md).

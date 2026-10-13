@@ -48,12 +48,45 @@ fun SettingsScreen(
     var confirmClearFiles by rememberSaveable { mutableStateOf(false) }
     val tree = SettingsStore.storageTree
     var folderAccessError by rememberSaveable { mutableStateOf(false) }
+    var pendingClearFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var clearAccessError by rememberSaveable { mutableStateOf<String?>(null) }
+    val clearTreeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val expected = pendingClearFolder
+        pendingClearFolder = null
+        if (uri != null && expected != null) {
+            clearAccessError = runCatching {
+                require(SettingsStore.storageTree == null && SettingsStore.storageFolder == expected &&
+                    StorageFolderAccess.matchesDefault(uri.authority, DocumentsContract.getTreeDocumentId(uri), expected)) {
+                    "Pilih tepat Download/$expected. Folder lain tidak dihapus dan tujuan download tetap sama."
+                }
+                context.contentResolver.takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                onRefreshStorage()
+                onClearStorage()
+            }.exceptionOrNull()?.message
+        }
+    }
     if (confirmClearFiles) {
         AlertDialog(
             onDismissRequest = { confirmClearFiles = false },
             title = { Text("Hapus semua file?") },
-            text = { Text("Seluruh file di ${if (tree != null) "folder pilihan" else "Downloads/${SettingsStore.storageFolder}"} (termasuk subfolder playlist dan file pendukung lirik/subtitle) akan dihapus permanen. Riwayat unduhan tetap tersimpan di aplikasi, tetapi file-nya hilang. Unduhan yang berjalan atau dijeda harus diselesaikan atau dibatalkan dulu.") },
-            confirmButton = { TextButton(onClick = { confirmClearFiles = false; onClearStorage() }) { Text("Hapus semua", color = MaterialTheme.colorScheme.error) } },
+            text = { Text("Seluruh file dan subfolder di ${if (tree != null) "folder pilihan" else "Download/${SettingsStore.storageFolder}"} akan dihapus permanen. Folder utama dan riwayat unduhan tetap tersimpan. Selesaikan atau batalkan unduhan yang berjalan/dijeda terlebih dahulu. Jika akses folder belum tersedia, pilih folder utama di pemilih sistem untuk melanjutkan.") },
+            confirmButton = { TextButton(onClick = {
+                confirmClearFiles = false
+                clearAccessError = null
+                val folder = SettingsStore.storageFolder
+                val writableDefault = context.contentResolver.persistedUriPermissions.any { permission ->
+                    permission.isReadPermission && permission.isWritePermission && runCatching {
+                        StorageFolderAccess.matchesDefault(permission.uri.authority,
+                            DocumentsContract.getTreeDocumentId(permission.uri), folder)
+                    }.getOrDefault(false)
+                }
+                if (tree != null || writableDefault) onClearStorage() else {
+                    pendingClearFolder = folder
+                    clearTreeLauncher.launch(DocumentsContract.buildDocumentUri(
+                        "com.android.externalstorage.documents", "primary:Download/$folder"))
+                }
+            }) { Text("Hapus semua", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { confirmClearFiles = false }) { Text("Batal") } },
         )
     }
@@ -146,6 +179,9 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                if (clearAccessError != null) {
+                    Text(clearAccessError.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 if (folderAccessError) {
                     Text("Akses folder tidak dapat disimpan. Pilih folder yang bisa dibaca dan ditulis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

@@ -4,21 +4,37 @@ import org.json.JSONObject
 
 object SourceMetadata {
     private val officialCredit = Regex("""(?i)^official\s+(?:music|audio)(?:\s+live)?\s+from\s+(.+?)\s+[-–—]\s+(.+?)\s*$""")
+    private val trackLabel = Regex("""(?i)^(?:title|song title|track|judul(?: lagu)?)\s*:\s*(.+)$""")
+    private val performerLabel = Regex("""(?i)^(?:voc|vocals?|vokal|vocalist|singer|penyanyi|performed by)\s*:\s*(.+)$""")
+    private val collaboration = Regex("""(?i)\s+(?:x|ft\.?|feat\.?|featuring|&)\s+""")
     private fun normalized(value: String) = value.lowercase().replace(Regex("""[^\p{L}\p{N}]+"""), " ").trim()
+    private fun creditWords(value: String) = normalized(value.replace(collaboration, " & "))
 
     /** Explicit performer/track credit corroborated by the title; unrelated names and composers are ignored. */
     private fun descriptionCredit(title: String, description: String): Pair<String, String>? {
-        val titleWords = " ${normalized(title)} "
-        return description.lineSequence().take(50).mapNotNull { line ->
+        val titleWords = " ${creditWords(title)} "
+        fun corroborated(artist: String, track: String): Boolean {
+            val artistWords = creditWords(artist)
+            val trackWords = normalized(track)
+            return artistWords.isNotBlank() && trackWords.isNotBlank() &&
+                titleWords.contains(" $artistWords ") && titleWords.contains(" $trackWords ")
+        }
+        val lines = description.lineSequence().take(50).map(String::trim).toList()
+        val credits = lines.mapNotNull { line ->
             val match = officialCredit.matchEntire(line.trim()) ?: return@mapNotNull null
             val artist = match.groupValues[1].trim()
             val track = match.groupValues[2].trim()
-            val artistWords = normalized(artist)
-            val trackWords = normalized(track)
-            if (artistWords.isBlank() || trackWords.isBlank() ||
-                !titleWords.contains(" $artistWords ") || !titleWords.contains(" $trackWords ")) null
-            else artist to track
-        }.distinctBy { normalized(it.first) to normalized(it.second) }.toList().singleOrNull()
+            if (corroborated(artist, track)) artist to track else null
+        }.toMutableList()
+        // Accept one explicit title/performer pair, not composers, producers or channel names.
+        val tracks = lines.mapNotNull { trackLabel.matchEntire(it)?.groupValues?.get(1)?.trim() }
+            .distinctBy(::normalized)
+        val performers = lines.mapNotNull { performerLabel.matchEntire(it)?.groupValues?.get(1)?.trim() }
+            .distinctBy(::creditWords)
+        if (tracks.size == 1 && performers.size == 1 && corroborated(performers.single(), tracks.single())) {
+            credits += performers.single() to tracks.single()
+        }
+        return credits.distinctBy { creditWords(it.first) to normalized(it.second) }.singleOrNull()
     }
 
     fun parse(json: JSONObject, url: String): VideoMetadata {

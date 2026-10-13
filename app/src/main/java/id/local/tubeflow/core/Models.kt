@@ -21,7 +21,7 @@ data class DownloadOptions(
 )
 data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "")
 data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "")
-data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "")
+data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "")
 @Entity(tableName = "downloads")
 data class DownloadJob(
  @PrimaryKey val id: String,
@@ -102,7 +102,15 @@ fun DownloadJob.withMetadata(meta: VideoMetadata): DownloadJob {
         platformId = meta.platformId.ifBlank { SourcePlatforms.fromUrl(url).id },
         thumbnailUrl = meta.thumbnail.ifBlank { thumbnailUrl }, sourceId = meta.sourceId, extractor = meta.extractor,
         durationSeconds = meta.durationSeconds.takeIf { it > 0 } ?: durationSeconds,
-        subfolder = if (autoFolder.isNotBlank()) Selection.artistFolder(identity.artist.orEmpty(), autoFolder == "mix").orEmpty() else subfolder)
+        subfolder = automaticSubfolder(identity))
+}
+
+/** Collection snapshots survive per-song metadata refresh; legacy policies keep their behavior. */
+private fun DownloadJob.automaticSubfolder(identity: SongIdentity): String = when (autoFolder) {
+    "collection" -> subfolder
+    "performer" -> Selection.artistFolder(identity.artist.orEmpty().ifBlank { identity.remixer }).orEmpty()
+    "" -> subfolder
+    else -> Selection.artistFolder(identity.artist.orEmpty(), autoFolder == "mix").orEmpty()
 }
 
 /** Existing file credits are evidence, never an uploader fallback. Keep raw source identity intact. */
@@ -119,7 +127,7 @@ fun DownloadJob.withNativeAudioMetadata(nativeTitle: String, nativeArtist: Strin
         evidence = if (identity.artist.isNullOrBlank() && performer.isNotBlank()) "file_metadata" else identity.evidence)
     return copy(trackTitle=resolved.title, title=TitleSplit.display(resolved), artist=performer,
         artistEvidence=resolved.evidence,
-        subfolder=if (autoFolder.isNotBlank()) Selection.artistFolder(performer, autoFolder == "mix").orEmpty() else subfolder)
+        subfolder=automaticSubfolder(resolved))
 }
 
 /** Semua opsi keluaran identik — dasar cek duplikat antrean maupun hasil selesai (BUG-005). */
@@ -348,6 +356,19 @@ object Selection {
 
   // No artist evidence: keep the root folder, rather than promote an uploader/title fragment.
   return null
+ }
+ /** One folder per collection. Mix uses the verified seed performer, never the playlist owner. */
+ fun collectionFolder(playlist: PlaylistMetadata, seed: VideoMetadata? = null): String {
+  if (!isMix(playlist.url)) return artistFolder(playlist.title)
+   ?: "playlist-${java.security.MessageDigest.getInstance("SHA-256").digest(playlist.url.toByteArray()).take(6).joinToString("") { "%02x".format(it) }}"
+  val seedId = videoId(playlistInspectionUrl(playlist.url).orEmpty())
+  val trusted = seed?.takeIf { seedId != null && videoId(it.url) == seedId }
+  val identity = trusted?.let { TitleSplit.identify(it.title, it.uploader, it.artist, it.track, it.creator) }
+  val performer = identity?.artist.orEmpty().ifBlank { identity?.remixer.orEmpty() }
+   .split(collaborator).first().trim()
+  return artistFolder(performer, mix=true)
+   ?: artistFolder(seedId.orEmpty().ifBlank { listParam(playlist.url).orEmpty() }, mix=true)
+   ?: "mix-${java.security.MessageDigest.getInstance("SHA-256").digest(playlist.url.toByteArray()).take(6).joinToString("") { "%02x".format(it) }}"
  }
  fun artistFolder(artist: String, mix: Boolean = false): String? {
   if (artist.isBlank()) return null

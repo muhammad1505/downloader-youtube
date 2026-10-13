@@ -8,7 +8,9 @@ Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPME
 
 ## Status dan titik mulai
 
-**Pembaruan 13 Oktober:** daftar mencapai BUG-037. 1.0.12 memperbaiki alias SoundCloud ber-UTM dan tie kandidat lirik. Lamunan sebelumnya dikonfirmasi sinkron; estimasi terbaru Ya Sudahlah sekitar1detik. Koreksi per lagu1.1.0 teruji secara struktural, koreksi per rekaman total−2s pada1.1.0 dikonfirmasi sinkron oleh pengguna. Detail dan cakupan: [laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md). **Rilis 1.1.1/code15** (dashboard Ringkasan media + penguatan cari ulang lirik/BUG-016) kini terpasang di HP — hasil host/perangkat dan batas cakupan ada pada [laporan DASHBOARD_LYRICS](DASHBOARD_LYRICS_2026-10-13.md) dan [DEVICE_TEST](DEVICE_TEST.md); tidak ada temuan ID baru dalam batch ini.
+**Pembaruan 13 Oktober:** daftar mencapai BUG-039. 1.0.12 memperbaiki alias SoundCloud ber-UTM dan tie kandidat lirik. Lamunan sebelumnya dikonfirmasi sinkron; estimasi terbaru Ya Sudahlah sekitar1detik. Koreksi per lagu1.1.0 teruji secara struktural, koreksi per rekaman total−2s pada1.1.0 dikonfirmasi sinkron oleh pengguna. Detail dan cakupan: [laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md). **Rilis 1.1.1/code15** (dashboard Ringkasan media + penguatan cari ulang lirik/BUG-016) kini terpasang di HP — hasil host/perangkat dan batas cakupan ada pada [laporan DASHBOARD_LYRICS](DASHBOARD_LYRICS_2026-10-13.md) dan [DEVICE_TEST](DEVICE_TEST.md); tidak ada temuan ID baru dalam batch ini.
+
+**Pembaruan 1.1.2/code16:** kredit Title/Voc dan folder per artis/remixer diperbaiki (BUG-038/039);149 Kotlin/76 Python, lint0, audit paket/bundletool lulus. APK final terpasang,57file lama utuh; seed Mix terbit di folder remixer. [Laporan sumber dan pengujian](SOURCE_REVIEW_2026-10-13.md).
 
 ### Rekonsiliasi kode dan bukti terbaru — 13 Oktober 2026
 
@@ -64,6 +66,8 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-035 | P2 | Tahun unggah/uploader mencemari tag musik | Kebijakan tag native/musik eksplisit diperbaiki 1.1.0, regresi host lulus |
 | BUG-036 | P2 | URI kanonis LRC membuat rename ditolak Android10 | URI akses dipakai; rename pasangan dan pemulihan nama asli lulus APK final |
 | BUG-037 | P1 | Dispatch bootstrap gagal sebelum transfer | Entry point diperbaiki, 76 tes Python lulus; retry video final berhasil, decode penuh lulus |
+| BUG-038 | P1 | Kredit Title/Voc tidak dibaca | Diperbaiki1.1.2; SATRU2 terbit dengan judul/artis/tag/folder benar pada HP |
+| BUG-039 | P2 | Auto Folder mengabaikan remixer teridentifikasi | Diperbaiki1.1.2; seed Mix terbit di folder remixer pada HP, decode/hash lama lulus |
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -454,3 +458,34 @@ Permintaan lengkap pengelola 13 Oktober 2026 ditangani sebagai satu perubahan da
 - **Status:** diperbaiki; retry YouTube Lamunan pada APK final memublikasikan MP4 28.569.594 byte, decode penuh exit0, lihat [laporan upgrade](SMART_MEDIA_UPGRADE_2026-10-13.md).
 
 Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar delay tetap±0,5s. Total koreksi kini−1,5s, seluruh62timestamp diverifikasi terhadap baseline asli; Pengguna kemudian memajukan lagi menjadi total−2s dan mengonfirmasi sinkron; semua62timestamp pada file aktual diverifikasi−2000ms, hash audio tetap asli.
+
+
+## BUG-038 — P1: Kredit penyanyi berlabel Title/Voc tidak dibaca
+
+- **Bukti:** sumber `rEjSkBl47OY` adalah SATRU 2 live, channel DC.PRODUCTION; artist/track engine kosong tetapi deskripsi memberi judul dan penyanyi eksplisit. Link ini bukan PINGAL.
+- **Akar penyebab:** `SourceMetadata.descriptionCredit` hanya menerima kalimat Official Music from, sehingga kredit berlabel terlewat dan memengaruhi nama, folder, tag serta query lirik.
+- **Perbaikan:** satu pasangan label judul/performer divalidasi terhadap nama lengkap dan raw title; connector X/FT disetarakan, kredit ganda dan Cipt/produser ditolak. Raw title/creator tetap terpisah; Live dipertahankan.
+- **Status:** implementasi1.1.2;149 tes Kotlin/76 Python lulus. Build/audit final lulus; SATRU2 di HP terbit dengan judul/artis/tag/folder benar dan decode penuh lulus. Format target `SATRU 2 | Live - DENNY CAKNAN FT HAPPY ASMARA`; belum membuktikan lirik sinkron untuk setiap rekaman.
+
+## BUG-039 — P2: Auto Folder mengabaikan remixer teridentifikasi
+
+- **Bukti:** Mix `RD3J1Opi7MVHw` membaca25 entri pada respons audit. Seed mempunyai remixer teridentifikasi dari kredit judul, tetapi artist kosong membuat folder tetap root.
+- **Pilihan awal pengelola (digantikan BUG-040):** folder per artis/remixer di TubeFlow. Aturan terbaru memakai satu folder bersama per Mix/album.
+- **Akar penyebab:** `withMetadata`/`withNativeAudioMetadata` hanya memakai artist; `queuePlaylist` menentukan mode dari prefix judul dan mengabaikan kredit remixer.
+- **Perbaikan:** job playlist baru memakai `autoFolder=performer`; helper bersama memilih artis terbukti lalu remixer teridentifikasi. Uploader/channel tidak dianggap artis. UI menjelaskan fallback root jika kredit belum pasti. Schema9 dan policy lama kompatibel.
+- **Status:**149 tes Kotlin/76 Python, lint0 dan audit paket lulus; seed Mix pada APK final terbit di folder remixer dan decode penuh lulus. Contoh seed: `TubeFlow/maman-fvndy-rmx/`. [Laporan sumber dan hasil](SOURCE_REVIEW_2026-10-13.md).
+
+
+## BUG-040 — P2: Satu Mix/album tersebar ke beberapa folder
+
+- **Akar penyebab:** policy `performer` menentukan folder ulang dari artis/remixer setiap entri saat metadata sumber/native diperbarui. Ini bertentangan dengan pilihan terbaru: satu folder per koleksi.
+- **Solusi:** inspeksi menyimpan snapshot folder koleksi; Mix memakai artis utama seed yang terbukti atau remixer, bukan pemilik playlist. Album/playlist statis memakai judul playlist. Fallback Mix adalah ID seed. Seluruh pilihan memakai `autoFolder=collection` dan `subfolder` yang sama, termasuk retry/resume. Nama/tag tiap lagu tetap mengikuti identitasnya sendiri.
+- **Contoh:** SATRU2 seed `rEjSkBl47OY` → `TubeFlow/mix-denny-caknan/`; seed DJ `3J1Opi7MVHw` → `TubeFlow/mix-maman-fvndy-rmx/`.
+- **Validasi:** lihat [laporan koleksi dan cleanup](COLLECTION_CLEANUP_2026-10-13.md). Jumlah entri mengikuti snapshot server, bukan angka25 yang dipaksakan.
+
+## BUG-041 — P2: Hapus semua file meninggalkan subfolder dan mengaku bersih
+
+- **Bukti awal:** setelah reset pengguna, root TubeFlow berisi0 file tetapi5 subfolder kosong.
+- **Akar penyebab:** MediaStore tidak mencatat direktori kosong; pruning dilewati ketika grant SAF belum ada. `clearTree` juga menggunakan ID root pada rekursi anak; pembacaan gagal pada pruning tidak dicatat sebagai kegagalan.
+- **Solusi:** akses baca/tulis tepat pada root lewat pemilih Android, tanpa mengganti default MediaStore. Traversal terbatas bottom-up memakai ID dokumen anak, menghitung file/folder terpisah, memverifikasi kosong sebelum menghapus induk, mempertahankan root/riwayat dan menolak laporan bersih bila gagal. Root lain tidak dihapus; job aktif/dijeda memblokir cleanup.
+- **Validasi:** tes kegagalan/rekursi/siklus/batas traversal dan HP tercatat dalam [laporan](COLLECTION_CLEANUP_2026-10-13.md).

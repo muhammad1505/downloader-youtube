@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.work.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import java.io.File class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context,params) {
  companion object {
   /**
@@ -182,7 +183,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    val resolver = applicationContext.contentResolver
    val tree = SettingsStore.storageTree
    // SAF: dokumen induk media & sidecar — direktori subfolder playlist bila ada, akar tree kalau tidak.
-   val parentDoc: Uri? = if (tree != null) (subfolder?.let { ensureSubfolderDoc(resolver, tree, it) } ?: treeRootUri(tree)) else null
+   val parentDoc: Uri? = if (tree != null) (subfolder?.let { MediaFileOperations.mutex.withLock { ensureSubfolderDoc(resolver, tree, it) } } ?: treeRootUri(tree)) else null
    val name = SmartMedia.fileName(job.songIdentity(), job.rawTitle.ifBlank { job.title }, result.extension, job.autoRename)
    val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(result.extension) ?: "application/octet-stream"
    publish(DownloadProgress(DownloadPhase.SAVING, 0f), force = true)
@@ -377,12 +378,13 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   val treeUri = tree.toUri()
   val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
   val rootDoc = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
-  fun findExisting(): String? = runCatching {
+  fun findExisting(): String? {
    resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(rootDoc, treeDocId), arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
     while (cursor.moveToNext()) if (cursor.getString(2) == android.provider.DocumentsContract.Document.MIME_TYPE_DIR && cursor.getString(1) == name) return cursor.getString(0)
    }
-   null
-  }.getOrNull()
+   ?: error("Folder pilihan belum dapat dibaca.")
+   return null
+  }
   findExisting()?.let { return DocumentsContract.buildDocumentUriUsingTree(rootDoc, it) }
   val made = DocumentsContract.createDocument(resolver, rootDoc, android.provider.DocumentsContract.Document.MIME_TYPE_DIR, name) ?: error("Tidak dapat membuat subfolder di folder pilihan.")
   // Balapan dua worker: menangkan direktori paling awal dan buang yang kosong baru dibuat.
@@ -392,6 +394,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    if (winnerUri != made) runCatching { DocumentsContract.deleteDocument(resolver, made) }
    return winnerUri
   }
+  require(displayNameOf(resolver, made) == name) { "Nama folder koleksi tidak sesuai; periksa konflik nama di folder pilihan." }
   return made
  }
 

@@ -188,3 +188,19 @@ Batch dashboard + penguatan cari ulang lirik (kontrak, hasil host, dan batas len
 - **Instalasi:** `adb install -r` atas 1.1.0 (code14) → **1.1.1 (code15)** sukses (`lastUpdateTime 13 Okt 2026 09:58:46`); `base.apk` ditarik dari HP ber-SHA256 `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0` — identik `distribution/1.1.1/TubeFlow-1.1.1-arm64-v8a-release.apk` (63.025.099 byte). Sertifikat signer sama dengan rilis sebelumnya.
 - **UI dashboard (UIAutomator + screenshot, 09:59–10:03):** donat kondisi kosong menampilkan "0 media tersedia / Belum ada media tersedia" dan "5 file tidak dapat diakses tidak masuk grafik"; batang 7 hari (2026-10-07…2026-10-13) menampilkan puncak 2 selesai/hari, ringkasan 2/1/0 dan rasio 66% dengan catatan "Pencatatan dimulai 13 Okt 2026 08:21 … tidak merekonstruksi aktivitas sebelum upgrade", hari tanpa pencatatan bertanda "Titik abu-abu", bukan 0; garis akumulasi total periode 2 dengan legenda "bukan jumlah file atau riwayat ukuran penyimpanan"; kartu sumber "YouTube · 2". Tangkapan layar: [donut](images/dashboard-1.1.1-donut.png), [bars](images/dashboard-1.1.1-bars.png), [line](images/dashboard-1.1.1-line.png). Periode 30/90 hari tercatat diperiksa via UIAutomator pada `release.json`; screenshot yang disimpan hanya 7 hari.
 - **Belum diuji di batch ini:** koleksi berisi media setelah pembersihan pengelola (donat hanya diuji pada kondisi kosong — retensi media `not established` menurut `release.json`); refetch lirik live di perangkat, kegagalan provider SAF, dan proses mati (fault injection host saja); sinkronisasi lirik/Lamunan tidak disentuh; benchmark FPS/daya/kecepatan tidak diukur.
+
+
+## Pemeriksaan perubahan dan Auto Folder1.1.2 — 13 Oktober2026
+
+Baseline1.1.1 yang benar-benar terpasang diperiksa kembali dengan koleksi nyata:50audio/259.937.411byte/7LRC, donat50/0, batang/garis50, rowhistory50completed vs aktivitas50completed/2failed (retry). Normalisasi/tag/artwork aktif.43metadata masih parsial, sehingga penamaan seluruh koleksi belum dinyatakan selesai.
+
+Release1.1.2/code16/Room9 ber-SHA256 `d7210fba3fe44419144629a7c41335296733be6da79fe31b73b2ad0dfd7a093a` terpasang sebagai update pada RealmeAndroid10, base.apk cocok.57file lama memiliki nama/hash identik sebelum/sesudah update.149Kotlin/76Python, lint0, audit APK×3/AAB dan bundletool lulus.
+
+Mix RD3J1Opi7MVHw menampilkan25entri. Hanya seed dipilih, opsiAudioAuto+lirik+sampul: Opus4.114.238byte/247,800s terbit di `Download/TubeFlow/maman-fvndy-rmx/`, nama judul/version/remixer sesuai; tag creator/remixer terpisah dari artist asli yang kosong, cover800×450. Decode penuh exit0, antrean kembali kosong, semua57file lama utuh. Ini bukan unduhan ulang otomatisMP3 lama, melainkan varian sumber untuk uji policyfolder. [Detail dan batas](SOURCE_REVIEW_2026-10-13.md).
+
+Sampel kedua dariMixRDrEjSkBl47OY (SATRU2duet) juga selesai lewat pickerplaylist: `TubeFlow/denny-caknan-ft-happy-asmara/SATRU 2 _ Live - DENNY CAKNAN FT HAPPY ASMARA.opus`,6.693.911byte/393,980s, tag title/artis/creator benar, cover800×450, decode penuh exit0.57file lama dan sampelMix pertama utuh. LRC baru tidak terbit pada kedua sampel; tidak ada klaim auditori baru.
+
+
+## Kandidat1.1.3 — playlist dan cleanup
+
+160 Kotlin/76 Python/lint0 lulus. Pengguna meminta APK dipasang segera setelah build dan akan menguji sendiri karena waktu kerja; skenario runtime1.1.3 belum dijalankan. Baseline pengguna setelah reset:0file/5subfolder kosong. [Checklist dan cakupan](COLLECTION_CLEANUP_2026-10-13.md).

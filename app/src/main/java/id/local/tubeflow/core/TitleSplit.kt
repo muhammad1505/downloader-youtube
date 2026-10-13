@@ -31,7 +31,7 @@ object TitleSplit {
             val inner = clean(match.groupValues[1])
             when {
                 version.containsMatchIn(inner) -> {
-                    bits += clean(inner.replace(Regex("""(?i)\b(?:official|music|video|audio)\b"""), " "))
+                    bits += clean(inner.replace(Regex("""(?i)\b(?:official|offical|music|video|audio)\b"""), " "))
                     " "
                 }
                 promoGroup.containsMatchIn(inner) -> " "
