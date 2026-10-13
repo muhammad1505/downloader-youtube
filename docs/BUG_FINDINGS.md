@@ -2,32 +2,47 @@
 
 Dokumen serah-terima pengembangan berdasarkan hasil review dalam percakapan dan pembacaan kode pada **9 Oktober 2026**. Daftar komentar berisi **12 temuan** (1 P1, 9 P2, 2 P3), walaupun ringkasan review menyebut 11. Tidak tersedia riwayat Git untuk melacak commit perbaikan. Nomor baris di bawah sesuai snapshot saat dokumentasi dibuat; gunakan nama fungsi bila kode bergeser.
 
-Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, lalu catatan verifikasi perangkat 9 Oktober 2026 (malam) menambahkan **BUG-015** (provider SAF menyisipkan ekstensi mime). Audit ulang kemudian menemukan **BUG-016** (penggantian lirik dapat merusak file lama saat gagal). Total sekarang **16 temuan** (1 P1, 13 P2, 2 P3). BUG-013/014/016 berasal dari pemeriksaan kode/probe; bukti perangkat BUG-015 berasal dari sesi sebelumnya.
+Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, lalu catatan verifikasi perangkat 9 Oktober 2026 (malam) menambahkan **BUG-015** (provider SAF menyisipkan ekstensi mime). Audit ulang kemudian menemukan **BUG-016** (penggantian lirik dapat merusak file lama saat gagal). Total pada audit 9 Oktober tersebut **16 temuan** (1 P1, 13 P2, 2 P3). BUG-013/014/016 berasal dari pemeriksaan kode/probe; bukti perangkat BUG-015 berasal dari sesi sebelumnya.
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
 ## Status dan titik mulai
 
-**Hasil audit ulang: belum semua tuntas.** Dari 15 temuan sebelumnya, **9 memiliki perbaikan kode sesuai masalah awal, 6 masih sebagian diperbaiki**; ditambah **1 temuan baru terbuka** (BUG-016). Perbaikan kode sesuai belum berarti verifikasi runtime lengkap. Bukti, lokasi kode terkini, dan langkah pengerjaan ada di [REVIEW_2026-10-09.md](REVIEW_2026-10-09.md). [PROGRESS.md](PROGRESS.md) dan "Catatan perbaikan" di bawah mencatat batch sebelumnya; kesimpulan audit terbaru menjadi acuan status.
+**Pembaruan 13 Oktober:** daftar mencapai BUG-037. 1.0.12 memperbaiki alias SoundCloud ber-UTM dan tie kandidat lirik. Lamunan sebelumnya dikonfirmasi sinkron; estimasi terbaru Ya Sudahlah sekitar1detik. Koreksi per lagu1.1.0 teruji secara struktural, koreksi per rekaman total−2s pada1.1.0 dikonfirmasi sinkron oleh pengguna. Detail dan cakupan: [laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md). **Rilis 1.1.1/code15** (dashboard Ringkasan media + penguatan cari ulang lirik/BUG-016) kini terpasang di HP — hasil host/perangkat dan batas cakupan ada pada [laporan DASHBOARD_LYRICS](DASHBOARD_LYRICS_2026-10-13.md) dan [DEVICE_TEST](DEVICE_TEST.md); tidak ada temuan ID baru dalam batch ini.
+
+### Rekonsiliasi kode dan bukti terbaru — 13 Oktober 2026
+
+Tidak ada klaim seluruh37bug tertutup. Perbaikan host, uji normal perangkat, dan fault injection adalah bukti berbeda. [Roadmap aktual](DEVELOPMENT_ROADMAP.md#status-aktual-hasil-rekonsiliasi--13-oktober-2026-110code14) dan [checkpoint backlog](PROGRESS.md#rekonsiliasi-backlog-bug-roadmap-dan-release--13-oktober-2026) memisahkan pekerjaan belum diimplementasikan dari cakupan belum diuji.
+
+Risiko kode pada checkpoint rekonsiliasi1.1.0 berikut adalah historis; **refetch BUG-016/OPT-002 diperkuat oleh rilis 1.1.1** (kini terpasang di HP — lihat [laporan dashboard/lirik](DASHBOARD_LYRICS_2026-10-13.md) untuk hasil host/perangkat dan batasnya). Risiko worker/recovery BUG-008/003 dan generation tetap terbuka. Tidak mengklaim semua risiko berikut telah diperbaiki:
+
+- **BUG-016 / OPT-002:** `writeLyricBesideAudio` tetap membuka `wt` saat backup null; pemulihan memakai `runCatching` tanpa read-back. Editor koreksi1.1.0 mempunyai jurnal/`VerifiedTextWrite`, tetapi refetch lama belum menggunakannya. Refetch dan editor memakai guard terpisah sehingga tidak saling mengunci.
+- **BUG-008 / BUG-003:** recovery ViewModel dan awal worker mengabaikan hasil `StorageUris.delete` lalu melepas pending/sidecar journal; URI dapat kehilangan jejak bila provider menolak. Create/rename sidecar worker juga mendahului pencatatan URI sehingga jendela process death masih ada. Komit sidecar atomik tidak menutup seluruh alur.
+- **BUG-002 / BUG-004 / BUG-008:** `sidecarPending`, `sidecars`, `commitSidecar`, `lyricStatus` belum memiliki syarat generation/state; `awaitIdle` menunggu WorkManager+thread engine, bukan bukti semua coroutine cleanup berhenti. Ini risiko berdasarkan kode, belum reproduksi race Android baru.
+- **BUG-010 / BUG-015:** nama actual stem dipakai pada unduhan normal, tetapi jalur refetch lama hanya memeriksa akhiran `.lrc`, bukan kesamaan nama dasar lengkap; fallback induk SAF ke root saat query parent gagal belum membuktikan sidecar tetap di subfolder audio.
+
+Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jangan memakai sukses koreksi waktu Ya Sudahlah untuk menutup keamanan Cari ulang atau cleanup provider gagal.
+
+**Hasil audit ulang 9 Oktober: belum semua tuntas.** Dari 15 temuan sebelumnya, **9 memiliki perbaikan kode sesuai masalah awal, 6 masih sebagian diperbaiki**; ditambah **1 temuan baru terbuka** (BUG-016). Perbaikan kode sesuai belum berarti verifikasi runtime lengkap. Bukti, lokasi kode terkini, dan langkah pengerjaan ada di [REVIEW_2026-10-09.md](REVIEW_2026-10-09.md). [PROGRESS.md](PROGRESS.md) dan "Catatan perbaikan" di bawah mencatat batch sebelumnya; audit tersebut menjadi bukti historis; status per baris dan laporan batch terbaru di bawah menjadi acuan pengerjaan.
 
 | ID | Prioritas | Temuan | Status |
 | --- | --- | --- | --- |
-| BUG-001 | P1 | URI induk SAF untuk pembuatan dokumen | Diperbaiki; terverifikasi di perangkat (audio) — sidecar `.lrc` perlu uji |
-| BUG-002 | P2 | Worker lama membatalkan unduhan yang dilanjutkan | Diperbaiki kode 10 Okt (R1: cleanup bergaris generasi + evaluasi ulang kepemilikan); menunggu verifikasi perangkat |
-| BUG-003 | P2 | Penghapusan dokumen SAF salah jalur | Diperbaiki (`StorageUris`); penghapusan file SAF perlu uji perangkat |
-| BUG-004 | P2 | Berkas parsial job yang dijeda tidak dibersihkan | Diperbaiki kode 10 Okt (R1: `remove`/`clearUnsuccessful` hanya menghapus direktori bila baris benar-benar terhapus); menunggu perangkat |
+| BUG-001 | P1 | URI induk SAF untuk pembuatan dokumen | Perbaikan tersedia; audio + LRC Despacito pernah diuji SAF; video/subtitle/provider lain masih perlu uji |
+| BUG-002 | P2 | Worker lama membatalkan unduhan yang dilanjutkan | Sebagian: mutasi utama bergaris generasi, engine ownership dan resume normal teruji; sidecar/status lirik + race cleanup/lanjut cepat belum aman terbukti |
+| BUG-003 | P2 | Penghapusan dokumen SAF salah jalur | Helper tersedia; recovery masih dapat melepas jejak meskipun delete gagal; provider menolak/izin dicabut belum diuji penuh |
+| BUG-004 | P2 | Berkas parsial job yang dijeda tidak dibersihkan | Sebagian: retensi/retry normal teruji; cleanup cancel/remove/clear/restart lintas owner perlu perbaikan/audit dan uji terkontrol |
 | BUG-005 | P2 | Deteksi duplikat mengabaikan opsi keluaran | Diperbaiki; teruji host |
 | BUG-006 | P2 | Inspeksi gagal tidak bisa diulang untuk URL yang sama | Diperbaiki kode 10 Okt (R6: retry memakai jenis inspeksi terakhir); uji perangkat ditunda terakhir atas permintaan pengguna |
 | BUG-007 | P2 | Tautan pendek/Shorts gagal dibuka sebagai playlist | Diperbaiki; teruji host + terverifikasi di perangkat (watch+list → kartu playlist 31 video) |
-| BUG-008 | P2 | File pendukung parsial tertinggal saat publikasi gagal | Diperbaiki kode 10 Okt (R2: commit atomik per sidecar + jurnal jujur); simulasi proses mati menunggu runtime |
+| BUG-008 | P2 | File pendukung parsial tertinggal saat publikasi gagal | Sebagian: commit atomik tersedia; pelepasan jurnal recovery saat delete gagal, create→journal dan guard generasi masih perlu diperkuat |
 | BUG-009 | P2 | Pilihan bahasa lirik tidak diterapkan | Diperbaiki; terverifikasi di perangkat (toggle lirik audio, ringkasan tanpa bahasa) |
 | BUG-010 | P2 | Nama lirik tidak mengikuti nama audio aktual | Diperbaiki; terverifikasi sebagian (Despacito `.lrc` ikut nama audio; kasus tabrakan `Judul (1)` belum diuji) |
 | BUG-011 | P3 | Subfolder SAF tidak dihitung dalam ukuran penyimpanan | Diperbaiki; menunggu verifikasi runtime |
 | BUG-012 | P3 | Ukuran penyimpanan mencakup folder lain | Diperbaiki; menunggu verifikasi runtime |
-| BUG-013 | P2 | Pencocokan lirik terlalu longgar dan mengabaikan durasi/versi | Diperbaiki kode 10 Okt (R3: gerbang 12 dtk/10%, durasi ke API + worker, `tidy` bertahan penanda versi); sinkron menunggu perangkat |
+| BUG-013 | P2 | Pencocokan lirik terlalu longgar dan mengabaikan durasi/versi | Diperketat 13 Okt: ±2 detik pada exact/search, durasi wajib diketahui; Lamunan sinkron menurut pengguna; SoundCloud Ya Sudahlah sinkron setelah koreksi per rekaman−2s, lihat BUG-033 |
 | BUG-014 | P2 | Hasil pencarian/penyimpanan lirik tidak dilaporkan ke pengguna | Diperbaiki kode 10 Okt (R4: kegagalan HTTP → status jaringan); tes fixture host lulus |
 | BUG-015 | P2 | Provider SAF menyisipkan ekstensi mime (`.lrc` → `.lrc.txt`) | Diperbaiki kode 10 Okt (R5: nama diverifikasi semua jalur, salah nama dibuang); simulasi provider menunggu runtime |
-| BUG-016 | P2 | Penggantian lirik dapat merusak file lama ketika penulisan gagal | Diperbaiki kode 10 Okt (R7: cadangan isi lama + rollback sebelum timpa); simulasi kegagalan menunggu runtime |
+| BUG-016 | P2 | Penggantian lirik dapat merusak file lama ketika penulisan gagal | Diperkuat 1.1.1 (terpasang di HP): backup wajib, jurnal before/next, read-back/rollback dan shared lock lewat `JournaledTextReplacement`; fault injection host lulus. Android/provider/process death dan refetch live belum teruji — lihat [batas](DASHBOARD_LYRICS_2026-10-13.md) |
 | BUG-017 | P2 | Progres akhir dinaikkan timer dan mencampur transfer dengan pemrosesan | Diperbaiki 10 Oktober: byte per track + tahap terpisah; host dan Realme Android 10 lulus — [PROGRESS_COVER_2026-10-10.md](PROGRESS_COVER_2026-10-10.md) |
 | BUG-018 | P2 | Pratinjau Mix memuat lanjutan antrean hingga 500 entri | Diperbaiki: panel awal tanpa continuation, seed dipertahankan; link contoh 25 entri di Realme Android 10 — [bukti](MIX_DUPLICATES_2026-10-10.md) |
 | BUG-019 | P2 | Duplikat video lolos ketika bentuk URL berbeda | Diperbaiki: ID video + semua opsi, termasuk riwayat lama; dua alias ditolak di perangkat tanpa file baru — [bukti dan batas](MIX_DUPLICATES_2026-10-10.md) |
@@ -36,9 +51,19 @@ Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPME
 | BUG-022 | P3 | Tautan playlist dibagikan memunculkan error sesaat dan inspeksi ganda | Diperbaiki 10 Okt (inspeksi share diserahkan ke efek DownloadScreen) |
 | BUG-023 | P3 | Label "Selesai" memakai waktu antre, bukan waktu selesai | Diperbaiki kode 10 Okt (kolom `completedAt`, Room v5 + migrasi 4→5 + snapshot schema); tampilan di HP menunggu |
 | BUG-024 | P3 | Selector audio m4a/opus manual tanpa fallback; wadah sumber tampak tertukar | Diperbaiki 10 Okt (fallback ditambahkan; pemetaan lintas wadah dipertahankan — lihat koreksi di seksi) |
-| BUG-025 | P3 | Putus koneksi di tengah unduh menghapus parsial sehingga mulai dari nol | Diperbaiki kode 10 Okt (parsial dipertahankan saat QUEUED/interrupted); lanjutan `.part` di HP menunggu |
-| BUG-026 | P3 | "Unduh lagi" selalu error selama file hasil masih ada | Diperbaiki kode 10 Okt (ganti hasil: hapus lama + `requeueCompleted`, dialog konfirmasi Riwayat); uji HP menunggu |
-| BUG-027 | P2 | Link Mix/RD tanpa seed (Tautan Bagikan autoplay) → "This playlist type is unviewable" | Diperbaiki kode + rilis 1.0.3 (seed dipulihkan dari ID Mix → jalur `watch+list+start_radio`); terbukti di HP dengan 1.0.2, rilis 1.0.3 terpasang di HP, verifikasi link menunggu buka kunci layar |
+| BUG-025 | P3 | Putus koneksi di tengah unduh menghapus parsial sehingga mulai dari nol | Host putus/Range/checkpoint lulus; FAILED→pause/restart/update→resume nyata selesai di HP (BUG-029). Pemutusan jaringan sengaja di HP dan cleanup cancel masih perlu uji |
+| BUG-026 | P3 | "Unduh lagi" selalu error selama file hasil masih ada | Dialog penggantian + reuse row teruji pada MP3 penguji1.0.9; delete gagal/hasil dihapus manual dan provider lain belum penuh |
+| BUG-027 | P2 | Link Mix/RD tanpa seed (Tautan Bagikan autoplay) → "This playlist type is unviewable" | Seed recovery teruji host dan HP1.0.4: Mix SATRU2 tampil25entri, satu lagu selesai. Catatan menunggu keyguard1.0.3 sudah historis |
+| BUG-028 | P1 | Identitas judul/artis, Auto Folder dan pencarian lirik tidak konsisten | Snapshot/kredit/tag terpusat; sumber DJ dan Lamunan teruji, identitas ambigu tetap fallback |
+| BUG-029 | P1 | Resume kegagalan kehilangan parsial/progres | Validasi HTTP/fragmen host; gagal→jeda→restart→update→resume selesai di HP, sumber lain belum seluruhnya teruji |
+| BUG-030 | P2 | Platform/thumbnail berbeda atau hilang pada antrean/riwayat | YouTube dan SoundCloud nyata teruji; model persisten dan cache bersama |
+| BUG-031 | P2 | LRC membuang offset dan menerima timestamp tidak valid | Validasi/retensi offset lulus host; arti offset lintas pemutar belum diuji |
+| BUG-032 | P2 | Structured track mengulang keterangan versi | Diperbaiki 1.0.11, regresi metadata SoundCloud/Live/Remix lulus |
+| BUG-033 | P2 | Lirik Ya Sudahlah terlambat pada rekaman SoundCloud | Koreksi per lagu diterapkan 1.1.0; 62 timestamp −2000ms, reset/idempotensi/hash audio lulus; koreksi khusus rekaman dikonfirmasi sinkron pengguna |
+| BUG-034 | P2 | Alias SoundCloud ber-UTM lolos cek duplikat | Diperbaiki 1.0.12; link bersih ditolak di HP, riwayat satu/file enam, antrean kosong |
+| BUG-035 | P2 | Tahun unggah/uploader mencemari tag musik | Kebijakan tag native/musik eksplisit diperbaiki 1.1.0, regresi host lulus |
+| BUG-036 | P2 | URI kanonis LRC membuat rename ditolak Android10 | URI akses dipakai; rename pasangan dan pemulihan nama asli lulus APK final |
+| BUG-037 | P1 | Dispatch bootstrap gagal sebelum transfer | Entry point diperbaiki, 76 tes Python lulus; retry video final berhasil, decode penuh lulus |
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -195,7 +220,8 @@ Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut a
 - **Pemicu/dampak:** Cari ulang lirik ketika sudah ada `.lrc`; stream menimpa file lama dengan mode `wt`. Bila write/close gagal setelah file terbuka, lirik lama dapat kosong atau parsial meskipun fungsi mengembalikan false.
 - **Arah perbaikan:** Siapkan dan verifikasi pengganti lebih dulu; gunakan mekanisme replace provider atau backup/rollback. Pertahankan file lama sampai penggantian berhasil, serta jurnal URI dan pembaruan database sesuai BUG-008. Lihat audit R7 di [REVIEW_2026-10-09.md](REVIEW_2026-10-09.md).
 - [x] **Perbaikan kode 10 Oktober 2026 (R7):** penimpaan `.lrc` lama membaca isi lama sebagai cadangan lebih dulu; write/close gagal → rollback dari cadangan + melapor `gagal_simpan` (bukan diam-diam mengosongkan). Cadangan gagal dibaca → tetap tanpa rollback (perilaku lama, dikomentari di kode). Pencatatan URI pengganti tetap lewat jurnal R2.
-- [ ] **Kriteria selesai:** Uji kegagalan setelah open, write sebagian, dan close; lirik lama tetap utuh/dapat dipulihkan, tidak ada sidecar baru yatim, dan UI melaporkan gagal simpan.
+- [x] **Penguatan 1.1.1 (13 Oktober 2026):** jalur refetch lama kini memakai `JournaledTextReplacement` (backup wajib, jurnal AtomicFile before/next Base64, write/close/read-back wajib cocok, rollback + recovery hanya menerima bytes yang dikenal) dengan mutex `MediaFileOperations` yang sama seperti koreksi waktu/rename/delete, plus verifikasi stem audio penuh dan pembatalan bila state berubah selama request jaringan. Regresi `JournaledTextReplacementTest` (backup tak terbaca, journal penuh, partial-write/close gagal, rollback gagal, bytes asing, no-op/baseline, lock bersama) lulus. Terpasang di HP via 1.1.1.
+- [ ] **Kriteria selesai:** Uji kegagalan setelah open, write sebagian, dan close; lirik lama tetap utuh/dapat dipulihkan, tidak ada sidecar baru yatim, dan UI melaporkan gagal simpan. **Sisa:** fault injection pada provider Android/proses mati nyata dan refetch live belum dijalankan — host saja belum menutup kriteria ini.
 
 ## Catatan perbaikan batch sebelumnya (9 Oktober 2026)
 
@@ -352,3 +378,79 @@ Ditambahkan **10 Oktober 2026** dari review kode ([REVIEW_2026-10-10.md](REVIEW_
 - **Risiko pilihan awal (salah):** menormalisasi ke `playlist?list=RD…` kanonis sama saja dengan meniru endpoint yang ditolak — seed wajib dipulihkan.
 - [x] **Perbaikan kode 10 Oktober 2026:** helper baru `mixSeed(id)` memulihkan seed dari ID Mix (`RD`+11 karakter, atau `RDMM`+11 karakter; lainnya → null). `playlistInspectionUrl` kini mengambil seed dari URL (watch/shorts/youtu.be + `list`, pola BUG-018) **atau** hasil pemulihan ID Mix, lalu memakai `watch?v=$seed&list=$id&start_radio=1` — URL yang terbukti diterima YouTube. ID yang tidak cocok pola tetap jatuh ke kanonis (perilaku lama untuk playlist biasa). Regresi host: `standaloneMixLinkRecoversSeedFromPlaylistId` (link persis laporan + bentuk RDMM); tes lama `mixInspectionPreservesSeedAcrossLinkForms` memastikan bentuk watch/shorts/youtu.be tidak berubah. Kotlin 67 tes, 0 gagal.
 - [ ] **Kriteria selesai:** tautan persis laporan terbuka di HP — rilis 1.0.3 (versionCode 4) sudah `adb install -r` ke Realme dengan hash terverifikasi, tetapi sesi berakhir saat layar terkunci keyguard PIN; playlist biasa dan link campuran watch+list tidak terpengaruh (tertutup lewat tes).
+
+## BUG-028/029/030 — identitas lagu, resume dan kartu download
+
+Permintaan lengkap pengelola 13 Oktober 2026 ditangani sebagai satu perubahan data, bukan perubahan tampilan saja. Analisis tiap poin, file yang diubah, kontrak fallback, tes dan batas cakupan berada pada [SYSTEM_METADATA_RESUME_2026-10-13.md](SYSTEM_METADATA_RESUME_2026-10-13.md). Total ID temuan menjadi 30; hasil batch ini tidak menutup temuan lain atau seluruh cakupan platform.
+
+- [x] Metadata/penamaan/lirik/Auto Folder: regresi host dan sumber DJ pengguna; lirik sinkron/artist nyata NEGORO-PINGAL tetap di batas cakupan laporan.
+- [x] Resume: Range/tanpa Range/sumber berubah/URL bertoken/checkpoint fragmen pada downloader host; gagal→tutup aplikasi→jeda→update→resume hingga selesai pada HP.
+- [x] Platform/thumbnail/riwayat: migrasi, cache dan tampilan YouTube di HP fisik; live platform lain dan recovery artwork lama tanpa media belum terbukti.
+
+## BUG-031 — P2: Pembersihan LRC membuang offset dan menerima timestamp tidak valid
+
+- **Lokasi:** `core/Lyrics.kt`, `cleanLyrics`.
+- **Pemicu:** Respons penyedia berisi `[offset:250]`, hanya tag `[ar:Artist]`, timestamp `[00:60.00]`, atau timestamp setelah akhir audio.
+- **Akar penyebab:** Semua baris bertanda `[` dianggap cukup membuktikan LRC; baris tanpa teks setelah `]` dibuang sehingga offset ikut hilang.
+- [x] **Perbaikan kode 13 Oktober 2026:** metadata/offset numerik dipertahankan, beberapa timestamp pada satu baris tetap utuh, baris waktu tanpa teks dibuang, format detik dan batas audio diperiksa. Hasil tidak cocok dilabeli `tidak_cocok`, bukan “tidak tersedia”; jaringan tetap terpisah. Regresi fixture end-to-end dan tes status lulus.
+- [x] **Auditori Lamunan:** pengelola mengonfirmasi lagu/lirik sinkron di Poweramp pada HP.
+- [ ] **Cakupan offset/lintas versi:** arah offset pada pemutar dan rekaman lain belum terverifikasi. Bukan klaim seluruh lirik otomatis sinkron. [Rincian sumber dan hasil](LYRICS_PLATFORMS_2026-10-13.md).
+
+**Lanjutan BUG-013/028/030 (1.0.10):** toleransi lama ±12 detik/10% digantikan ±2 detik, durasi kosong tidak menerima timed lyrics; kredit performer/track eksplisit pada deskripsi dibaca hanya bila judul menguatkan keduanya, unik dan tidak bertentangan dengan metadata platform. Link Lamunan pengguna mengungkap artis Sasya Arkhisna terpisah dari uploader Music Interactive. Pengujian SoundCloud dan hasil instalasi dicatat pada laporan di atas; status historis tidak berarti semua platform sudah diuji.
+
+## BUG-032 — P2: Versi lagu di structured track muncul dua kali
+
+- **Sumber pemicu:** link SoundCloud penuh dari pengelola, `Hysteria-MUSE (slowed)`, metadata track sama dengan title, artist kosong dan uploader sleep_shady.
+- **Akar penyebab:** raw title membuang `(slowed)` ke versionTag, sedangkan metadataTrack langsung menggantikan title tanpa pembersihan itu. Akibatnya nama menjadi `Hysteria-MUSE (slowed) | slowed`.
+- **Perbaikan:** `TitleSplit` memakai helper grup/credit yang sama untuk raw title dan structured track; versi/credit tidak ganda, artis tidak ditebak dari uploader. Tidak membuat unduhan salah nama untuk reproduksi.
+- **Regresi:** source JSON nyata minimal melalui `SourceMetadata` → snapshot job, track Live/credit terbalik, pipe Remix; fallback artis/folder tetap konservatif.
+- **Status:** 112 tes Kotlin lulus; perbaikan masuk signed release 1.0.11 yang terpasang di HP. Source slowed hanya diuji metadata/host, tidak diunduh; [hasil perangkat terbaru](LYRICS_PLATFORMS_2026-10-13.md).
+
+
+## BUG-033 — P2: LRC SoundCloud Ya Sudahlah masih delay; pemilihan kandidat setara bergantung urutan
+
+- **Status:** koreksi khusus rekaman total−2s pada1.1.0 dikonfirmasi sinkron oleh pengguna. Masalah awal ditemukan melalui auditori pada release1.0.11. MP3, artwork, publikasi LRC dan playback berhasil; pengguna melaporkan delay sekitar 0,5 detik. Pengguna mengonfirmasi sorotan terlambat dan selisih tetap sampai tengah/akhir; lirik perlu dimajukan sekitar 0,5 detik khusus rekaman ini.
+- **Reproduksi:** SoundCloud `bondanfade2black/ya-sudahlah` → Audio MP3 128 + lirik + sampul → Poweramp → dengarkan peralihan baris awal/tengah/akhir. Audio 252,499592 detik, LRC 62 timestamp berteks.
+- **Lokasi seleksi:** `core/Lyrics.kt`, `fetch`, `if (score > bestScore)`; gerbang durasi ±2 detik tidak memeringkat kandidat dengan skor identitas sama. LRC aktual sama timeline-nya dengan record 25044772/254 detik; kandidat 22922939/252,342857 detik lebih dekat durasinya.
+- **Bukti/batas akar masalah:** fallback dapat memilih kandidat lebih jauh karena urutan provider. Timeline alternatif berbeda −0,31 sampai +0,21 detik pada 29 pasangan teks unik; belum terbukti memperbaiki delay yang didengar. Delay bisa terkait timeline rekaman/provider/pemutar dan tidak boleh diklaim selesai hanya dengan tes host.
+- **Perbaikan seleksi 1.0.12:** tie skor identitas memakai durasi terdekat; regresi kedua urutan provider dan gerbang versi/skor lebih kuat lulus. Ini belum membuktikan delay auditori teratasi.
+- **Perbaikan 1.1.0:** pengguna memperbarui estimasi menjadi sekitar1detik. Koreksi per LRC ±30detik dengan baseline asli, preview, backup privat, read-back/rollback dan reset. Pada HP kandidat, 62 timestamp dimajukan1000ms, simpan ulang idempoten, reset hash asli dan audio tidak berubah. Setelah beberapa pemeriksaan, total−2s dikonfirmasi sinkron pengguna; tidak menggeser semua lagu global.
+- **Kriteria selesai:** arah/selisih sudah dikonfirmasi pengguna; uji alternatif/koreksi pada file yang sama tanpa unduh ulang audio, verifikasi auditori awal/tengah/akhir dan ekspor LRC tanpa merusak timestamp/offset lama. [Bukti dan laporan](LYRICS_PLATFORMS_2026-10-13.md).
+
+
+## BUG-034 — P2: Link SoundCloud dengan UTM lolos pemeriksaan duplikat
+
+- **Status:** diperbaiki dan terverifikasi pada signed 1.0.12 di HP; link bersih ditolak, antrean kosong, satu riwayat completed dan enam file tetap utuh. 116 tes Kotlin/lint debug+release/audit paket lulus.
+- **Reproduksi nyata:** unduh `bondanfade2black/ya-sudahlah?utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing` dengan MP3 128+lirik+sampul; ajukan link tanpa query dengan opsi sama. Release 1.0.11 mengantrekan job kedua. Agent membatalkan dan menghapus hanya job uji kedua sebelum publikasi; audio/LRC pertama dan empat file sebelumnya utuh.
+- **Akar penyebab/lokasi:** `core/Models.kt`, `Selection.identity`; hanya URL YouTube memakai ID, platform lain membandingkan URL penuh. Parameter pelacakan SoundCloud ikut dianggap identitas konten.
+- **Perbaikan:** identitas SoundCloud mengabaikan `utm_*` dan menormalkan host web/mobile; parameter lain, terutama `secret_token`, tetap utuh. URL asli riwayat tidak diubah; platform lain tidak disatukan tanpa bukti.
+- **Regresi:** alias ber-UTM/bersih pada queued/running/paused/completed, bitrate berbeda, lagu/akun berbeda, token akses berbeda, host berbahaya dan platform lain.
+- **Kriteria selesai:** signed update tanpa reset; link bersih ditolak sebagai file sudah diunduh, riwayat tetap satu dan file tetap enam, tidak ada job baru. [Laporan perangkat](LYRICS_PLATFORMS_2026-10-13.md).
+
+
+## BUG-035 — P2: Upload date dan fallback uploader mencemari tag musik
+
+- **Akar penyebab:** default `FFmpegMetadataPP` memakai upload_date untuk date, uploader/creator untuk artist, categories/tags untuk genre, series untuk album; override meta_artist kosong berisiko menghapus artist asli.
+- **Bukti:** source SoundCloud Ya Sudahlah memiliki upload_date20120513 tanpa release_year/release_date, tetapi download1.0.12 menulis date2012. Tahun rilis tidak disimpulkan dari tanggal unggah.
+- **Perbaikan 1.1.0:** `prepare_audio_tags` pada bootstrap memeriksa format/stream audio; gunakan field musik eksplisit atau tag asli valid. Probe gagal melewati tagging dan memberi processingNotice. Tag file hasil lengkap dapat memperbaiki identitas artis/judul, Auto Folder dan pencarian lirik sebelum publikasi. Video tidak diproses sebagai audio.
+- **Regresi host:** tag asli dipertahankan, kredit eksplisit prioritas, uploader/upload date/categories/series/URL tidak menjadi tag musik; probe gagal aman; stream Opus sebelum/sesudah memiliki hash paket yang sama. File lama tidak diubah diam-diam.
+- **Status:** implementasi/tes host lulus; build final dan regresi download perangkat dicatat pada [laporan upgrade](SMART_MEDIA_UPGRADE_2026-10-13.md).
+
+
+## BUG-036 — P2: Rename pasangan LRC ditolak MediaProvider Android10
+
+- **Reproduksi:** Koleksi → Ya Sudahlah → Ubah nama. Kandidat1.1.0 memakai URI kanonis `file/<id>` pada LRC dan API29 menolak movement; rollback mempertahankan audio/LRC asli.
+- **Akar penyebab:** kunci deduplikasi katalog disalahgunakan sebagai URI operasi. Android10 mendukung perpindahan melalui koleksi Downloads/Audio/Video/Images yang sesuai, bukan Files.
+- **Perbaikan:** simpan URI akses LRC asli pada transaksi/jurnal, gunakan kanonis hanya sebagai identitas katalog. Nama input menonaktifkan auto-correction. Rename/read-back/rollback tetap berlaku.
+- **Status:** diperbaiki dan rename pasangan audio/LRC pada APK final lulus; kedua nama dikembalikan dan hash tetap utuh. Bukti dicatat pada [laporan upgrade](SMART_MEDIA_UPGRADE_2026-10-13.md). Tidak mengubah schema9 atau menghapus file.
+
+
+## BUG-037 — P1: Kombinasi flag bootstrap menghentikan download sebelum transfer
+
+- **Bukti perangkat:** tes video Lamunan pada kandidat upgrade menghasilkan `TypeError: list.remove() takes exactly one argument (2 given)` sebelum byte media dipublikasikan.
+- **Akar penyebab:** perubahan daftar flag optionalAudio ikut menyisipkan argumen kedua pada penghapusan flag validateResume. Tes helper resume tidak menjalankan dispatch CLI.
+- **Perbaikan:** `list.remove` kembali menerima satu flag; dispatch optionalAudio tetap terpisah. Bootstrap source/aset identik, ZIP engine tidak diubah.
+- **Regresi baru:** entrypoint aktual menjalankan pinned ZIP untuk resume saja, resume+audio opsional, serta semua flag cover/mix/resume/optional; exit0, versi sesuai manifest dan jurnal proses dibersihkan. Suite76Python lulus.
+- **Status:** diperbaiki; retry YouTube Lamunan pada APK final memublikasikan MP4 28.569.594 byte, decode penuh exit0, lihat [laporan upgrade](SMART_MEDIA_UPGRADE_2026-10-13.md).
+
+Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar delay tetap±0,5s. Total koreksi kini−1,5s, seluruh62timestamp diverifikasi terhadap baseline asli; Pengguna kemudian memajukan lagi menjadi total−2s dan mengonfirmasi sinkron; semua62timestamp pada file aktual diverifikasi−2000ms, hash audio tetap asli.

@@ -1,5 +1,15 @@
 # Bukti verifikasi komputer
 
+## Status terbaru — 13 Oktober 2026
+
+Baseline produksi aktual **1.1.1/code15/Room9**: 145 tes Kotlin (dibaca ulang dari `test-results/testDebugUnitTest`), **76 tes Python dijalankan ulang → `OK` (23,173 detik)**, lint debug/release “No issues found”, signed APK×3/AAB dengan `sha256sum -c SHA256SUMS` semua OK. Audit dijalankan ulang sesi dokumentasi pada artefak distribusi (source tidak berubah sesudah build): native 255/255/257 ELF + AAB 1.024 ELF 0 gagal 16 KB, ZIP reflektif 13 kelas 0 gagal, `zipalign -c -P 16 4` OK, `apksigner` v2 verified sertifikat `ebe3b40e…`, AAB `jarsigner` jar verified. ARM64 SHA256 `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0` cocok APK terpasang di Realme Android 10. [Laporan 1.1.1 dan cakupan](DASHBOARD_LYRICS_2026-10-13.md), [signing](PRODUCTION_SIGNING.md), [uji perangkat](DEVICE_TEST.md).
+
+Angka bundletool pada rilis 1.1.0 adalah bukti batch itu; sesi 1.1.1 tidak mengulang bundletool (tidak ada log sesi ini). Pemeriksaan 13 Okt sesi ini hanya dokumentasi + audit ulang artefak — tidak menjalankan ulang build; audit host tidak membuktikan seluruh jalur gagal Android aman. Risiko fault injection provider/proses mati, journal cleanup dan concurrency serta matriks perangkat/lisensi yang belum lengkap ada pada [rekonsiliasi progres](PROGRESS.md#rekonsiliasi-backlog-bug-roadmap-dan-release--13-oktober-2026).
+
+## Bukti historis
+
+Angka tes/lint, kandidat testing dan catatan “signing produksi belum dikonfigurasi” di bawah berlaku pada checkpoint awal masing-masing; status tersebut sudah dilanjutkan oleh release produksi di atas.
+
 - yt-dlp stabil 2026.08.19: SHA256 `1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6`, cocok dengan SHA2-256SUMS resmi yang disimpan di docs.
 - Patched FFmpeg AAR: SHA256 `b30168221f89d88dc6ec242e3438dbaab6b7d89dec0647f548259a22d0230d5e`.
 - WebP source 1.6.0 dipin, sumber/notice disimpan di third_party/libwebp. Recipe dapat menghasilkan SHA AAR yang sama pada lingkungan build ini.

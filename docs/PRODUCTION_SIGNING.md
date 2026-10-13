@@ -73,3 +73,45 @@ Distribusi lokal: `app/build/outputs/distribution/1.0.1/`, bersama sertifikat pu
 | `TubeFlow-1.0.1-release.aab` | 209,954,847 | `1ceee34932ccd86229218b6f10a03ddd2053174762168e85191a1cf26f29538a` |
 
 APK 1.0.1 **sudah terpasang** di Realme Android 10 melalui installer bawaan. APK yang ditarik dari HP cocok hash ARM64 di tabel dan sertifikat produksi. Root default, angka 246,4 MB dan persistensi setelah restart terverifikasi. Hasil serta batas cakupan ada di [STORAGE_SIZE_2026-10-10.md](STORAGE_SIZE_2026-10-10.md). Log build/validasi final tersimpan di `build/reports/storage-*.log` dan `storage-final-verification.json`. Signing tidak menyatakan temuan runtime lainnya selesai.
+
+## Release 1.0.9 — sistem metadata/resume (13 Oktober 2026)
+
+Kunci produksi yang sama dipakai untuk APK×3/AAB lokal; tidak membuat keystore baru atau memublikasikan ke toko. Distribusi `app/build/outputs/distribution/1.0.9/` memuat sertifikat publik, release.json dan SHA256SUMS. ARM64 final 62.853.907 byte, SHA256 `e3c5b3f3587614f55f6d56a670d04a41e1f55a6325ddc02e3d1c9958a0cdf91f`; hash APK yang ditarik dari HP identik. Candidate awal yang menemukan fallback artist uploader diarsipkan privat dalam build/reports dan diganti pada distribusi lokal oleh hasil koreksi tag.
+
+102 tes Kotlin/61 Python lulus; lint debug/release 0 masalah. Signature/cert, zipalign 16 KB, manifest non-debuggable, native 255/255/257 dan refleksi ZIP 13 kelas per APK lulus. AAB jarsigner/cert, bundletool validate dan native 1.024 ELF lulus; pin engine/bootstrap cocok. Deprecation internal Gradle dan peringatan sertifikat JAR self-signed/timestamp tetap dicatat terpisah. Update tanpa uninstall/clear data mempertahankan riwayat; cakupan fisik dan batasnya ada pada [laporan sistem](SYSTEM_METADATA_RESUME_2026-10-13.md).
+
+## Release 1.0.10 — validasi lirik/kredit sumber (13 Oktober 2026)
+
+Memakai keystore produksi yang sama, versionCode 11, Room v8. Build signed APK×3/AAB sukses dalam 8m30s; 110 tes Kotlin dan 61 tes Python lulus, lint debug/release 0 masalah. Signature/cert, zipalign 16 KB, manifest non-debuggable, audit native 255/255/257 ELF dan refleksi ZIP 13 kelas per APK lulus. AAB signature/certificate, native 1.024 ELF dan bundletool validate lulus. Pin engine dan bootstrap paket cocok, tidak ada pembaruan engine.
+
+ARM64 `TubeFlow-1.0.10-arm64-v8a-release.apk`: 62.858.143 byte, SHA256 `6c80ff2a13f5eac65735534227ad51c9f1d8cc6315e6d145093932e9d676ccf5`. APK sudah di-update melalui ADB `install -r` pada Realme Android 10; hash yang ditarik dari HP cocok dan 27 riwayat lama tetap ada. Distribusi `app/build/outputs/distribution/1.0.10/` memuat APK per ABI, AAB, sertifikat publik, release.json dan SHA256SUMS; artefak versi lama dipertahankan. Deprecation Gradle dan peringatan JAR self-signed/timestamp terpisah dari lint.
+
+[Laporan lirik dan platform](LYRICS_PLATFORMS_2026-10-13.md) mencatat pengujian fungsional serta batas sinkronisasi; signing tidak membuktikan kompatibilitas seluruh perangkat/platform. Tidak memublikasikan ke toko atau membagikan private key.
+
+
+## Release 1.0.11 — normalisasi structured track (13 Oktober 2026)
+
+VersionCode 12, Room v8, sertifikat produksi sama. Signed APK×3/AAB berhasil dalam 10m26s; 112 tes Kotlin, 61 tes Python pada batch (engine tidak berubah setelah tes), lint debug/release 0 masalah. Audit signature/certificate, zipalign 16 KB, manifest non-debuggable, native 255/255/257 ELF dan ZIP reflection 13 kelas per APK lulus. AAB signature/cert, native 1.024 ELF dan bundletool validate lulus. Peringatan JAR self-signed/timestamp dan deprecation Gradle terpisah dari lint.
+
+Distribusi lokal `app/build/outputs/distribution/1.0.11/` mempertahankan versi sebelumnya. ARM64 62.858.595 byte, SHA256 `800f3fd703a539c8996c9611ca1c50ae25ba88d661fbb6e55bba70585e55bd48`; sudah terpasang dengan `install -r` dan hash yang ditarik dari HP identik. Pengelola mengonfirmasi menghapus riwayat selama menunggu build; empat file publik sebelumnya tetap ada, agent tidak uninstall/clear data. Tidak mengklaim retensi 28 baris pada update ini. Hasil fungsional tercatat pada [laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md); tidak ada publikasi toko.
+
+
+## Release 1.0.12 — alias SoundCloud dan pemeringkatan lirik (13 Oktober 2026)
+
+VersionCode13, Room v8, keystore produksi sama. Signed APK×3/AAB sukses dalam 5m24s; 116 Kotlin, lint debug/release 0 masalah; 61 Python pada batch tanpa perubahan engine setelah tes. Audit signature/cert, zipalign 16 KB, native 255/255/257 ELF dan ZIP reflection 13 kelas per APK lulus; AAB jarsigner/cert, 1.024 ELF dan bundletool validate lulus. Peringatan JAR self-signed/timestamp dan deprecation Gradle tetap tercatat terpisah.
+
+ARM64 62.859.063 byte, SHA256 `e6fe701f96de98c83c0ab4cca598b0b71e02978d9df30c54bd44d504ba83d60a`; sudah terpasang di HP dengan `install -r`, hash pulled identik. Satu riwayat SoundCloud bertahan setelah update/restart, duplikat link bersih ditolak dan enam file tetap utuh. Distribusi `app/build/outputs/distribution/1.0.12/` menyertakan APK×3/AAB/cert/release.json/SHA256SUMS, versi sebelumnya dipertahankan, tidak upload toko. Delay lirik Ya Sudahlah 0,5 detik masih terbuka; [laporan fungsional](LYRICS_PLATFORMS_2026-10-13.md).
+
+
+## Release 1.1.0 — Smart Media (13 Oktober 2026)
+
+VersionCode14, Room9, keystore produksi yang sama. Build final teroptimasi APK×3/AAB sukses;136Kotlin/76Python lulus, lint debug/release0masalah. Signature/certificate, zipalign16KB, audit native/reflectiveZIP serta manifest nondebuggable lulus pada ketiga APK; AAB jarsigner/certificate/native dan bundletool validate lulus. Engine ZIP yang dipin tidak berubah.
+
+Distribusi `app/build/outputs/distribution/1.1.0/` memuat APK, AAB, sertifikat publik, release.json dan SHA256SUMS. ARM64 63.008.739byte, SHA256 `06da7742a451ad27ae8dd88b15c31fad0b047e2bffcead4de1a6f9482e45eda6`, bertambah149.676byte (~0,24%) dibanding1.0.12. Update `install -r` berhasil pada RealmeAndroid10 dan hash base.apk cocok; data nonempty dan hash audio lama dipertahankan. Tidak uninstall/clear-data, tidak upload toko, tidak membuat ulang keystore. [Cakupan dan batas pengujian](SMART_MEDIA_UPGRADE_2026-10-13.md).
+
+
+## Release 1.1.1 — dashboard Ringkasan media dan penguatan cari ulang lirik (13 Oktober 2026)
+
+VersionCode15, Room9 (tanpa migrasi — schema tidak berubah), keystore produksi yang sama (signer SHA-256 `ebe3b40e…`, identik rilis sebelumnya). APK×3/AAB ditandatangani oleh `scripts/build_release.sh`; 145 tes Kotlin lulus, **76 tes Python dijalankan ulang ulang sesi dokumentasi → `OK` (23,173 detik)**, lint debug/release “No issues found”. Audit dijalankan ulang sesi dokumentasi pada artefak distribusi (source tidak berubah sesudah build): native 255/255/257 ELF per APK + AAB 1.024 ELF 0 gagal 16 KB, ZIP reflektif 13 kelas 0 gagal, `zipalign -c -P 16 4` OK, `apksigner` v2 verified, AAB `jarsigner` jar verified (peringatan self-signed/PKIX/timestamp/POSIX wajar). Bundletool tidak diulang pada rilis ini (tidak ada log sesi ini).
+
+Distribusi `app/build/outputs/distribution/1.1.1/` memuat APK per ABI, AAB, sertifikat publik, `release.json`, `SHA256SUMS` (semua entri `sha256sum -c` OK). ARM64 63.025.099 byte, SHA256 `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0` (+16.360 byte dibanding 1.1.0). Update `install -r` pada Realme Android 10 sukses (`lastUpdateTime 13 Okt 09:58:46`) dan hash `base.apk` dari HP identik artefak. Tidak uninstall/clear-data, tidak upload toko, tidak membuat ulang keystore. Retensi media `not established` (pengelola membersihkan media selama build); [laporan, hasil UI dashboard dan batas cakupan](DASHBOARD_LYRICS_2026-10-13.md), [uji perangkat](DEVICE_TEST.md).

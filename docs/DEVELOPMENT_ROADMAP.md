@@ -2,7 +2,29 @@
 
 Dicatat **9 Oktober 2026** sebagai panduan pengembang berikutnya. Delapan usulan berikut sudah disetujui untuk **didokumentasikan**. Status per **9 Oktober 2026** (pembaruan setelah perbaikan bug): OPT-001 **dikerjakan sebagian**, OPT-002 **dikerjakan sebagian**, sisanya **diusulkan**. Daftar bug dan bukti pemeriksaan tersedia di [BUG_FINDINGS.md](BUG_FINDINGS.md); keputusan desain dan bukti perbaikan di [PROGRESS.md](PROGRESS.md).
 
-## Prioritas dan urutan pengerjaan
+## Status aktual hasil rekonsiliasi — 13 Oktober 2026, 1.1.0/code14
+
+Tabel ini menggantikan status historis9–13Oktober di bawah. Pemeriksaan mencocokkan laporan terbaru dengan kode, bukan implementasi baru atau tes runtime seluruh fitur. Checklist lama tetap menjadi kriteria cakupan lengkap, bukan jumlah pekerjaan yang belum ditulis. **Pembaruan sesi 1.1.1/code15** (dashboard Ringkasan media + penguatan cari ulang lirik): baris OPT-002 dan catatan dashboard di bawah tabel sudah diperbarui; baris lain masih status 1.1.0.
+
+| ID | Status aktual | Yang masih perlu dikerjakan atau dibuktikan |
+| --- | --- | --- |
+| OPT-001 | Sebagian; pencocokan terstruktur/versi/durasi±2detik, status tidak cocok dan tie durasi tersedia | Persistensi record ID/atribusi belum ada; pratinjau/pemilihan kandidat belum ada. Lamunan pernah dikonfirmasi sinkron, uji auditori terbaru menunggu |
+| OPT-002 | Sebagian; pengamanan refetch diperkuat dan ikut rilis 1.1.1 (terpasang di HP) | Backup wajib/read-back/rollback+jurnal persisten melalui `JournaledTextReplacement`, mutex bersama edit/refetch/rename/delete dan stale snapshot guard; stem audio diverifikasi penuh. Uji fault injection Android/provider/process death serta refetch live tetap perlu; lihat [laporan](DASHBOARD_LYRICS_2026-10-13.md) |
+| OPT-003 | Belum diimplementasikan | Daftar kandidat, preview, pilih/cancel dengan record ID dan atribusi persisten |
+| OPT-004 | Implementasi tersedia dan teruji terbatas | `LrcTiming`/`LyricEditor`, ±30detik/langkah0,5detik, baseline/reset/jurnal/read-back/rollback; Ya Sudahlah−2detik dikonfirmasi pengguna. Fault injection Android/process death/provider berbeda dan interaksi refetch belum terbukti; tidak menjamin semua lagu sinkron |
+| OPT-005 | Sebagian, bukan belum dimulai | Cache respons LRCLIB10MiB/200entry, positif24jam/4041jam, clear/refresh dan regresi TTL/error tersedia. `extractor-cache` yt-dlp bukan cache snapshot metadata app berdasarkan engine/TTL. Snapshot metadata, benchmark request/waktu, serta tes permintaan bersamaan/coalescing belum lengkap |
+| OPT-006 | Diterapkan; progres per tahap telah diuji host/Realme | Cakupan callback terlambat/stop-resume cepat dan proses mati tetap terkait BUG-002/008; bukan kembali ke heartbeat lama |
+| OPT-007 | Belum diimplementasikan | UI Salin detail error, kategori/persistensi, versi/tahap/waktu/HTTP dan redaksi rahasia; pesan error biasa bukan fitur ini |
+| OPT-008 | Sebagian | Budget/prune cache cover/library/lirik dan tombol clear cache lirik tersedia; angka ukuran cache/parsial terpisah serta cleanup aman lintas restart/owner belum lengkap. FAILED menyimpan parsial untuk retry; jangan menghapusnya otomatis hanya untuk memenuhi kalimat historis |
+| OPT-009 | Diterapkan; kompresi cover teruji | JPEG maksimum800px/rasio/paket audio; format/provider lain tetap bagian matriks runtime, bukan bukti seluruh codec |
+
+Urutan lanjut (diperbarui 13 Okt setelah 1.1.1): penguatan BUG-016/OPT-002 sudah masuk rilis 1.1.1 di tingkat host — sisa langkahnya fault injection Android/provider + refetch live → jurnal recovery BUG-008/003 (create→journal, proses mati) → ownership/konkurensi BUG-002/004 → uji fixture SAF/publish/collision → BUG-006 retry jaringan terakhir sesuai permintaan lama → OPT-003/007, sisa OPT-005/008 dan benchmark. Usulan fitur tetap memerlukan penugasan implementasi; audit status ini tidak mengubah media.
+
+Bukti: [laporan Smart Media](SMART_MEDIA_UPGRADE_2026-10-13.md), [uji perangkat](DEVICE_TEST.md), [rekonsiliasi backlog](PROGRESS.md#rekonsiliasi-backlog-bug-roadmap-dan-release--13-oktober-2026).
+
+**Dashboard rilis 1.1.1:** donat komposisi koleksi (media AVAILABLE saja), batang harian dan garis akumulasi COMPLETED memakai periode kalender 7/30/90 hari. Hari sebelum pencatatan bukan 0; tren byte historis tidak dibuat. Memoisasi/TTL validasi katalog tidak merupakan bukti speedup perangkat. Signed 1.1.1/code15 terpasang di HP; donat kondisi kosong, batang/garis 7 hari diperiksa via UIAutomator + screenshot — retensi media dan periode 30/90 hanya tercatat, bukan terbukti penuh. [Kontrak, hasil dan batas](DASHBOARD_LYRICS_2026-10-13.md).
+
+## Prioritas dan urutan pengerjaan (historis)
 
 Prioritas roadmap menunjukkan urutan pengembangan, bukan tingkat keparahan bug.
 
@@ -103,3 +125,12 @@ Selesaikan dulu jalur penyimpanan/penghapusan SAF, cleanup sidecar, dan race pau
 OPT-006 diterapkan dalam kode: tahap persisten di Room v4, template byte per track, indikator tak tentu untuk proses yang tidak terukur, notifikasi dengan nama tahap, dan status selesai sesudah publikasi sidecar. Heartbeat persen dihapus. Persen video dan audio ditampilkan terpisah karena bobot ukuran kedua track berbeda. Hasil pemeriksaan dan cakupan uji ada di [PROGRESS_COVER_2026-10-10.md](PROGRESS_COVER_2026-10-10.md).
 
 **OPT-009 — Kompresi sampul (disetujui pengguna):** JPEG dengan sisi terpanjang maksimal 800 piksel, tanpa memperbesar gambar kecil atau mengubah rasio. Bootstrap memperluas postprocessor konversi thumbnail dari yt-dlp yang dipin agar JPEG sumber juga diperkecil; gambar diolah sebelum disematkan atau disimpan terpisah. Audio tidak dikompresi ulang oleh tahap sampul. Tidak ada batas byte tetap: ukuran bergantung detail gambar. File lama tidak dimodifikasi; kebijakan berlaku pada unduhan baru. Tes meliputi dimensi, pengurangan ukuran PNG besar, JPEG sumber, gambar kecil, kegagalan konversi, progres pipeline, dan kesamaan paket audio sebelum/sesudah embedding.
+
+## Pembaruan validasi lirik — 13 Oktober 2026
+
+Lanjutan OPT-001/BUG-013 pada 1.0.10 memakai gerbang durasi ±2 detik pada exact/search dan menolak durasi kosong, memvalidasi timestamp, mempertahankan offset LRC, serta membedakan kandidat tidak cocok dari penyedia tidak memiliki lirik. Kredit sumber eksplisit kini mengatasi link Lamunan live dari channel Music Interactive tanpa menjadikan channel sebagai artis. [Laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md) memuat pemeriksaan provider, pembandingan caption, tes dan batas cakupan.
+
+**Status pada checkpoint1.0.10 (historis, digantikan tabel aktual di atas):** OPT-003/004 saat itu belum diimplementasikan; OPT-004 sekarang tersedia pada1.1.0, OPT-003 masih belum. Prioritaskan pemilihan ID rekaman dengan pratinjau dan koreksi offset yang tidak merusak file lama, karena beberapa record LRCLIB menyimpan timestamp identik pada durasi berbeda. Pertimbangkan caption manual dari sumber yang sama sebagai kandidat tambahan dengan atribusi/language dan timeline yang divalidasi; jangan menganggap caption narasi/terjemahan otomatis sebagai lirik asli. Tautan pertama Muse/Hysteria resmi di SoundCloud hanya memberi preview 30 detik tanpa login; sumber SoundCloud lain yang dikirim kemudian menyediakan format penuh, sehingga batas ini tidak berlaku untuk seluruh tautan Hysteria; tampilkan keterbatasan sumber tersebut jika menambah penanda preview, tanpa menawarkan bypass akses.
+
+
+Tes akhir SoundCloud Ya Sudahlah 1.0.11 mengungkap delay auditori ±0,5 detik (BUG-033). Prioritaskan tie-break selisih durasi untuk kandidat dengan skor identitas sama, penyimpanan record ID/atribusi, dan OPT-003/004 dengan pratinjau serta backup. Kandidat berdurasi lebih dekat bukan bukti timing lebih tepat; pengguna mengonfirmasi sorotan terlambat 0,5 detik dengan selisih tetap, sehingga koreksi per lagu perlu memajukan lirik. Audio jangan diunduh ulang untuk mengganti lirik.

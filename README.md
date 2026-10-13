@@ -1,6 +1,6 @@
 # TubeFlow
 
-Aplikasi Android Kotlin/Compose untuk mengunduh audio/video YouTube langsung di perangkat. Tidak membutuhkan backend. Android 10 (API 29) atau lebih baru.
+Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-platform langsung di perangkat. Tidak membutuhkan backend. Android 10 (API 29) atau lebih baru.
 
 ## Fitur
 
@@ -19,6 +19,14 @@ Aplikasi Android Kotlin/Compose untuk mengunduh audio/video YouTube langsung di 
 - Tema terang/gelap mengikuti sistem atau pilihan manual, plus warna dinamis (Material You) di Android 12+.
 - Splash screen mengikuti tema aplikasi (terang/gelap) saat aplikasi dibuka.
 - Folder penyimpanan bisa diubah di Pengaturan → Penyimpanan (nama satu segmen di bawah Downloads/).
+
+- Smart Media: satu katalog Semua/Musik/Video, terpisah dari riwayat; scan folder dan impor dokumen tanpa salinan media. Pencarian, filter folder/artis/album, sortir, detail, thumbnail dan playback melalui pemutar perangkat.
+- Smart Audio: normalisasi nama, tag khusus audio yang menjaga informasi valid, pengaturan otomatis artwork/lirik/katalog. Tahun unggah dan nama uploader tidak dijadikan tahun/artis lagu.
+- Koreksi waktu LRC per lagu (±30 detik), baseline asli, preview dan reset; cocok untuk offset konstan, bukan perbedaan aransemen/drift.
+- Rename pasangan audio–LRC MediaStore dengan verifikasi/rollback, serta hapus permanen berkonfirmasi. Dukungan rename SAF bergantung kemampuan provider.
+- Ringkasan: jumlah/ukuran media tersedia, status metadata/artwork/lirik, penyimpanan internal, aktivitas harian/mingguan/platform sejak upgrade. Riwayat yang dihapus dan statistik lama tidak ditebak.
+
+Detail implementasi, migrasi, hasil tes dan batas cakupan: [laporan Smart Media](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
 
 Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio Auto memakai MP3 agar bitrate dapat diterapkan. Bitrate lebih tinggi dan format lossless tidak meningkatkan kualitas sumber. Resolusi manual membatasi kualitas maksimum, bukan menjamin sumber tersedia pada resolusi itu.
 
@@ -63,7 +71,13 @@ Hasil [audit ulang 9 Oktober 2026](docs/REVIEW_2026-10-09.md): build dan tes hos
 
 Usulan fitur dan optimasi berikutnya tersedia di [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md), termasuk peningkatan pencocokan lirik, cari ulang lirik, koreksi waktu, cache, progres, dan diagnostik.
 
-Validasi terbaru: signed release **1.0.1 (2)**, **60 unit tests Kotlin**, **37 host tests**, lint debug/release (0 masalah), serta signature/alignment/audit native dan ZIP APK ketiga ABI lulus. AAB juga lolos verifikasi signing, bundletool dan audit native. Artefak tersedia di `app/build/outputs/distribution/1.0.1/`; kunci produksi sama dengan 1.0.0 yang sudah terpasang di HP. Release 1.0.1 sudah terpasang dan hash terverifikasi di Realme Android 10: ukuran 246,4 MB sesuai 50 file/258.380.600 byte, tetap benar setelah kembali ke default dan restart. Default tetap `Download/TubeFlow`. Lihat [rincian perbaikan](docs/STORAGE_SIZE_2026-10-10.md) dan [signing produksi](docs/PRODUCTION_SIGNING.md). Rincian toolchain dan sisa deprecation internal AGP ada di [catatan lint](docs/LINT_CLEANUP_2026-10-09.md). Kesiapan distribusi tetap mengikuti [persiapan rilis](docs/RELEASE.md). Payload FFmpeg upstream telah diperbaiki dengan membangun ulang sepuluh library WebP 1.6.0 pada ARM64/x86_64 dengan alignment 16 KB. Audit 448 ELF payload menemukan nol kegagalan alignment 64-bit, dengan simbol ekspor dan dependensi yang sama. Pengujian runtime pada perangkat 16 KB tetap wajib dilakukan.
+Validasi terbaru **13 Oktober 2026 — 1.1.1 (15), Room9 (tanpa migrasi)**: 145 tes Kotlin dan 76 tes Python lulus (Python dijalankan ulang pada sesi dokumentasi), lint debug/release 0 masalah; signed APK×3/AAB, audit native/ZIP/zipalign/apksigner lulus. APK ARM64 `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0` terpasang sebagai update di Realme Android 10, hash cocok. Dashboard Ringkasan media (donat/batang/garis 7/30/90 hari) diperiksa via UIAutomator + screenshot; pengamanan cari ulang lirik (jurnal backup/read-back/rollback + mutex bersama) lulus fault injection host. **Batas:** retensi media tidak terbukti (pengelola membersihkan media selama build), refetch live/proses mati/provider Android belum diuji. Distribusi lokal `app/build/outputs/distribution/1.1.1/`; [hasil, kontrak dan batas cakupan](docs/DASHBOARD_LYRICS_2026-10-13.md).
+
+Validasi sebelumnya **13 Oktober 2026 — 1.1.0 (14), Room9**: 136 tes Kotlin dan76 tes Python lulus, lint debug/release0masalah; build produksi, audit tiga APK/AAB dan bundletool lulus. APK ARM64 final terpasang sebagai update pada Realme Android10, hash cocok. Migrasi nonempty, katalog tanpa duplikat, rename audio–LRC, impor, hapus fixture, pengaturan, dashboard dan download audio/video diuji. Ya Sudahlah dikonfirmasi sinkron setelah koreksi per rekaman−2detik; audio lama utuh. Distribusi lokal `app/build/outputs/distribution/1.1.0/`; [hasil lengkap, status fitur dan batas cakupan](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
+
+Validasi sistem **13 Oktober 2026 — 1.0.9 (10)**: 102 tes Kotlin, 61 tes Python, lint debug/release 0 masalah, audit signed APK/AAB lulus. APK ARM64 final terpasang dan hash cocok di Realme Android 10. Migrasi mempertahankan 25 riwayat lama; thumbnail/platform, duplikat URL alias, tag audio dan resume setelah HTTP 403 hingga MP4 selesai diuji. Folder tetap root TubeFlow, ukuran 84,6 MB cocok dua file/88.733.655 byte. Distribusi lokal `app/build/outputs/distribution/1.0.9/`. Cakupan dan batas tes: [laporan sistem](docs/SYSTEM_METADATA_RESUME_2026-10-13.md).
+
+Validasi batch penghitung folder: signed release **1.0.1 (2)**, **60 unit tests Kotlin**, **37 host tests**, lint debug/release (0 masalah), serta signature/alignment/audit native dan ZIP APK ketiga ABI lulus. AAB juga lolos verifikasi signing, bundletool dan audit native. Artefak tersedia di `app/build/outputs/distribution/1.0.1/`; kunci produksi sama dengan 1.0.0 yang sudah terpasang di HP. Release 1.0.1 sudah terpasang dan hash terverifikasi di Realme Android 10: ukuran 246,4 MB sesuai 50 file/258.380.600 byte, tetap benar setelah kembali ke default dan restart. Default tetap `Download/TubeFlow`. Lihat [rincian perbaikan](docs/STORAGE_SIZE_2026-10-10.md) dan [signing produksi](docs/PRODUCTION_SIGNING.md). Rincian toolchain dan sisa deprecation internal AGP ada di [catatan lint](docs/LINT_CLEANUP_2026-10-09.md). Kesiapan distribusi tetap mengikuti [persiapan rilis](docs/RELEASE.md). Payload FFmpeg upstream telah diperbaiki dengan membangun ulang sepuluh library WebP 1.6.0 pada ARM64/x86_64 dengan alignment 16 KB. Audit 448 ELF payload menemukan nol kegagalan alignment 64-bit, dengan simbol ekspor dan dependensi yang sama. Pengujian runtime pada perangkat 16 KB tetap wajib dilakukan.
 
 Mesin yt-dlp disertakan dalam aplikasi. Pembaruan dilakukan lewat rilis aplikasi; tidak ada pembaruan executable jaringan tanpa verifikasi.
 
@@ -74,6 +88,8 @@ Mesin yt-dlp disertakan dalam aplikasi. Pembaruan dilakukan lewat rilis aplikasi
 ## Skill pengembangan
 
 Skill Codex [tubeflow-dev](.agents/skills/tubeflow-dev/SKILL.md) menyimpan alur kerja, aturan perilaku download/SAF/lirik, serta validasi dan signing. Contoh pemakaian: `$tubeflow-dev perbaiki BUG-013 dan catat hasil pengujiannya`. Skill mengikuti kode dan laporan terkini; status bug tetap pada `docs/BUG_FINDINGS.md`.
+
+Kontrak identitas lagu, migrasi Room, thumbnail/platform dan validasi resume diperinci pada [laporan sistem 13 Oktober](docs/SYSTEM_METADATA_RESUME_2026-10-13.md). Gunakan snapshot `DownloadJob.withMetadata`/`songIdentity` untuk penamaan, folder dan lirik; uploader/creator/remixer tidak otomatis menjadi artis. Tag output harus memakai override `meta_*` melalui `MetadataTags` agar fallback internal yt-dlp tidak mengisi artist dari uploader.
 
 Skill tersimpan dalam repo dan ditautkan ke direktori skill Codex lokal pada komputer ini. Untuk checkout baru, jalankan dari root repo (jangan menimpa skill lokal yang sudah ada):
 

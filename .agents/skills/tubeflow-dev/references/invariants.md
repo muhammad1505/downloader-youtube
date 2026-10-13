@@ -8,7 +8,7 @@ Root Kotlin: `app/src/main/java/id/local/tubeflow/`.
 
 | Area | Titik awal |
 | --- | --- |
-| Identitas URL, opsi, Room dan migrasi | `core/Format.kt` (`Selection`), `core/Models.kt` |
+| Identitas URL, opsi, Room dan migrasi | `core/Models.kt` (`Selection`, Room), `core/Format.kt` |
 | Submit/retry/inspeksi/cleanup/ukuran folder | `core/DownloadViewModel.kt` |
 | Download, publikasi dan worker | `core/DownloadWorker.kt`, `core/Engine.kt` |
 | URI SAF dan cakupan folder default | `core/StorageUris.kt`, `core/StorageFolderAccess.kt` |
@@ -21,7 +21,7 @@ Root Kotlin: `app/src/main/java/id/local/tubeflow/`.
 
 - `generation` membedakan eksekusi sebelum/sesudah resume atau revive. Pertahankan pemeriksaan kepemilikan pada mutasi worker; audit juga pending URI, sidecar, status lirik dan cleanup. Beberapa mutasi belum memiliki guard: jangan menganggap `cancelOwned` membuat seluruh cleanup aman.
 - Status WorkManager `CANCELLED` tidak membuktikan coroutine/proses native sudah berhenti. Pastikan eksekusi lama tidak menyentuh status atau file milik eksekusi baru.
-- Pause mempertahankan berkas parsial; cancel/remove harus membersihkan berkas setelah pemiliknya berhenti. Recovery harus tetap memiliki jejak file pending bila penghapusan gagal.
+- Pause/Gagal mempertahankan berkas parsial ("Coba lagi" memeriksa jurnal identitas sumber/format dan validator/prefix HTTP sebelum memakai Range/ukuran downloader; kemampuan sumber berbeda-beda); putus koneksi kembali QUEUED dengan parsial utuh. Cancel/remove/clear harus membersihkan berkas setelah pemiliknya berhenti. Recovery harus tetap memiliki jejak file pending bila penghapusan gagal.
 - Perubahan entity/versi Room harus disertai migrasi dan `app/schemas/`. Periksa migrasi yang terpasang di `Models.kt`; jangan mengandalkan nomor schema pada dokumen historis.
 - Pembatalan engine mengikuti identitas proses/session/token di `Engine.kt`, `ProcessIdentity.kt` dan bootstrap. Jangan mengganti dengan kill global Python/FFmpeg.
 
@@ -37,7 +37,12 @@ Root Kotlin: `app/src/main/java/id/local/tubeflow/`.
 ## Identitas, playlist dan UI
 
 - Gunakan `Selection.videoId` dan `DownloadJob.matchesOutput` untuk identitas sumber serta seluruh opsi keluaran. Alias watch/youtu.be/Shorts/Live/Music untuk video sama tidak menjadi hasil baru; bitrate/format/opsi berbeda tetap sah.
+- Snapshot identitas disimpan pada job: rawTitle/trackTitle/artist/artistEvidence/creator/remixer/versionTag. `TitleSplit` + `SourceMetadata` dipakai submit/worker/tag audio/Auto Folder/lirik. Jangan mempromosikan creator atau uploader menjadi artis; channel hanya sinyal jika credit judul lengkap memperkuatnya. Tanpa bukti, artist kosong. Structured track melewati pembersihan grup versi/credit yang sama dengan raw title; jangan membuat `(slowed) | slowed` atau mengulang artist yang sudah terbukti. Resolusi provider hanya menerima identitas unik dengan judul/artis/versi dan durasi yang cocok. Auto Folder memakai artis per item; artis tidak diketahui tetap root, tanpa fallback channel Mix atau tebakan segmen.
+- Tag output memakai `MetadataTags`/override `meta_*`, termasuk artist kosong bila tidak terbukti. Postprocessor yt-dlp mendahulukan track dan memakai uploader sebagai fallback artist; mengganti field title/artist saja tidak cukup. Uji parser resmi, generator metadata dan tag file nyata; custom creator/remixer dapat dibuang container MP4.
+- Platform persisten `platformId` berasal dari registry `SourcePlatforms` berdasarkan URL sumber. `DownloadJob.sourcePlatform` digunakan bersama antrean/riwayat/filter; fallback URL hanya untuk data lama. Thumbnail disimpan terpisah (`thumbnailUrl`/`coverPath`), dengan pemulihan artwork tertanam untuk riwayat lama. Jangan menurunkan platform dari nama file/creator.
+
 - Terapkan pemeriksaan konsisten pada submit dan retry. Hasil selesai mencegah duplikat jika file masih ada; riwayat URL lama ikut dibandingkan.
+- Identitas SoundCloud mengabaikan parameter pelacakan `utm_*`, tetapi mempertahankan parameter akses seperti `secret_token`. Jangan membuang seluruh query atau menormalkan URL platform lain tanpa bukti bahwa kontennya sama.
 - Mix `RD...` mempertahankan seed dan membaca panel awal tanpa continuation otomatis. Playlist statis tetap mengikuti pagination sesuai batas engine. Jangan memaksakan 25 untuk semua Mix; hasil server dapat berubah/personal.
 - Video dengan parameter list tetap dapat diinspeksi sebagai video, lalu playlist lewat aksi khusus. Retry inspeksi harus memungkinkan URL sama setelah kegagalan tanpa loop retry otomatis.
 - Persen transfer adalah per track; pemrosesan/lirik/finalisasi memakai indikator tak tentu, penyalinan memakai byte tersimpan. Speed/ETA hanya ketika datanya valid. Jangan membuat timer 90→98% seolah-olah transfer masih berjalan.
@@ -48,6 +53,8 @@ Root Kotlin: `app/src/main/java/id/local/tubeflow/`.
 
 Audio memakai LRCLIB dalam implementasi saat ini; caption/subtitle YouTube untuk mode video. Jangan menyebut LRCLIB sebagai Musixmatch atau penyedia berlisensi tanpa integrasi/bukti. Jika sumber diganti, tinjau kontrak API, atribusi dan privasi yang berlaku.
 
-Nilai kecocokan judul/artis/versi/durasi pada seluruh endpoint dan fallback. Metadata cocok belum membuktikan timestamp sinkron dengan audio live/cover/remix; dengarkan beberapa posisi lagu pada HP. Lihat temuan terbuka pencocokan dan toleransi durasi sebelum mengklaim sinkronisasi beres.
+Nilai kecocokan judul/artis/versi/durasi pada seluruh endpoint dan fallback. Penerimaan timed lyrics memakai gerbang ±2 detik dan durasi kedua pihak wajib diketahui; jangan melonggarkan search untuk mengakomodasi intro/outro tanpa bukti offset. Validasi timestamp, pertahankan metadata/offset LRC, dan bedakan hasil tidak cocok dari penyedia tidak punya lirik. Kredit deskripsi performer/track hanya dipakai bila eksplisit, unik dan dicocokkan dengan judul lengkap; songwriter/arranger bukan bukti vokalis. Metadata cocok belum membuktikan timestamp sinkron dengan audio live/cover/remix; dengarkan beberapa posisi lagu pada HP. Lihat temuan terbuka pencocokan dan toleransi durasi sebelum mengklaim sinkronisasi beres.
 
-Bedakan tidak ditemukan, instrumental, kegagalan jaringan dan gagal simpan. Download audio yang berhasil tetap sukses meskipun lirik gagal, dengan status lirik terpisah. Cari ulang lirik memakai lokasi audio yang sudah terbit, bukan folder pengaturan terbaru; penggantian gagal harus mempertahankan lirik lama. Jalur tulis langsung tanpa backup/rollback merupakan temuan terbuka, bukan pola yang perlu disalin.
+Bedakan tidak ditemukan, instrumental, kegagalan jaringan dan gagal simpan. Download audio yang berhasil tetap sukses meskipun lirik gagal, dengan status lirik terpisah. Cari ulang lirik memakai lokasi audio yang sudah terbit, bukan folder pengaturan terbaru; penggantian gagal harus mempertahankan lirik lama. Periksa implementasi backup/rollback serta hasil audit terbaru; jangan mengganti jalur aman dengan penulisan langsung yang menghilangkan lirik lama saat gagal.
+
+Pada pencarian fallback, skor identitas lebih kuat tetap prioritas; tie memakai selisih durasi terdekat setelah gerbang versi/durasi. Ini bukan bukti sinkronisasi auditori. Delay tetap perlu koreksi per rekaman dengan pratinjau/backup; jangan menggeser timestamp seluruh lagu karena satu contoh terlambat.
