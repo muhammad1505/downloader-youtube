@@ -33,14 +33,21 @@ class LyricTest {
 
     @Test
     fun durationMismatchIsRejected() {
-        // Durasi meleset jauh = rekaman/versi berbeda (toleransi 12 dtk atau 10% — BUG-013/R3).
+        // Exact and search share a two-second gate; a video intro cannot be assumed harmless.
         assertTrue(LyricMatch.score(query("Song", "Artist", 180), candidate("Song", "Artist", 240)) < 0.0)
         assertTrue(LyricMatch.score(query("Song", "Artist", 300), candidate("Song", "Artist", 200)) < 0.0)
         // Probe R3: 200 vs 229 detik dulu diterima dengan skor 1.0 — sekarang wajib ditolak.
         assertTrue(LyricMatch.score(query("Song", "Artist", 200), candidate("Song", "Artist", 229)) < 0.0)
-        // Selisih wajar (intro/outro video) tetap diterima (batas 10% dari 200 = 20 dtk).
-        val close = LyricMatch.score(query("Song", "Artist", 200), candidate("Song", "Artist", 210))
-        assertTrue(close.toString(), close >= LyricMatch.ACCEPT)
+        assertTrue(LyricMatch.score(query("Song", "Artist", 200), candidate("Song", "Artist", 210)) < 0.0)
+        assertTrue(LyricMatch.score(query("Song", "Artist", 200), candidate("Song", "Artist", 203)) < 0.0)
+        assertTrue(LyricMatch.score(query("Song", "Artist", 200), candidate("Song", "Artist", 202)) >= LyricMatch.ACCEPT)
+    }
+
+    @Test
+    fun timedLyricsRequireDurationOnBothSides() {
+        assertFalse(LyricMatch.acceptsTimedLyrics(query("Song", "Artist", 0), candidate("Song", "Artist", 200)))
+        assertFalse(LyricMatch.acceptsTimedLyrics(query("Song", "Artist", 200), candidate("Song", "Artist", -1)))
+        assertTrue(LyricMatch.acceptsTimedLyrics(query("Song", "Artist", 200), candidate("Song", "Artist", 198)))
     }
 
     @Test
@@ -83,11 +90,15 @@ class LyricTest {
     @Test
     fun lyricStatusReportingAndRetryRules() {
         assertEquals("Lirik tersimpan", LyricStatus.label(LyricStatus.SAVED))
-        assertEquals("Lirik tidak ditemukan", LyricStatus.label(LyricStatus.NOT_FOUND))
+        // Label harus jelas: "tidak ada di penyedia" berbeda dari "gagal (jaringan)" (permintaan pengguna).
+        assertEquals("Lirik tidak tersedia di penyedia lirik", LyricStatus.label(LyricStatus.NOT_FOUND))
+        assertEquals("Lirik belum cocok dengan versi audio", LyricStatus.label(LyricStatus.NO_MATCH))
+        assertEquals("Pencarian lirik gagal (periksa jaringan)", LyricStatus.label(LyricStatus.NETWORK))
         assertEquals("Lagu instrumental — tanpa lirik", LyricStatus.label(LyricStatus.INSTRUMENTAL))
         assertTrue(LyricStatus.retryable(LyricStatus.NETWORK))
         assertTrue(LyricStatus.retryable(LyricStatus.SAVE_FAILED))
         assertTrue(LyricStatus.retryable(LyricStatus.NOT_FOUND))
+        assertTrue(LyricStatus.retryable(LyricStatus.NO_MATCH))
         assertFalse(LyricStatus.retryable(LyricStatus.SAVED))
         assertFalse(LyricStatus.retryable(LyricStatus.INSTRUMENTAL))
     }

@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
+import android.media.MediaMetadataRetriever
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
@@ -59,7 +60,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   val jobId = inputData.getString("jobId")
   // Generasi eksekusi diambil SEBELUM antre slot: worker yang digantikan (jeda→lanjut) memakai generasi lamanya,
   // sehingga semua update bersyaratnya otomatis tidak mengenai baris yang sudah dilanjutkan (BUG-002).
-  val generation = jobId?.let { dao.get(it)?.generation } ?: -1
+  val generation = inputData.getInt("generation", -1).takeIf { it >= 0 } ?: jobId?.let { dao.get(it)?.generation } ?: -1
   try {
    setForeground(getForegroundInfo())
    SettingsStore.load(applicationContext)
@@ -76,7 +77,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
  private suspend fun executeDownload(generation: Int): Result = withContext(Dispatchers.IO) {
   val jobId = inputData.getString("jobId") ?: return@withContext Result.failure()
   var job = dao.get(jobId) ?: return@withContext Result.failure()
-  if(job.state == JobState.CANCELLED) return@withContext Result.success()
+  if(job.state !in setOf(JobState.QUEUED, JobState.RUNNING) || job.generation != generation) return@withContext Result.success()
   job.pendingUri?.let { raw -> runCatching { StorageUris.delete(applicationContext, raw) } }
   // Sisa publikasi sidecar dari run sebelumnya yang mati di tengah jalan — bersihkan sekarang (BUG-008).
   if(job.sidecarPending != null) {
@@ -90,10 +91,10 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    dao.sidecars(jobId, null)
   }
   val directory = File(applicationContext.noBackupFilesDir,"downloads/$jobId").apply { mkdirs() }
+  dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, "")
   var pending: Uri? = null
   // Auto-folder playlist/Mix: subfolder satu segmen yang divalidasi (nama kosong/tak aman = folder utama).
-  val subfolder = Selection.safeFolder(job.subfolder)
-  val relativePath = run { SettingsStore.load(applicationContext); "Download/${SettingsStore.storageFolder}" + (subfolder?.let { "/$it" } ?: "") }
+
   try {
    val gate = Any()
    var last = 0L
@@ -113,37 +114,76 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     }
    }
    publish(lastProgress, force = true)
-   if(job.title == "Video YouTube") {
-    try {
-     val metadata=Engine.inspect(applicationContext,job.url,job.id)
-     val neat=Format.neatTitle(metadata.title,metadata.uploader)
-     if(dao.title(jobId,generation,neat) == 0) throw CancellationException()
-     // Durasi hasil inspeksi ikut tersimpan (bersyarat generasi) — gerbang durasi lirik tidak boleh
-     // mati karena job diajukan dengan judul placeholder tanpa durasi (BUG-013/R3).
-     if(metadata.durationSeconds > 0) dao.duration(jobId,generation,metadata.durationSeconds)
-     job=job.copy(title=neat, durationSeconds=metadata.durationSeconds.takeIf { it > 0 } ?: job.durationSeconds)
-    } catch(cancelled: CancellationException) { throw cancelled }
-    catch(_: Exception) { /* Metadata failure must not block an otherwise available download. */ }
+   var sourceTrackAvailable = false
+   // Refresh source metadata on every attempt: playlist entries and expired URLs need the same identity path.
+   try {
+    var metadata = Engine.inspect(applicationContext, job.url, job.id)
+    sourceTrackAvailable = metadata.track.isNotBlank()
+    if (job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) {
+     val initial = TitleSplit.identify(metadata.title, metadata.uploader, metadata.artist, metadata.track, metadata.creator)
+     val resolved = Lyrics.resolveIdentity(initial, metadata.durationSeconds)
+     if (resolved.evidence == "provider_identity") metadata = metadata.copy(artist=resolved.artist.orEmpty(), track=resolved.title, artistEvidence=resolved.evidence)
+    }
+    val updated = job.withMetadata(metadata)
+    if (dao.metadata(jobId, generation, updated.rawTitle, updated.trackTitle, updated.title, updated.artist,
+      updated.creator, updated.remixer, updated.versionTag, updated.artistEvidence, updated.platformId,
+      updated.thumbnailUrl, updated.sourceId, updated.extractor, updated.subfolder, updated.durationSeconds) == 0) throw CancellationException()
+    job = updated
+   } catch (cancelled: CancellationException) { throw cancelled }
+   catch (_: Exception) { /* Extracting metadata may fail while the engine can still download. Keep the stored identity. */ }
+   CoverCache.fetch(applicationContext, job)?.let { path ->
+    if (dao.coverPath(jobId, generation, path) > 0) job = job.copy(coverPath = path) else CoverCache.deleteIfUnused(applicationContext, jobId, path)
    }
    ensureActive()
    if(dao.get(jobId)?.state == JobState.CANCELLED) throw CancellationException()
+   // Mode audio tanpa lirik penyedia: caption YouTube tidak ditulis sama sekali (lebih baik kosong daripada ngaco).
+   val skipSubtitles = job.mode == MediaMode.AUDIO
+   // Each track reports its actual byte percentage; postprocessors have no reliable percent.
+   dao.processingNotice(jobId, generation, "")
+   val result = Engine.download(applicationContext,job,directory,skipSubtitles, callback = { update -> publish(update) }, resumeNotice = { notice ->
+    runBlocking { dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, notice) }
+   }, processingNotice = { notice -> runBlocking { dao.processingNotice(jobId, generation, notice) } })
+   // Inspect completed audio only. File tags can resolve identity when source credits were absent.
+   if (job.mode == MediaMode.AUDIO) {
+    val reader = MediaMetadataRetriever()
+    try {
+     reader.setDataSource(result.absolutePath)
+     val updated = job.withNativeAudioMetadata(
+      reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty(),
+      reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST).orEmpty(), !sourceTrackAvailable)
+     if (dao.metadata(jobId, generation, updated.rawTitle, updated.trackTitle, updated.title, updated.artist,
+       updated.creator, updated.remixer, updated.versionTag, updated.artistEvidence, updated.platformId,
+       updated.thumbnailUrl, updated.sourceId, updated.extractor, updated.subfolder, updated.durationSeconds) == 0) throw CancellationException()
+     job = updated
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (_: Exception) { /* Optional tag inspection never discards complete media. */ }
+    finally { reader.release() }
+   }
+   val subfolder = Selection.safeFolder(job.subfolder)
+   val relativePath = "Download/${SettingsStore.storageFolder}" + (subfolder?.let { "/$it" } ?: "")
    // Lirik audio HANYA dari penyedia lirik (LRCLIB) — caption YouTube untuk musik sering berantakan/beda lagu.
    // Hasil terstruktur (tersimpan/tidak ditemukan/instrumental/jaringan) dicatat ke riwayat (BUG-014).
    val lyricOutcome = if (job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty()) {
     publish(DownloadProgress(DownloadPhase.LYRICS), force = true)
-    Lyrics.fetch(job.title, job.durationSeconds)
+    Lyrics.fetch(job.songIdentity(), job.durationSeconds)
    } else null
-   // Mode audio tanpa lirik penyedia: caption YouTube tidak ditulis sama sekali (lebih baik kosong daripada ngaco).
-   val skipSubtitles = job.mode == MediaMode.AUDIO
-   // Each track reports its actual byte percentage; postprocessors have no reliable percent.
-   val result = Engine.download(applicationContext,job,directory,skipSubtitles) { update -> publish(update) }
+   // Cache sampul untuk kartu Antrean/Riwayat (P2): salin thumbnail hasil unduhan ke covers/<id>.jpg —
+   // jalur internal yang bertahan setelah direktori kerja job dibersihkan. Gagal menyalin tidak menggagalkan job.
+   runCatching {
+    val thumb = directory.listFiles()?.firstOrNull { it.isFile && it.name.startsWith("media.") && it.extension.equals("jpg", ignoreCase = true) }
+    if (thumb != null) {
+     CoverCache.fromFile(applicationContext, job, thumb)?.let { path ->
+      dao.coverPath(jobId, generation, path)
+     }
+    }
+   }
    ensureActive()
    if(dao.get(jobId)?.state == JobState.CANCELLED) throw CancellationException()
    val resolver = applicationContext.contentResolver
    val tree = SettingsStore.storageTree
    // SAF: dokumen induk media & sidecar — direktori subfolder playlist bila ada, akar tree kalau tidak.
    val parentDoc: Uri? = if (tree != null) (subfolder?.let { ensureSubfolderDoc(resolver, tree, it) } ?: treeRootUri(tree)) else null
-   val name = Format.tidyFileName(job.title) + "." + result.extension
+   val name = SmartMedia.fileName(job.songIdentity(), job.rawTitle.ifBlank { job.title }, result.extension, job.autoRename)
    val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(result.extension) ?: "application/octet-stream"
    publish(DownloadProgress(DownloadPhase.SAVING, 0f), force = true)
    pending = if (tree != null) {
@@ -196,6 +236,10 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     // Completed only after media, requested sidecars and their outcomes are recorded.
     if(dao.finish(jobId,generation,published.toString(),System.currentTimeMillis()) == 0) throw CancellationException()
     pending=null
+    dao.get(jobId)?.processingNotice?.takeIf { it.isNotBlank() }?.let {
+     DownloadDatabase.get(applicationContext).media().event(MediaEvent(jobId = jobId, action = "PROCESSING_FAILED", kind = job.mode.name, platformId = job.platformId, at = System.currentTimeMillis()))
+    }
+    runCatching { MediaIndexWorker.enqueue(applicationContext, jobId) }
     notifyResult(job, published, null, lyricStatus)
    }
    Result.success()
@@ -225,11 +269,11 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     val current = dao.get(jobId)
     if (!takenOver && current != null && current.generation == generation) {
      dao.clearPendingOwned(jobId, generation)
-     // Jeda (PAUSED) dan putus koneksi (kembali QUEUED, dijalankan ulang otomatis WorkManager) menyimpan
-     // parsial — "Lanjutkan"/retry otomatis lanjut dari file .part, bukan dari nol (BUG-004/BUG-025).
-     // Gagal/batal tetap dibersihkan. Pemeriksaan ulang tepat sebelum hapus: pekerjaan pengganti boleh
-     // muncul setelah pemeriksaan pertama.
-     val keepPartial = current.state == JobState.PAUSED || current.state == JobState.QUEUED
+     dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, dao.get(jobId)?.resumeNotice.orEmpty())
+    // Jeda (PAUSED), putus koneksi (kembali QUEUED), maupun Gagal (FAILED) menyimpan parsial —
+    // "Lanjutkan"/"Coba lagi" lanjut dari file .part, bukan dari nol (BUG-004/BUG-025/P1 resume).
+    // yt-dlp memvalidasi sendiri keaslian parsial (Range/ukuran; -c default) saat lanjut. Batal tetap dibersihkan.
+    val keepPartial = current.state == JobState.PAUSED || current.state == JobState.QUEUED || current.state == JobState.FAILED
      if (!Engine.isRunning(jobId) && !keepPartial && !takenOverByOther()) directory.deleteRecursively()
     }
    }
@@ -257,7 +301,8 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    val extension = file.extension.lowercase()
    if (extension !in mediaExtensions) continue
    val isThumb = extension in setOf("jpg","jpeg","png","webp","gif")
-   if (isThumb && job.embedThumb && !job.thumbnail) continue
+    // Thumbnail selalu terunduh untuk cache sampul (P2) — sebagai sidecar hanya bila diminta pengguna.
+    if (isThumb && !job.thumbnail) continue
    // Lirik audio disimpan sebagai .lrc — .srt hanya untuk subtitle video.
    val kind = if (isThumb) "thumb" else "sub"
    val lyric = kind == "sub" && job.mode == MediaMode.AUDIO

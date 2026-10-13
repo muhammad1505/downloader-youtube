@@ -33,8 +33,35 @@ object SettingsStore {
     var maxConcurrent by mutableIntStateOf(1)
         private set
 
+    var autoRename by mutableStateOf(true); private set
+    var autoTag by mutableStateOf(true); private set
+    var autoArtwork by mutableStateOf(true); private set
+    var autoLyrics by mutableStateOf(false); private set
+    var autoLibrary by mutableStateOf(true); private set
+    var analyticsSince: Long = 0; private set
+
+    fun setSmart(context: Context, key: String, enabled: Boolean) {
+        when (key) {
+            "rename" -> autoRename = enabled
+            "tag" -> autoTag = enabled
+            "artwork" -> autoArtwork = enabled
+            "lyrics" -> autoLyrics = enabled
+            "library" -> autoLibrary = enabled
+            else -> return
+        }
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putBoolean("smart_$key", enabled) }
+    }
+
     fun load(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        autoRename = prefs.getBoolean("smart_rename", true)
+        autoTag = prefs.getBoolean("smart_tag", true)
+        autoArtwork = prefs.getBoolean("smart_artwork", true)
+        autoLyrics = prefs.getBoolean("smart_lyrics", false)
+        autoLibrary = prefs.getBoolean("smart_library", true)
+        analyticsSince = prefs.getLong("analytics_since", 0).takeIf { it > 0 } ?: System.currentTimeMillis().also {
+            prefs.edit { putLong("analytics_since", it) }
+        }
         themeMode = prefs.getString("theme", MODE_SYSTEM)?.takeIf { it in supported } ?: MODE_SYSTEM
         dynamicColor = prefs.getBoolean("dynamic", true)
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER

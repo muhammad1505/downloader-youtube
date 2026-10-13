@@ -16,10 +16,12 @@ object Engine {
  private data class Execution(val thread: Thread, val controlFile: File, val token: String)
  private val activeThreads=java.util.concurrent.ConcurrentHashMap<String,Execution>()
  private lateinit var processDirectory: File
+ private lateinit var extractorCache: File
  fun isRunning(id: String) = activeThreads[id]?.thread?.isAlive == true
  suspend fun initialize(context: Context) = lock.withLock {
   withContext(Dispatchers.IO) {
    try {
+    if (Lyrics.responseCache == null) Lyrics.responseCache = LyricsResponseCache(File(context.cacheDir, "lyrics-responses"))
     installBundledEngine(context)
     YoutubeDL.getInstance().init(context)
     FFmpeg.getInstance().init(context)
@@ -56,6 +58,7 @@ object Engine {
    try { java.io.FileOutputStream(temporary).use { it.write(bootstrap); it.fd.sync() }; android.system.Os.rename(temporary.absolutePath,entry.absolutePath) }
    finally { temporary.delete() }
   }
+  extractorCache=File(context.cacheDir, "extractor-cache").apply { mkdirs() }
   processDirectory=File(context.noBackupFilesDir,"engine-processes").apply { mkdirs() }
   processDirectory.listFiles()?.forEach { record ->
    val token=record.name.removeSuffix(".json")
@@ -85,6 +88,7 @@ object Engine {
   var executionThread: Thread? = null
   val token=java.util.UUID.randomUUID().toString().replace("-", "")
   val controlFile=File(processDirectory,"$token.json")
+  request.addOption("--cache-dir", extractorCache.absolutePath)
   request.addCommands(listOf("--tubeflow-process-file",controlFile.absolutePath,"--tubeflow-process-token",token))
   var execution: Execution? = null
   try { return suspendCancellableCoroutine { continuation ->
@@ -130,10 +134,10 @@ object Engine {
   return json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty().firstOrNull { it.endsWith("-orig") }
  }
  suspend fun inspect(context: Context, url: String, id: String): VideoMetadata {
-  require(Selection.validUrl(url)) { "Gunakan tautan video YouTube yang valid." }
+  require(Selection.validUrl(url)) { "Gunakan tautan video dari platform yang didukung." }
   val json = dumpInfo(context, url, id)
   val langs = genuineSubtitleLangs(json).take(8)
-  return VideoMetadata(json.optString("title", "Video"), json.optString("uploader"), json.optLong("duration"), json.optString("thumbnail"), url.trim(), langs)
+  return SourceMetadata.parse(json, url.trim()).copy(subtitleLangs = langs)
  }
  suspend fun inspectPlaylist(context: Context, url: String, id: String): PlaylistMetadata {
   require(Selection.validPlaylistUrl(url)) { "Gunakan tautan playlist YouTube yang valid." }
@@ -142,34 +146,40 @@ object Engine {
   if (Selection.isMix(url)) request.addOption("--tubeflow-mix-snapshot")
   val json = JSONObject(execute(request,id))
   val array = json.optJSONArray("entries") ?: JSONArray()
+  val entryChannels = mutableListOf<String>()
   val entries = (0 until array.length()).mapNotNull { index ->
    val entry = array.optJSONObject(index) ?: return@mapNotNull null
    val videoId = entry.optString("id")
    if (videoId.isBlank()) return@mapNotNull null
-   PlaylistEntry(videoId, entry.optString("title", "Video").ifBlank { "Video" }, entry.optLong("duration"), "https://www.youtube.com/watch?v=$videoId")
+   entryChannels += entry.optString("channel").ifBlank { entry.optString("uploader") }
+   PlaylistEntry(videoId, entry.optString("title", "Video").ifBlank { "Video" }, entry.optLong("duration"), "https://www.youtube.com/watch?v=$videoId", entry.optString("uploader").ifBlank { entry.optString("channel") }, entry.optString("artist").takeUnless { it == "null" }.orEmpty(), entry.optString("track").takeUnless { it == "null" }.orEmpty(), SourceMetadata.parse(entry, "https://www.youtube.com/watch?v=$videoId").thumbnail)
   }
-  return PlaylistMetadata(json.optString("title", "Playlist").ifBlank { "Playlist" }, url.trim(), entries)
+  // Channel kreator dipertahankan untuk auto-folder Mix — judul Mix YouTube sering tidak terpecah
+  // oleh heuristik segmen (satu kalimat panjang tanpa " - "), sedangkan channel artisnya jelas.
+  val channel = Selection.pickChannel(
+   json.optString("channel").ifBlank { null } ?: json.optString("uploader").ifBlank { null },
+   entryChannels,
+  )
+  return PlaylistMetadata(json.optString("title", "Playlist").ifBlank { "Playlist" }, url.trim(), entries, channel)
  }
- suspend fun download(context: Context, job: DownloadJob, directory: File, skipSubtitles: Boolean = false, callback: (DownloadProgress)->Unit): File {
+ suspend fun download(context: Context, job: DownloadJob, directory: File, skipSubtitles: Boolean = false, callback: (DownloadProgress)->Unit, resumeNotice: (String)->Unit = {}, processingNotice: (String)->Unit = {}): File {
   initialize(context)
   val options = DownloadOptions(job.url,job.mode,job.format,job.quality,job.bitrate,job.subtitles,job.embedSubs,job.thumbnail,job.embedThumb)
   Selection.validate(options)
- val request = YoutubeDLRequest(job.url).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist").addOption("--newline").addOption("--socket-timeout",30).addOption("--retries",3).addOption("--fragment-retries",3).addOption("--add-metadata").addOption("-f",Selection.selector(options)).addOption("-o",File(directory,"media.%(ext)s").absolutePath)
+ val request = YoutubeDLRequest(job.url).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist") // retries mengikuti default yt-dlp (10) — nilai 3 lama membuat jaringan sedikit goyang langsung menggagalkan job (P1 resume).
+ .addOption("--newline").addOption("--socket-timeout",30).addOption("--retries",10).addOption("--fragment-retries",10).addOption("-f",Selection.selector(options)).addOption("-o",File(directory,"media.%(ext)s").absolutePath)
  request.addOption("--progress")
  request.addCommands(listOf("--progress-template", DownloadProgress.DOWNLOAD_TEMPLATE, "--progress-template", DownloadProgress.PROCESS_TEMPLATE))
- // Tag judul/artis diambil dari nama file "Artis - Judul" (konvensi auto-tagger zdt-music-toolkit), bukan judul mentah YouTube.
- // --replace-in-metadata dipakai karena nilainya literal (aman untuk kolon, tanda kurung, %); tanpa " - " hanya judul yang diset.
- val neat = job.title.trim()
- fun literal(value: String) = value.replace("\\", "").replace('\n', ' ').replace('\r', ' ').trim()
- literal(if (" - " in neat) neat.substringAfter(" - ") else neat).takeIf { it.isNotEmpty() }?.let { value ->
-  request.addCommands(listOf("--replace-in-metadata", "title", "(?s)^.*$", value))
+ // Explicit meta_* also suppresses yt-dlp's uploader fallback and original track-title precedence.
+ if (job.mode == MediaMode.AUDIO && job.autoTag) {
+  request.addOption("--add-metadata")
+  request.addCommands(MetadataTags.arguments(job.songIdentity()))
  }
- literal(if (" - " in neat) neat.substringBefore(" - ") else "").takeIf { it.isNotEmpty() }?.let { value ->
-  request.addCommands(listOf("--replace-in-metadata", "artist,uploader", "(?s)^.*$", value))
- }
+ request.addOption("--continue").addOption("--tubeflow-validate-resume")
+ if (job.mode == MediaMode.AUDIO) request.addOption("--tubeflow-optional-audio")
  val embedCover = job.embedThumb && Selection.coverSupported(job.mode, job.format)
  if (job.mode == MediaMode.AUDIO) {
-   request.addOption("-x").addOption("--audio-format",if(job.format == "auto") { if(job.bitrate > 0 || embedCover) "mp3" else "best" } else job.format)
+   request.addOption("-x").addOption("--audio-format",Selection.audioTargetFormat(job.format, job.bitrate))
    if (job.bitrate > 0 && job.format !in setOf("flac","wav","vorbis")) request.addOption("--audio-quality","${job.bitrate}K")
   } else if (job.format != "auto") request.addOption("--merge-output-format",job.format).addOption("--remux-video",job.format)
   if (job.subtitles.isNotEmpty() && !skipSubtitles) {
@@ -181,13 +191,16 @@ object Engine {
     if (job.embedSubs) request.addOption("--embed-subs")
    }
   }
- if (job.thumbnail || embedCover || (job.embedThumb && job.mode == MediaMode.VIDEO)) {
-  request.addOption("--write-thumbnail").addOption("--convert-thumbnails", "jpg").addOption("--tubeflow-compress-cover")
- }
+ // Source previews use CoverCache separately. Download/embed artwork only when this job requests it.
+ if (job.thumbnail || job.embedThumb) request.addOption("--write-thumbnail").addOption("--convert-thumbnails", "jpg").addOption("--tubeflow-compress-cover")
  if (embedCover || (job.embedThumb && job.mode == MediaMode.VIDEO)) request.addOption("--embed-thumbnail")
   val manifest=File(directory,"result.txt")
   request.addCommands(listOf("--print-to-file","after_move:filepath",manifest.absolutePath))
-  execute(request,job.id) { _, _, line -> DownloadProgress.parse(line)?.let(callback) }
+  execute(request,job.id) { _, _, line ->
+   if (line.contains("[tubeflow-resume]")) resumeNotice(line.substringAfter("[tubeflow-resume]").trim())
+   if (line.contains("[tubeflow-processing]")) processingNotice(line.substringAfter("[tubeflow-processing]").trim())
+   DownloadProgress.parse(line)?.let(callback)
+  }
   val sidecarExtensions = setOf("srt","vtt","ass","lrc","ttml","srv1","srv2","srv3","jpg","jpeg","png","webp","gif")
   val output=File(manifest.readLines().filter { line -> line.isNotBlank() && line.substringAfterLast('.').lowercase() !in sidecarExtensions }.lastOrNull() ?: error("Hasil unduhan tidak ditemukan.")).canonicalFile
   require(output.parentFile == directory.canonicalFile && output.isFile && output.name.startsWith("media.")) { "Jalur hasil unduhan tidak valid." }

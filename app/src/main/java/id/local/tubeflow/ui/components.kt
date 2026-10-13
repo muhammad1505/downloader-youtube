@@ -19,14 +19,17 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.DownloadPhase
+import id.local.tubeflow.core.sourcePlatform
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.Format
 import id.local.tubeflow.core.JobState
@@ -96,10 +99,46 @@ fun StateChip(state: JobState) {
         JobState.FAILED -> Triple("Gagal", scheme.errorContainer, scheme.onErrorContainer)
         JobState.CANCELLED -> Triple("Dibatalkan", scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
-    Surface(color = container, shape = MaterialTheme.shapes.small) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = content, fontWeight = FontWeight.SemiBold)
+    Surface(color = container, shape = MaterialTheme.shapes.small) {        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = content, fontWeight = FontWeight.SemiBold)
     }
-}private fun formatMeta(job: DownloadJob): String {
+}
+
+/**
+ * Ikon platform sumber (P2) — peta ringkas nama platform ke ikon; platform baru di luar peta memakai
+ * globe sehingga item tetap tampil tanpa perlu mengubah banyak bagian sistem.
+ */
+@Composable
+fun PlatformIcon(platform: id.local.tubeflow.core.SourcePlatform, modifier: Modifier = Modifier) {
+    val icon = when (platform.icon) {
+        "play" -> Icons.Outlined.SmartDisplay
+        "music" -> Icons.Outlined.MusicVideo
+        "wave" -> Icons.Outlined.GraphicEq
+        "camera" -> Icons.Outlined.CameraAlt
+        "facebook" -> Icons.Outlined.ThumbUp
+        "x" -> Icons.Outlined.Close
+        "video" -> Icons.Outlined.Videocam
+        "game" -> Icons.Outlined.SportsEsports
+        else -> Icons.Outlined.Language
+    }
+    Icon(icon, platform.label, modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/**
+ * Sampul hasil cache (P2): decode file covers/<id>.jpg di IO. Tanpa sampul/gagal decode = ikon mode
+ * di atas gradien (fallback lama) — item tidak pernah gagal tampil karena gambar.
+ */
+@Composable
+fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifier: Modifier = Modifier) {
+    val model: Any? = coverPath.takeIf { it.isNotBlank() && java.io.File(it).isFile }?.let { java.io.File(it) }
+        ?: thumbnailUrl.takeIf { it.isNotBlank() }
+    Box(modifier.clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+        Icon(if (mode == MediaMode.AUDIO) Icons.Outlined.Headphones else Icons.Outlined.Videocam,
+            null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (model != null) coil.compose.AsyncImage(model = model, contentDescription = "Sampul sumber",
+            modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+    }
+}
+private fun formatMeta(job: DownloadJob): String {
     val base = if (job.mode == MediaMode.VIDEO)
         "${if (job.quality == 0) "Auto" else "${job.quality}p"} · ${job.format.uppercase(Locale.ROOT)}"
     else
@@ -125,28 +164,18 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
     Card(modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(42.dp).background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
-                            ),
-                        ),
-                        MaterialTheme.shapes.small,
-                    ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (job.mode == MediaMode.AUDIO) Icons.Outlined.Headphones else Icons.Outlined.Videocam,
-                        null,
-                        Modifier.size(22.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
+                CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(42.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(job.title.ifBlank { job.url }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(formatMeta(job), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Platform asal tautan (mis. SoundCloud, TikTok) + ikonnya — dikirim oleh Antrean & Riwayat (P2).
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PlatformIcon(job.sourcePlatform, Modifier.size(13.dp))
+                        Text(
+                            formatMeta(job) + " · ${job.sourcePlatform.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 StateChip(job.state)
             }
@@ -177,7 +206,15 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
-                JobState.FAILED -> job.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                JobState.FAILED -> {
+                    job.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                    if (job.partialBytes > 0) Text(
+                        "${Format.bytes(job.partialBytes)} disimpan; Coba lagi memeriksa dukungan lanjut dari sumber.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (job.resumeNotice.isNotBlank()) Text(job.resumeNotice, style = MaterialTheme.typography.labelSmall)
+
+                }
                 JobState.QUEUED -> Text("Menunggu giliran · antrean berjalan otomatis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 JobState.PAUSED -> {
                     if (job.progress >= 0f) {
@@ -191,7 +228,10 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
                 JobState.CANCELLED -> Text("Dibatalkan oleh kamu", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (job.state != JobState.FAILED && job.resumeNotice.isNotBlank())
+                Text(job.resumeNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Status lirik terpisah dari status audio: audio sukses tetap "Selesai" walau lirik tidak ada (BUG-014).
+            if (job.processingNotice.isNotBlank()) Text(job.processingNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
             if (job.state == JobState.COMPLETED && job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty() && job.lyricStatus.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                     Icon(
@@ -311,9 +351,12 @@ fun concreteMime(context: Context, uri: Uri, fallback: String): String {
     return if (mime.isNullOrBlank() || mime.contains('*') || mime == "application/octet-stream") fallback else mime
 }
 
-fun launchFile(context: Context, job: DownloadJob, share: Boolean): String? = try {
-    val uri = requireNotNull(job.outputUri).toUri()
-    val mime = concreteMime(context, uri, if (job.mode == MediaMode.AUDIO) "audio/mpeg" else "video/mp4")
+fun launchFile(context: Context, job: DownloadJob, share: Boolean): String? =
+    job.outputUri?.let { launchMedia(context, it, job.mode == MediaMode.AUDIO, share) } ?: "File tidak tersedia."
+
+fun launchMedia(context: Context, raw: String, audio: Boolean, share: Boolean): String? = try {
+    val uri = raw.toUri()
+    val mime = concreteMime(context, uri, if (audio) "audio/mpeg" else "video/mp4")
     val intent = if (share) Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri) else Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     intent.clipData = ClipData.newRawUri("Download", uri)

@@ -38,6 +38,7 @@ import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.TitleSplit
 import id.local.tubeflow.core.VideoMetadata
 import kotlinx.coroutines.delay
 
@@ -90,9 +91,11 @@ fun DownloadScreen(
 
     var subtitleLang by rememberSaveable { mutableStateOf("") }
     // Lirik audio hanya on/off dari penyedia lirik — pilihan bahasa berlaku untuk subtitle video (BUG-009).
-    var lyrics by rememberSaveable { mutableStateOf(false) }
+    var lyrics by rememberSaveable { mutableStateOf(SettingsStore.autoLyrics) }
     var embedSubs by rememberSaveable { mutableStateOf(false) }
-    var embedThumb by rememberSaveable { mutableStateOf(true) }
+    var embedThumb by rememberSaveable { mutableStateOf(SettingsStore.autoArtwork) }
+    LaunchedEffect(SettingsStore.autoLyrics) { lyrics = SettingsStore.autoLyrics }
+    LaunchedEffect(SettingsStore.autoArtwork) { embedThumb = SettingsStore.autoArtwork }
 
     val trimmed = url.trim()
     val isVideo = Selection.validUrl(trimmed)
@@ -150,7 +153,7 @@ fun DownloadScreen(
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Masukkan URL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Tempel link video atau playlist YouTube, detailnya otomatis terbaca.",
+                    "Tempel link video atau playlist — YouTube, TikTok, Instagram, SoundCloud, dan lainnya. Detailnya otomatis terbaca.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -169,10 +172,10 @@ fun DownloadScreen(
                 supportingText = {
                     when {
                         busy -> Text("Membaca detail link…")
-                        url.isNotBlank() && !isVideo && !isPlaylistLink -> Text("Masukkan link YouTube yang valid (https).")
+                        url.isNotBlank() && !isVideo && !isPlaylistLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
                         hasList -> Text("Link ini bagian dari sebuah playlist.")
-                        else -> Text("Contoh: youtube.com/watch, youtu.be, /shorts, /playlist.")
+                        else -> Text("Contoh: youtube.com, youtu.be, tiktok.com, soundcloud.com.")
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -238,7 +241,7 @@ fun DownloadScreen(
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(shownPlaylist.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                                Text(if (Selection.isMix(shownPlaylist.url)) "${entries.size} video dalam antrean awal" else "${entries.size} video ditemukan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (Selection.isMix(shownPlaylist.url)) "${entries.size} video dalam antrean awal" else "${entries.size} video · mengikuti isi link (maks 500)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             TextButton(onClick = {
                                 selectedIds = if (allSelected) emptySet() else selectedIds + visibleEntries.map { it.id }
@@ -246,7 +249,7 @@ fun DownloadScreen(
                         }
                         if (Selection.isMix(shownPlaylist.url)) {
                             Text(
-                                "Antrean awal Mix tanpa memuat halaman lanjutan. Daftar dapat berubah dan berbeda dari akun YouTube Anda.",
+                                "Antrean awal Mix dari YouTube (± video terkait yang sedang diputar) — tanpa memuat halaman lanjutan. Daftar dapat berubah dan berbeda dari akun YouTube Anda.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -310,10 +313,10 @@ fun DownloadScreen(
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (shownPlaylist != null) {
-                        val folder = Selection.playlistFolder(shownPlaylist.title)
-                        if (folder != null) Text("Hasil unduhan otomatis masuk ke subfolder \"$folder\" (dibuat dari judul playlist).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    if (shownPlaylist != null) Text(
+                        "Auto Folder mengikuti artis yang teridentifikasi untuk setiap lagu. Jika artis belum pasti, file masuk folder utama.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(
@@ -366,7 +369,7 @@ fun DownloadScreen(
                                     Text(if (mode == MediaMode.VIDEO) "Download subtitle" else "Download lirik", style = MaterialTheme.typography.bodyMedium)
                                     Text(
                                         if (mode == MediaMode.VIDEO) "Simpan teks subtitle (.srt) di samping file video."
-                                        else "Simpan lirik tersinkron (.lrc) dari penyedia lirik (LRCLIB) — tanpa caption YouTube yang sering ngaco.",
+                                        else "Simpan lirik tersinkron (.lrc) dari penyedia lirik (LRCLIB).",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -417,7 +420,7 @@ fun DownloadScreen(
                                         }
                                         Switch(checked = embedThumb, onCheckedChange = { embedThumb = it })
                                     }
-                                    if (embedThumb && audioFormat == "auto") Text("Format Auto akan dikonversi ke MP3 agar sampul selalu tertanam.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (embedThumb && audioFormat == "auto") Text("Auto mengikuti format asli jika bitrate tidak dipilih. Sampul disematkan bila format dan engine mendukung; preview tetap tersedia.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 } else {
                                     Text("Format ${audioFormat.uppercase()} belum mendukung sampul album — pilih Auto, MP3, atau M4A.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }

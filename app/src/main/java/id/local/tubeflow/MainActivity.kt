@@ -28,11 +28,12 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) readSharedLink(intent)
         SettingsStore.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
+        val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
         setContent {
             TubeFlowTheme(
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
-            ) { TubeFlowApp(model, incomingUrl.value, ::requestDownloadNotifications) }
+            ) { TubeFlowApp(model, library, incomingUrl.value, ::requestDownloadNotifications) }
         }
     }
     private fun requestDownloadNotifications() {

@@ -14,9 +14,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import id.local.tubeflow.core.sourcePlatform
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.JobState
 import id.local.tubeflow.core.MediaMode
+import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
 
 @Composable
@@ -33,6 +35,9 @@ fun HistoryScreen(
     val unsuccessful = jobs.count { it.state == JobState.FAILED || it.state == JobState.CANCELLED }
     var query by rememberSaveable { mutableStateOf("") }
     var modeFilter by rememberSaveable { mutableIntStateOf(-1) }
+    var platformFilter by rememberSaveable { mutableStateOf("") }
+    // Kategori asal tautan (YouTube, TikTok, SoundCloud, …) — hanya platform yang benar-benar ada di riwayat.
+    val platforms = completed.map { it.sourcePlatform.label }.distinct().sorted()
     var confirmClear by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<DownloadJob?>(null) }
     var pendingRedownload by remember { mutableStateOf<DownloadJob?>(null) }
@@ -46,7 +51,8 @@ fun HistoryScreen(
             1 -> job.mode == MediaMode.AUDIO
             else -> true
         }
-        matchesQuery && matchesMode
+        val matchesPlatform = platformFilter.isEmpty() || job.sourcePlatform.label == platformFilter
+        matchesQuery && matchesMode && matchesPlatform
     }
 
     if (pendingDelete != null) {
@@ -116,6 +122,17 @@ fun HistoryScreen(
                 FilterChip(selected = modeFilter == 1, onClick = { modeFilter = 1 }, label = { Text("Audio") }) }
         }
 
+        if (platforms.size > 1) {
+            item {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = platformFilter.isEmpty(), onClick = { platformFilter = "" }, label = { Text("Semua platform") })
+                    platforms.forEach { name ->
+                        FilterChip(selected = platformFilter == name, onClick = { platformFilter = name }, label = { Text(name) })
+                    }
+                }
+            }
+        }
+
         if (completed.isNotEmpty() || unsuccessful > 0) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -140,7 +157,7 @@ fun HistoryScreen(
                 EmptyState(
                     Icons.Outlined.SearchOff,
                     "Tidak ada yang cocok",
-                    "Coba kata kunci lain atau ubah filter mode di atas.",
+                    "Coba kata kunci lain atau ubah filter di atas.",
                 )
             }
             else -> items(filtered, key = { it.id }) { job ->

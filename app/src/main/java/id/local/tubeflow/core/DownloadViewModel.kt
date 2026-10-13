@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 class DownloadViewModel(application: Application) : AndroidViewModel(application) {
@@ -56,17 +57,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  }
  private fun measureStorage(): Pair<Long,Boolean> {
   var total=0L
-  val resolver=getApplication<Application>().contentResolver
   val tree=SettingsStore.storageTree
   if (tree != null) return measureTree(tree.toUri()) to true
   // Returning to the default output folder must not discard an existing read grant.
-  val defaultTree=resolver.persistedUriPermissions.firstOrNull { permission ->
-   permission.isReadPermission && runCatching {
-    StorageFolderAccess.matchesDefault(permission.uri.authority,
-     android.provider.DocumentsContract.getTreeDocumentId(permission.uri), SettingsStore.storageFolder)
-   }.getOrDefault(false)
-  }?.uri
-  if (defaultTree != null) return measureTree(defaultTree) to true
+  defaultTreeGrant()?.let { return measureTree(it) to true }
   // Batas folder HARUS berhenti tepat di folder pilihan: dulu prefix "Download/TubeFlow%" ikut menghitung
   // folder saudara (TubeFlowBackup) dan "_" dalam nama jadi wildcard SQL (BUG-012).
   val folder="Download/${SettingsStore.storageFolder}"
@@ -108,6 +102,29 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   walk(android.provider.DocumentsContract.getTreeDocumentId(root), 0)
   return total
  }
+ /** Grant SAF tersimpan yang menunjuk folder bawaan (pernah dipilih lewat pemilihan folder) — dipakai mengukur ukuran folder penuh dan membersihkan folder kosong. */
+ private fun defaultTreeGrant(): android.net.Uri? {
+  val resolver=getApplication<Application>().contentResolver
+  return resolver.persistedUriPermissions.firstOrNull { permission ->
+   permission.isReadPermission && runCatching {
+    StorageFolderAccess.matchesDefault(permission.uri.authority,
+     android.provider.DocumentsContract.getTreeDocumentId(permission.uri), SettingsStore.storageFolder)
+   }.getOrDefault(false)
+  }?.uri
+ }
+ // Old history keeps its original title/output; recover artwork from the actual audio, not a guessed URL.
+ private val artworkRecovery = viewModelScope.launch(Dispatchers.IO) {
+  val attempted=mutableSetOf<String>()
+  dao.observe().collect { rows ->
+   rows.forEach { job ->
+    if (job.platformId.isBlank()) dao.platform(job.id, SourcePlatforms.fromUrl(job.url).id)
+    if (job.state == JobState.COMPLETED && (job.coverPath.isBlank() || !java.io.File(job.coverPath).isFile) && attempted.add(job.id)) {
+     val path=CoverCache.fromMedia(getApplication(),job) ?: CoverCache.fetch(getApplication(),job)
+     if (path != null && dao.recoveredCover(job.id,job.generation,job.outputUri.orEmpty(),path) == 0) java.io.File(path).delete()
+    }
+   }
+  }
+ }
  private var inspection: Job?=null
  private var inspectionId: String?=null
  /** Jenis inspeksi terakhir — retry harus mengulang operasi yang sama, bukan yang lain (BUG-006/R6). */
@@ -129,15 +146,20 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
       job.sidecarUris.lines().mapNotNull { line -> line.substringAfter('|',"").takeIf { it.isNotBlank() } }.forEach { raw -> StorageUris.delete(application, raw) }
       dao.sidecars(job.id, null)
      }
-     // Unduhan yang dijeda menyimpan berkas parsialnya — jangan dihapus supaya "Lanjutkan" bisa melanjutkan (BUG-004).
-     if(job.state != JobState.PAUSED) deleteJobDir(job.id)
-     if(job.state in setOf(JobState.RUNNING,JobState.QUEUED)) { if(infos.any { it.state == WorkInfo.State.CANCELLED }) dao.cancel(job.id) else dao.fail(job.id,"Unduhan terhenti. Ketuk coba lagi untuk mengunduh ulang.") }
+     // Jeda/Gagal menyimpan berkas parsial — jangan dihapus supaya "Lanjutkan"/"Coba lagi" bisa
+     // lanjut dari progres terakhir (BUG-004/P1 resume). Hanya batal yang dibersihkan.
+     if(job.state == JobState.CANCELLED) deleteJobDir(job.id)
+     if(job.state in setOf(JobState.RUNNING, JobState.QUEUED)) { if(infos.any { it.state == WorkInfo.State.CANCELLED }) dao.cancel(job.id) else dao.fail(job.id,"Unduhan terhenti. Ketuk Coba lagi untuk melanjutkan dari progres terakhir.") }
      dao.clearPending(job.id)
     }
    }
  }
  /** Berkas parsial sementara sebuah job di noBackupFilesDir (BUG-004). */
- private fun deleteJobDir(id: String) { java.io.File(getApplication<Application>().noBackupFilesDir, "downloads/$id").deleteRecursively() }
+ private fun deleteJobDir(id: String) {
+  val app=getApplication<Application>()
+  java.io.File(app.noBackupFilesDir, "downloads/$id").deleteRecursively()
+  java.io.File(app.noBackupFilesDir, "covers").listFiles()?.filter { it.name == "$id.jpg" || it.name.startsWith("$id-") }?.forEach { it.delete() }
+ }
  /** Masih ada pekerjaan WorkManager aktif untuk job ini? */
  private fun hasActiveWork(id: String): Boolean = runCatching { work.getWorkInfosByTag(id).get().any { !it.state.isFinished } }.getOrDefault(false)
  fun clearError() { _error.value=null }
@@ -151,7 +173,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    try { _metadata.value=Engine.inspect(getApplication(),url,id) }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
-    val message=error.message ?: "Tidak dapat membaca video."
+    val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca video.")
     _error.value=message; _inspectError.value=message
    }
    finally { if(inspectionId==id) _busy.value=false }
@@ -170,34 +192,41 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    try { _playlist.value=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original) }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
-    val message=error.message ?: "Tidak dapat membaca playlist."
+    val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca playlist.")
     _error.value=message; _inspectError.value=message
    }
    finally { if(inspectionId==id) _busy.value=false }
   }
  }
  fun clearPlaylist() { _playlist.value=null }
+ /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
+ private fun inspectErrorMessage(url: String, message: String): String {
+  if(Selection.platform(url) != "Facebook") return message
+  return "Tautan Facebook tidak dapat dibaca — video mungkin privat, butuh login, atau tautannya sudah kedaluwarsa. Coba salin tautan video publik langsung dari aplikasi Facebook."
+ }
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang
   * playlist, bukan inspeksi video (BUG-006/R6). */
  fun retryInspect(url: String) { if(lastInspectPlaylist) inspectPlaylist(url) else inspect(url) }
- /** Queues every selected entry as its own job using the shared options; seluruh batch berbagi SATU subfolder otomatis dari judul playlist/Mix. */
- fun queuePlaylist(entries: List<PlaylistEntry>, options: DownloadOptions, folderTitle: String? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
-   try {
-    // Auto-folder: engine selalu mengunduh per-video (--no-playlist), jadi subfolder diwirakan di sini
-    // saat batch diajukan — "Mix - DENNY CAKNAN" → folder "mix-denny-caknan" untuk seluruh batch.
-    val folder=folderTitle?.let { Selection.playlistFolder(it) }
-    var queued=0; var skipped=0
-    entries.forEach { entry ->
-     try { submit(options.copy(url=entry.url), titleHint=entry.title, durationSeconds = entry.durationSeconds.takeIf { it > 0 }, subfolder=folder); queued++ }
-     catch(cancelled: CancellationException) { throw cancelled }
-     catch(_: Exception) { skipped++ }
-    }
-    _notice.value="Playlist: $queued video diantrekan" + (folder?.let { " ke folder \"$it\"" } ?: "") + if(skipped > 0) ", $skipped dilewati." else "."
+ /** Each playlist item shares output options; its own proven artist determines the automatic subfolder. */ fun queuePlaylist(entries: List<PlaylistEntry>, options: DownloadOptions, folderTitle: String? = null, folderChannel: String? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
+  try {
+   val folderMode = if (folderTitle?.startsWith("Mix - ", ignoreCase = true) == true) "mix" else "artist"
+   var queued=0; var skipped=0
+   entries.forEach { entry ->
+    try {
+     val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
+       artist = entry.artist, track = entry.track, creator = entry.uploader,
+       platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, entryMetadata=meta, autoFolder=folderMode)
+     queued++
+    } catch(cancelled: CancellationException) { throw cancelled }
+    catch(_: Exception) { skipped++ }
+   }
+   _notice.value="Playlist: $queued video diantrekan; folder mengikuti artis teridentifikasi." + if(skipped > 0) " $skipped dilewati." else ""
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
  } }
- private var submitting=false
+ @Volatile private var submitting=false
  fun enqueue(options: DownloadOptions) { if(submitting) return; submitting=true; viewModelScope.launch {
    try { submit(options) }
    catch(cancelled: CancellationException) { throw cancelled }
@@ -225,7 +254,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
  } }
- private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null) {
+ private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null, entryMetadata: VideoMetadata? = null, autoFolder: String = "") {
    recovery.join()
    Selection.validate(options)
    val url=options.url.trim()
@@ -236,20 +265,28 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    val previous=keepId?.let { dao.get(it) }
    val done=dao.observe().first().firstOrNull { it.id != keepId && it.matchesOutput(url, options) && it.state == JobState.COMPLETED && outputStillExists(it) }
    require(done == null) { "File ini sudah pernah diunduh." }
-   val meta=_metadata.value?.takeIf { it.url==url }
-   val title=Format.neatTitle(titleHint ?: meta?.title ?: previous?.title ?: "Video YouTube", meta?.uploader)
+   val meta=entryMetadata ?: _metadata.value?.takeIf { it.url==url }
+   val base = previous ?: DownloadJob(id,url,titleHint ?: "Video",options.mode,options.format,options.quality,options.bitrate,
+       subtitles=options.subtitles, embedSubs=options.embedSubs, thumbnail=options.thumbnail, embedThumb=options.embedThumb,
+       durationSeconds=durationSeconds ?: 0L, subfolder=subfolder.orEmpty(), autoFolder=autoFolder,
+       platformId=SourcePlatforms.fromUrl(url).id, rawTitle=titleHint.orEmpty(),
+       autoRename=SettingsStore.autoRename, autoTag=SettingsStore.autoTag, autoLibrary=options.mode != MediaMode.AUDIO || SettingsStore.autoLibrary)
+   val prepared = meta?.let { base.withMetadata(it) } ?: base
    if(keepId != null) {
-    val revived=dao.revive(id,title,options.mode,options.format,options.quality,options.bitrate,options.subtitles,options.embedSubs,options.thumbnail,options.embedThumb,System.currentTimeMillis())
+    awaitIdle(id)
+    val revived=dao.revive(id,prepared.title,prepared.artist,options.mode,options.format,options.quality,options.bitrate,options.subtitles,options.embedSubs,options.thumbnail,options.embedThumb,System.currentTimeMillis())
     if(revived == 0) return
     cancelResultNotification(id)
-   } else {
-    dao.put(DownloadJob(id,url,title,options.mode,options.format,options.quality,options.bitrate, subtitles=options.subtitles, embedSubs=options.embedSubs, thumbnail=options.thumbnail, embedThumb=options.embedThumb, durationSeconds=durationSeconds ?: meta?.durationSeconds ?: previous?.durationSeconds ?: 0L, subfolder=subfolder ?: ""))
+   } else dao.put(prepared)
+   viewModelScope.launch {
+    val current = dao.get(id) ?: return@launch
+    CoverCache.fetch(getApplication(), current)?.let { if (dao.coverPath(id, current.generation, it) == 0) CoverCache.deleteIfUnused(getApplication(), id, it) }
    }
    enqueueWork(id)
  }
  /** Menaruh pekerjaan WorkManager untuk sebuah job (dipakai submit baru maupun melanjutkan yang dijeda). */
  private suspend fun enqueueWork(id: String, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP, failMessage: String = "Tidak dapat memasukkan unduhan ke antrean.") {
-  val request=OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(workDataOf("jobId" to id)).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).addTag(id).build()
+  val request=OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(workDataOf("jobId" to id, "generation" to (dao.get(id)?.generation ?: -1))).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).addTag(id).build()
   try { withContext(Dispatchers.IO) { work.enqueueUniqueWork("download-$id",policy,request).result.get() } }
   catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { dao.fail(id,failMessage); throw error }
@@ -278,9 +315,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private suspend fun awaitIdle(id: String) { withContext(Dispatchers.IO) {
   repeat(100) {
    val infos=runCatching { work.getWorkInfosByTag(id).get() }.getOrDefault(emptyList())
-   if(infos.all { it.state.isFinished }) { delay(250); return@withContext }
+   if(infos.all { it.state.isFinished } && !Engine.isRunning(id)) { return@withContext }
    delay(100)
   }
+  error("Unduhan sebelumnya masih berhenti. Coba lagi sebentar.")
  } }
  /** Menjeda satu unduhan: status dicatat lebih dulu lalu pekerjaan dihentikan; berkas parsial disimpan. */
  fun pause(id: String) { viewModelScope.launch {
@@ -334,16 +372,19 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   if(job.state != JobState.COMPLETED) { enqueueRevive(job); return }
   if(submitting) return
   submitting=true
-  viewModelScope.launch {
+  viewModelScope.launch(Dispatchers.IO) {
    try {
     val app=getApplication<Application>()
     var failed=0
+    MediaFileOperations.mutex.withLock {
     // StorageUris.delete jujur: true = sudah hilang/terbukti terhapus, false = provider menolak sambil file masih ada.
     job.outputUri?.let { raw -> if(!StorageUris.delete(app, raw)) failed++ }
     job.sidecarUris?.lines()?.forEach { line ->
      val raw=line.substringAfter('|',"")
      if(raw.isNotBlank() && !StorageUris.delete(app, raw.toUri())) failed++
     }
+    }
+    job.outputUri?.let { MediaRepository(app).refresh(it) }
     if(failed>0) { _notice.value="File lama tidak dapat dihapus ($failed file) — unduhan ulang dibatalkan."; return@launch }
     if(dao.requeueCompleted(job.id, System.currentTimeMillis()) == 0) { _notice.value="Entri sudah tidak berstatus selesai."; return@launch }
     cancelResultNotification(job.id)
@@ -360,22 +401,27 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
  } }
- fun remove(id: String) { viewModelScope.launch { cancelResultNotification(id); // Hapus direktori hanya bila barisnya benar-benar terhapus — jangan menyentuh parsial job yang baru dilanjutkan (R1).
-  if(dao.remove(id) > 0) deleteJobDir(id) } }
+ fun remove(id: String) { viewModelScope.launch { MediaFileOperations.mutex.withLock {
+  cancelResultNotification(id)
+  if(dao.remove(id) > 0) deleteJobDir(id)
+ } } }
  /** Removes the entry together with its stored file, sidecar files and result notification. */
- fun removeFile(id: String) { viewModelScope.launch {
+ fun removeFile(id: String) { viewModelScope.launch(Dispatchers.IO) {
   cancelResultNotification(id)
   val job=dao.get(id)
   var failed=0
   if(job != null) {
    val app=getApplication<Application>()
+   MediaFileOperations.mutex.withLock {
    job.outputUri?.let { raw -> if(!StorageUris.delete(app, raw)) failed++ }
    job.sidecarUris?.lines()?.forEach { line ->
     val raw=line.substringAfter('|',"")
     if(raw.isNotBlank() && !StorageUris.delete(app, raw)) failed++
    }
   }
-  val removed=dao.remove(id)
+  }
+  job?.outputUri?.let { MediaRepository(getApplication()).refresh(it) }
+  val removed=MediaFileOperations.mutex.withLock { dao.remove(id) }
   // Jangan melapor sukses bila file ternyata tidak terhapus (izin/provider menolak) — BUG-003.
   _notice.value=when {
    removed == 0 -> "Entri sudah tidak ada."
@@ -399,6 +445,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    }
    val app=getApplication<Application>()
    var files=0; var failed=0
+   MediaFileOperations.mutex.withLock {
    // 1) Berkas tercatat di riwayat — penghapusan jujur lewat helper bersama (BUG-003).
    rows.forEach { job ->
     job.outputUri?.let { raw -> if(StorageUris.delete(app, raw)) files++ else failed++ }
@@ -411,8 +458,13 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    val tree=SettingsStore.storageTree
    val swept=if(tree != null) clearTree(tree.toUri(), 0) else clearMediaStoreFolder()
    files+=swept.first; failed+=swept.second
+   // Jalur MediaStore tak menyimpan direktori — folder playlist yang kini kosong ikut dihapus lewat
+   // grant SAF folder bawaan bila pernah diberikan (tanpa izin, direktori memang tak bisa dihapus Android).
+   if(tree == null) defaultTreeGrant()?.let { root -> val pruned=pruneEmptyFolders(root); files+=pruned.first; failed+=pruned.second }
    // 3) Parsial sementara (noBackupFilesDir) semua job — sudah dipastikan tidak ada yang berjalan/dijeda.
    rows.forEach { deleteJobDir(it.id); cancelResultNotification(it.id) }
+   }
+   MediaRepository(app).refreshAllAvailability()
    _notice.value=when {
     files == 0 && failed == 0 -> "Folder sudah bersih — tidak ada file untuk dihapus."
     failed > 0 -> "$files file dihapus · $failed file gagal dihapus."
@@ -438,8 +490,30 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     val nested=clearTree(uri, depth+1)
     deleted+=nested.first; failed+=nested.second
     if(StorageUris.delete(app, uri)) deleted++ else failed++ // direktori kosong ikut dihapus.
-   } else if(StorageUris.delete(app, uri)) deleted++ else failed++
+   } else  if(StorageUris.delete(app, uri)) deleted++ else failed++
   }
+  return deleted to failed
+ }
+ /** Hapus direktori KOSONG bottom-up di bawah root tree — jalur file MediaStore tak meninggalkan jejak direktori sehingga folder playlist kosong tertinggal. */
+ private fun pruneEmptyFolders(root: android.net.Uri): Pair<Int,Int> {
+  val app=getApplication<Application>()
+  var deleted=0; var failed=0
+  fun walk(docId: String): Boolean {
+   val children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(root, docId)
+   val entries=mutableListOf<Pair<String,String>>()
+   app.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
+    while(c.moveToNext()) entries += (c.getString(0) to (c.getString(1) ?: ""))
+   } ?: return false // folder tak terbaca = berhenti, jangan nebak kosong.
+   var empty=true
+   entries.forEach { (id, mime) ->
+    if(mime != android.provider.DocumentsContract.Document.MIME_TYPE_DIR) { empty=false; return@forEach }
+    if(!walk(id)) { empty=false; return@forEach }
+    // Hanya direktori yang terbukti kosong (semua anaknya sudah terhapus) yang ikut dihapus.
+    if(StorageUris.delete(app, android.provider.DocumentsContract.buildDocumentUriUsingTree(root, id))) deleted++ else { failed++; empty=false }
+   }
+   return empty
+  }
+  walk(android.provider.DocumentsContract.getTreeDocumentId(root)) // root tree sendiri tidak dihapus.
   return deleted to failed
  }
  /** Baris MediaStore di bawah folder tujuan (termasuk subfolder playlist) — escape % dan _ agar batas berhenti di folder ini (BUG-012). */
@@ -478,15 +552,37 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     _notice.value="Hanya audio yang sudah selesai dan punya lirik yang bisa dicari ulang."; return@launch
    }
    if(job.outputUri.isNullOrBlank() || !outputStillExists(job)) { _notice.value="File audio tidak ditemukan di penyimpanan."; return@launch }
-   _notice.value="Mencari lirik di penyedia lirik…"
-   val outcome=Lyrics.fetch(job.title,job.durationSeconds)
-   val status=when {
-    outcome.status != LyricStatus.SAVED -> outcome.status
-    writeLyricBesideAudio(job,requireNotNull(outcome.text)) -> LyricStatus.SAVED
-    else -> LyricStatus.SAVE_FAILED
+   val editor = LyricEditor(getApplication())
+   val snapshot = MediaFileOperations.mutex.withLock {
+    val outputName = displayNameOf(requireNotNull(job.outputUri).toUri()) ?: error("Nama audio tidak dapat dibaca.")
+    val old = job.sidecarUris?.lines()?.filter { it.startsWith("sub|") }
+     ?.map { it.substringAfter('|') }?.filter {
+      val name = displayNameOf(it.toUri()) ?: error("File pendamping tidak dapat diperiksa; lirik tidak diubah.")
+      name.endsWith(".lrc", true)
+     }.orEmpty()
+    outputName to old.associateWith(editor::captureForRefetch)
    }
-   dao.lyricStatus(id,status)
-   _notice.value=LyricStatus.label(status)+"."
+   _notice.value="Mencari lirik di penyedia lirik…"
+   Lyrics.clearCache() // Explicit refresh bypasses provider response cache.
+   val outcome=Lyrics.fetch(job.songIdentity(),job.durationSeconds)
+   var saveError: String? = null
+   val status = MediaFileOperations.mutex.withLock {
+    val current = dao.get(id) ?: error("Entri telah dihapus; lirik tidak diubah.")
+    require(current.state == JobState.COMPLETED && current.generation == job.generation &&
+     current.outputUri == job.outputUri && current.sidecarUris == job.sidecarUris && outputStillExists(current) &&
+     displayNameOf(requireNotNull(current.outputUri).toUri()) == snapshot.first) { "Audio berubah selama pencarian; coba lagi." }
+    val result = when {
+     outcome.status != LyricStatus.SAVED -> outcome.status
+     else -> try {
+      if (writeLyricBesideAudio(current, requireNotNull(outcome.text), snapshot.second)) LyricStatus.SAVED else LyricStatus.SAVE_FAILED
+     } catch (cancelled: CancellationException) { throw cancelled }
+     catch (failure: Exception) { saveError = failure.message; LyricStatus.SAVE_FAILED }
+    }
+    dao.lyricStatus(id, result)
+    result
+   }
+   MediaRepository(getApplication()).indexDownload(id)
+   _notice.value=LyricStatus.label(status)+"." + saveError?.let { " $it" }.orEmpty()
   } catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { _notice.value="Pencarian lirik gagal: "+(error.message ?: "kesalahan tak dikenal.") }
   finally { lyricRetries.remove(id) }
@@ -501,7 +597,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   * Nama mengikuti nama audio yang benar-benar tersimpan (BUG-010); kegagalan menulis selalu gagal total,
   * tidak meninggalkan dokumen parsial (BUG-008).
   */
- private suspend fun writeLyricBesideAudio(job: DownloadJob, text: String): Boolean {
+ private suspend fun writeLyricBesideAudio(job: DownloadJob, text: String, expected: Map<String, ByteArray>): Boolean {
   val app=getApplication<Application>()
   val resolver=app.contentResolver
   val bytes=text.toByteArray(Charsets.UTF_8)
@@ -509,11 +605,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   fun writeTo(target: android.net.Uri, mode: String): Boolean = runCatching {
    val stream=resolver.openOutputStream(target, mode) ?: return@runCatching false
    stream.use { it.write(bytes) }
+   require(LyricEditor(app).captureForRefetch(target.toString()).contentEquals(bytes)) { "Verifikasi lirik gagal." }
    true
   }.getOrDefault(false)
-  fun readAll(target: android.net.Uri): ByteArray? = runCatching {
-   resolver.openInputStream(target)?.use { it.readBytes() }
-  }.getOrNull()
   /** Lepas jurnal pending setelah penghapusan terbukti berhasil; gagal = jejak tetap untuk recovery (BUG-008/R2). */
   suspend fun dropJournal(target: android.net.Uri) {
    if(StorageUris.delete(app, target)) dao.sidecarPending(job.id, null)
@@ -523,38 +617,37 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   // setelah pengganti terbit (BUG-015).
   val subs=job.sidecarUris?.lines()?.filter { it.startsWith("sub|") }?.map { it.substringAfter('|') }
    .orEmpty().filter { it.isNotBlank() }.map { it.toUri() }
-  val validOld=subs.filter { displayNameOf(it)?.endsWith(".lrc") == true }
-  val stale=subs.filter { displayNameOf(it)?.endsWith(".lrc") != true }
+  val stem=displayNameOf(output)?.substringBeforeLast('.') ?: return false
+  val requested="$stem.lrc"
+  val validOld=subs.filter { displayNameOf(it)?.endsWith(".lrc", true) == true }
+  require(validOld.map { it.toString() }.toSet() == expected.keys) { "Lirik berubah selama pencarian; coba lagi." }
+  require(validOld.size <= 1) { "Beberapa file lirik tercatat; penggantian dibatalkan." }
+  val stale=subs.filter { displayNameOf(it)?.endsWith(".lrc", true) != true }
   suspend fun dropStale() {
    if(stale.isEmpty()) return
-   stale.forEach { StorageUris.delete(app, it) }
-   val staleRaw=stale.map { it.toString() }.toSet()
+   val staleRaw=stale.filter { StorageUris.delete(app, it) }.map { it.toString() }.toSet()
    val kept=job.sidecarUris?.lines()?.filter { it.isNotBlank() && it.substringAfter('|',"") !in staleRaw }.orEmpty()
    dao.sidecars(job.id, kept.joinToString("\n").ifBlank { null })
   }
-  // R7: cadangkan isi lama SEBELUM menimpa — mode "wt" men-truncate begitu stream terbuka. Bila
-  // write/close gagal, isi lama dipulihkan dari cadangan dan refetch melapor gagal simpan (bukan diam-diam
-  // mengosongkan lirik). Cadangan gagal dibaca = tetap coba timpa tanpa rollback (perilaku lama).
   if(validOld.isNotEmpty()) {
    val old=validOld.first()
-   val backup=readAll(old)
-   if(writeTo(old, "wt")) { dropStale(); return true }
-   if(backup != null) runCatching { resolver.openOutputStream(old, "wt")?.use { it.write(backup) } }
-   return false
+   require(displayNameOf(old) == requested) { "Nama lirik tidak sesuai audio; file lama tidak diubah." }
+   LyricEditor(app).replaceForRefetch(old.toString(), text, requireNotNull(expected[old.toString()]), job.durationSeconds.takeIf { it > 0 }?.times(1000))
+   dropStale()
+   return true
   }
-  val stem=displayNameOf(output)?.substringBeforeLast('.') ?: return false
   val uri = if(android.provider.DocumentsContract.isDocumentUri(app, output)) {
-   // Induk file audio yang SEBENARNYA (parent dokumen), bukan akar tree — hasil subfolder playlist
-   // tetap mendapat .lrc di folder yang sama dengan audionya. Gagal query = akar tree (perilaku lama).
-   // "parent_document_id" adalah kolom kontrak dokumen; konstanta SDK publiknya tidak ada — provider
-   // yang tak mendukung akan gagal query dan jatuh ke akar tree seperti perilaku lama.
+   // Verify the actual parent; opaque providers without parent information fail closed.
+   // ExternalStorageProvider document IDs supply a path fallback, not an arbitrary tree root.
    val parentId=runCatching {
     resolver.query(output, arrayOf("parent_document_id"), null, null, null)?.use { c -> if(c.moveToFirst()) c.getString(0) else null }
    }.getOrNull()
-   val parent=parentId?.let { android.provider.DocumentsContract.buildDocumentUriUsingTree(output, it) }
-    ?: android.provider.DocumentsContract.buildDocumentUriUsingTree(output, android.provider.DocumentsContract.getTreeDocumentId(output))
+   // Fail closed for opaque providers rather than publishing beside the wrong audio.
+   val documentId = android.provider.DocumentsContract.getDocumentId(output)
+   val pathParent = if (output.authority == "com.android.externalstorage.documents" && documentId.contains('/')) documentId.substringBeforeLast('/') else null
+   val resolvedParent = parentId ?: pathParent ?: error("Induk audio tidak dapat diverifikasi; file tidak diubah.")
+   val parent=android.provider.DocumentsContract.buildDocumentUriUsingTree(output, resolvedParent)
    // BUG-015: paksa kembali nama yang diminta bila provider menyisipkan ekstensi mime.
-   val requested="$stem.lrc"
    val made=runCatching { android.provider.DocumentsContract.createDocument(resolver, parent, "text/plain", requested) }.getOrNull() ?: return false
    // Jurnal sebelum menulis: proses mati di tengah penulisan tetap terlacak (BUG-008/R2).
    dao.sidecarPending(job.id, made.toString())
@@ -564,7 +657,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    dao.sidecarPending(job.id, final.toString())
    if(!writeTo(final, "wt")) { dropJournal(final); return false }
    // R5: verifikasi nama tampilan akhir — rename yang ditolak provider tidak boleh dilaporkan sukses ("X.lrc.txt").
-   if(displayNameOf(final)?.endsWith(".lrc") != true) { dropJournal(final); return false }
+   if(displayNameOf(final) != requested) { dropJournal(final); return false }
    final
   } else {
    val relative=runCatching {
@@ -580,21 +673,17 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    if(!writeTo(created, "w")) { dropJournal(created); return false }
    if(resolver.update(created, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null) <= 0) { dropJournal(created); return false }
    // Nama MediaStore ikut DISPLAY_NAME; verifikasi sama seperti jalur SAF (R5).
-   if(displayNameOf(created)?.endsWith(".lrc") != true) { dropJournal(created); return false }
+   if(displayNameOf(created) != requested) { dropJournal(created); return false }
    created
   }
   // Perbarui daftar sidecar: buang baris lirik lama/salah ekstensi dan catat pengganti baru.
   dropStale()
-  val staleRaw=stale.map { it.toString() }.toSet()
-  val kept=job.sidecarUris?.lines()?.filter { it.isNotBlank() && it.substringAfter('|',"") !in staleRaw }.orEmpty()
-  dao.sidecars(job.id, (kept + "sub|$uri").joinToString("\n"))
-  // Pengganti sudah tercatat di sidecarUris — jurnal pending dilepas (BUG-008/R2).
-  dao.sidecarPending(job.id, null)
+  dao.commitSidecar(job.id, "sub|$uri", null)
   return true
  }
  fun clearCompleted() { viewModelScope.launch {
   val ids=dao.observe().first().filter { it.state == JobState.COMPLETED }.map { it.id }
-  val n=dao.clearCompleted(); ids.forEach(::cancelResultNotification)
+  val n=MediaFileOperations.mutex.withLock { dao.clearCompleted() }; ids.forEach(::cancelResultNotification)
   _notice.value=if(n>0) "Riwayat dibersihkan." else "Riwayat sudah kosong."
  } } fun clearUnsuccessful() { viewModelScope.launch {
   val ids=dao.observe().first().filter { it.state == JobState.FAILED || it.state == JobState.CANCELLED }.map { it.id }

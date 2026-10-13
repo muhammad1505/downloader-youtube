@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DownloadTransitionsTest(unittest.TestCase):
     def setUp(self):
-        schema = json.loads((ROOT / 'app/schemas/id.local.tubeflow.core.DownloadDatabase/6.json').read_text())
+        schema = json.loads((ROOT / 'app/schemas/id.local.tubeflow.core.DownloadDatabase/8.json').read_text())
         self.db = sqlite3.connect(':memory:')
         self.db.row_factory = sqlite3.Row
         entity = schema['database']['entities'][0]
@@ -30,6 +30,45 @@ class DownloadTransitionsTest(unittest.TestCase):
 
     def row(self):
         return self.db.execute('SELECT * FROM downloads WHERE id=?', ('job',)).fetchone()
+
+    def test_migration_7_8_preserves_history_and_matches_schema(self):
+        source = (ROOT / 'app/src/main/java/id/local/tubeflow/core/Models.kt').read_text()
+        db = sqlite3.connect(':memory:')
+        old = json.loads((ROOT / 'app/schemas/id.local.tubeflow.core.DownloadDatabase/7.json').read_text())['database']['entities'][0]
+        db.execute(old['createSql'].replace('${TABLE_NAME}', old['tableName']))
+        db.execute("INSERT INTO downloads (id,url,title,mode,format,quality,bitrate,state,progress,speed,eta,createdAt,outputUri,artist,coverPath) VALUES ('old','url','Old song','AUDIO','mp3',0,128,'COMPLETED',100,'','',1,'content://audio','Artist','cover.jpg')")
+        for sql in self.migration_alters(source, 'MIGRATION_7_8'):
+            db.execute(sql)
+        current = self.db.execute('PRAGMA table_info(downloads)').fetchall()
+        self.assertEqual(sorted(tuple(r)[1:6] for r in current), sorted(tuple(r)[1:6] for r in db.execute('PRAGMA table_info(downloads)')))
+        self.assertEqual(db.execute('SELECT title,outputUri,artist,coverPath,rawTitle,platformId,partialBytes FROM downloads').fetchone(),
+                         ('Old song','content://audio','Artist','cover.jpg','','',0))
+        db.close()
+
+    def test_resume_keeps_position_and_metadata_and_old_worker_cannot_update_them(self):
+        self.db.execute("UPDATE downloads SET state='PAUSED', progress=42, phase='DOWNLOADING_AUDIO', trackTitle='Song', platformId='youtube', thumbnailUrl='cover', partialBytes=1024 WHERE id='job'")
+        self.query('resume')
+        self.assertEqual(self.row()['progress'],42)
+        self.assertEqual(self.row()['partialBytes'],1024)
+        self.assertEqual(self.row()['platformId'],'youtube')
+        self.assertEqual(self.query('resumeInfo', gen=0, bytes=0, notice='old'),0)
+        self.assertEqual(self.query('resumeInfo', gen=1, bytes=2048, notice='valid'),1)
+
+    def test_metadata_snapshot_is_atomic_owned_and_retained_through_lifecycle(self):
+        fields = dict(rawTitle='Artist - Song', trackTitle='Song', title='Song - Artist', artist='Artist',
+                      creator='Uploader', remixer='', versionTag='', evidence='metadata_artist',
+                      platform='youtube_music', thumb='https://cdn/cover', source='video-id',
+                      extractor='Youtube', folder='artist', duration=200)
+        self.assertEqual(self.query('metadata', **fields),1)
+        self.query('pause'); self.query('resume')
+        self.assertEqual(self.query('metadata', **dict(fields, title='stale')),0)
+        self.query('progress', gen=1, state='RUNNING', progress=50, speed='', eta='')
+        self.query('finish', gen=1, uri='content://media/result', now=2)
+        row=self.row()
+        self.assertEqual((row['rawTitle'],row['trackTitle'],row['artist'],row['creator'],row['platformId'],row['thumbnailUrl']),
+                         ('Artist - Song','Song','Artist','Uploader','youtube_music','https://cdn/cover'))
+        self.assertEqual(self.query('recoveredCover', gen=1, uri='content://wrong', path='bad'),0)
+        self.assertEqual(self.query('recoveredCover', gen=1, uri='content://media/result', path='good'),1)
 
     def test_late_progress_never_revives_terminal_job(self):
         for state in ('CANCELLED', 'COMPLETED', 'FAILED'):
@@ -183,6 +222,27 @@ class DownloadTransitionsTest(unittest.TestCase):
         self.assertEqual(migrated.execute('SELECT state,outputUri,subfolder FROM downloads').fetchone(), ('COMPLETED', 'content://video', ''))
         migrated.close(); expected.close()
 
+    def test_migration_6_7_adds_artist_and_cover_like_schema_v7(self):
+        """Migrasi 6→7 (artist + coverPath, P1/P2) harus tepat sama dengan schema v7 Room;
+        baris lama tetap terbaca dengan '' (tanpa bukti artis / tanpa sampul cache)."""
+        source = (ROOT / 'app/src/main/java/id/local/tubeflow/core/Models.kt').read_text()
+        alters = self.migration_alters(source, 'MIGRATION_6_7')
+        self.assertTrue(alters, 'MIGRATION_6_7 SQL not found in Models.kt')
+        migrated = sqlite3.connect(':memory:')
+        v6 = json.loads((ROOT / 'app/schemas/id.local.tubeflow.core.DownloadDatabase/6.json').read_text())['database']['entities'][0]
+        migrated.execute(v6['createSql'].replace('${TABLE_NAME}', v6['tableName']))
+        migrated.execute("INSERT INTO downloads (id,url,title,mode,format,quality,bitrate,state,progress,speed,eta,createdAt,outputUri) VALUES ('old','url','Old song','AUDIO','mp3',0,128,'COMPLETED',100,'','',1,'content://audio')")
+        for statement in alters:
+            migrated.execute(statement)
+        v7 = json.loads((ROOT / 'app/schemas/id.local.tubeflow.core.DownloadDatabase/7.json').read_text())['database']['entities'][0]
+        expected = sqlite3.connect(':memory:')
+        expected.execute(v7['createSql'].replace('${TABLE_NAME}', v7['tableName']))
+        columns = lambda conn: sorted((r[1], r[2].upper(), bool(r[3]), r[4]) for r in conn.execute('PRAGMA table_info(downloads)'))
+        self.assertEqual(columns(migrated), columns(expected))
+        # Baris lama tetap terbaca; artist/coverPath '' → tanpa tebakan nama artis, tanpa sampul (fallback ikon).
+        self.assertEqual(migrated.execute('SELECT state,artist,coverPath FROM downloads').fetchone(), ('COMPLETED', '', ''))
+        migrated.close(); expected.close()
+
     def test_phase_transition_clears_transfer_metrics_and_completion(self):
         self.query('progress', state='RUNNING', progress=75, phase='AUDIO', speed='at 1MiB/s', eta='3s')
         self.query('progress', state='RUNNING', progress=-1, phase='PROCESSING', speed='', eta='')
@@ -216,9 +276,23 @@ class DownloadTransitionsTest(unittest.TestCase):
         self.assertEqual(self.row()['lyricStatus'], 'tersimpan')
         self.db.execute("UPDATE downloads SET state='FAILED'")
         self.db.execute(self.queries['revive'], dict(
-            id='job', title='Revived', mode='AUDIO', format='mp3', quality=0, bitrate=320,
+            id='job', title='Revived', artist='Denny Caknan', mode='AUDIO', format='mp3', quality=0, bitrate=320,
             subtitles='asli', embedSubs=0, thumbnail=0, embedThumb=1, now=98))
         self.assertEqual(self.row()['lyricStatus'], '')
+
+    def test_artist_and_cover_updates_are_generation_guarded(self):
+        """Identitas artis & sampul cache hanya ditulis milik generasi sendiri (P1/P2/P3)."""
+        self.assertEqual(self.query('artist', gen=0, artist='Maman Fvndy Rmx'), 1)
+        self.assertEqual(self.query('coverPath', gen=0, path='/data/covers/job.jpg'), 1)
+        row = self.row()
+        self.assertEqual(row['artist'], 'Maman Fvndy Rmx')
+        self.assertEqual(row['coverPath'], '/data/covers/job.jpg')
+        # Worker lama (generasi 0) tak boleh menimpa job yang sudah dilanjutkan.
+        self.db.execute("UPDATE downloads SET generation=1")
+        self.assertEqual(self.query('artist', gen=0, artist='Stale'), 0)
+        self.assertEqual(self.query('coverPath', gen=0, path='/stale.jpg'), 0)
+        self.assertEqual(self.row()['artist'], 'Maman Fvndy Rmx')
+        self.assertEqual(self.row()['coverPath'], '/data/covers/job.jpg')
 
     def test_new_option_columns_have_defaults(self):
         self.db.execute('INSERT INTO downloads (id,url,title,mode,format,quality,bitrate,state,progress,speed,eta,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', ('fresh','https://youtu.be/new','New','AUDIO','mp3',0,0,'QUEUED',0,'','',2))
@@ -261,7 +335,7 @@ class DownloadTransitionsTest(unittest.TestCase):
     def test_revive_carries_subtitle_and_thumbnail_options(self):
         self.db.execute("UPDATE downloads SET state='FAILED' WHERE id='job'")
         self.db.execute(self.queries['revive'], dict(
-            id='job', title='Revived', mode='AUDIO', format='mp3', quality=0, bitrate=320,
+            id='job', title='Revived', artist='Sasya Arkhisna', mode='AUDIO', format='mp3', quality=0, bitrate=320,
             subtitles='id', embedSubs=0, thumbnail=1, embedThumb=1, now=99))
         row = self.row()
         self.assertEqual(row['state'], 'QUEUED')
@@ -269,6 +343,8 @@ class DownloadTransitionsTest(unittest.TestCase):
         self.assertEqual(row['thumbnail'], 1)
         self.assertEqual(row['embedThumb'], 1)
         self.assertEqual(row['bitrate'], 320)
+        # Identitas artis ikut dibawa saat revive — antrean/riwayat/lirik tetap konsisten (P3).
+        self.assertEqual(row['artist'], 'Sasya Arkhisna')
 
 
     def test_stale_generation_cannot_clear_new_pending(self):

@@ -25,7 +25,7 @@ import id.local.tubeflow.core.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val metadata by model.metadata.collectAsStateWithLifecycle()
     val playlist by model.playlist.collectAsStateWithLifecycle()
@@ -37,7 +37,8 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
     val storageError by model.storageError.collectAsStateWithLifecycle()
     val storageFolderAccess by model.storageFolderAccess.collectAsStateWithLifecycle()
     val clearingFiles by model.clearing.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val libraryMessage by library.message.collectAsStateWithLifecycle()
+    var tab by rememberSaveable { mutableIntStateOf(2) }
     var url by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -49,14 +50,15 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
             url = incomingUrl
-            tab = 0
+            tab = 2
             // Inspeksi diserahkan ke efek DownloadScreen (video vs playlist) — memanggil inspect langsung di sini
             // membuat tautan playlist murni memunculkan "tautan tidak valid" sesaat dan video diperiksa dua kali (BUG-022).
         }
     }
     LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it); model.clearError() } }
     // Info "Terpakai …" di Pengaturan ikut terbaru tiap tab dibuka, bukan cuma pas aplikasi start.
-    LaunchedEffect(tab) { if (tab == 3) model.refreshStorage() }
+    LaunchedEffect(tab) { if (tab == 4) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
+    LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); library.clearMessage() } }
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
     val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
@@ -85,14 +87,14 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val tabs = listOf("Download", "Antrean", "Riwayat", "Pengaturan")
-                val icons = listOf(Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.History, Icons.Outlined.Settings)
+                val tabs = listOf("Ringkasan", "Koleksi", "Download", "Antrean", "Pengaturan")
+                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.LibraryMusic, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.Settings)
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
                         onClick = { tab = index },
                         icon = {
-                            if (index == 1 && activeCount > 0) {
+                            if (index == 3 && activeCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (activeCount > 99) "99+" else "$activeCount") } }) {
                                     Icon(icons[index], contentDescription = null)
                                 }
@@ -122,7 +124,7 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
         ) { current ->
             screenState.SaveableStateProvider("screen-$current") {
             when (current) {
-                0 -> DownloadScreen(
+                2 -> DownloadScreen(
                     url = url,
                     onUrl = { url = it },
                     metadata = metadata,
@@ -139,18 +141,18 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
                         model.enqueue(opts.copy(url = url.trim()))
                         url = ""
                         model.clearPlaylist()
-                        tab = 1
+                        tab = 3
                     },
                     downloadPlaylist = { entries, opts ->
                         requestNotifications()
                         // Judul playlist ikut diambil SEBELUM panel dibersihkan — jadi nama subfolder otomatis.
-                        model.queuePlaylist(entries, opts, playlist?.title)
+                        model.queuePlaylist(entries, opts, playlist?.title, playlist?.channel)
                         url = ""
                         model.clearPlaylist()
-                        tab = 1
+                        tab = 3
                     },
                 )
-                1 -> QueueScreen(
+                3 -> QueueScreen(
                     jobs = jobs,
                     listState = queueList,
                     onCancel = { model.cancel(it) },
@@ -162,8 +164,11 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
                     onPauseAll = { model.pauseAll() },
                     onResumeAll = { model.resumeAll() },
                     onCancelAll = { model.cancelAll() },
+                    onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
-                2 -> HistoryScreen(
+                0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 1 }, downloads = { tab = 2 })
+                1 -> MediaLibraryScreen(library) {
+                    HistoryScreen(
                     jobs = jobs,
                     listState = historyList,
                     onRetry = { model.retry(it) },
@@ -172,6 +177,7 @@ fun TubeFlowApp(model: DownloadViewModel, incomingUrl: String, requestNotificati
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
+                }
                 else -> SettingsScreen(
                     themeMode = SettingsStore.themeMode,
                     onThemeMode = { SettingsStore.setThemeMode(context, it) },

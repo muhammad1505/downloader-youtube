@@ -3,6 +3,7 @@ package id.local.tubeflow.ui
 import android.content.Intent
 import android.os.Build
 import android.provider.DocumentsContract
+import kotlinx.coroutines.launch
 import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,8 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.Format
-import id.local.tubeflow.core.Selection
+import id.local.tubeflow.core.Lyrics
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.StorageFolderAccess
 
 @Composable
 fun SettingsScreen(
@@ -42,9 +44,8 @@ fun SettingsScreen(
     onClearStorage: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    var folderInput by rememberSaveable { mutableStateOf(SettingsStore.storageFolder) }
+    val smartScope = androidx.compose.runtime.rememberCoroutineScope()
     var confirmClearFiles by rememberSaveable { mutableStateOf(false) }
-    val folderValid = Selection.safeFolder(folderInput) != null
     val tree = SettingsStore.storageTree
     var folderAccessError by rememberSaveable { mutableStateOf(false) }
     if (confirmClearFiles) {
@@ -63,7 +64,13 @@ fun SettingsScreen(
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }.isFailure
             if (!folderAccessError) {
-                SettingsStore.setStorageTree(context, uri.toString())
+                // Folder bawaan itu sendiri TIDAK dijadikan target SAF: penyimpanan lewat MediaStore
+                // tetap tanpa izin. Pemilihan folder bawaan justru mengembalikan tujuan ke default
+                // (grant-nya tetap dipakai untuk membaca ukuran folder secara penuh).
+                val pickedDefault = runCatching {
+                    StorageFolderAccess.matchesDefault(uri.authority, DocumentsContract.getTreeDocumentId(uri), SettingsStore.storageFolder)
+                }.getOrDefault(false)
+                SettingsStore.setStorageTree(context, if (pickedDefault) null else uri.toString())
                 onRefreshStorage()
             }
         }
@@ -79,20 +86,16 @@ fun SettingsScreen(
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Tampilan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Pilih mode tema yang paling nyaman untuk mata kamu.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(
-                        SettingsStore.MODE_SYSTEM to "Sistem",
+                OptionMenu(
+                    label = "Mode tema",
+                    options = listOf(
+                        SettingsStore.MODE_SYSTEM to "Ikut sistem",
                         SettingsStore.MODE_LIGHT to "Terang",
                         SettingsStore.MODE_DARK to "Gelap",
-                    ).forEachIndexed { index, (value, label) ->
-                        SegmentedButton(
-                            selected = themeMode == value,
-                            onClick = { onThemeMode(value) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
-                            label = { Text(label) },
-                        )
-                    }
-                }
+                    ),
+                    selected = themeMode,
+                    onSelect = onThemeMode,
+                )
                 if (Build.VERSION.SDK_INT >= 31) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -117,22 +120,10 @@ fun SettingsScreen(
                     )
                 }
                 if (tree == null) {
-                    OutlinedTextField(
-                        value = folderInput,
-                        onValueChange = { input ->
-                            folderInput = input
-                            if (SettingsStore.setStorageFolder(context, input)) onRefreshStorage()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Folder penyimpanan") },
-                        singleLine = true,
-                        isError = !folderValid,
-                        supportingText = {
-                            Text(
-                                if (folderValid) "Baru & selesai diunduh tersimpan di folder ini."
-                                else "Maks 40 karakter: huruf, angka, spasi, titik, tanda minus/underscore/().",
-                            )
-                        },
+                    Text(
+                        "Folder bawaan ini bagian dari penyimpanan internal — unduhan disimpan tanpa izin apa pun. Untuk memindahkan hasil download (mis. ke kartu memori), pakai tombol pilih folder di bawah: dari pemilih folder sistem kamu bisa langsung membuat folder baru.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     TextButton(onClick = { SettingsStore.setStorageTree(context, null); onRefreshStorage() }, modifier = Modifier.fillMaxWidth()) {
@@ -147,7 +138,14 @@ fun SettingsScreen(
                 }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.FolderOpen, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (tree == null) "Pilih folder sendiri…" else "Pilih ulang folder…")
+                    Text(if (tree == null) "Pilih folder… (bisa buat baru, SD card, dll.)" else "Pilih ulang folder…")
+                }
+                if (tree == null) {
+                    Text(
+                        "Folder di luar Downloads/${SettingsStore.storageFolder} (mis. kartu memori) disimpan lewat pilihan folder sistem dan butuh izin aksesnya — buat folder baru langsung dari pemilih folder. Memilih kembali folder bawaan mengembalikan tujuan ke Downloads/${SettingsStore.storageFolder} tanpa izin.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (folderAccessError) {
                     Text("Akses folder tidak dapat disimpan. Pilih folder yang bisa dibaca dan ditulis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -206,21 +204,38 @@ fun SettingsScreen(
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Antrean", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Unduhan yang boleh berjalan bersamaan.", style = MaterialTheme.typography.bodyMedium)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    (1..4).forEachIndexed { index, count ->
-                        SegmentedButton(
-                            selected = SettingsStore.maxConcurrent == count,
-                            onClick = { SettingsStore.setMaxConcurrent(context, count) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = 4),
-                            label = { Text(if (count == 1) "1 · urut" else "$count×") },
-                        )
-                    }
-                }
+                OptionMenu(
+                    label = "Unduhan bersamaan",
+                    options = (1..4).map { count -> count to (if (count == 1) "1 · urut" else "$count×") },
+                    selected = SettingsStore.maxConcurrent,
+                    onSelect = { count -> SettingsStore.setMaxConcurrent(context, count) },
+                )
                 Text(
                     "Urut (1) paling hemat CPU dan kuota. Mode paralel lebih cepat, dengan progres tiap unduhan tetap tampil di notifikasi. Maksimal 4 bersamaan; perubahan berlaku untuk antrean berikutnya, sedangkan unduhan yang sudah berjalan dibiarkan selesai.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Smart Media", style = MaterialTheme.typography.titleMedium)
+                Text("Berlaku untuk download baru. Lirik dan sampul di panel download tetap dapat dipilih secara eksplisit.", style = MaterialTheme.typography.bodySmall)
+                listOf(
+                    Triple("rename", "Normalisasi nama audio/video", SettingsStore.autoRename),
+                    Triple("tag", "Tag metadata audio", SettingsStore.autoTag),
+                    Triple("artwork", "Sampul audio otomatis", SettingsStore.autoArtwork),
+                    Triple("lyrics", "Lirik audio otomatis", SettingsStore.autoLyrics),
+                    Triple("library", "Tambah audio otomatis ke koleksi", SettingsStore.autoLibrary),
+                ).forEach { (key, label, checked) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, Modifier.weight(1f))
+                        Switch(checked = checked, onCheckedChange = { SettingsStore.setSmart(context, key, it) })
+                    }
+                }
+                Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { smartScope.launch(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() } }) { Text("Bersihkan cache respons lirik") }
             }
         }
 

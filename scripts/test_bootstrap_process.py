@@ -127,6 +127,19 @@ class BootstrapProcessTest(unittest.TestCase):
         self.assertEqual(output.strip(), expected)
         self.assertFalse(self.control.exists())
 
+    def test_actual_entrypoint_accepts_download_extension_flag_combinations(self):
+        shutil.copyfile(ROOT / "app/src/main/assets/yt-dlp", self.directory / "yt-dlp-original")
+        expected = json.loads((ROOT / "app/src/main/assets/engine.json").read_text())["version"]
+        for flags in (("--tubeflow-validate-resume",),
+                      ("--tubeflow-validate-resume", "--tubeflow-optional-audio"),
+                      ("--tubeflow-validate-resume", "--tubeflow-optional-audio", "--tubeflow-compress-cover", "--tubeflow-mix-snapshot")):
+            with self.subTest(flags=flags):
+                process = self.start(*flags, "--version")
+                output, errors = process.communicate(timeout=20)
+                self.assertEqual(0, process.returncode, errors)
+                self.assertEqual(expected, output.strip())
+                self.assertFalse(self.control.exists())
+
     def test_group_kill_stops_stubborn_child_and_grandchild(self):
         record, child, grandchild = self.fixture()
         self.assertEqual(record["pid"], self.process.pid)

@@ -77,6 +77,193 @@ def install_cover_compression():
     FFmpegThumbnailsConvertorPP.run = PostProcessorMetaClass.run_wrapper(compress_thumbnails)
 
 
+def prepare_audio_tags(info, probe):
+    """Only explicit music fields or existing audio tags may supply music metadata."""
+    native = {}
+    for stream in probe.get("streams", []):
+        if stream.get("codec_type") == "audio":
+            native.update({key.lower(): value for key, value in stream.get("tags", {}).items()})
+    native.update({key.lower(): value for key, value in probe.get("format", {}).get("tags", {}).items()})
+
+    def text(value):
+        if isinstance(value, (list, tuple)):
+            value = ", ".join(str(item) for item in value if item)
+        value = str(value or "").strip().replace("\0", "")
+        return "" if value.lower() in ("null", "unknown", "unknown artist", "unknown album") else value
+
+    def first(*values):
+        return next((value for item in values if (value := text(item))), "")
+
+    info["meta_title"] = first(info.get("meta_title") if info.get("track") else None,
+                                info.get("track"), native.get("title"), info.get("meta_title"), info.get("title"))
+    info["meta_artist"] = first(info.get("meta_artist"), info.get("artist"), info.get("artists"), native.get("artist"))
+    info["meta_album"] = first(info.get("album"), native.get("album"))
+    info["meta_album_artist"] = first(info.get("album_artist"), info.get("album_artists"), native.get("album_artist"))
+    info["meta_genre"] = first(info.get("genre"), info.get("genres"), native.get("genre"))
+    release = first(info.get("release_year"), info.get("release_date"))
+    info["meta_date"] = release if re.fullmatch(r"\d{4}(?:\d{4}|-\d{2}-\d{2})?", release) else first(native.get("date"), native.get("year"))
+    info["meta_track"] = first(info.get("track_number"), native.get("track"))
+    info["meta_disc"] = first(info.get("disc_number"), native.get("disc"))
+    # Do not turn URLs, upload descriptions, categories or TV series into audio tags.
+    for key in ("description", "synopsis", "purl", "comment", "show", "season_number", "episode_id", "episode_sort"):
+        info["meta_" + key] = first(native.get(key))
+    return info
+
+
+def install_optional_audio_processing():
+    """A failed optional tag/artwork step must not discard an untouched complete audio file.
+
+    Only the pinned FFmpeg metadata / thumbnail paths are wrapped. Extraction,
+    merge, transcoding and downloads still fail normally. No exception text (URLs)
+    is emitted. The original media must remain unchanged in size and mtime.
+    """
+    from yt_dlp.postprocessor.ffmpeg import FFmpegMetadataPP, FFmpegThumbnailsConvertorPP
+    from yt_dlp.postprocessor.embedthumbnail import EmbedThumbnailPP, mutagen
+    from yt_dlp.utils import PostProcessingError
+
+    def wrap(processor, label):
+        original = processor.run
+        if getattr(original, "_tubeflow_optional", False):
+            return
+
+        def optional(instance, info):
+            filename = info.get("filepath")
+            before = os.stat(filename) if filename and os.path.isfile(filename) else None
+            try:
+                if processor is FFmpegMetadataPP:
+                    try:
+                        probe = instance.get_metadata_object(filename)
+                    except (PostProcessingError, OSError, ValueError):
+                        instance.to_screen("[tubeflow-processing] Metadata tidak dapat diperiksa; tag asli dipertahankan.")
+                        return [], info
+                    prepare_audio_tags(info, probe)
+                return original(instance, info)
+            except (PostProcessingError, OSError):
+                if before is None or not os.path.isfile(filename):
+                    raise
+                after = os.stat(filename)
+                if before.st_size <= 0 or (after.st_size, after.st_mtime_ns) != (before.st_size, before.st_mtime_ns):
+                    raise
+                instance.to_screen("[tubeflow-processing] " + label)
+                return [], info
+
+        optional._tubeflow_optional = True
+        processor.run = optional
+
+    wrap(FFmpegMetadataPP, "Metadata gagal; media lengkap tetap disimpan.")
+    wrap(FFmpegThumbnailsConvertorPP, "Kompresi artwork gagal; media lengkap tetap disimpan.")
+    # The bundled Android engine has no mutagen. Never suppress an in-place tag writer's failure.
+    if mutagen is None:
+        wrap(EmbedThumbnailPP, "Artwork gagal disematkan; media lengkap tetap disimpan.")
+
+
+def install_resume_validation():
+    """Journal source/format identity; leave byte/fragment resumption to the pinned downloader."""
+    import hashlib
+    import re
+    from urllib.parse import urlsplit
+    from yt_dlp.downloader.common import FileDownloader
+    from yt_dlp.networking import Request
+    from yt_dlp.utils import DownloadError
+
+    if getattr(FileDownloader.download, "_tubeflow_resume", False):
+        return
+    original = FileDownloader.download
+
+    def write(path, value):
+        temporary = Path(str(path) + ".tmp")
+        temporary.write_text(json.dumps(value, sort_keys=True))
+        os.replace(temporary, path)
+
+    def validated(downloader, filename, info, subtitle=False):
+        # Fragment downloader's nested HTTP pieces have no media identity; its parent validates the stream.
+        if subtitle or not isinstance(filename, str) or filename == "-" or not info.get("id"):
+            return original(downloader, filename, info, subtitle)
+        target = Path(filename)
+        part = Path(filename + ".part")
+        journal = Path(filename + ".tubeflow.json")
+        checkpoint = Path(filename + ".ytdl")
+        fragments = info.get("fragments") or []
+        identity = {key: info.get(key) for key in ("id", "extractor_key", "format_id", "ext", "vcodec", "acodec", "filesize", "protocol")}
+        identity["fragments"] = hashlib.sha256(json.dumps([
+            {"path": urlsplit(fragment.get("url", "")).path, "duration": fragment.get("duration")}
+            for fragment in fragments], sort_keys=True).encode()).hexdigest() if fragments else None
+        try:
+            previous = json.loads(journal.read_text())
+        except (OSError, ValueError):
+            previous = {}
+        has_data = part.exists() or target.exists()
+        reason = ""
+        if has_data and (previous.get("identity") != identity or info.get("is_live")):
+            reason = "Sumber/format berubah atau identitas parsial belum tersedia; mulai ulang dengan aman."
+        if part.exists() and info.get("filesize") and part.stat().st_size > info["filesize"]:
+            reason = "Ukuran parsial tidak valid; mulai ulang dengan aman."
+        if part.exists() and fragments:
+            try:
+                progress = json.loads(checkpoint.read_text())["downloader"]["current_fragment"]["index"]
+                if not isinstance(progress, int) or not 0 <= progress <= len(fragments):
+                    raise ValueError("Invalid fragment checkpoint")
+            except (OSError, ValueError, KeyError, TypeError):
+                reason = "Checkpoint fragmen tidak valid; mulai ulang dengan aman."
+        headers = {}
+        protocol = info.get("protocol", "https")
+        if not fragments and protocol in ("http", "https") and info.get("url"):
+            request_headers = dict(info.get("http_headers") or {})
+            try:
+                if part.exists() and not reason:
+                    length = min(part.stat().st_size, 65536)
+                    request_headers["Range"] = f"bytes=0-{max(0, length - 1)}"
+                    validator = previous.get("headers", {}).get("etag") or previous.get("headers", {}).get("modified")
+                    if validator and not validator.startswith("W/"):
+                        request_headers["If-Range"] = validator
+                    response = downloader.ydl.urlopen(Request(info["url"], headers=request_headers))
+                    try:
+                        content_range = response.headers.get("Content-Range", "")
+                        headers = {"etag": response.headers.get("ETag"), "modified": response.headers.get("Last-Modified")}
+                        old = previous.get("headers", {})
+                        range_match = re.fullmatch(r"bytes 0-(\d+)/(\d+|\*)", content_range)
+                        expected_size = info.get("filesize")
+                        if not range_match or int(range_match[1]) + 1 != length:
+                            reason = "Server tidak mendukung lanjut atau berkas berubah; mulai ulang dengan aman."
+                        elif expected_size and range_match[2] != str(expected_size):
+                            reason = "Ukuran berkas server berubah; mulai ulang dengan aman."
+                        elif any(old.get(key) and headers.get(key) != old[key] for key in ("etag", "modified")):
+                            reason = "Identitas berkas server berubah; mulai ulang dengan aman."
+                        else:
+                            remote = response.read(length)
+                            with part.open("rb") as local:
+                                if remote != local.read(length):
+                                    reason = "Isi parsial berbeda dari sumber; mulai ulang dengan aman."
+                    finally:
+                        response.close()
+                else:
+                    response = downloader.ydl.urlopen(Request(info["url"], headers=request_headers, method="HEAD"))
+                    try:
+                        headers = {"etag": response.headers.get("ETag"), "modified": response.headers.get("Last-Modified")}
+                        if target.exists() and any(previous.get("headers", {}).get(key) and headers.get(key) != previous["headers"][key] for key in ("etag", "modified")):
+                            reason = "Identitas berkas server berubah; mulai ulang dengan aman."
+                    finally:
+                        response.close()
+            except Exception:
+                # Never append unverifiable bytes; let the normal downloader report/retry connectivity errors.
+                if has_data:
+                    downloader.to_screen("[tubeflow-resume] Sumber belum dapat diverifikasi; berkas parsial dipertahankan untuk Coba lagi.")
+                    raise DownloadError("Sumber parsial belum dapat diverifikasi; coba lagi saat jaringan tersedia.")
+        if reason:
+            for file in (part, target, checkpoint):
+                file.unlink(missing_ok=True)
+            for file in target.parent.glob(target.name + ".part-Frag*"):
+                file.unlink(missing_ok=True)
+            downloader.to_screen("[tubeflow-resume] " + reason)
+        elif part.exists():
+            downloader.to_screen("[tubeflow-resume] Identitas parsial cocok; melanjutkan byte/fragmen yang tersimpan.")
+        write(journal, {"identity": identity, "headers": headers or previous.get("headers", {})})
+        return original(downloader, filename, info, subtitle)
+
+    validated._tubeflow_resume = True
+    FileDownloader.download = validated
+
+
 def install_mix_snapshot():
     """Expose the initial radio panel without fetching its endless continuation.
 
@@ -118,7 +305,7 @@ def run():
     os.replace(temporary, control_file)
     original = Path(__file__).resolve().with_name("yt-dlp-original")
     try:
-        extensions = ("--tubeflow-compress-cover", "--tubeflow-mix-snapshot")
+        extensions = ("--tubeflow-compress-cover", "--tubeflow-mix-snapshot", "--tubeflow-validate-resume", "--tubeflow-optional-audio")
         if any(flag in forwarded for flag in extensions):
             sys.path.insert(0, str(original))
         if "--tubeflow-compress-cover" in forwarded:
@@ -127,6 +314,12 @@ def run():
         if "--tubeflow-mix-snapshot" in forwarded:
             forwarded.remove("--tubeflow-mix-snapshot")
             install_mix_snapshot()
+        if "--tubeflow-validate-resume" in forwarded:
+            forwarded.remove("--tubeflow-validate-resume")
+            install_resume_validation()
+        if "--tubeflow-optional-audio" in forwarded:
+            forwarded.remove("--tubeflow-optional-audio")
+            install_optional_audio_processing()
         sys.argv = [str(original), *forwarded]
         runpy.run_path(str(original), run_name="__main__")
     finally:

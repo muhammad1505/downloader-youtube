@@ -39,36 +39,46 @@ object Format {
     fun tidyFileName(raw: String): String {
         val cleaned = raw.replace(illegal, " ").replace(emoji, "").replace(spaces, " ").trim(' ', '.', '_', '-')
         if (cleaned.isEmpty()) return "TubeFlow"
-        return if (cleaned.length > 60) cleaned.take(60).trimEnd(' ', '.', '-', '_') else cleaned
+        if (cleaned.length <= 60) return cleaned
+        // Nama "Judul - Artis": potong bagian judulnya saja supaya artis tetap terbaca di nama file.
+        val dash = cleaned.lastIndexOf(" - ")
+        if (dash > 0 && cleaned.length - dash - 3 <= 24) {
+            val artist = cleaned.substring(dash + 3)
+            val keep = (60 - artist.length - 3).coerceAtLeast(12)
+            return cleaned.substring(0, dash).take(keep).trimEnd(' ', '.', '-', '_') + " - " + artist
+        }
+        return cleaned.take(60).trimEnd(' ', '.', '-', '_')
     }
 
-    private val noiseWords = setOf(
-        "official", "music", "video", "videos", "lyric", "lyrics", "audio", "with", "visualizer", "visualiser",
-        "4k", "8k", "60fps", "hd", "uhd", "remaster", "remastered", "mv", "hq", "teaser", "explicit", "clean",
-        "full", "album", "version", "clip", "klip", "musik", "resmi", "lirik",
-    )
-    private val trailingTag = Regex("""\s*[(\[][^)\]]*[)\]]\s*$""")
-    private val trailingDash = Regex("""\s+-\s+[^-]+$""")
-    private val wordSplit = Regex("""[\s,.&|]+""")
-
-    /** "Artist - Title" yang rapi: buang embel-embel (Official Video, 4K, …) dan tambahkan artis bila perlu. */
-    fun neatTitle(raw: String, artist: String? = null): String {
-        var title = raw.trim()
-        while (true) {
-            val match = trailingTag.find(title) ?: break
-            val words = match.value.trim().trim('(', ')', '[', ']').split(wordSplit).filter { it.isNotEmpty() }
-            if (words.isEmpty() || words.any { it.lowercase() !in noiseWords }) break
-            title = title.removeRange(match.range).trim()
+    /** Keep version and credit when the main title is long; reserve bytes for extension/provider suffix. */
+    fun musicFileName(identity: SongIdentity): String {
+        fun component(value: String, budget: Int): String {
+            val clean = value.replace(illegal, " ").replace(emoji, "").replace(spaces, " ").trim(' ', '.', '_', '-')
+            val result = StringBuilder()
+            var index = 0
+            var bytes = 0
+            while (index < clean.length) {
+                val point = clean.codePointAt(index)
+                val token = String(Character.toChars(point))
+                val size = token.toByteArray(Charsets.UTF_8).size
+                if (bytes + size > budget) break
+                result.append(token); bytes += size; index += Character.charCount(point)
+            }
+            return result.toString().trimEnd()
         }
-        trailingDash.find(title)?.let { match ->
-            val words = match.value.trim().removePrefix("-").trim().split(wordSplit).filter { it.isNotEmpty() }
-            if (words.isNotEmpty() && words.all { it.lowercase() in noiseWords }) title = title.removeRange(match.range).trim()
-        }
-        if (title.isBlank()) title = raw.trim()
-        val name = artist?.trim()
-        if (" - " !in title && !name.isNullOrEmpty() && !title.startsWith(name, ignoreCase = true)) title = "$name - $title"
-        return title.trim()
+        val main = component(identity.title,100).ifBlank { "TubeFlow" }
+        val version = component(identity.versionTag,60)
+        val credit = component(identity.artist.orEmpty().ifBlank { identity.remixer },50)
+        return main + (if (version.isBlank()) "" else " | $version") + (if (credit.isBlank()) "" else " - $credit")
     }
+
+    /**
+     * "Judul - Artis" yang rapi (urutan konsisten: judul dulu). Delegasi ke [TitleSplit] agar
+     * penamaan file, pencarian lirik, dan auto-folder SEMUA memakai identifikasi artis yang sama.
+     * [artist] dipakai sebagai BUKTI artis bila muncul utuh di judul — bukan tebakan posisi.
+     */
+    fun neatTitle(raw: String, artist: String? = null): String =
+        TitleSplit.display(TitleSplit.identify(raw, channel = artist))
 
     // Format.toLrc (konversi caption SRT/VTT → LRC) dihapus: lirik audio kini hanya dari LRCLIB
     // (BUG-009) dan tak ada pemanggilnya — jalur konversi caption lama jadi dead code.

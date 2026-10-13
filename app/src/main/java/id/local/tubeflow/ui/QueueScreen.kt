@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.JobState
+import id.local.tubeflow.core.Selection
 
 @Composable
 fun QueueScreen(
@@ -33,12 +34,14 @@ fun QueueScreen(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     onCancelAll: () -> Unit,
+    onClearUnsuccessful: () -> Unit,
 ) {
     val active = jobs.filter { it.state != JobState.COMPLETED }
     val running = active.count { it.state == JobState.RUNNING }
     val queued = active.count { it.state == JobState.QUEUED }
     val paused = active.count { it.state == JobState.PAUSED }
     val failed = active.count { it.state == JobState.FAILED }
+    val cancelled = active.count { it.state == JobState.CANCELLED }
     val pausable = running + queued
     var confirmCancelAll by remember { mutableStateOf(false) }
 
@@ -101,14 +104,22 @@ fun QueueScreen(
             }
         }
 
-        if (failed > 0) {
+        if (failed > 0 || cancelled > 0) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Card(colors = CardDefaults.cardColors(containerColor = if (failed > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Warning, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Icon(Icons.Outlined.Warning, null, Modifier.size(20.dp), tint = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(10.dp))
-                        Text("$failed unduhan gagal", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetryAll) { Text("Ulangi semua", color = MaterialTheme.colorScheme.onErrorContainer) }
+                        Text(
+                            (if (failed > 0) "$failed unduhan gagal" else "") +
+                                (if (failed > 0 && cancelled > 0) " · " else "") +
+                                (if (cancelled > 0) "$cancelled dibatalkan" else ""),
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (failed > 0) TextButton(onClick = onRetryAll) { Text("Ulangi semua", color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary) }
+                        TextButton(onClick = onClearUnsuccessful) { Text("Bersihkan", color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary) }
                     }
                 }
             }
@@ -131,6 +142,7 @@ fun QueueScreen(
                     remove = if (job.state == JobState.FAILED || job.state == JobState.CANCELLED) ({ onRemove(job.id) }) else null,
                     pause = if (job.state == JobState.QUEUED || job.state == JobState.RUNNING) ({ onPause(job.id) }) else null,
                     resume = if (job.state == JobState.PAUSED) ({ onResume(job.id) }) else null,
+                    // Platform sumber tampil di antrean DAN riwayat dari sumber data yang sama (P2/P3).
                     modifier = Modifier.animateItem(),
                 )
             }
