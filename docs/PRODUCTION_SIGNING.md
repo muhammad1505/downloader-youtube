@@ -165,3 +165,15 @@ verifikasi dicatat pada [laporan1.1.10](PLAYER_AUTOPLAY_1_1_10.md).
 Artefak di outputs/apk/release dan outputs/bundle/release; tidak menambah salinan
 distribution, mengganti keystore, atau menerbitkan toko. Uji kabel sesudah Recent
 berhasil; TWS/Android12+/runtime16KB tetap belum dibuktikan.
+
+
+## Kandidat1.1.11/code25 — 15 Oktober 2026
+
+Keystore produksi/Room9/dependensi tetap; signed APK×3/AAB, signature/cert,
+alignment16KB/native/refleksiZIP dan AAB jarsigner/bundletool lulus. 240Kotlin/
+83Python lulus, lint0error/2warning diketahui. ARM64 **70.566.627byte**, SHA256
+`93c6318b682a3a4837b171f5ff264e55fc56e60859e0874f43635bee9004a662`, terpasang update-r
+pada RealmeAndroid10, hashbase.apk cocok;70file utuh saat update. Sesudah itu,
+pengelola menguji Hapus semua tanpa SAF dan root tersisa kosong. Artefak aktif
+outputs/apk/release dan outputs/bundle/release, tanpa salinan distribusi tambahan
+atau publikasi toko. [Checksum semuaABI dan batas tes](STORAGE_CLEANUP_1_1_11.md).

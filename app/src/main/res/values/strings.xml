@@ -1,4 +1,5 @@
 <resources>
+    <string name="storage_clear_description">Seluruh file dan subfolder di %1$s akan dihapus permanen. Folder utama dan riwayat unduhan tetap tersimpan. Selesaikan atau batalkan unduhan yang berjalan/dijeda terlebih dahulu. Izin yang sudah tersedia digunakan langsung; pemilih folder hanya dibuka jika akses hapus belum tersedia.</string>
     <string name="app_name">TubeFlow</string>
     <plurals name="storage_partial_sizes">
         <item quantity="one">Ukuran sebagian: %1$d file di Koleksi belum memiliki informasi ukuran.</item>

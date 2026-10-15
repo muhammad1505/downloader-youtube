@@ -370,3 +370,21 @@ clear/tanpa hasil sesuai. **Kabel sesudah sapu Recent langsung memutar tanpa buk
 dikonfirmasi pengelola; log task removed/koneksi dan PLAYING1.095→3.108ms sementara
 Launcher foreground mendukung hasil. Belum diuji TWS/Android12+/process death penuh,
 font besar/lightmode versi ini dan runtime16KB. [Laporan dan bukti visual](PLAYER_AUTOPLAY_1_1_10.md).
+
+
+## Hapus semua tanpa SAF tambahan — 1.1.11/code25, 15 Oktober 2026
+
+BUG-050: UI/backend hanya menerima tree SAF padahal Android10 legacy sudah punya
+izin tulis. Capability bersama kini memilih akses filesystem terbatas tepat di
+Download/<folder> (API29+legacy+write), atau mempertahankan SAF sesuai kebutuhan.
+Adapter memakai FolderCleanup bottom-up, menolak symlink/escape, menjaga root dan
+sibling, serta menghapus indeks MediaStore. Room9/dependensi/default tidak berubah.
+
+240Kotlin/83Python lulus; signed/debug APK×3/AAB BUILD SUCCESSFUL4m53s;
+lint0error/2warning diketahui, audit artefak dan AAB bundletool lulus. ARM64
+70.566.627byte SHA256 `93c6318b682a3a4837b171f5ff264e55fc56e60859e0874f43635bee9004a662`
+terpasang update-r di RMX1821Android10, base.apk cocok.70/70file utuh saat update.
+Pengelola kemudian menjalankan Hapus semua dan mengonfirmasi **langsung bersih
+tanpa SAF**; pemeriksaan ADB sesudahnya rootTubeFlow ada/0entri (file maupun
+subfolder). Agent tidak menekan hapus media pengguna. Android scoped/provider lain
+belum diuji ulang. [Laporan lengkap](STORAGE_CLEANUP_1_1_11.md).

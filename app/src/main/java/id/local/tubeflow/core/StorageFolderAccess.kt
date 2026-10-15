@@ -6,6 +6,21 @@ import android.provider.DocumentsContract
 
 /** Reuse a persisted grant only when it names the exact default Downloads folder. */
 object StorageFolderAccess {
+    /** Android 10 may already grant full access; readable catalogue rows alone do not prove this. */
+    @Suppress("DEPRECATION")
+    fun hasLegacyWriteAccess(context: Context): Boolean = legacyWritable(
+        android.os.Build.VERSION.SDK_INT,
+        android.os.Environment.isExternalStorageLegacy(),
+        androidx.core.content.ContextCompat.checkSelfPermission(context,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED,
+    )
+
+    internal fun legacyWritable(api: Int, legacy: Boolean, writeGranted: Boolean): Boolean =
+        api == 29 && legacy && writeGranted
+
+    fun canClearDefault(context: Context, folder: String): Boolean =
+        hasLegacyWriteAccess(context) || defaultTree(context, folder, requireWrite = true) != null
+
     /**
      * Grant SAF persisten yang tepat menunjuk folder bawaan Download/[folder], bila pernah dipilih
      * pengguna. Dipakai bersama untuk ukuran folder, pembersihan, dan pemindaian koleksi — grant

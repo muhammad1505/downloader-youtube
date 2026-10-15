@@ -73,6 +73,7 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-047 | P2 | Slider full player terlalu besar dan badge antrean terpotong | Diperbaiki; layar penuh/track tipis/jumlah51 terbaca di HP Android10; matriks font besar belum diuji |
 | BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent terverifikasi langsung putar di HP/pengelola; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
 | BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
+| BUG-050 | P2 | Hapus semua meminta SAF walau Android10 sudah memiliki izin hapus | Diperbaiki1.1.11; 240Kotlin/83Python lulus, pengelola+HP membuktikan langsung bersih tanpa SAF, root tetap/0entri |
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -494,7 +495,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Bukti awal:** setelah reset pengguna, root TubeFlow berisi0 file tetapi5 subfolder kosong.
 - **Akar penyebab:** MediaStore tidak mencatat direktori kosong; pruning dilewati ketika grant SAF belum ada. `clearTree` juga menggunakan ID root pada rekursi anak; pembacaan gagal pada pruning tidak dicatat sebagai kegagalan.
 - **Solusi:** akses baca/tulis tepat pada root lewat pemilih Android, tanpa mengganti default MediaStore. Traversal terbatas bottom-up memakai ID dokumen anak, menghitung file/folder terpisah, memverifikasi kosong sebelum menghapus induk, mempertahankan root/riwayat dan menolak laporan bersih bila gagal. Root lain tidak dihapus; job aktif/dijeda memblokir cleanup.
-- **Status:** implementasi1.1.3, regresi host/build lulus dan APK terpasang; operasi Hapus semua di HP menunggu pengelola.
+- **Status:** implementasi1.1.3; jalur Android10 tanpa grant diperbaiki pada BUG-050/1.1.11. Pengelola menguji Hapus semua tanpa SAF dan pemeriksaan HP membuktikan root tetap/0entri; provider SAF lain belum diuji ulang.
 - **Validasi:** tes kegagalan/rekursi/siklus/batas traversal dan HP tercatat dalam [laporan](COLLECTION_CLEANUP_2026-10-13.md).
 
 ## BUG-042 — P1: Kredit judul/artis tidak konsisten antar entri koleksi
@@ -550,3 +551,13 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Perbaikan:** filter lokal judul/artis, beberapa kata tanpa membedakan kapital, jumlah hasil, bersihkan dan keadaan tanpa hasil. Tidak melakukan request jaringan.
 - **Integritas aksi:** hasil menyimpan posisi asli; putar/move/remove tidak memakai nomor urut hasil filter. Pencarian tidak mengubah antrean dan lagu berikutnya tetap memakai antrean penuh.
 - **Regresi:** lima tes meliputi query kosong, indeks asli untuk jump/remove, kombinasi judul+artis, entri ganda, serta hasil kosong. HP: nemen→2hasil, pilih Nemen→lagu12dari51, clear dan tanpa hasil sesuai; [laporan](PLAYER_AUTOPLAY_1_1_10.md).
+
+
+## BUG-050 — P2: Hapus semua selalu meminta SAF meski izin legacy tersedia
+
+- **Laporan:** pengelola memakai Hapus semua file di Pengaturan1.1.10, tetapi pemilih SAF muncul.
+- **Akar:** perbaikan BUG-041 mewajibkan grant SAF agar direktori kosong dapat dibersihkan. UI hanya mencari persistedUriPermissions dan backend hanya menerima tree, melewatkan akses filesystem Android10 legacy dengan WRITE_EXTERNAL_STORAGE yang sudah diberikan. Katalog terbaca sendiri memang tidak membuktikan izin hapus.
+- **Solusi:** satu pemeriksaan kemampuan bersama (API29 + legacy nyata + write granted) dipakai UI/backend. Jalur itu membersihkan tepat Download/<folder> dengan adapter FolderCleanup bottom-up, mempertahankan root/riwayat, menolak symlink/escape, memverifikasi kosong dan melaporkan gagal secara jujur. Berkas terindeks dihapus lewat MediaStore, fallback filesystem menyegarkan scanner. Folder eksplisit/Android scoped tetap memakai SAF sah.
+- **Pengujian:** enam tes filesystem nyata dalam folder sementara (media+LRC/direktori kosong, sibling, gagal hapus, link luar/root, penambahan bersamaan, root tidak ada), satu tes policy izin dan regresi FolderCleanup lama. Hasil build/perangkat pada [laporan1.1.11](STORAGE_CLEANUP_1_1_11.md).
+
+- **Hasil1.1.11:** 240Kotlin/83Python lulus, build signed/debug berhasil, lint0error/2warning. Update di RealmeAndroid10 mempertahankan70file sampai pengelola menjalankan Hapus semua sendiri. Pengelola menjawab “Langsung bersih tanpa SAF”; pemeriksaan ADB memastikan root masih ada dan isi0entri. Batas Android scoped/provider lain tetap pada laporan.

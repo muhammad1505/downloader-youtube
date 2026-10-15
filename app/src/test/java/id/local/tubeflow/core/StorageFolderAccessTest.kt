@@ -4,6 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StorageFolderAccessTest {
+    @Test fun legacyDeletionRequiresAndroid10LegacyModeAndWritePermission() {
+        assertTrue(StorageFolderAccess.legacyWritable(29, true, true))
+        assertFalse(StorageFolderAccess.legacyWritable(29, false, true))
+        assertFalse(StorageFolderAccess.legacyWritable(29, true, false))
+        assertFalse(StorageFolderAccess.legacyWritable(30, true, true))
+        assertFalse(StorageFolderAccess.legacyWritable(37, true, true))
+    }
+
     @Test fun matchesPrimaryFolderAndTrailingSlash() {
         val authority = "com.android.externalstorage.documents"
         assertTrue(StorageFolderAccess.matchesDefault(authority, "primary:Download/TubeFlow", "TubeFlow"))

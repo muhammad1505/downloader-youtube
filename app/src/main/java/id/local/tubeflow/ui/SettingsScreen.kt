@@ -73,17 +73,13 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmClearFiles = false },
             title = { Text("Hapus semua file?") },
-            text = { Text("Seluruh file dan subfolder di ${if (tree != null) "folder pilihan" else "Download/${SettingsStore.storageFolder}"} akan dihapus permanen. Folder utama dan riwayat unduhan tetap tersimpan. Selesaikan atau batalkan unduhan yang berjalan/dijeda terlebih dahulu. Jika akses folder belum tersedia, pilih folder utama di pemilih sistem untuk melanjutkan.") },
+            text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.storage_clear_description,
+                if (tree != null) "folder pilihan" else "Download/${SettingsStore.storageFolder}")) },
             confirmButton = { TextButton(onClick = {
                 confirmClearFiles = false
                 clearAccessError = null
                 val folder = SettingsStore.storageFolder
-                val writableDefault = context.contentResolver.persistedUriPermissions.any { permission ->
-                    permission.isReadPermission && permission.isWritePermission && runCatching {
-                        StorageFolderAccess.matchesDefault(permission.uri.authority,
-                            DocumentsContract.getTreeDocumentId(permission.uri), folder)
-                    }.getOrDefault(false)
-                }
+                val writableDefault = StorageFolderAccess.canClearDefault(context, folder)
                 if (tree != null || writableDefault) onClearStorage() else {
                     pendingClearFolder = folder
                     clearTreeLauncher.launch(DocumentsContract.buildDocumentUri(

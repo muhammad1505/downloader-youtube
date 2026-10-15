@@ -467,14 +467,20 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  fun clearStorageFolder() { if(_clearing.value) return; _clearing.value=true; viewModelScope.launch(Dispatchers.IO) {
   try {
    val app=getApplication<Application>()
-   val root=SettingsStore.storageTree?.toUri() ?: defaultTreeGrant(requireWrite=true)
-    ?: error("Akses folder diperlukan. Pilih Download/${SettingsStore.storageFolder} agar file dan subfolder dapat dibersihkan.")
+   // Snapshot the confirmed destination; a later settings change must not widen the deletion scope.
+   val folder=SettingsStore.storageFolder
+   val selectedTree=SettingsStore.storageTree?.toUri()
+   val legacy=selectedTree == null && StorageFolderAccess.hasLegacyWriteAccess(app)
+   val root=selectedTree ?: StorageFolderAccess.defaultTree(app,folder,requireWrite=true)
+   check(legacy || root != null) {
+    "Akses folder diperlukan. Pilih Download/$folder agar file dan subfolder dapat dibersihkan."
+   }
    val result=MediaFileOperations.mutex.withLock {
     val rows=dao.observe().first()
     check(rows.none { it.state in setOf(JobState.QUEUED,JobState.RUNNING,JobState.PAUSED) } && !submitting) {
      "Masih ada unduhan berjalan atau dijeda — batalkan dulu sebelum menghapus semua file."
     }
-    val swept=clearTree(root)
+    val swept=if(legacy) clearLegacyFolder(folder) else clearTree(requireNotNull(root))
     rows.forEach { deleteJobDir(it.id); cancelResultNotification(it.id) }
     swept
    }
@@ -488,6 +494,25 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   catch(error: Exception) { _error.value=error.message ?: "Pembersihan folder gagal." }
   finally { _clearing.value=false; refreshStorage() }
  } }
+ @Suppress("DEPRECATION")
+ private fun clearLegacyFolder(folder: String): FolderCleanup.Result {
+  val app=getApplication<Application>()
+  check(StorageFolderAccess.hasLegacyWriteAccess(app)) { "Izin hapus berubah; coba lagi." }
+  require(Selection.safeFolder(folder) == folder) { "Nama folder tidak valid." }
+  val downloads=android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).canonicalFile
+  val root=java.io.File(downloads,folder)
+  require(root.canonicalFile == root.absoluteFile && root.parentFile == downloads) { "Folder tujuan tidak valid." }
+  return LegacyFolderCleanup.clear(root) { file ->
+   // Delete indexed files through MediaStore as well, so scans do not resurrect stale rows.
+   runCatching { app.contentResolver.delete(MediaStore.Files.getContentUri("external"),
+    "${MediaStore.MediaColumns.DATA} = ?",arrayOf(file.path)) }
+   if(java.nio.file.Files.notExists(file.toPath())) true else {
+    val deleted=file.delete()
+    if(deleted) android.media.MediaScannerConnection.scanFile(app,arrayOf(file.path),null,null)
+    deleted
+   }
+  }
+ }
  /** Use child document IDs at every level; never delete the granted root. */
  private fun clearTree(root: android.net.Uri): FolderCleanup.Result {
   val app=getApplication<Application>()
