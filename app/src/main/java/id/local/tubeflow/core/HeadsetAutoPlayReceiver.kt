@@ -1,6 +1,5 @@
 package id.local.tubeflow.core
 
-import android.app.Application
 import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -24,6 +23,6 @@ class HeadsetAutoPlayReceiver : BroadcastReceiver() {
         }
         android.util.Log.d("TubeFlow-autoload", "receiver action=${intent?.action} connected=$connected")
         if (!connected) return
-        PlayerViewModel.autoPlayFromSystem(context.applicationContext as Application)
+        PlaybackService.requestAutoPlay(context.applicationContext)
     }
 }

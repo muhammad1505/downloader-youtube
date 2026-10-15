@@ -377,3 +377,23 @@ Host: 222 tes Kotlin 0 gagal (termasuk regresi baru `PlaybackQueueTest` untuk `m
 Melanjutkan batch 7 yang sudah ada di source lokal: mini player tetap memakai kartu membulat beraksen sampul seperti Koleksi; pemutar penuh dapat digulir pada layar pendek dan memberi petunjuk swipe; antrean dipindahkan ke panel bawah dengan menu putar sekarang/setelah lagu ini, pindah atas/bawah, keluarkan, acak/ulangi, dan bersihkan berkonfirmasi. BUG-045: ukuran Pengaturan kini mengamati agregat Room sehingga scan/impor/hapus/karaoke ikut memperbarui angka; ukuran null diberi keterangan parsial. Uji HP menemukan BUG-046 (seek saat jeda tidak memperbarui MediaSession), diperbaiki lewat `PlaybackNotifications`: publikasi progres per detik serta seek/kecepatan segera. Notifikasi custom 48dp punya X langsung; tinta X diganti netral karena atribut tema Activity menghasilkan hitam pada drawer gelap OEM. Garis progres custom memakai aksen tema; warna kontrol sistem mengikuti sampul.
 
 Bukti akhir: **228 Kotlin, 79 Python**, lint debug/release **0 error/2 warning** (`SelectedPhotoAccess`, pin ONNX), build signed APK×3/AAB, audit native/ZIP reflektif/zipalign/tanda tangan dan bundletool lulus. **1.1.9/code23 ARM64 70.546.231 byte**, SHA256 `042d64db675617826441da0c0e76e7aab39ecad849d73732aa8279a0d9696af0`, terpasang update-r pada Realme Android 10; `base.apk` cocok. Penyimpanan terbaca **263,8 MB** tanpa grant folder baru, cocok dengan 51 audio fisik/276.635.482 byte. Seek jeda 2:37 = MediaSession 157.042ms; progres PLAYING 4.089→6.101ms; X menghapus sesi/notifikasi; **69/69 file lama hash identik**. Terang/gelap dan antrean satu lagu diuji. Font besar via ADB ditolak ColorOS, jadi belum terverifikasi; Android versi lain/16KB runtime, TalkBack, landscape dan gangguan SAF masih di luar cakupan. [Laporan, foto, akar masalah, dan batas](PLAYER_POLISH_2026-10-15.md).
+
+
+## Pemutar dan auto-play 1.1.10 / code24 — 15 Oktober 2026
+
+Seekbar penuh dirampingkan menjadi track4dp/thumb12dp dengan target sentuh48dp;
+jumlah antrean masuk tombol agar tidak terpotong; pencarian judul/artis mempertahankan
+indeks asli. Receiver koneksi, bootstrap foreground sebelum I/O/fokus, izin Bluetooth
+sesuai Android dan pemulihan sesi aktif diperbaiki tanpa mengganti engine/Room9.
+
+Host:233 Kotlin/83 Python lulus; signed debug/releaseAPK×3/AAB berhasil;
+lint debug/release0error/2warning diketahui, audit signature/native/alignment16KB/
+ZIP reflektif serta AAB bundletool lulus. ARM64 produksi70.564.491byte SHA256
+`3ff8b5a250a82b3e2aef65a1cf06f9ca2d7200e262b328418ea628e3b3f70d3a`
+terpasang update-r di RealmeRMX1821Android10, base.apk cocok;70/70file awal identik.
+
+HP: full player dan jumlah51 terbaca; pencarian nemen→2hasil, pilih→lagu12dari51,
+clear/tanpa hasil sesuai. **Kabel sesudah sapu Recent langsung memutar tanpa buka UI**,
+dikonfirmasi pengelola; log task removed/koneksi dan PLAYING1.095→3.108ms sementara
+Launcher foreground mendukung hasil. Belum diuji TWS/Android12+/process death penuh,
+font besar/lightmode versi ini dan runtime16KB. [Laporan dan bukti visual](PLAYER_AUTOPLAY_1_1_10.md).

@@ -350,3 +350,23 @@ Perangkat fisik Realme RMX1821/Android 10/ARM64/4KB. APK produksi code23 SHA256 
 Terbukti: UI mini/penuh/antrean terang dan gelap, menu antrean, pindah lagu menjadi berikutnya, bersihkan hanya menyisakan lagu aktif, ukuran Koleksi 263,8 MB tanpa pemilih folder/grant baru (51 audio fisik/276.635.482 byte), seek saat jeda 2:37→MediaSession157.042ms, progres sistem PLAYING4.089→6.101ms, X kontras terlihat dan menghapus notifikasi/sesi. **69/69 file awal identik SHA256**, jumlah tetap69. Tema dikembalikan Ikut sistem; font0,9 tidak berubah. Tidak ada TubeFlow pada buffer crash saat pemeriksaan.
 
 Belum diuji: font1,3×/2× (WRITE_SETTINGS ditolak ColorOS), 360dp, landscape/tablet, TalkBack, Android12+/runtime16KB, gangguan SAF/storage penuh atau download jaringan baru dalam checkpoint ini. [Bukti visual dan laporan lengkap](PLAYER_POLISH_2026-10-15.md).
+
+
+## Pemutar dan auto-play 1.1.10 / code24 — 15 Oktober 2026
+
+Seekbar penuh dirampingkan menjadi track4dp/thumb12dp dengan target sentuh48dp;
+jumlah antrean masuk tombol agar tidak terpotong; pencarian judul/artis mempertahankan
+indeks asli. Receiver koneksi, bootstrap foreground sebelum I/O/fokus, izin Bluetooth
+sesuai Android dan pemulihan sesi aktif diperbaiki tanpa mengganti engine/Room9.
+
+Host:233 Kotlin/83 Python lulus; signed debug/releaseAPK×3/AAB berhasil;
+lint debug/release0error/2warning diketahui, audit signature/native/alignment16KB/
+ZIP reflektif serta AAB bundletool lulus. ARM64 produksi70.564.491byte SHA256
+`3ff8b5a250a82b3e2aef65a1cf06f9ca2d7200e262b328418ea628e3b3f70d3a`
+terpasang update-r di RealmeRMX1821Android10, base.apk cocok;70/70file awal identik.
+
+HP: full player dan jumlah51 terbaca; pencarian nemen→2hasil, pilih→lagu12dari51,
+clear/tanpa hasil sesuai. **Kabel sesudah sapu Recent langsung memutar tanpa buka UI**,
+dikonfirmasi pengelola; log task removed/koneksi dan PLAYING1.095→3.108ms sementara
+Launcher foreground mendukung hasil. Belum diuji TWS/Android12+/process death penuh,
+font besar/lightmode versi ini dan runtime16KB. [Laporan dan bukti visual](PLAYER_AUTOPLAY_1_1_10.md).

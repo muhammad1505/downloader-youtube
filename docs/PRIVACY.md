@@ -24,3 +24,13 @@ Saat pengguna meminta pemisahan vokal, model UVR sekitar67MB diunduh dari GitHub
 Pemrosesan menyalin sumber sementara ke penyimpanan privat, membaca PCM per potongan dan menyiapkan FLAC instrumental. Sumber asli tidak diubah. Input/PCM dibersihkan setelah berhasil atau batal; pratinjau terakhir dipertahankan sampai proses baru menggantikannya. Proses yang dihentikan sistem dapat memulai ulang dengan aman; karaoke belum melanjutkan inference dari potongan terakhir. Model dan pratinjau hilang saat uninstall/reset data; file publik yang sudah disimpan dapat tetap ada.
 
 Simpan hasil hanya dilakukan setelah pengguna memilihnya. Hasil masuk katalog media sebagai file turunan, bukan unduhan jaringan baru. LRC disalin terpisah hanya untuk hasil lagu penuh; cuplikan uji tidak memakai lirik lagu penuh. Tidak ada izin akses seluruh penyimpanan baru.
+
+### Auto-play headset dan Bluetooth
+
+Auto-play hanya menanggapi sambungan perangkat audio. Pada Android12+, izin
+`BLUETOOTH_CONNECT` diminta melalui tombol di Pengaturan untuk menerima peristiwa
+sambungan TWS/Bluetooth ketika UI tertutup; headset kabel tidak membutuhkan izin
+ini. Android10–11 memakai izin Bluetooth normal. Aplikasi tidak meminta izin
+pemindaian Bluetooth/lokasi untuk fitur ini dan tidak mengunggah informasi
+perangkat. Penanda sesi player disimpan lokal agar sesi aktif dapat dipulihkan
+setelah proses dihentikan sistem; tombol X mengakhiri sesi tersebut.

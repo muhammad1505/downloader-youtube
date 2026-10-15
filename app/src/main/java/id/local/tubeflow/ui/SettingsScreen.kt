@@ -306,6 +306,8 @@ fun SettingsScreen(
             }
         }
 
+        if (Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Privasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -341,3 +343,41 @@ private fun treeLabel(tree: String): String = runCatching {
     val shown = if (':' in id) id.substringAfter(':') else id
     shown.ifBlank { "penyimpanan utama" }
 }.getOrNull() ?: "folder pilihan"
+
+
+@Composable
+private fun BluetoothAutoPlaySettings() {
+    if (Build.VERSION.SDK_INT < 31) return
+    val context=LocalContext.current
+    fun isGranted()=androidx.core.content.ContextCompat.checkSelfPermission(context,
+        android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED
+    var granted by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(isGranted()) }
+    val launcher=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted=it }
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
+            if (event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) granted=isGranted()
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_title),
+                style=MaterialTheme.typography.titleMedium)
+            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_description),
+                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(androidx.compose.ui.res.stringResource(if (granted) id.local.tubeflow.R.string.autoplay_bluetooth_granted else id.local.tubeflow.R.string.autoplay_bluetooth_missing),
+                style=MaterialTheme.typography.bodyMedium)
+            if (!granted) {
+                FilledTonalButton(onClick={ launcher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) }) {
+                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_enable))
+                }
+                TextButton(onClick={ context.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    "package:${context.packageName}".toUri())) }) {
+                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_app_settings))
+                }
+            }
+        }
+    }
+}

@@ -70,6 +70,9 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-039 | P2 | Auto Folder mengabaikan remixer teridentifikasi | Diperbaiki1.1.2; seed Mix terbit di folder remixer pada HP, decode/hash lama lulus |
 | BUG-045 | P2 | Angka penyimpanan tertinggal dari Koleksi setelah scan/impor/hapus/karaoke | Pengamatan agregat Room dan label ukuran parsial diterapkan; verifikasi checkpoint pada laporan player |
 | BUG-046 | P2 | Posisi notifikasi tertinggal setelah seek saat jeda dan progres berjalan | Sinkronisasi dibatasi per detik, seek saat jeda dan kecepatan disinkronkan langsung; regresi host lulus, verifikasi APK akhir pada laporan player |
+| BUG-047 | P2 | Slider full player terlalu besar dan badge antrean terpotong | Diperbaiki; layar penuh/track tipis/jumlah51 terbaca di HP Android10; matriks font besar belum diuji |
+| BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent terverifikasi langsung putar di HP/pengelola; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
+| BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -526,3 +529,24 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Perbaikan:** `PlaybackNotifications.shouldUpdate` membandingkan dengan state terakhir yang diterbitkan. Tick berjalan diterbitkan saat detik berubah; seek ketika jeda, durasi, judul/track, kecepatan, loading/error, serta stop diperbarui segera. Engine dan MediaSession tetap tunggal.
 - **Regresi:** tiga tes memeriksa seek saat jeda (termasuk dalam detik yang sama), pembatasan tick 200 ms, perubahan kecepatan/durasi/identitas/stop, dan perubahan antrean yang tidak perlu membangun ulang notifikasi.
 - **Bukti/batas:** [laporan player](PLAYER_POLISH_2026-10-15.md); perilaku pusat media Android versi lain tetap memerlukan HP terkait.
+
+## BUG-047 — P2: Slider dan jumlah antrean full player kurang proporsional
+
+- **Akar:** slider Material3 default memakai track/thumb ekspresif besar. `BadgedBox` menggambar badge di luar batas pill yang memotong anaknya.
+- **Perbaikan:** track4dp, thumb12dp, target sentuh48dp dan gestur/semantik Slider tetap. Empat aksi sekunder berlabel; jumlah berada di dalam tombol Antrean. Pelat sampul/bayangan/pill dekoratif dihilangkan. Dialog memenuhi window, insets dan kontras ikon sistem mengikuti tema.
+- **Bukti:** HP Android10 menampilkan track tipis dan jumlah51 utuh; [rencana, tangkapan layar dan laporan 1.1.10](PLAYER_AUTOPLAY_1_1_10.md). Matriks font besar/Android lain tidak boleh disimpulkan dari build.
+
+## BUG-048 — P1: Auto-play berhenti bekerja setelah UI ditutup
+
+- **Laporan pengelola:** headset kabel; TubeFlow disapu dari daftar aplikasi terbaru, lalu kabel tersambung tetapi harus membuka aplikasi dahulu.
+- **Akar kode:** receiver manifest/runtime Bluetooth berstatus tidak diekspor sehingga UID Bluetooth tersendiri dapat ditolak; izin penerimaan Bluetooth belum dideklarasikan; callback receiver memulai pekerjaan async ViewModel sebelum service hidup; `START_NOT_STICKY` tidak meminta pemulihan jika service sesi aktif dihentikan sistem. Kabel `HEADSET_PLUG` sendiri hanya dikirim ke receiver runtime, sehingga receiver manifest tidak bisa membangunkan proses mati.
+- **Perbaikan:** receiver hanya mendengarkan tiga action koneksi sistem terproteksi dan diekspor; PlaybackService tetap privat. Pemicu memulai foreground service dahulu, lalu membaca Room dan melanjutkan engine yang sama. Sesi aktif memakai `START_STICKY` dan penanda preferensi; X menghapus penanda. Pemulihan tanpa headset menyiapkan lagu dalam keadaan jeda. Setelan kecepatan tidak menerapkan PlaybackParams ke MediaPlayer yang dijeda; diterapkan setelah fokus audio didapat saat mulai putar.
+- **Jalur gagal:** pekerjaan bootstrap dibatasi10detik, dibatalkan bersama service, empty/error dihentikan; penolakan start di latar menawarkan notifikasi ketuk-untuk-putar jika izin notifikasi tersedia.
+- **Batas:** sticky bukan jaminan terhadap force-stop/ColorOS yang melarang restart. Tidak ada service pengawas permanen. Pemulihan proses mati membangun antrean lagi; posisi seek sesi mati belum dipersist. TWS tidak tersedia pada sesi tes ini.
+- **Bukti:** empat regresi host memeriksa receiver exported/action terproteksi, service privat serta izin Bluetooth sesuai versi tanpa discovery; tes kabel sesudah sapu Recent berhasil (konfirmasi pengelola “Langsung berjalan”), Launcher foreground/PLAYING1.095→3.108ms. TWS/Android12+ belum diuji; [laporan](PLAYER_AUTOPLAY_1_1_10.md).
+
+## BUG-049 — P2: Pencarian belum tersedia di antrean putar
+
+- **Perbaikan:** filter lokal judul/artis, beberapa kata tanpa membedakan kapital, jumlah hasil, bersihkan dan keadaan tanpa hasil. Tidak melakukan request jaringan.
+- **Integritas aksi:** hasil menyimpan posisi asli; putar/move/remove tidak memakai nomor urut hasil filter. Pencarian tidak mengubah antrean dan lagu berikutnya tetap memakai antrean penuh.
+- **Regresi:** lima tes meliputi query kosong, indeks asli untuk jump/remove, kombinasi judul+artis, entri ganda, serta hasil kosong. HP: nemen→2hasil, pilih Nemen→lagu12dari51, clear dan tanpa hasil sesuai; [laporan](PLAYER_AUTOPLAY_1_1_10.md).

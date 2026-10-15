@@ -8,4 +8,24 @@
     <string name="player_queue_close">Tutup antrean</string>
     <string name="player_swipe_hint">Geser sampul untuk melihat lirik</string>
     <string name="player_stop">Tutup pemutar</string>
+    <string name="player_now_playing">Sedang diputar</string>
+    <string name="player_shuffle">Acak</string>
+    <string name="player_repeat">Ulangi</string>
+    <string name="player_karaoke">Karaoke</string>
+    <string name="player_queue">Antrean</string>
+    <string name="player_queue_search">Cari judul atau artis</string>
+    <string name="player_queue_clear_search">Bersihkan pencarian antrean</string>
+    <string name="player_queue_no_results">Tidak ada lagu yang cocok. Coba judul atau artis lain.</string>
+    <plurals name="player_queue_results">
+        <item quantity="one">%1$d lagu cocok</item>
+        <item quantity="other">%1$d lagu cocok</item>
+    </plurals>
+    <string name="player_autoplay_prepare">Menyiapkan musik dari headset…</string>
+    <string name="player_autoplay_retry">Ketuk untuk melanjutkan musik</string>
+    <string name="autoplay_bluetooth_title">Auto-play Bluetooth</string>
+    <string name="autoplay_bluetooth_description">Izin perangkat terdekat diperlukan untuk menerima sambungan TWS/Bluetooth saat aplikasi tertutup. Headset kabel tidak memerlukan izin ini. TubeFlow tidak memindai lokasi atau perangkat sekitar.</string>
+    <string name="autoplay_bluetooth_granted">Izin sambungan Bluetooth tersedia.</string>
+    <string name="autoplay_bluetooth_missing">Izin sambungan Bluetooth belum tersedia.</string>
+    <string name="autoplay_bluetooth_enable">Izinkan sambungan Bluetooth</string>
+    <string name="autoplay_bluetooth_app_settings">Buka pengaturan aplikasi</string>
 </resources>

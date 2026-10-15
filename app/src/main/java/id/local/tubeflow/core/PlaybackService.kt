@@ -20,6 +20,15 @@ import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import id.local.tubeflow.MainActivity
 import id.local.tubeflow.R
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
  * Foreground service pemutaran: menjaga audio tetap berjalan saat layar mati/aplikasi ke latar,
@@ -32,6 +41,8 @@ class PlaybackService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var playing = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var autoStart: Job? = null
     private val renew = object : Runnable {
         override fun run() {
             if (playing) { holdWakeLock(); handler.postDelayed(this, RENEW_MS) }
@@ -41,6 +52,7 @@ class PlaybackService : Service() {
     companion object {
         private const val CHANNEL_ID = "playback"
         private const val NOTIFICATION_ID = 42
+        private const val AUTOPLAY_NOTICE_ID = 43
         private val DEFAULT_ACCENT = 0xFFC6B7FF.toInt()
         private val coverLock = Any()
         private var coverKey = ""
@@ -52,7 +64,31 @@ class PlaybackService : Service() {
         const val ACTION_PREVIOUS = "id.local.tubeflow.action.PREVIOUS"
         const val ACTION_NEXT = "id.local.tubeflow.action.NEXT"
         const val ACTION_STOP = "id.local.tubeflow.action.STOP"
+        const val ACTION_AUTO_PLAY = "id.local.tubeflow.action.AUTO_PLAY_CONNECTED"
         @Volatile private var instance: PlaybackService? = null
+
+        /** Transfer ownership to a service before receiver return / asynchronous catalogue I/O. */
+        fun requestAutoPlay(context: Context) {
+            try {
+                ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java).setAction(ACTION_AUTO_PLAY))
+            } catch (error: RuntimeException) {
+                android.util.Log.w("TubeFlow-autoload", "foreground start denied: ${error.javaClass.simpleName}")
+                showAutoPlayRetry(context)
+            }
+        }
+
+        private fun showAutoPlayRetry(context: Context) {
+            runCatching {
+                val manager = context.getSystemService(NotificationManager::class.java)
+                manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Pemutaran", NotificationManager.IMPORTANCE_LOW))
+                val retry = PendingIntent.getForegroundService(context, AUTOPLAY_NOTICE_ID,
+                    Intent(context, PlaybackService::class.java).setAction(ACTION_AUTO_PLAY), PendingIntent.FLAG_IMMUTABLE)
+                manager.notify(AUTOPLAY_NOTICE_ID, Notification.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_stat_playback)
+                    .setContentTitle(context.getString(R.string.player_autoplay_retry))
+                    .setContentIntent(retry).setAutoCancel(true).build())
+            }
+        }
 
         /** Sinkronkan service dengan state engine: tampilkan saat ada track, hentikan saat kosong. */
         fun sync(context: Context, state: PlayerViewModel.State) {
@@ -91,12 +127,44 @@ class PlaybackService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val restoring = intent == null && PlayerViewModel.active?.state?.value?.track == null &&
+            PlayerViewModel.hasRestorableSession(this)
+        if (intent?.action == ACTION_AUTO_PLAY || restoring) {
+            getSystemService(NotificationManager::class.java).cancel(AUTOPLAY_NOTICE_ID)
+            val state = PlayerViewModel.active?.state?.value
+            // Foreground first: no Room query or audio-focus request may precede this point.
+            startForeground(NOTIFICATION_ID, if (state?.track != null) build(state) else
+                Notification.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_stat_playback)
+                    .setContentTitle(getString(R.string.player_autoplay_prepare)).setOngoing(true).build())
+            if (autoStart?.isActive != true) autoStart = scope.launch {
+                try {
+                    withTimeout(10000) {
+                        val player = PlayerViewModel.obtain(application)
+                        if (restoring) player.restorePlaybackSession() else player.resumeForConnectedDevice()
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    showAutoPlayRetry(this@PlaybackService)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    android.util.Log.w("TubeFlow-autoload", "restore failed: ${error.javaClass.simpleName}")
+                    showAutoPlayRetry(this@PlaybackService)
+                } finally {
+                    if (PlayerViewModel.active?.state?.value?.track == null) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
+                }
+            }
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_STOP) autoStart?.cancel()
         if (intent?.action != null) handle(intent.action!!)
         val state = PlayerViewModel.active?.state?.value
         if (state == null || state.track == null) { stopSelf(); return START_NOT_STICKY }
         startForeground(NOTIFICATION_ID, build(state))
         renderLock(state)
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun handle(action: String) {
@@ -225,6 +293,7 @@ class PlaybackService : Service() {
         Notification.Action.Builder(icon, title, actionIntent(action)).build()
 
     override fun onDestroy() {
+        scope.cancel()
         instance = null
         playing = false
         handler.removeCallbacks(renew)
@@ -234,6 +303,11 @@ class PlaybackService : Service() {
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        android.util.Log.i("TubeFlow-autoload", "task removed; active media session retained")
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

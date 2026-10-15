@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -20,13 +21,16 @@ import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -35,12 +39,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import id.local.tubeflow.core.AutoEq
 import id.local.tubeflow.core.LrcLines
 import id.local.tubeflow.core.MediaItem
 import id.local.tubeflow.core.MediaLibraryViewModel
 import id.local.tubeflow.core.MediaMode
 import id.local.tubeflow.core.PlaybackQueue
+import id.local.tubeflow.core.PlaybackQueueSearch
 import id.local.tubeflow.core.PlayerEqualizer
 import id.local.tubeflow.core.PlayerViewModel
 import kotlinx.coroutines.launch
@@ -80,6 +87,7 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: MediaLibraryViewModel, karaoke: () -> Unit, dismiss: () -> Unit) {
     val track=state.track ?: return
@@ -112,14 +120,24 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     LaunchedEffect(track.uri) { pager.scrollToPage(if (state.lines.isNotEmpty()) 1 else 0) }
     LaunchedEffect(state.lines) { if (!userChoseView && state.lines.isNotEmpty() && pager.settledPage==0) pager.animateScrollToPage(1) }
     LaunchedEffect(active,pager.settledPage,track.uri) { if (pager.settledPage==1 && active>=0 && !list.isScrollInProgress) list.animateScrollToItem(active) }
-    Dialog(onDismissRequest=dismiss,properties=DialogProperties(usePlatformDefaultWidth=false)) {
+    Dialog(onDismissRequest=dismiss,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
+        val view=LocalView.current
+        val darkBars=MaterialTheme.colorScheme.background.luminance()<0.5f
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.let { window ->
+                WindowCompat.getInsetsController(window,view).apply {
+                    isAppearanceLightStatusBars=!darkBars
+                    isAppearanceLightNavigationBars=!darkBars
+                }
+            }
+        }
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-            val pageHeight=(maxHeight-400.dp).coerceIn(220.dp,420.dp)
-            Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.32f),coverAccent.copy(alpha=0.12f),MaterialTheme.colorScheme.background))).verticalScroll(rememberScrollState()).padding(20.dp)) {
+            val pageHeight=(maxHeight-370.dp).coerceIn(220.dp,400.dp)
+            Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),MaterialTheme.colorScheme.background))).verticalScroll(rememberScrollState()).padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                     IconButton(onClick=dismiss) { Icon(Icons.Outlined.ExpandMore,"Kembali ke mini player") }
-                    Text("Sedang diputar",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                    Text(stringResource(id.local.tubeflow.R.string.player_now_playing),Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Box {
                         Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=0.7f),
                             border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.6f))) {
@@ -168,15 +186,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                             }
                         }
                     } else {
-                        // Sampul duduk di atas "pelat" bernuansa aksen yang sama dengan kartu Koleksi: satu
-                        // bahasa bentuk, bukan kotak melayang tanpa konteks.
-                        Box(Modifier.fillMaxSize().padding(24.dp),contentAlignment=Alignment.Center) {
-                            Surface(shape=MaterialTheme.shapes.large,color=accent.copy(alpha=0.10f).compositeOver(MaterialTheme.colorScheme.surface),
-                                border=BorderStroke(1.dp,accent.copy(alpha=0.22f)),
-                                modifier=Modifier.widthIn(max=360.dp).fillMaxWidth().aspectRatio(1f)
-                                    .shadow(18.dp,MaterialTheme.shapes.large,ambientColor=accent,spotColor=accent)) {
-                                CoverThumb(track.cover,"",MediaMode.AUDIO,Modifier.fillMaxSize().padding(12.dp),shape=MaterialTheme.shapes.medium)
-                            }
+                        Box(Modifier.fillMaxSize().padding(16.dp),contentAlignment=Alignment.Center) {
+                            CoverThumb(track.cover,"",MediaMode.AUDIO,
+                                Modifier.widthIn(max=340.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
                         }
                     }
                 }
@@ -190,12 +202,17 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     "Lagu ${state.queueIndex+1} dari ${state.queueTracks.size}" + (if (state.shuffle) " · acak" else "") + (if (state.repeat!=PlaybackQueue.Repeat.OFF) " · ulangi ${repeatLabel(state.repeat)}" else ""),
                     style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+                val seekColors=SliderDefaults.colors(thumbColor=accent,activeTrackColor=accent,inactiveTrackColor=accent.copy(alpha=0.18f))
                 Slider(value=dragging ?: state.positionMs.toFloat().coerceIn(0f,state.durationMs.coerceAtLeast(1).toFloat()),
                     onValueChange={ dragging=it }, onValueChangeFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
+                    modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),
                     valueRange=0f..state.durationMs.coerceAtLeast(1).toFloat(),enabled=!state.loading && state.durationMs>0,
-                    colors=SliderDefaults.colors(thumbColor=accent,activeTrackColor=accent,inactiveTrackColor=accent.copy(alpha=0.18f)))
+                    colors=seekColors,
+                    thumb={ Box(Modifier.size(12.dp).background(accent,CircleShape)) },
+                    track={ sliderState -> SliderDefaults.Track(sliderState,modifier=Modifier.height(4.dp),
+                        colors=seekColors,thumbTrackGapSize=0.dp,drawStopIndicator=null) })
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium); Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium) }
-                Row(Modifier.fillMaxWidth().padding(vertical=16.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
                     IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }
                     IconButton(onClick=player::previous,enabled=!state.loading) { Icon(Icons.Outlined.SkipPrevious,"Lagu sebelumnya") }
                     FilledIconButton(onClick=player::toggle,modifier=Modifier.size(64.dp),enabled=!state.loading) {
@@ -204,26 +221,38 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     IconButton(onClick=player::next,enabled=!state.loading && state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
                     IconButton(onClick={ player.skip(10000) },enabled=!state.loading) { Icon(Icons.Outlined.Forward10,"Maju 10 detik") }
                 }
-                // Acak, ulangi, karaoke, dan antrean dikelompokkan dalam satu "cluster" tonal: satu
-                // area aksi sekunder yang tenang, terpisah dari aksi utama di atasnya.
-                Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=0.55f),
-                    border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)),
-                    modifier=Modifier.fillMaxWidth().padding(top=14.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
-                        IconToggleButton(checked=state.shuffle,onCheckedChange={ player.toggleShuffle() },enabled=state.queueTracks.size>1) {
-                            Icon(Icons.Outlined.Shuffle,"Acak antrean: ${if (state.shuffle) "aktif" else "nonaktif"}",tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                    IconToggleButton(checked=state.shuffle,onCheckedChange={ player.toggleShuffle() },
+                        enabled=state.queueTracks.size>1,modifier=Modifier.weight(1f).height(64.dp)) {
+                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Outlined.Shuffle,null,tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(id.local.tubeflow.R.string.player_shuffle),style=MaterialTheme.typography.labelSmall)
                         }
-                        IconButton(onClick=player::cycleRepeat) {
-                            Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,"Ulangi: ${repeatLabel(state.repeat)}",
-                                tint=if (state.repeat==PlaybackQueue.Repeat.OFF) MaterialTheme.colorScheme.onSurfaceVariant else accent)
+                    }
+                    IconButton(onClick=player::cycleRepeat,modifier=Modifier.weight(1f).height(64.dp)) {
+                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
+                                "Ulangi: ${repeatLabel(state.repeat)}",tint=if (state.repeat==PlaybackQueue.Repeat.OFF) MaterialTheme.colorScheme.onSurfaceVariant else accent)
+                            Text(stringResource(id.local.tubeflow.R.string.player_repeat),style=MaterialTheme.typography.labelSmall)
                         }
-                        IconButton(onClick=karaoke) { Icon(Icons.Outlined.MicOff,"Karaoke · Pisahkan vokal") }
-                        BadgedBox(badge={ Badge { Text(if (state.queueTracks.size>99) "99+" else "${state.queueTracks.size}") } }) {
-                            IconButton(onClick={ queueOpen=true }) { Icon(Icons.AutoMirrored.Outlined.QueueMusic,"Antrean putar") }
+                    }
+                    IconButton(onClick=karaoke,modifier=Modifier.weight(1f).height(64.dp)) {
+                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Outlined.MicOff,null)
+                            Text(stringResource(id.local.tubeflow.R.string.player_karaoke),style=MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    IconButton(onClick={ queueOpen=true },modifier=Modifier.weight(1f).height(64.dp)
+                        .semantics { contentDescription="Antrean putar, ${state.queueTracks.size} lagu" }) {
+                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.AutoMirrored.Outlined.QueueMusic,null,Modifier.size(20.dp))
+                                Text("${state.queueTracks.size}",style=MaterialTheme.typography.labelMedium,maxLines=1)
+                            }
+                            Text(stringResource(id.local.tubeflow.R.string.player_queue),style=MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
-                Text("Karaoke memproses instrumental secara terpisah.", style = MaterialTheme.typography.labelSmall, textAlign=TextAlign.Center, modifier=Modifier.fillMaxWidth().padding(top=6.dp))
             }
             if (queueOpen) QueueDialog(state,player) { queueOpen=false }
             if (equalizerOpen) EqualizerDialog(player) { equalizerOpen=false }
@@ -241,7 +270,11 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
     val accent=rememberCoverAccent(state.track?.cover.orEmpty())
     val list=rememberLazyListState()
     var confirmClear by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { if (state.queueIndex > 2) list.scrollToItem(state.queueIndex - 1) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val positions=remember(query,state.queueTracks) {
+        PlaybackQueueSearch.positions(state.queueTracks,query) { "${it.title} ${it.artist}" }
+    }
+    LaunchedEffect(query) { list.scrollToItem(if (query.isBlank()) (state.queueIndex-1).coerceAtLeast(0) else 0) }
     ModalBottomSheet(onDismissRequest=dismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
@@ -254,6 +287,14 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                 }
                 IconButton(onClick=dismiss) { Icon(Icons.Outlined.Close,stringResource(id.local.tubeflow.R.string.player_queue_close)) }
             }
+            OutlinedTextField(value=query,onValueChange={ query=it },singleLine=true,
+                label={ Text(stringResource(id.local.tubeflow.R.string.player_queue_search)) },
+                leadingIcon={ Icon(Icons.Outlined.Search,null) },
+                trailingIcon={ if (query.isNotEmpty()) IconButton(onClick={ query="" }) {
+                    Icon(Icons.Outlined.Close,stringResource(id.local.tubeflow.R.string.player_queue_clear_search))
+                } },modifier=Modifier.fillMaxWidth().padding(top=12.dp))
+            if (query.isNotBlank()) Text(pluralStringResource(id.local.tubeflow.R.plurals.player_queue_results,positions.size,positions.size),
+                Modifier.padding(top=8.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
                 FilterChip(selected=state.shuffle,onClick={ player.toggleShuffle() },enabled=state.queueTracks.size>1,
                     label={ Text("Acak") },leadingIcon={ Icon(Icons.Outlined.Shuffle,null,Modifier.size(18.dp)) })
@@ -264,8 +305,11 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                     Icon(Icons.Outlined.DeleteSweep,null,Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Bersihkan")
                 }
             }
+            if (positions.isEmpty()) Text(stringResource(id.local.tubeflow.R.string.player_queue_no_results),
+                Modifier.padding(vertical=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(state=list,modifier=Modifier.weight(1f,fill=false).heightIn(max=440.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(state.queueTracks,key={ index,queued -> "${queued.uri}#$index" }) { position,queued ->
+                items(positions,key={ position -> "${state.queueTracks[position].uri}#$position" }) { position ->
+                    val queued=state.queueTracks[position]
                     val current=position==state.queueIndex
                     var menu by remember(queued.uri,position) { mutableStateOf(false) }
                     Surface(shape=MaterialTheme.shapes.medium,

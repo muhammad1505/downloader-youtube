@@ -6,6 +6,8 @@
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+ <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+ <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
  <!-- Baca koleksi: file yang dibuat versi/SAF lama tidak terlihat MediaStore tanpa izin baca,
       dan grant SAF hilang saat data aplikasi dihapus. Penulisan download tetap tanpa izin. -->
  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
@@ -22,7 +24,7 @@
   </activity>
   <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" android:exported="false" xmlns:tools="http://schemas.android.com/tools" tools:node="merge"/>
   <service android:name=".core.PlaybackService" android:foregroundServiceType="mediaPlayback" android:exported="false"/>
-  <receiver android:name=".core.HeadsetAutoPlayReceiver" android:exported="false">
+  <receiver android:name=".core.HeadsetAutoPlayReceiver" android:exported="true">
    <intent-filter>
     <action android:name="android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"/>
     <action android:name="android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED"/>
