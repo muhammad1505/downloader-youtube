@@ -21,7 +21,7 @@ object Engine {
  suspend fun initialize(context: Context) = lock.withLock {
   withContext(Dispatchers.IO) {
    try {
-    if (Lyrics.responseCache == null) Lyrics.responseCache = LyricsResponseCache(File(context.cacheDir, "lyrics-responses"))
+    Lyrics.initialize(File(context.cacheDir, "lyrics-responses"), File(context.noBackupFilesDir, "lyrics-cooldown.json"))
     installBundledEngine(context)
     YoutubeDL.getInstance().init(context)
     FFmpeg.getInstance().init(context)

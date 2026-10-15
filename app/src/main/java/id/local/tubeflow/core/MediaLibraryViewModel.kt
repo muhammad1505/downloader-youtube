@@ -167,7 +167,8 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     data class LyricsState(val item: MediaItem, val title: String, val artist: String,
         val choices: List<Lyrics.Choice> = emptyList(), val loading: Boolean = false,
-        val saving: Boolean = false, val searched: Boolean = false, val error: String? = null) {
+        val saving: Boolean = false, val searched: Boolean = false, val error: String? = null,
+        val canExpand: Boolean = false, val failureStatus: String? = null) {
         val query get() = LyricMatch.Query(TitleSplit.identify(item.title,metadataArtist=item.artist,recognizeCollaboration=false).lyricTitle,item.artist,(item.durationMs ?: 0)/1000)
     }
     private val _lyrics=MutableStateFlow<LyricsState?>(null)
@@ -211,11 +212,11 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun displayName(raw: String): String? = getApplication<Application>().contentResolver.query(raw.toUri(),
         arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use { if (it.moveToFirst()) it.getString(0) else null }
-    fun searchLyrics(title: String, artist: String) {
+    fun searchLyrics(title: String, artist: String, expand: Boolean = false) {
         val previous=_lyrics.value ?: return
         if (previous.loading || previous.saving) return
         val session=++lyricsSession
-        _lyrics.value=previous.copy(title=title.trim(),artist=artist.trim(),loading=true,choices=emptyList(),error=null,searched=false)
+        _lyrics.value=previous.copy(title=title.trim(),artist=artist.trim(),loading=true,choices=emptyList(),error=null,searched=false,canExpand=false,failureStatus=null)
         lyricsRequest=viewModelScope.launch {
             try {
                 val captured=withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
@@ -225,11 +226,15 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                     val bytes=current.lyricUri?.let { mapOf(it to lyricEditor.captureForRefetch(it)) }.orEmpty()
                     Triple(current,bytes,job)
                 } }
-                val result=withContext(Dispatchers.IO) { Lyrics.search(title,artist) }
+                val result=runInterruptible(Dispatchers.IO) {
+                    val app=getApplication<Application>()
+                    Lyrics.initialize(java.io.File(app.cacheDir,"lyrics-responses"),java.io.File(app.noBackupFilesDir,"lyrics-cooldown.json"))
+                    Lyrics.search(title,artist,expand)
+                }
                 if (session != lyricsSession) return@launch
                 expectedLyrics=captured.second; expectedJob=captured.third
                 _lyrics.value=_lyrics.value?.copy(item=captured.first,choices=result.choices,loading=false,searched=true,
-                    error=result.failureStatus?.let(LyricStatus::label))
+                    error=result.failureStatus?.let(LyricStatus::label),canExpand=result.canExpand,failureStatus=result.failureStatus)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(loading=false,error=failure.message ?: "Pencarian gagal.") }
         }
@@ -238,7 +243,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         val current=_lyrics.value ?: return
         if (current.loading || current.saving || !current.choices.contains(choice) || !choice.hasSyncedLyrics) return
         if (!choice.automaticMatch(current.query) && !acknowledgedMismatch) return
-        _lyrics.value=current.copy(saving=true,error=null)
+        _lyrics.value=current.copy(saving=true,error=null,failureStatus=null)
         val session=lyricsSession
         viewModelScope.launch {
             try {

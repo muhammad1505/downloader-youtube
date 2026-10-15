@@ -11,9 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.core.Lyrics
+import id.local.tubeflow.core.LyricStatus
 import id.local.tubeflow.core.MediaLibraryViewModel
+import id.local.tubeflow.R
+import kotlinx.coroutines.delay
 
 @Composable
 fun LyricsSearchDialog(model: MediaLibraryViewModel) {
@@ -25,16 +30,25 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
     var acknowledge by remember(selected) { mutableStateOf(false) }
     val mismatch=selected?.automaticMatch(current.query) == false
     val blocked=current.loading || current.saving
+    var retrySeconds by remember(current.failureStatus) { mutableLongStateOf(Lyrics.retryAfterSeconds()) }
+    LaunchedEffect(current.failureStatus) {
+        while (true) { retrySeconds=Lyrics.retryAfterSeconds(); delay(1000) }
+    }
     AlertDialog(onDismissRequest=model::closeLyrics, title={ Text("Cari dan pilih lirik") }, text={
         Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(current.item.displayName,style=MaterialTheme.typography.labelMedium)
             Text("Sumber: LRCLIB. Parameter pencarian dapat diedit; tag audio tetap sama.",style=MaterialTheme.typography.bodySmall)
             OutlinedTextField(title,{ title=it.take(200) },label={ Text("Judul lagu") },singleLine=true,enabled=!blocked,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(artist,{ artist=it.take(200) },label={ Text("Artis (opsional)") },singleLine=true,enabled=!blocked,modifier=Modifier.fillMaxWidth())
-            OutlinedButton(onClick={ model.searchLyrics(title,artist) },enabled=!blocked && title.isNotBlank()) { Text("Cari lirik") }
+            OutlinedButton(onClick={ model.searchLyrics(title,artist) },enabled=!blocked && retrySeconds == 0L && title.isNotBlank()) { Text("Cari lirik") }
+            if (retrySeconds > 0) Text(pluralStringResource(R.plurals.lyrics_retry_after,
+                retrySeconds.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),retrySeconds),style=MaterialTheme.typography.bodySmall)
             if (blocked) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(if (current.saving) "Menyimpan pilihan…" else "Mencari di LRCLIB…") }
-            current.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-            if (current.searched && current.choices.isEmpty()) Text("Tidak ada hasil. Coba judul/artis lain.")
+            current.error?.let {
+                if (current.failureStatus != LyricStatus.RATE_LIMIT) Text(it,color=MaterialTheme.colorScheme.error)
+                else if (retrySeconds == 0L) Text(stringResource(R.string.lyrics_retry_ready),style=MaterialTheme.typography.bodySmall)
+            }
+            if (current.searched && current.choices.isEmpty() && current.error == null) Text("Tidak ada hasil. Coba judul/artis lain.")
             if (current.choices.isNotEmpty()) {
                 Text("${current.choices.size} hasil · pilih lirik bertimestamp",style=MaterialTheme.typography.labelMedium)
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max=220.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -51,6 +65,11 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
                             }
                         }
                     }
+                }
+            }
+            if (current.canExpand && title.trim() == current.title && artist.trim() == current.artist) {
+                TextButton(onClick={ model.searchLyrics(title,artist,expand=true) },enabled=!blocked && retrySeconds == 0L) {
+                    Text(stringResource(R.string.lyrics_search_more))
                 }
             }
             selected?.let { choice ->

@@ -5,6 +5,18 @@ import org.junit.Test
 import java.nio.file.Files
 
 class LyricsResponseCacheTest {
+    @Test fun explicitRetryRefreshesOnlyMissingResponsesAndKeepsPositiveCache() {
+        val dir=Files.createTempDirectory("lyrics-refresh").toFile()
+        try {
+            val cache=LyricsResponseCache(dir)
+            for ((key,code,text) in listOf(Triple("missing",404,""),Triple("empty",200,"[]"),Triple("positive",200,"[{\"id\":1}]"))) {
+                cache.request(key) { LyricsResponseCache.Response(code,text) }
+                var calls=0
+                cache.request(key,refreshMissing=true) { calls++; LyricsResponseCache.Response(200,"[{\"id\":2}]") }
+                assertEquals(if(key=="positive") 0 else 1,calls)
+            }
+        } finally { dir.deleteRecursively() }
+    }
     @Test fun positiveCacheWorksOfflineThenExpiresAndCanBeCleared() {
         val dir = Files.createTempDirectory("lyrics-cache").toFile()
         try {

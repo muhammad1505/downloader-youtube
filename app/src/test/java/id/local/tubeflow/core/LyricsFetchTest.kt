@@ -20,9 +20,12 @@ class LyricsFetchTest {
 
     /** Kode HTTP + badan per jalur; diatur ulang oleh tiap tes. */
     private var respond: (path: String) -> Pair<Int, String> = { 404 to "" }
+    private var retryAfter: String? = null
 
     @Before
     fun start() {
+        Lyrics.requestGate = LyricsRequestGate(minimumGapMs=0)
+        Lyrics.responseCache = null
         requests.clear()
         respond = { 404 to "" }
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -30,6 +33,7 @@ class LyricsFetchTest {
             val path = exchange.requestURI.toString()
             synchronized(requests) { requests += path }
             val (code, body) = respond(path)
+            retryAfter?.let { exchange.responseHeaders.set("Retry-After",it) }
             val bytes = body.toByteArray(Charsets.UTF_8)
             if (bytes.isEmpty()) exchange.sendResponseHeaders(code, -1)
             else {
@@ -43,6 +47,7 @@ class LyricsFetchTest {
 
     @After
     fun stop() {
+        Lyrics.responseCache = null
         Lyrics.baseUrl = "https://lrclib.net"
         server.stop(0)
     }
@@ -55,6 +60,55 @@ class LyricsFetchTest {
 
     private fun studioRecord() =
         """{"trackName":"Song","artistName":"Artist","duration":200,"instrumental":false,"syncedLyrics":"[00:01.00]line"}"""
+
+    @Test fun displayVersionAndCollaborationDoNotForceAnUnnecessaryRawSearchBeforeUsefulResults() {
+        respond={ path -> if(path=="/api/search?track_name=Song&artist_name=Denny+Caknan") 200 to
+            studioList().replace("{","{\"id\":99,").replace("Artist","Denny Caknan") else 429 to "" }
+        val result=Lyrics.search("Song | Live","Denny Caknan FT Happy Asmara")
+        assertEquals(1,result.choices.size)
+        assertEquals(null,result.failureStatus)
+        assertEquals(1,requests.size)
+        assertTrue(!result.choices.single().automaticMatch(LyricMatch.Query("Song | Live","Denny Caknan FT Happy Asmara",200)))
+    }
+
+    @Test fun usefulManualResultsAvoidUnneededVariantsButCanExpandExplicitly() {
+        respond={ 200 to studioList().replace("{","{\"id\":99,") }
+        assertTrue(Lyrics.search("Song","Artist").canExpand)
+        assertEquals(1,requests.size)
+        requests.clear()
+        assertTrue(!Lyrics.search("Song","Artist",expand=true).canExpand)
+        assertTrue(requests.size > 1)
+    }
+
+    @Test fun expiredProviderCooldownActuallyRetriesAndCanFindLyrics() {
+        var now=1000L
+        Lyrics.requestGate=LyricsRequestGate(minimumGapMs=0,clock={ now })
+        retryAfter="600"
+        respond={ 429 to "" }
+        assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Song","Artist").failureStatus)
+        assertEquals(600L,Lyrics.retryAfterSeconds())
+        Lyrics.clearCache()
+        assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Song","Artist").failureStatus)
+        assertEquals(1,requests.size)
+        now += 600_000
+        respond={ 200 to studioList().replace("{","{\"id\":99,") }
+        assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+        assertEquals(2,requests.size)
+        assertEquals(0L,Lyrics.retryAfterSeconds())
+    }
+
+    @Test fun cachedLyricsRemainUsableWhileAnotherTrackIsLimited() {
+        val dir=java.nio.file.Files.createTempDirectory("lyrics-cached-limit").toFile()
+        try {
+            Lyrics.responseCache=LyricsResponseCache(dir)
+            respond={ 200 to studioList().replace("{","{\"id\":99,") }
+            assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+            respond={ 429 to "" }
+            assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Other","Artist").failureStatus)
+            assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+            assertEquals(2,requests.size)
+        } finally { Lyrics.responseCache=null; dir.deleteRecursively() }
+    }
 
     @Test
     fun tidyFallbackNeverBuildsSecondPairForVersionedTitle() {
@@ -269,7 +323,7 @@ class LyricsFetchTest {
     @Test fun manualSearchReportsPartialFailureAndDisablesMalformedTimedText() {
         respond={ path -> if (path.contains("track_name=")) 200 to
             """[{"id":13,"trackName":"Song","artistName":"Artist","duration":200,"syncedLyrics":"[00:90.00]bad"},{"id":14,"trackName":"Song","artistName":"Artist","duration":200,"syncedLyrics":"[00:01.00]fixture"}]""" else 503 to "" }
-        val results=Lyrics.search("Song","Artist")
+        val results=Lyrics.search("Song","Artist",expand=true)
         assertTrue(results.incomplete)
         assertTrue(!results.choices.first().hasSyncedLyrics)
         assertTrue(results.choices.last().hasSyncedLyrics)

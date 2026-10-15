@@ -563,10 +563,13 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     Triple(outputName,old.associateWith(editor::captureForRefetch),media?.durationMs?.takeIf { it > 0 }?.let { (it+500)/1000 } ?: job.durationSeconds)
    }
    _notice.value="Mencari lirik di penyedia lirik…"
-   Lyrics.clearCache() // Explicit refresh bypasses provider response cache, never a provider cooldown.
+   Lyrics.initialize(java.io.File(getApplication<Application>().cacheDir,"lyrics-responses"),
+    java.io.File(getApplication<Application>().noBackupFilesDir,"lyrics-cooldown.json"))
    val query=PublishedLyricIdentity.fromName(job,snapshot.first)
-   val resolved=Lyrics.resolveIdentity(query,snapshot.third)
-   val outcome=Lyrics.fetch(resolved,snapshot.third)
+   val outcome=runInterruptible(Dispatchers.IO) {
+    val resolved=Lyrics.resolveIdentity(query,snapshot.third,refreshMissing=true)
+    Lyrics.fetch(resolved,snapshot.third,refreshMissing=true)
+   }
    var saveError: String? = null
    val status = MediaFileOperations.mutex.withLock {
     val current = dao.get(id) ?: error("Entri telah dihapus; lirik tidak diubah.")

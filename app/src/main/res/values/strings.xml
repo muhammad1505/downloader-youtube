@@ -1,6 +1,12 @@
 <resources>
     <string name="storage_clear_description">Seluruh file dan subfolder di %1$s akan dihapus permanen. Folder utama dan riwayat unduhan tetap tersimpan. Selesaikan atau batalkan unduhan yang berjalan/dijeda terlebih dahulu. Izin yang sudah tersedia digunakan langsung; pemilih folder hanya dibuka jika akses hapus belum tersedia.</string>
     <string name="app_name">TubeFlow</string>
+    <plurals name="lyrics_retry_after">
+        <item quantity="one">LRCLIB membatasi permintaan. Coba lagi dalam %1$d detik. Lirik yang sudah tersimpan tetap tersedia.</item>
+        <item quantity="other">LRCLIB membatasi permintaan. Coba lagi dalam %1$d detik. Lirik yang sudah tersimpan tetap tersedia.</item>
+    </plurals>
+    <string name="lyrics_search_more">Cari lebih banyak hasil</string>
+    <string name="lyrics_retry_ready">Waktu tunggu telah lewat. Coba pencarian lagi.</string>
     <plurals name="storage_partial_sizes">
         <item quantity="one">Ukuran sebagian: %1$d file di Koleksi belum memiliki informasi ukuran.</item>
         <item quantity="other">Ukuran sebagian: %1$d file di Koleksi belum memiliki informasi ukuran.</item>

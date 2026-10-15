@@ -141,7 +141,7 @@ object LyricMatch {
 
 /**
  * Pencari lirik tersinkron dari LRCLIB (terbuka, tanpa kunci API).
- * [fetch] tidak pernah melempar: kegagalan jaringan dilaporkan sebagai [LyricStatus.NETWORK]
+ * [fetch] meneruskan pembatalan; kegagalan jaringan dilaporkan sebagai [LyricStatus.NETWORK]
  * agar pengguna bisa membedakan "tidak ada" dengan "gagal" (BUG-014).
  */
 object Lyrics {
@@ -151,16 +151,18 @@ object Lyrics {
         fun automaticMatch(query: LyricMatch.Query): Boolean = LyricMatch.acceptsTimedLyrics(query,
             LyricMatch.Candidate(title,artist,durationSeconds,syncedLyrics=text))
     }
-    data class Search(val choices: List<Choice>, val incomplete: Boolean = false, val failureStatus: String? = null)
+    data class Search(val choices: List<Choice>, val incomplete: Boolean = false, val failureStatus: String? = null,
+                      val canExpand: Boolean = false)
 
     /** Explicit search exposes alternatives without weakening automatic download matching. */
-    fun search(title: String, artist: String): Search {
+    fun search(title: String, artist: String, expand: Boolean = false): Search {
         require(title.isNotBlank() && title.length <= 200 && artist.length <= 200) { "Judul wajib diisi, maksimal 200 karakter." }
         val paths = searchPaths(title, artist)
         val found=linkedMapOf<Long,Choice>()
         var failure: String? = null
+        var canExpand = false
         for (path in paths) {
-            when (val response=get(path)) {
+            when (val response=get(path, refreshMissing=true)) {
                 is Res.Body -> {
                     val records=runCatching { org.json.JSONArray(response.text) }.getOrNull()
                     if (records == null) { failure=LyricStatus.INVALID_RESPONSE; continue }
@@ -180,8 +182,13 @@ object Lyrics {
                 is Res.Fail -> { failure=response.status; if (response.status == LyricStatus.RATE_LIMIT) break }
                 else -> Unit
             }
+            // Offer further variants on demand instead of spending requests after useful results.
+            if (!expand && found.values.any { it.hasSyncedLyrics }) {
+                canExpand = path != paths.last()
+                break
+            }
         }
-        return Search(found.values.take(50),failure != null,failure)
+        return Search(found.values.take(50),failure != null,failure,canExpand)
     }
 
     fun selectedText(choice: Choice, durationMs: Long?): String {
@@ -199,7 +206,7 @@ object Lyrics {
      * atau judul polos, pada durasi video [durationSeconds].
      */
     /** Resolve ambiguous order using provider records, never the position of a name alone. */
-    fun resolveIdentity(identity: SongIdentity, durationSeconds: Long): SongIdentity {
+    fun resolveIdentity(identity: SongIdentity, durationSeconds: Long, refreshMissing: Boolean = false): SongIdentity {
         if (identity.artist != null || durationSeconds <= 0) return identity
         val hypotheses = linkedSetOf(identity)
         if (identity.remixer.isBlank()) {
@@ -213,7 +220,9 @@ object Lyrics {
         for (hypothesis in hypotheses) {
             val query = LyricMatch.Query(hypothesis.lyricTitle, hypothesis.artist.orEmpty(), durationSeconds)
             val path = "/api/search?track_name=${enc(hypothesis.title)}" + hypothesis.artist?.let { "&artist_name=${enc(it)}" }.orEmpty()
-            val response = get(path) as? Res.Body ?: continue
+            val response = get(path, refreshMissing)
+            if (response is Res.Fail && response.status == LyricStatus.RATE_LIMIT) break
+            if (response !is Res.Body) continue
             val array = runCatching { org.json.JSONArray(response.text) }.getOrNull() ?: continue
             for (index in 0 until array.length()) {
                 val record = array.optJSONObject(index) ?: continue
@@ -230,7 +239,7 @@ object Lyrics {
     /** Unstructured legacy input carries no evidence of an artist; never split merely on a dash. */
     fun fetch(title: String, durationSeconds: Long): LyricOutcome = fetch(TitleSplit.identify(title), durationSeconds)
 
-    fun fetch(identity: SongIdentity, durationSeconds: Long): LyricOutcome {
+    fun fetch(identity: SongIdentity, durationSeconds: Long, refreshMissing: Boolean = false): LyricOutcome {
         val validation = LyricMatch.Query(identity.lyricTitle, identity.artist.orEmpty(), durationSeconds)
         if (validation.title.isBlank()) return LyricOutcome(LyricStatus.NOT_FOUND)
         val paths = linkedSetOf<String>()
@@ -248,7 +257,7 @@ object Lyrics {
         var instrumental = false
         val acceptedCredits = mutableSetOf<String>()
         for (path in paths) {
-            val response = get(path)
+            val response = get(path, refreshMissing)
             when (response) {
                 is Res.Fail -> {
                     failure = response.status
@@ -305,9 +314,11 @@ object Lyrics {
         val lead = TitleSplit.primaryArtist(credit)
         fun field(track: String, who: String) = "/api/search?track_name=${enc(track)}" +
             who.takeIf { it.isNotBlank() }?.let { "&artist_name=${enc(it)}" }.orEmpty()
-        return linkedSetOf(field(raw,credit),
+        // Search the normalized song/lead credit first; keep the original recording for validation.
+        // A display label such as "SATRU 2 | Live" is not necessarily the provider's track name.
+        return linkedSetOf(field(simple,lead), field(raw,credit),
             "/api/search?q=${enc(listOf(raw,credit).filter { it.isNotBlank() }.joinToString(" "))}",
-            field(simple,lead), field(simple, "")).take(4)
+            field(simple, "")).take(4)
     }
 
     private fun candidateOf(record: org.json.JSONObject) = LyricMatch.Candidate(
@@ -349,10 +360,17 @@ object Lyrics {
      * (bukan jaringan); status lain (401/403/408/429/5xx/exception) = gagal sementara, bisa dicoba lagi.
      */
     @Volatile internal var responseCache: LyricsResponseCache? = null
+    @Volatile internal var requestGate = LyricsRequestGate()
+    @Synchronized fun initialize(cacheDirectory: java.io.File, cooldownFile: java.io.File) {
+        requestGate.attach(cooldownFile)
+        if (responseCache == null) responseCache = LyricsResponseCache(cacheDirectory)
+    }
+    fun retryAfterSeconds(): Long = requestGate.remainingSeconds()
     fun clearCache() { responseCache?.clear() }
-    private fun get(path: String): Res {
+    private fun get(path: String, refreshMissing: Boolean = false): Res {
+        if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
         val cache = responseCache ?: return networkGet(path)
-        val cached = cache.request("$baseUrl$path") {
+        val cached = cache.request("$baseUrl$path", refreshMissing) {
             when (val result = networkGet(path)) {
                 is Res.Body -> LyricsResponseCache.Response(200, result.text)
                 Res.NotFound -> LyricsResponseCache.Response(404, "")
@@ -362,28 +380,25 @@ object Lyrics {
         }
         return when (cached.code) { 200 -> Res.Body(cached.text); 404 -> Res.NotFound; 400 -> Res.Rejected; 429 -> Res.Fail(LyricStatus.RATE_LIMIT); 502 -> Res.Fail(LyricStatus.INVALID_RESPONSE); 503 -> Res.Fail(LyricStatus.SERVICE); else -> Res.Fail(LyricStatus.NETWORK) }
     }
-    private val limitedUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private fun networkGet(path: String): Res {
-        if ((limitedUntil[baseUrl] ?: 0L) > System.currentTimeMillis()) return Res.Fail(LyricStatus.RATE_LIMIT)
-        return try {
+        return try { requestGate.request {
         val connection = java.net.URL("$baseUrl$path").openConnection() as java.net.HttpURLConnection
         connection.connectTimeout = 8000
         connection.readTimeout = 8000
-        connection.setRequestProperty("User-Agent", "TubeFlow/1.1.12 (https://github.com/muhammad1505/downloader-youtube)")
+        connection.setRequestProperty("User-Agent", "TubeFlow/1.1.13 (https://github.com/muhammad1505/downloader-youtube)")
         try {
             when (val code = connection.responseCode) {
                 200 -> Res.Body(connection.inputStream.use { input ->
                     val buffer = ByteArray(8192); val out = java.io.ByteArrayOutputStream()
                     while (true) { val n = input.read(buffer); if (n < 0) break; require(out.size() + n <= 1024 * 1024); out.write(buffer, 0, n) }
                     out.toString("UTF-8")
-                })
-                404 -> Res.NotFound
+                }).also { requestGate.accepted() }
+                404 -> Res.NotFound.also { requestGate.accepted() }
                 // 400/422/451 = jawaban tegas provider atas query itu sendiri → bukan jaringan.
                 // 401/403/408/429/dst tetap gagal sementara — salah melabelinya "tidak ada" menyesatkan.
                 400, 422, 451 -> Res.Rejected
                 429 -> {
-                    val seconds = connection.getHeaderField("Retry-After")?.toLongOrNull()?.coerceIn(1,300) ?: 10L
-                    limitedUntil[baseUrl] = System.currentTimeMillis() + seconds * 1000
+                    requestGate.limited(connection.getHeaderField("Retry-After"), connection.getHeaderField("Date"))
                     Res.Fail(LyricStatus.RATE_LIMIT)
                 }
                 in 500..599, 401, 403 -> Res.Fail(LyricStatus.SERVICE)
@@ -391,8 +406,9 @@ object Lyrics {
             }
         } finally {
             connection.disconnect()
-        }
+        } } ?: Res.Fail(LyricStatus.RATE_LIMIT)
     } catch (cancelled: java.util.concurrent.CancellationException) { throw cancelled }
+      catch (_: InterruptedException) { Thread.currentThread().interrupt(); throw java.util.concurrent.CancellationException() }
       catch (_: IllegalArgumentException) { Res.Fail(LyricStatus.INVALID_RESPONSE) }
       catch (_: Exception) { Res.Fail(LyricStatus.NETWORK) }
     }

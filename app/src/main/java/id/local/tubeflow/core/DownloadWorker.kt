@@ -125,7 +125,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     sourceTrackAvailable = metadata.track.isNotBlank()
     if (job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) {
      val initial = TitleSplit.identify(metadata.title, metadata.uploader, metadata.artist, metadata.track, metadata.creator)
-     val resolved = Lyrics.resolveIdentity(initial, metadata.durationSeconds)
+     val resolved = runInterruptible(Dispatchers.IO) { Lyrics.resolveIdentity(initial, metadata.durationSeconds) }
      if (resolved.evidence == "provider_identity") metadata = metadata.copy(artist=resolved.artist.orEmpty(), track=resolved.title, artistEvidence=resolved.evidence)
     }
     val updated = job.withMetadata(metadata)
@@ -172,7 +172,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    // Hasil terstruktur (tersimpan/tidak ditemukan/instrumental/jaringan) dicatat ke riwayat (BUG-014).
    val lyricOutcome = if (job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty()) {
     publish(DownloadProgress(DownloadPhase.LYRICS), force = true)
-    Lyrics.fetch(job.songIdentity(), job.durationSeconds)
+    runInterruptible(Dispatchers.IO) { Lyrics.fetch(job.songIdentity(), job.durationSeconds) }
    } else null
    // Cache sampul untuk kartu Antrean/Riwayat (P2): salin thumbnail hasil unduhan ke covers/<id>.jpg —
    // jalur internal yang bertahan setelah direktori kerja job dibersihkan. Gagal menyalin tidak menggagalkan job.

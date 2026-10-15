@@ -579,6 +579,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Bukti:** LRCLIB nyata mengembalikan429 saat probe; sebelumnya semua kegagalan disebut periksa jaringan. Query otomatis dapat jauh lebih banyak dan berbeda dari manual. Timestamp kosong dibuang pada download otomatis.
 - **Solusi:** satu discovery terbatas dan validasi LRC bersama, status429/provider/respons invalid/jaringan terpisah, cooldown Retry-After dan penghentian batch429. Blank timestamp dipertahankan untuk mengosongkan sorotan saat hening. Identitas/versi/durasi±2detik tetap wajib; hasil manual dari rekaman berbeda memerlukan pilihan sadar pengguna.
 - **Verifikasi:** fixture HTTP mencakup respons provider, fallback bersama, bounds, offset, blank lines, koneksi putus dan rate limit. Sinkronisasi auditori bukan konsekuensi otomatis kelulusan fixture. [Laporan](METADATA_LYRICS_LIBRARY_1_1_12.md).
+- **Kelanjutan1.1.13:** pengelola masih menemui pembatasan. Audit menemukan request tanpa pacing, invalidasi cache global pada refetch, dan Retry-After terpotong/tanpa persistensi. Gerbang bersama, cache terarah, perluasan manual atas permintaan, countdown dan pembatalan interruptible diterapkan;46tes lirik awal lulus. Build lengkap/perangkat belum selesai pada checkpoint ini. [Rincian dan hasil final](LYRICS_RATE_LIMIT_1_1_13.md).
 
 ## BUG-053 — P2: File terhapus masih menjadi kartu peringatan Koleksi
 

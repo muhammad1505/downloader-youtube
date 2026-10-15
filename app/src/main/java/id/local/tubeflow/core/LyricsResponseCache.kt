@@ -7,15 +7,17 @@ import java.security.MessageDigest
 /** Bounded provider responses. Network/rate-limit/invalid responses are never negative cached. */
 class LyricsResponseCache(private val directory: File, private val clock: () -> Long = System::currentTimeMillis) {
     data class Response(val code: Int, val text: String)
-    @Synchronized fun request(key: String, load: () -> Response): Response {
+    @Synchronized fun request(key: String, refreshMissing: Boolean = false, load: () -> Response): Response {
         directory.mkdirs()
         val name = MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString("") { "%02x".format(it) }
         val file = File(directory, "$name.json")
         runCatching {
             val json = JSONObject(file.readText())
             val age = clock() - json.getLong("at")
-            val ttl = if (json.getInt("code") == 404) 3_600_000 else 86_400_000
-            if (age in 0 until ttl) return Response(json.getInt("code"), json.getString("text"))
+            val cached = Response(json.getInt("code"), json.getString("text"))
+            val missing = cached.code == 404 || cached.code == 200 && cached.text.trim() == "[]"
+            val ttl = if (missing) 3_600_000 else 86_400_000
+            if (age in 0 until ttl && !(refreshMissing && missing)) return cached
         }
         val result = load()
         val valid = result.code == 404 || result.code == 200 && runCatching {
