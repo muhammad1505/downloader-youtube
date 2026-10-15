@@ -385,7 +385,7 @@ object Lyrics {
         val connection = java.net.URL("$baseUrl$path").openConnection() as java.net.HttpURLConnection
         connection.connectTimeout = 8000
         connection.readTimeout = 8000
-        connection.setRequestProperty("User-Agent", "TubeFlow/1.1.13 (https://github.com/muhammad1505/downloader-youtube)")
+        connection.setRequestProperty("User-Agent", "TubeFlow/1.1.14 (https://github.com/muhammad1505/downloader-youtube)")
         try {
             when (val code = connection.responseCode) {
                 200 -> Res.Body(connection.inputStream.use { input ->

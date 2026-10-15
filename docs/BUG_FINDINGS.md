@@ -78,6 +78,7 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.13: query bersih didahulukan, pacing/cache/backoff/countdown;271Kotlin/84Python; HP17→24hasil; auditori/otomatis/429ulang tetap terbatas |
 | BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus | Probe kehadiran dan observer/lifecycle, empty scan; host lulus,1.1.12 terpasang; tes UI tertahan Norton |
 | BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
+| BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | Log Facebook/permanen dan probeHP1.1.13 membuktikan; pemulihan berbasis aktivitas audio + otoritas jeda manual diterapkan;279Kotlin/84Python lulus; APK/HP final menunggu |
 
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
@@ -592,3 +593,10 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 
 - **Reproduksi:**1.1.11, MP3128/lirik/sampul, `https://youtu.be/3J1Opi7MVHw` → HTTP403 pada transfer media sebelum hasil dipublikasikan. Host dengan engine yang sama berhasil mengambil10KB format251.
 - **Status:** terbuka; belum membuktikan akar perbedaan IP/format/cache/provider. Jangan menyamakan dengan429LRCLIB atau menyebut download link ini lulus hanya karena inspect metadata berhasil.
+
+## BUG-055 — P2: Musik tidak lanjut setelah video aplikasi lain dijeda
+
+- **Bukti:** log HP1.1.13 menunjukkan Facebook meminta fokus permanen, TubeFlow abandon dan tetap paused setelah Facebook abandon. Probe fokus/media senyap6detik mereproduksi PLAYING→PAUSED tanpa lanjut pada versi lama.
+- **Akar:** loss permanen diperlakukan seperti jeda manual; tidak ada callback GAIN kembali. Loss sementara berulang juga menimpa penanda lanjut menjadi false. Pause MediaSession ketika sudah paused diabaikan, sehingga perlu diperbaiki agar dapat membatalkan pemulihan baru.
+- **Solusi1.1.14:** PlaybackInterruption mempertahankan niat track aktif; transient menunggu GAIN, permanent mengamati audio aktif→sunyi dan mencoba fokus sekali setelah debounce/preflight. Jeda manual/stop/ganti track/headset/error membatalkan. Tanpa izin baru atau engine tambahan.
+- **Checkpoint:**279Kotlin/84Python lulus; minify/build dan APK final di HP masih berjalan. [Akar, protokol dan hasil final](AUDIO_FOCUS_1_1_14.md).

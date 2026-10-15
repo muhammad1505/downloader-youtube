@@ -10,6 +10,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.HandlerThread
@@ -29,7 +30,7 @@ import kotlinx.coroutines.sync.withLock
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicLong
 
-/** One local audio engine, confined to one Looper. No background-playback service is advertised. */
+/** One local audio engine, confined to one Looper and shared with PlaybackService. */
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         const val RESTART_MS = 3_000L
@@ -91,7 +92,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var engineToken = -1L
     private var prepared = false
     private var autoplay = false
-    private var transientResume = false
+    private val interruption = PlaybackInterruption()
+    private var interruptionReadyAt = 0L
+    private val observePlayback = Runnable { observeInterruptedPlayback() }
+    private val resumeAfterQuiet = Runnable {
+        if (engineToken == token.get() && prepared && !_state.value.playing &&
+            interruption.takeAfterQuiet(otherAudioActive(), manager.mode == AudioManager.MODE_NORMAL)) {
+            // Facebook can request permanent focus, which removes us from Android's focus stack.
+            // Reclaim once after observed audio ends; never poll focus or use the headset retry loop.
+            if (claimFocus(engineToken)) resumeWithoutFocus()
+        }
+    }
+    private val playbackActivity = object : AudioManager.AudioPlaybackCallback() {
+        override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>?) {
+            // Read fresh state instead of trusting a queued snapshot from before our own pause.
+            observeInterruptedPlayback()
+        }
+    }
     private var request: AudioFocusRequest? = null
     private var focusSequence = 0L
     private val noisy = object : BroadcastReceiver() {
@@ -178,6 +195,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             addAction(ACTION_BT_HEADSET)
         }, ContextCompat.RECEIVER_EXPORTED)
         manager.registerAudioDeviceCallback(devices, handler)
+        manager.registerAudioPlaybackCallback(playbackActivity, handler)
         // Satu titik sinkron service, termasuk seek ketika jeda dan progres per detik.
         viewModelScope.launch {
             var previous = _state.value
@@ -381,13 +399,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         .setAudioAttributes(attributes).setWillPauseWhenDucked(true).setOnAudioFocusChangeListener({ change ->
             if (token.get() != id || sequence != focusSequence) return@setOnAudioFocusChangeListener
             when (change) {
-                AudioManager.AUDIOFOCUS_GAIN -> if (transientResume) { transientResume=false; resumeWithoutFocus() }
-                AudioManager.AUDIOFOCUS_LOSS -> pauseInternal(true)
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                    transientResume = _state.value.playing; pauseInternal(false)
+                AudioManager.AUDIOFOCUS_GAIN -> if (interruption.takeFocusGain()) { cancelInterruption(); resumeWithoutFocus() }
+                AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    val permanent = change == AudioManager.AUDIOFOCUS_LOSS
+                    interruption.lost(permanent, _state.value.playing)
+                    pauseInternal(false)
+                    if (permanent) abandon()
+                    // Give our own AudioTrack stop event time to settle before observing the blocker.
+                    interruptionReadyAt = android.os.SystemClock.elapsedRealtime() + 250
+                    handler.removeCallbacks(observePlayback)
+                    handler.removeCallbacks(resumeAfterQuiet)
+                    handler.postDelayed(observePlayback, 250)
                 }
             }
         }, handler).build()
+    private fun otherAudioActive(): Boolean = try {
+        manager.isMusicActive || manager.activePlaybackConfigurations.isNotEmpty()
+    } catch (_: RuntimeException) { true } // Unknown playback state must not steal focus.
+    private fun observeInterruptedPlayback() {
+        handler.removeCallbacks(resumeAfterQuiet)
+        if (!interruption.needsPlaybackEvents || !prepared || engineToken != token.get() || _state.value.playing) return
+        val settling = interruptionReadyAt - android.os.SystemClock.elapsedRealtime()
+        if (settling > 0) {
+            handler.removeCallbacks(observePlayback)
+            handler.postDelayed(observePlayback, settling)
+            return
+        }
+        if (interruption.playbackChanged(otherAudioActive())) handler.postDelayed(resumeAfterQuiet, 750)
+    }
+    private fun cancelInterruption() {
+        interruption.cancel()
+        handler.removeCallbacks(observePlayback)
+        handler.removeCallbacks(resumeAfterQuiet)
+    }
     private fun claimFocus(id: Long): Boolean {
         val sequence=++focusSequence
         val focus=focusRequest(id,sequence)
@@ -397,6 +441,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     private fun start(id: Long) {
         if (!prepared || token.get() != id) return
+        cancelInterruption()
         if (claimFocus(id)) { resumeWithoutFocus(); return }
         // Auto-play setelah headset tersambung (proses baru dibangun dari latar) mudah kehilangan
         // permintaan fokus pertama saat aplikasi lain baru melepaskannya: ulangi sekali sebelum
@@ -411,10 +456,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun resumeWithoutFocus() {
         try {
             val current = media ?: return
-            if (!prepared) return
+            if (!prepared || engineToken != token.get()) return
             if (_state.value.durationMs > 0 && current.currentPosition.toLong() >= _state.value.durationMs) current.seekTo(0)
             runCatching { current.playbackParams = current.playbackParams.setSpeed(speed) }
-            current.start(); updateEngine { it.copy(playing=true, error=null) }
+            current.start(); autoplay=true; updateEngine { it.copy(playing=true, error=null) }
             handler.removeCallbacks(tick); handler.post(tick)
         } catch (_: IllegalStateException) { fail("Audio tidak dapat dilanjutkan. Coba putar ulang.") }
     }
@@ -434,7 +479,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         autoplay=false
         if (prepared) try { media?.pause() } catch (_: IllegalStateException) { }
         handler.removeCallbacks(tick); updateEngine { it.copy(playing=false) }
-        if (relinquish) { transientResume=false; abandon() }
+        if (relinquish) { cancelInterruption(); abandon() }
     }
     fun seek(positionMs: Long) { val id=token.get(); handler.post {
         if (token.get() != id || !prepared) return@post
@@ -448,7 +493,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         token.incrementAndGet(); _state.value=State(); handler.post { queue=null; equalizer.release(); release() }
     }
     private fun abandon() { focusSequence++; request?.let(manager::abandonAudioFocusRequest); request=null }
-    private fun release() { handler.removeCallbacks(tick); abandon(); prepared=false; autoplay=false; transientResume=false; equalizer.release(); media?.release(); media=null }
+    private fun release() { handler.removeCallbacks(tick); cancelInterruption(); abandon(); prepared=false; autoplay=false; equalizer.release(); media?.release(); media=null }
     private fun fail(message: String) { release(); updateEngine { it.copy(loading=false, playing=false, error=message) } }
     override fun onCleared() {
         token.incrementAndGet()
@@ -456,6 +501,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         getApplication<Application>().unregisterReceiver(noisy)
         runCatching { getApplication<Application>().unregisterReceiver(devicePlug) }
         manager.unregisterAudioDeviceCallback(devices)
+        manager.unregisterAudioPlaybackCallback(playbackActivity)
         PlaybackService.sync(getApplication<Application>(), State())
         handler.post { release(); thread.quitSafely() }
     }

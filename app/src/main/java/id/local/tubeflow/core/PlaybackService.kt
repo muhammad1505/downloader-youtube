@@ -179,6 +179,8 @@ class PlaybackService : Service() {
 
     private fun command(action: String, wantPlaying: Boolean? = null) {
         val player = PlayerViewModel.active ?: return
+        // An explicit Pause while already interrupted must revoke pending automatic resume too.
+        if (wantPlaying == false) { player.pause(); return }
         if (wantPlaying != null && player.state.value.playing == wantPlaying) return
         handle(action)
     }

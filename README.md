@@ -29,7 +29,7 @@ Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-
 - Ringkasan: jumlah/ukuran media tersedia, status metadata/artwork/lirik, penyimpanan internal, aktivitas harian/mingguan/platform sejak upgrade. Riwayat yang dihapus dan statistik lama tidak ditebak.
 
 Detail implementasi, migrasi, hasil tes dan batas cakupan: [laporan Smart Media](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
-Perbaikan terbaru: [pacing, cache dan waktu tunggu LRCLIB1.1.13](docs/LYRICS_RATE_LIMIT_1_1_13.md); [nama, metadata, lirik dan pemulihan Koleksi1.1.12](docs/METADATA_LYRICS_LIBRARY_1_1_12.md). Pemutar: [pencarian antrean dan auto-play1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
+Perbaikan terbaru: [lanjut musik setelah interupsi audio1.1.14](docs/AUDIO_FOCUS_1_1_14.md); [pacing, cache dan waktu tunggu LRCLIB1.1.13](docs/LYRICS_RATE_LIMIT_1_1_13.md); [nama, metadata, lirik dan pemulihan Koleksi1.1.12](docs/METADATA_LYRICS_LIBRARY_1_1_12.md). Pemutar: [pencarian antrean dan auto-play1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
 
 Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio Auto memakai MP3 agar bitrate dapat diterapkan. Bitrate lebih tinggi dan format lossless tidak meningkatkan kualitas sumber. Resolusi manual membatasi kualitas maksimum, bukan menjamin sumber tersedia pada resolusi itu.
 

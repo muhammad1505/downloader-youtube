@@ -17,6 +17,10 @@ Katalog media dan event aktivitas berada pada database Room yang sama di perangk
 
 Cache respons LRCLIB dibatasi10MiB/200entry, cover32MiB dan frame/artwork katalog24MiB. Koreksi LRC menyimpan baseline/jurnal privat (batas32MiB) untuk reset/rollback; audio dan timestamp rekaman lain tidak diubah. Playback audio dapat menggunakan pemutar lokal TubeFlow atau aplikasi pemutar perangkat. Video tetap memakai pemutar perangkat.
 
+## Pemutaran dan interupsi audio
+
+Pemutar memakai audio focus dan notifikasi perubahan aktivitas audio Android untuk menjeda musik ketika audio lain dimulai dan dapat melanjutkannya setelah interupsi selesai. Pemeriksaan hanya memakai status aktif/tidak aktif serta mode audio; tidak merekam suara atau membaca layar/isi aplikasi lain. Jeda manual, menutup pemutar atau melepas headset membatalkan niat lanjut. Niat ini hanya tersimpan di RAM untuk track aktif dan tidak dipulihkan setelah proses mati.
+
 ## Karaoke opsional
 
 Saat pengguna meminta pemisahan vokal, model UVR sekitar67MB diunduh dari GitHub Releases (termasuk CDN pengiriman GitHub) dan diverifikasi SHA256. Penyedia unduhan melihat IP/request model; rekaman, judul lagu dan lirik tidak diunggah untuk proses karaoke. Model tersimpan privat dan tidak ada server TubeFlow. ONNX Runtime bekerja di HP, terpisah dari downloader biasa.
