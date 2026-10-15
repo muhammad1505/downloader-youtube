@@ -13,6 +13,7 @@ import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
@@ -127,7 +128,7 @@ class MediaRepository(private val context: Context) {
             val uri = access.toUri()
             var name = ""; var size: Long? = null; var modified: Long? = null
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
-                require(c.moveToFirst()) { "File tidak tersedia." }
+                if (!c.moveToFirst()) throw FileNotFoundException("File tidak tersedia.")
                 name = c.getString(0).orEmpty(); if (!c.isNull(1)) size = c.getLong(1).takeIf { it >= 0 }
             } ?: throw FileNotFoundException()
             resolver.openFileDescriptor(uri, "r")?.use { } ?: throw FileNotFoundException()
@@ -221,6 +222,11 @@ class MediaRepository(private val context: Context) {
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             if (old != null) {
+                if (MediaAvailability.probe(context,old) == MediaAvailability.State.MISSING) {
+                    dao.remove(old.uri)
+                    dao.event(MediaEvent(jobId=old.jobId.orEmpty(),action="UNAVAILABLE",kind=old.kind,platformId=old.platformId,at=System.currentTimeMillis()))
+                    return
+                }
                 val availability = if (error is SecurityException) "ACCESS_DENIED" else "UNAVAILABLE"
                 dao.put(old.copy(availability = availability, checkedAt = System.currentTimeMillis()))
                 if (old.availability != availability) dao.event(MediaEvent(jobId = old.jobId.orEmpty(), action = availability, kind = old.kind, platformId = old.platformId, at = System.currentTimeMillis()))
@@ -269,7 +275,7 @@ class MediaRepository(private val context: Context) {
             val rootLabel = if (SettingsStore.storageTree != null) "Folder pilihan" else "Download/${SettingsStore.storageFolder}"
             try { walk(DocumentsContract.getTreeDocumentId(root), rootLabel, 0) } catch (error: Exception) { treeError = error }
         }
-        if (rows.isEmpty()) throw (treeError ?: storeError ?: FileNotFoundException("Tidak ada media terlihat."))
+        if (rows.isEmpty() && (treeError != null || storeError != null)) throw (treeError ?: storeError!!)
         val jobs = database.downloads().observe().let { flow -> flow.first() }
         val jobsByUri = jobs.filter { it.state == JobState.COMPLETED && it.outputUri != null }.associateBy { canonical(it.outputUri!!) }
         val lyrics = rows.filter { it.second.endsWith(".lrc", true) }.associate { (uri, name, folder) -> (folder to name.substringBeforeLast('.')) to uri }
@@ -284,10 +290,22 @@ class MediaRepository(private val context: Context) {
         ScanSummary(checked, failed, rows.size)
     } }
 
+    /** Cheap presence checks; no metadata extraction/LRCLIB request for unchanged media. */
     suspend fun validateRecent(force: Boolean = false) = withContext(Dispatchers.IO) { operations.withLock {
         recoverRename()
-        dao.oldest(100).filter { force || it.checkedAt < System.currentTimeMillis() - 60 * 60 * 1000 }.forEach { item ->
-            runCatching { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder) }
+        for (item in dao.oldest(if (force) 4000 else 100)) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            when (MediaAvailability.probe(context,item)) {
+                MediaAvailability.State.MISSING -> {
+                    dao.remove(item.uri)
+                    dao.event(MediaEvent(jobId=item.jobId.orEmpty(),action="UNAVAILABLE",kind=item.kind,platformId=item.platformId,at=System.currentTimeMillis()))
+                }
+                MediaAvailability.State.DENIED -> if (item.availability != "ACCESS_DENIED")
+                    dao.put(item.copy(availability="ACCESS_DENIED",checkedAt=System.currentTimeMillis()))
+                MediaAvailability.State.PRESENT -> if (item.availability != "AVAILABLE")
+                    index(item.location,item.jobId?.let { database.downloads().get(it) },item.folder)
+                MediaAvailability.State.UNKNOWN -> Unit // Failure to inspect is never proof of deletion.
+            }
         }
     } }
 

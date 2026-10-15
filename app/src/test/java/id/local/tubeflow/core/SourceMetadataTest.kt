@@ -140,4 +140,23 @@ class SourceMetadataTest {
         assertEquals("unknown",SourcePlatforms.fromUrl("https://youtube.com.evil.test/video").id)
         assertEquals("globe",SourcePlatforms.fromId("future_platform").icon)
     }
+
+    @Test fun structuredTrackDoesNotBlockMissingArtistCreditFromDescription() {
+        val meta=SourceMetadata.parse(JSONObject().put("title","Artist - Song").put("track","Song")
+            .put("description","Song: Song\nArtist: Artist"),"https://youtu.be/example")
+        assertEquals("Artist",meta.artist)
+        assertEquals("Song",meta.track)
+        assertEquals("source_description_credit",meta.artistEvidence)
+    }
+    @Test fun placeholderArtistAndCreditsAfterFiftyLinesCanStillResolve() {
+        val meta=SourceMetadata.parse(JSONObject().put("title","Artist - Song").put("artist","Unknown Artist")
+            .put("description","intro\n".repeat(60)+"Judul: Song\nArtis: Artist"),"https://youtu.be/example")
+        assertEquals("Artist",meta.artist)
+    }
+    @Test fun conflictingStructuredTrackDoesNotAcquireAnUnrelatedPerformer() {
+        val meta=SourceMetadata.parse(JSONObject().put("title","Artist - Song - Other").put("track","Other")
+            .put("description","Title: Song\nVoc: Artist"),"https://youtu.be/example")
+        assertEquals("",meta.artist)
+        assertEquals("Other",meta.track)
+    }
 }

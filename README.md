@@ -29,7 +29,7 @@ Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-
 - Ringkasan: jumlah/ukuran media tersedia, status metadata/artwork/lirik, penyimpanan internal, aktivitas harian/mingguan/platform sejak upgrade. Riwayat yang dihapus dan statistik lama tidak ditebak.
 
 Detail implementasi, migrasi, hasil tes dan batas cakupan: [laporan Smart Media](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
-Perubahan pemutar terbaru: [player, pencarian antrean dan auto-play 1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
+Perbaikan terbaru: [nama, metadata, lirik dan pemulihan Koleksi1.1.12](docs/METADATA_LYRICS_LIBRARY_1_1_12.md). Pemutar: [pencarian antrean dan auto-play1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
 
 Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio Auto memakai MP3 agar bitrate dapat diterapkan. Bitrate lebih tinggi dan format lossless tidak meningkatkan kualitas sumber. Resolusi manual membatasi kualitas maksimum, bukan menjamin sumber tersedia pada resolusi itu.
 
@@ -74,7 +74,7 @@ Hasil [audit ulang 9 Oktober 2026](docs/REVIEW_2026-10-09.md): build dan tes hos
 
 Usulan fitur dan optimasi berikutnya tersedia di [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md), termasuk peningkatan pencocokan lirik, cari ulang lirik, koreksi waktu, cache, progres, dan diagnostik.
 
-Validasi terbaru **1.1.5 (19)**: input koreksi lirik dalam detik, pencarian/pemilihan kandidat LRCLIB, pencarian setelah rename, navigasi Ringkasan–Download–Antrean–Koleksi, lirik rata tengah dan kontrol kanal L/R. **184 Kotlin/78 Python lulus; lint debug/release 0 masalah.** Signed APK×3/AAB dan audit paket lulus; ARM64 final terpasang di Realme Android 10 dengan hash cocok dan 61 file dipertahankan saat update. Room 9 dan kunci produksi tetap. Karaoke AI belum diimplementasikan. [Hasil dan batas pengujian](docs/MANUAL_LYRICS_1_1_5_2026-10-14.md).
+Validasi historis **1.1.5 (19)**: input koreksi lirik dalam detik, pencarian/pemilihan kandidat LRCLIB, pencarian setelah rename, navigasi Ringkasan–Download–Antrean–Koleksi, lirik rata tengah dan kontrol kanal L/R. **184 Kotlin/78 Python lulus; lint debug/release 0 masalah.** Signed APK×3/AAB dan audit paket lulus; ARM64 final terpasang di Realme Android 10 dengan hash cocok dan 61 file dipertahankan saat update. Room 9 dan kunci produksi tetap. Karaoke AI belum diimplementasikan. [Hasil dan batas pengujian](docs/MANUAL_LYRICS_1_1_5_2026-10-14.md).
 
 Validasi sebelumnya **13 Oktober 2026 — 1.1.2 (16), Room9**:149 tes Kotlin dan76 tes Python lulus, lint debug/release0masalah; signed APK×3/AAB, audit native/ZIP/alignment/signature dan bundletool lulus. Kredit judul/penyanyi eksplisit berlabel Title/Voc kini divalidasi; job playlist baru memakai folder artis/remixer teridentifikasi, dengan fallback aman. APK ARM64 final terpasang pada RealmeAndroid10 dan57file sebelum update tetap identik. Distribusi `app/build/outputs/distribution/1.1.2/`; [perubahan, hasil perangkat dan batas](docs/SOURCE_REVIEW_2026-10-13.md).
 

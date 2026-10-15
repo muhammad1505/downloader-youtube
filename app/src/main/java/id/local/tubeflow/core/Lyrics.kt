@@ -12,6 +12,9 @@ object LyricStatus {
     const val NO_MATCH = "tidak_cocok"
     const val INSTRUMENTAL = "instrumental"
     const val NETWORK = "jaringan"
+    const val RATE_LIMIT = "dibatasi_penyedia"
+    const val SERVICE = "gangguan_penyedia"
+    const val INVALID_RESPONSE = "respons_tidak_valid"
     const val SAVE_FAILED = "gagal_simpan"
 
     /** Label ramah pengguna untuk kartu riwayat dan notifikasi hasil. */
@@ -20,13 +23,16 @@ object LyricStatus {
         NOT_FOUND -> "Lirik tidak tersedia di penyedia lirik"
         NO_MATCH -> "Lirik belum cocok dengan versi audio"
         INSTRUMENTAL -> "Lagu instrumental — tanpa lirik"
-        NETWORK -> "Pencarian lirik gagal (periksa jaringan)"
+        NETWORK -> "Tidak dapat terhubung ke LRCLIB; coba lagi sebentar"
+        RATE_LIMIT -> "LRCLIB membatasi permintaan; tunggu sebelum mencoba lagi"
+        SERVICE -> "LRCLIB sedang bermasalah atau menolak akses; coba lagi nanti"
+        INVALID_RESPONSE -> "Respons LRCLIB tidak valid; coba lagi nanti"
         SAVE_FAILED -> "Lirik gagal disimpan"
         else -> status
     }
 
     /** Status yang boleh dicari ulang tanpa mengunduh audio lagi. */
-    fun retryable(status: String): Boolean = status in setOf(NOT_FOUND, NO_MATCH, NETWORK, SAVE_FAILED)
+    fun retryable(status: String): Boolean = status in setOf(NOT_FOUND, NO_MATCH, NETWORK, RATE_LIMIT, SERVICE, INVALID_RESPONSE, SAVE_FAILED)
 }
 
 /** Hasil terstruktur satu pencarian lirik (BUG-014): [text] hanya berisi bila status [LyricStatus.SAVED]. */
@@ -79,7 +85,7 @@ object LyricMatch {
     private fun tokens(value: String): Set<String> =
         norm(value).split(' ').filterTo(mutableSetOf()) { it.isNotEmpty() }
 
-    /** Dipakai juga oleh [Lyrics.tidy] untuk mempertahankan penanda versi (BUG-013/R3). */
+    /** Penanda versi dipertahankan saat validasi semua variasi query (BUG-013/R3). */
     internal fun versionSet(value: String): Set<String> =
         tokens(value).filter { it in versionWords }.map { when(it) { "rmx" -> "remix"; "slow" -> "slowed"; "acustik" -> "acoustic"; else -> it } }.toSet()
 
@@ -145,25 +151,19 @@ object Lyrics {
         fun automaticMatch(query: LyricMatch.Query): Boolean = LyricMatch.acceptsTimedLyrics(query,
             LyricMatch.Candidate(title,artist,durationSeconds,syncedLyrics=text))
     }
-    data class Search(val choices: List<Choice>, val incomplete: Boolean = false)
+    data class Search(val choices: List<Choice>, val incomplete: Boolean = false, val failureStatus: String? = null)
 
     /** Explicit search exposes alternatives without weakening automatic download matching. */
     fun search(title: String, artist: String): Search {
         require(title.isNotBlank() && title.length <= 200 && artist.length <= 200) { "Judul wajib diisi, maksimal 200 karakter." }
-        val paths=linkedSetOf("/api/search?track_name=${enc(title.trim())}" +
-            artist.trim().takeIf { it.isNotEmpty() }?.let { "&artist_name=${enc(it)}" }.orEmpty(),
-            "/api/search?q=${enc(listOf(title.trim(),artist.trim()).filter { it.isNotEmpty() }.joinToString(" "))}")
-        val simpleTitle=TitleSplit.identify(title,recognizeCollaboration=false).title
-        val lead=TitleSplit.primaryArtist(artist)
-        paths += "/api/search?track_name=${enc(simpleTitle)}" + lead.takeIf { it.isNotBlank() }?.let { "&artist_name=${enc(it)}" }.orEmpty()
+        val paths = searchPaths(title, artist)
         val found=linkedMapOf<Long,Choice>()
-        var failed=false
-        for ((index,path) in paths.withIndex()) {
-            if (index >= 2 && found.values.any { it.hasSyncedLyrics }) break
+        var failure: String? = null
+        for (path in paths) {
             when (val response=get(path)) {
                 is Res.Body -> {
                     val records=runCatching { org.json.JSONArray(response.text) }.getOrNull()
-                    if (records == null) { failed=true; continue }
+                    if (records == null) { failure=LyricStatus.INVALID_RESPONSE; continue }
                     for (i in 0 until minOf(records.length(),200)) {
                         val record=records.optJSONObject(i) ?: continue
                         val id=record.optLong("id",-1)
@@ -177,16 +177,17 @@ object Lyrics {
                         if (found.size >= 50) break
                     }
                 }
-                Res.Fail -> failed=true
+                is Res.Fail -> { failure=response.status; if (response.status == LyricStatus.RATE_LIMIT) break }
                 else -> Unit
             }
         }
-        return Search(found.values.take(50),failed)
+        return Search(found.values.take(50),failure != null,failure)
     }
 
     fun selectedText(choice: Choice, durationMs: Long?): String {
         val text=choice.text ?: error("Hasil ini tidak mempunyai lirik bertimestamp.")
         LrcTiming.shift(text,0,durationMs)
+        require(durationMs == null || LrcLines.parse(text).all { it.atMs <= durationMs + 2000 }) { "Offset lirik melewati akhir audio." }
         val tagged="[re:TubeFlow / LRCLIB #${choice.id}]\n$text"
         require(tagged.toByteArray().size <= 512*1024) { "LRC terlalu besar." }
         return tagged
@@ -230,162 +231,109 @@ object Lyrics {
     fun fetch(title: String, durationSeconds: Long): LyricOutcome = fetch(TitleSplit.identify(title), durationSeconds)
 
     fun fetch(identity: SongIdentity, durationSeconds: Long): LyricOutcome {
-        val rawTrack = identity.lyricTitle
-        val rawArtist = identity.artist.orEmpty()
-        // Lookup variations may omit version/artist terms; acceptance ALWAYS uses the full identity.
-        val validation = LyricMatch.Query(rawTrack, rawArtist, durationSeconds)
-        val pairs = linkedSetOf<Pair<String, String>>()
-        if (rawTrack.isNotBlank()) {
-            pairs += rawTrack to rawArtist
-            val lead = TitleSplit.primaryArtist(rawArtist)
-            if (lead.isNotBlank() && lead != rawArtist) pairs += rawTrack to lead
-            pairs += rawTrack to ""
-            pairs += tidy(rawTrack) to rawArtist
-            if (identity.title != rawTrack) {
-                pairs += identity.title to rawArtist
-                pairs += identity.title to ""
-            }
+        val validation = LyricMatch.Query(identity.lyricTitle, identity.artist.orEmpty(), durationSeconds)
+        if (validation.title.isBlank()) return LyricOutcome(LyricStatus.NOT_FOUND)
+        val paths = linkedSetOf<String>()
+        if (validation.artist.isNotBlank() && durationSeconds > 0) {
+            paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(validation.artist)}&duration=$durationSeconds"
+            val lead = TitleSplit.primaryArtist(validation.artist)
+            if (lead != validation.artist) paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(lead)}&duration=$durationSeconds"
         }
-        if (pairs.isEmpty()) return LyricOutcome(LyricStatus.NOT_FOUND)
-
-        var sawFailure = false
-        var sawUnmatchedLyrics = false
+        paths += searchPaths(validation.title, validation.artist)
+        var failure: String? = null
+        var unmatched = false
         var bestScore = 0.0
-        var bestDurationDifference = Long.MAX_VALUE
+        var bestDifference = Long.MAX_VALUE
         var bestText: String? = null
-
-        for ((track, artist) in pairs) {
-            val query = validation
-            val exact = buildString {
-                append("track_name=").append(enc(track))
-                if (artist.isNotBlank()) append("&artist_name=").append(enc(artist))
-                // LRCLIB mencocokkan durasi ±2 detik pada get — kirim bila durasi valid (BUG-013/R3).
-                if (durationSeconds > 0) append("&duration=").append(durationSeconds)
-            }
-            // 1) Endpoint exact: identitas cocok di database LRCLIB; instrumental berarti tanpa lirik.
-            when (val res = get("/api/get?$exact")) {
-                Res.Fail -> sawFailure = true
-                Res.Rejected -> Unit // provider menolak query (bukan jaringan) — lanjut ke pencarian
-                Res.NotFound -> Unit
+        var instrumental = false
+        val acceptedCredits = mutableSetOf<String>()
+        for (path in paths) {
+            val response = get(path)
+            when (response) {
+                is Res.Fail -> {
+                    failure = response.status
+                    if (response.status == LyricStatus.RATE_LIMIT) break
+                }
                 is Res.Body -> {
-                    val record = runCatching { org.json.JSONObject(res.text) }.getOrNull()
-                    if (record != null) {
+                    val records = runCatching {
+                        if (path.startsWith("/api/get?")) listOf(org.json.JSONObject(response.text))
+                        else org.json.JSONArray(response.text).let { array ->
+                            (0 until minOf(array.length(), 200)).mapNotNull(array::optJSONObject)
+                        }
+                    }.getOrNull()
+                    if (records == null) { failure = LyricStatus.INVALID_RESPONSE; continue }
+                    for (record in records) {
                         val candidate = candidateOf(record)
-                        if (LyricMatch.acceptsTimedLyrics(query, candidate)) {
-                            if (candidate.instrumental) return LyricOutcome(LyricStatus.INSTRUMENTAL)
-                            cleanLyrics(candidate.syncedLyrics, durationSeconds)?.let { return LyricOutcome(LyricStatus.SAVED, it) }
+                        if (!LyricMatch.acceptsTimedLyrics(validation, candidate)) {
+                            if (!candidate.syncedLyrics.isNullOrBlank()) unmatched = true
+                            continue
                         }
-                        if (!candidate.syncedLyrics.isNullOrBlank()) sawUnmatchedLyrics = true
-                    }
-                }
-            }
-            // 2) Pencarian by-field lalu bebas: semua kandidat dinilai LyricMatch, bukan skor buta.
-            for (path in listOf(
-                "/api/search?track_name=${enc(track)}" + (if (artist.isBlank()) "" else "&artist_name=${enc(artist)}"),
-                "/api/search?q=${enc(listOf(track, artist).filter { it.isNotBlank() }.joinToString(" "))}",
-            )) {
-                when (val res = get(path)) {
-                    Res.Fail -> sawFailure = true
-                    Res.Rejected -> Unit // jawaban definitif provider: bukan jaringan, anggap tidak ada
-                    Res.NotFound -> Unit
-                    is Res.Body -> {
-                        val array = runCatching { org.json.JSONArray(res.text) }.getOrNull() ?: continue
-                        for (index in 0 until array.length()) {
-                            val record = array.optJSONObject(index) ?: continue
-                            val candidate = candidateOf(record)
-                            val score = LyricMatch.score(query, candidate)
-                            if (!LyricMatch.acceptsTimedLyrics(query, candidate)) {
-                                if (!candidate.syncedLyrics.isNullOrBlank()) sawUnmatchedLyrics = true
-                                continue
-                            }
-                            if (candidate.instrumental) return LyricOutcome(LyricStatus.INSTRUMENTAL)
-                            val text = cleanLyrics(candidate.syncedLyrics, durationSeconds)
-                            if (text == null) {
-                                if (!candidate.syncedLyrics.isNullOrBlank()) sawUnmatchedLyrics = true
-                                continue
-                            }
-                            val durationDifference = abs(durationSeconds - candidate.durationSeconds)
-                            // Equal identity scores should prefer the closest recording duration,
-                            // rather than whichever entry the provider returned first.
-                            if (score > bestScore || score == bestScore && durationDifference < bestDurationDifference) {
-                                bestScore = score
-                                bestDurationDifference = durationDifference
-                                bestText = text
-                            }
+                        val text = cleanLyrics(candidate.syncedLyrics, durationSeconds)
+                        if (text == null && !candidate.instrumental) {
+                            if (!candidate.syncedLyrics.isNullOrBlank()) unmatched = true
+                            continue
+                        }
+                        acceptedCredits += TitleSplit.creditKey(candidate.artist)
+                        val score = LyricMatch.score(validation, candidate)
+                        val diff = abs(durationSeconds - candidate.durationSeconds)
+                        if (score > bestScore || score == bestScore && diff < bestDifference) {
+                            bestScore = score; bestDifference = diff
+                            bestText = text; instrumental = candidate.instrumental
                         }
                     }
+                    // Avoid querying variants when a verified timed candidate already exists.
+                    if (bestText != null) break
                 }
+                else -> Unit
             }
-            if (bestText != null) break
         }
-
+        if (validation.artist.isBlank() && acceptedCredits.size > 1) return LyricOutcome(LyricStatus.NO_MATCH)
         bestText?.let { return LyricOutcome(LyricStatus.SAVED, it) }
-        // Ada kegagalan jaringan di jalur mana pun + tak ada kandidat diterima = pencarian belum lengkap,
-        // bukan “lagu tidak ada” — pengguna perlu bisa mencoba lagi (BUG-014/R4). Provider yang menjawab
-        // tegas (2xx/4xx tanpa kandidat) = memang tidak tersedia di penyedia, bukan masalah jaringan.
         return LyricOutcome(when {
-            sawFailure -> LyricStatus.NETWORK
-            sawUnmatchedLyrics -> LyricStatus.NO_MATCH
+            instrumental -> LyricStatus.INSTRUMENTAL
+            failure != null -> failure
+            unmatched -> LyricStatus.NO_MATCH
             else -> LyricStatus.NOT_FOUND
         })
     }
 
+    /** Same discovery plan for automatic/refetch/manual; at most four distinct searches. */
+    internal fun searchPaths(title: String, artist: String): List<String> {
+        val raw = title.trim()
+        val credit = artist.trim()
+        val simple = TitleSplit.identify(raw, metadataArtist=credit, recognizeCollaboration=false).title
+        val lead = TitleSplit.primaryArtist(credit)
+        fun field(track: String, who: String) = "/api/search?track_name=${enc(track)}" +
+            who.takeIf { it.isNotBlank() }?.let { "&artist_name=${enc(it)}" }.orEmpty()
+        return linkedSetOf(field(raw,credit),
+            "/api/search?q=${enc(listOf(raw,credit).filter { it.isNotBlank() }.joinToString(" "))}",
+            field(simple,lead), field(simple, "")).take(4)
+    }
+
     private fun candidateOf(record: org.json.JSONObject) = LyricMatch.Candidate(
-        title = record.optString("trackName"),
-        artist = record.optString("artistName"),
+        title = record.optString("trackName").takeUnless { record.isNull("trackName") }.orEmpty(),
+        artist = record.optString("artistName").takeUnless { record.isNull("artistName") }.orEmpty(),
         durationSeconds = record.optLong("duration", -1L).takeIf { it > 0 } ?: -1L,
         instrumental = record.optBoolean("instrumental"),
         syncedLyrics = if (record.isNull("syncedLyrics")) null else record.optString("syncedLyrics").takeIf { it.isNotBlank() },
     )
 
-    private val groupPattern = Regex("""\s*[(\[][^\)\]]*[)\]]""")
-    /**
-     * Buang embel-embel promosi "(Official Video)" tanpa membuang penanda versi "(Live)" —
-     * varian kedua dulu membangun query identitas baru dan lolos menerima versi studio (BUG-013/R3).
-     */
-    private fun tidy(value: String): String =
-        groupPattern.replace(value) { match ->
-            if (LyricMatch.versionSet(match.value).isNotEmpty()) match.value else " "
-        }.replace(Regex("""\s+"""), " ").trim()
-
-    private val timestamp = Regex("""\[(\d+):(\d{2})(?:\.(\d{1,3}))?\]""")
-    private val metadataTag = Regex("""\[(?:ar|ti|al|by|re|ve|length|offset):[^\]]*\]""", RegexOption.IGNORE_CASE)
-
-    /** Validate timed lines against the recording; preserve metadata such as the player's offset. */
+    /** Automatic and manual lookup share syntax/timeline validation, including blank timed lines. */
     private fun cleanLyrics(text: String?, durationSeconds: Long): String? {
-        if (text.isNullOrBlank() || durationSeconds <= 0) return null
-        val lines = mutableListOf<String>()
-        var hasTimedText = false
-        for (raw in text.lines()) {
-            val line = raw.trim()
-            if (line.isEmpty()) continue
-            if (metadataTag.matches(line)) {
-                if (line.startsWith("[offset:", ignoreCase=true) &&
-                    line.substringAfter(':').dropLast(1).trim().toLongOrNull() == null) return null
-                lines += line
-                continue
-            }
-            var end = 0
-            while (true) {
-                val match = timestamp.find(line, end)?.takeIf { it.range.first == end } ?: break
-                val minutes = match.groupValues[1].toDoubleOrNull() ?: return null
-                val seconds = match.groupValues[2].toInt()
-                val fraction = match.groupValues[3].let { if (it.isEmpty()) 0.0 else "0.$it".toDouble() }
-                if (seconds >= 60 || minutes * 60 + seconds + fraction > durationSeconds + 2.0) return null
-                end = match.range.last + 1
-            }
-            if (end == 0 || line.substring(end).startsWith('[')) return null
-            if (line.substring(end).isBlank()) continue
-            hasTimedText = true
-            lines += line
-        }
-        return if (hasTimedText) lines.joinToString("\n", postfix="\n") else null
+        if (text.isNullOrBlank() || durationSeconds <= 0 || text.toByteArray().size > 512 * 1024) return null
+        val normalized = text.trimStart('\uFEFF').trim() + "\n"
+        return runCatching {
+            LrcTiming.shift(normalized, 0, durationSeconds * 1000)
+            val lines = LrcLines.parse(normalized)
+            require(lines.any { it.text.isNotBlank() } && lines.all { it.atMs <= durationSeconds * 1000 + 2000 })
+            normalized
+        }.getOrNull()
     }
 
     private sealed interface Res {
         data class Body(val text: String) : Res
         object NotFound : Res
-        object Fail : Res
+        data class Fail(val status: String) : Res
         /** Provider MENJAWAB tapi menolak permintaan (4xx selain 429) — bukan gangguan jaringan. */
         object Rejected : Res
     }
@@ -409,16 +357,19 @@ object Lyrics {
                 is Res.Body -> LyricsResponseCache.Response(200, result.text)
                 Res.NotFound -> LyricsResponseCache.Response(404, "")
                 Res.Rejected -> LyricsResponseCache.Response(400, "")
-                Res.Fail -> LyricsResponseCache.Response(503, "")
+                is Res.Fail -> LyricsResponseCache.Response(when(result.status) { LyricStatus.RATE_LIMIT -> 429; LyricStatus.INVALID_RESPONSE -> 502; LyricStatus.SERVICE -> 503; else -> 0 }, "")
             }
         }
-        return when (cached.code) { 200 -> Res.Body(cached.text); 404 -> Res.NotFound; 400 -> Res.Rejected; else -> Res.Fail }
+        return when (cached.code) { 200 -> Res.Body(cached.text); 404 -> Res.NotFound; 400 -> Res.Rejected; 429 -> Res.Fail(LyricStatus.RATE_LIMIT); 502 -> Res.Fail(LyricStatus.INVALID_RESPONSE); 503 -> Res.Fail(LyricStatus.SERVICE); else -> Res.Fail(LyricStatus.NETWORK) }
     }
-    private fun networkGet(path: String): Res = try {
+    private val limitedUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private fun networkGet(path: String): Res {
+        if ((limitedUntil[baseUrl] ?: 0L) > System.currentTimeMillis()) return Res.Fail(LyricStatus.RATE_LIMIT)
+        return try {
         val connection = java.net.URL("$baseUrl$path").openConnection() as java.net.HttpURLConnection
         connection.connectTimeout = 8000
         connection.readTimeout = 8000
-        connection.setRequestProperty("User-Agent", "TubeFlow/1.0")
+        connection.setRequestProperty("User-Agent", "TubeFlow/1.1.12 (https://github.com/muhammad1505/downloader-youtube)")
         try {
             when (val code = connection.responseCode) {
                 200 -> Res.Body(connection.inputStream.use { input ->
@@ -430,13 +381,20 @@ object Lyrics {
                 // 400/422/451 = jawaban tegas provider atas query itu sendiri → bukan jaringan.
                 // 401/403/408/429/dst tetap gagal sementara — salah melabelinya "tidak ada" menyesatkan.
                 400, 422, 451 -> Res.Rejected
-                else -> Res.Fail
+                429 -> {
+                    val seconds = connection.getHeaderField("Retry-After")?.toLongOrNull()?.coerceIn(1,300) ?: 10L
+                    limitedUntil[baseUrl] = System.currentTimeMillis() + seconds * 1000
+                    Res.Fail(LyricStatus.RATE_LIMIT)
+                }
+                in 500..599, 401, 403 -> Res.Fail(LyricStatus.SERVICE)
+                else -> Res.Fail(LyricStatus.NETWORK)
             }
         } finally {
             connection.disconnect()
         }
-    } catch (failure: Exception) {
-        Res.Fail
+    } catch (cancelled: java.util.concurrent.CancellationException) { throw cancelled }
+      catch (_: IllegalArgumentException) { Res.Fail(LyricStatus.INVALID_RESPONSE) }
+      catch (_: Exception) { Res.Fail(LyricStatus.NETWORK) }
     }
 
     private fun enc(value: String) = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())

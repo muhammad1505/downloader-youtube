@@ -559,11 +559,14 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
       val name = displayNameOf(it.toUri()) ?: error("File pendamping tidak dapat diperiksa; lirik tidak diubah.")
       name.endsWith(".lrc", true)
      }.orEmpty()
-    outputName to old.associateWith(editor::captureForRefetch)
+    val media=DownloadDatabase.get(getApplication()).media().let { it.getByAccess(requireNotNull(job.outputUri)) ?: it.get(requireNotNull(job.outputUri)) }
+    Triple(outputName,old.associateWith(editor::captureForRefetch),media?.durationMs?.takeIf { it > 0 }?.let { (it+500)/1000 } ?: job.durationSeconds)
    }
    _notice.value="Mencari lirik di penyedia lirik…"
-   Lyrics.clearCache() // Explicit refresh bypasses provider response cache.
-   val outcome=Lyrics.fetch(job.songIdentity(),job.durationSeconds)
+   Lyrics.clearCache() // Explicit refresh bypasses provider response cache, never a provider cooldown.
+   val query=PublishedLyricIdentity.fromName(job,snapshot.first)
+   val resolved=Lyrics.resolveIdentity(query,snapshot.third)
+   val outcome=Lyrics.fetch(resolved,snapshot.third)
    var saveError: String? = null
    val status = MediaFileOperations.mutex.withLock {
     val current = dao.get(id) ?: error("Entri telah dihapus; lirik tidak diubah.")

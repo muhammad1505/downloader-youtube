@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import java.net.InetSocketAddress
@@ -61,14 +62,15 @@ class LyricsFetchTest {
         // rekaman studio dengan skor penuh (probe R3: LIVE_REQUEST_STUDIO_RESULT=tersimpan).
         respond = { path -> if (path.startsWith("/api/get")) 404 to "" else 200 to studioList() }
         val outcome = fetchKnown("Song (Live) - Artist", 200)
-        assertTrue("lookup harus mencoba variasi tanpa melonggarkan versi", requests.count { it.startsWith("/api/get") } > 1)
+        assertTrue("lookup harus mencoba variasi tanpa melonggarkan versi", requests.any { it.startsWith("/api/search?track_name=Song&") })
         assertEquals(LyricStatus.NO_MATCH, outcome.status)
     }
 
     @Test fun collaborationLookupUsesLeadArtistButKeepsFullValidationGate() {
         respond = { path ->
             if (path.contains("artist_name=Denny+Caknan") && !path.contains("Happy")) {
-                200 to """{"trackName":"Song","artistName":"Denny Caknan","duration":200,"syncedLyrics":"[00:01.00]line"}"""
+                val record="""{"trackName":"Song","artistName":"Denny Caknan","duration":200,"syncedLyrics":"[00:01.00]line"}"""
+                200 to if (path.startsWith("/api/get")) record else "[$record]"
             } else if (path.startsWith("/api/get")) 404 to "" else 200 to "[]"
         }
         assertEquals(LyricStatus.SAVED,Lyrics.fetch(SongIdentity("Song","Denny Caknan x Happy Asmara"),200).status)
@@ -98,7 +100,7 @@ class LyricsFetchTest {
                 else -> 503 to ""
             }
         }
-        assertEquals(LyricStatus.NETWORK, fetchKnown("Song - Artist", 200).status)
+        assertEquals(LyricStatus.SERVICE, fetchKnown("Song - Artist", 200).status)
     }
 
     @Test
@@ -111,7 +113,7 @@ class LyricsFetchTest {
     @Test
     fun allFailuresReportNetwork() {
         respond = { 503 to "" }
-        assertEquals(LyricStatus.NETWORK, fetchKnown("Song - Artist", 200).status)
+        assertEquals(LyricStatus.SERVICE, fetchKnown("Song - Artist", 200).status)
     }
 
     @Test
@@ -122,10 +124,11 @@ class LyricsFetchTest {
     }
 
     @Test
-    fun rateLimitStillReportsNetwork() {
+    fun rateLimitReportsProviderLimitAndStopsFurtherRequests() {
         // 429 = kelebihan permintaan — bisa dicoba lagi nanti, jangan dibilang "tidak ada".
         respond = { 429 to "" }
-        assertEquals(LyricStatus.NETWORK, fetchKnown("Song - Artist", 200).status)
+        assertEquals(LyricStatus.RATE_LIMIT, fetchKnown("Song - Artist", 200).status)
+        assertEquals(1, requests.size)
     }
 
     @Test
@@ -141,8 +144,8 @@ class LyricsFetchTest {
     fun exactRequestOmitsDurationWhenUnknown() {
         respond = { 404 to "" }
         fetchKnown("Song - Artist", 0)
-        val get = requests.first { it.startsWith("/api/get") }
-        assertTrue(get, !get.contains("duration="))
+        assertTrue(requests.none { it.startsWith("/api/get") })
+        assertTrue(requests.any { it.startsWith("/api/search") })
     }
 
     @Test
@@ -215,7 +218,7 @@ class LyricsFetchTest {
         respond = { 200 to record }
         val outcome = fetchKnown("Song - Artist", 200)
         assertEquals(LyricStatus.SAVED, outcome.status)
-        assertEquals("[ar:Artist]\n[offset:250]\n[00:01.00][00:02.000]line\n", outcome.text)
+        assertEquals("[ar:Artist]\n[offset:250]\n[00:01.00][00:02.000]line\n[00:03.00]\n", outcome.text)
     }
     @Test fun titleOnlyFallbackStillValidatesKnownArtistAndVersion() {
         respond = { path ->
@@ -281,7 +284,7 @@ class LyricsFetchTest {
         val result=Lyrics.search("Song | Live","Denny Caknan FT Happy Asmara")
         assertEquals(1,result.choices.size)
         assertTrue(!result.choices.single().automaticMatch(LyricMatch.Query("Song | Live","Denny Caknan FT Happy Asmara",200)))
-        assertTrue(requests.size <= 3)
+        assertTrue(requests.size <= 4)
     }
 
     @Test fun nullableProviderMetadataDoesNotBecomeFictionalArtistOrAlbum() {
@@ -292,4 +295,61 @@ class LyricsFetchTest {
         assertTrue(result.hasSyncedLyrics)
     }
 
+
+    @Test fun automaticAndManualDiscoveryUseTheSameSimplifiedFallback() {
+        respond={ path -> if (path == "/api/search?track_name=Song") 200 to studioList().replace("{", "{\"id\":99,")
+            else if(path.startsWith("/api/get")) 404 to "" else 200 to "[]" }
+        assertEquals(LyricStatus.SAVED,Lyrics.fetch(SongIdentity("Song (Official Audio)","Artist"),200).status)
+        assertEquals(1,Lyrics.search("Song (Official Audio)","Artist").choices.size)
+        assertTrue(requests.count { it.startsWith("/api/get") } <= 1)
+    }
+    @Test fun providerLimitIsSharedWithManualSearchAndNeverBlamesConnectivity() {
+        respond={ 429 to "" }
+        val automatic=fetchKnown("Song - Artist",200)
+        assertEquals(LyricStatus.RATE_LIMIT,automatic.status)
+        assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Song","Artist").failureStatus)
+        assertEquals(1,requests.size)
+    }
+    @Test fun malformedJsonIsNotReportedAsMissingLyricsOrNetwork() {
+        respond={ 200 to "<html>upstream proxy error</html>" }
+        assertEquals(LyricStatus.INVALID_RESPONSE,fetchKnown("Song - Artist",200).status)
+        assertEquals(LyricStatus.INVALID_RESPONSE,Lyrics.search("Song","Artist").failureStatus)
+    }
+    @Test fun lookupIsBoundedAndNoArtistOrDurationNeverUsesExactEndpoint() {
+        respond={ path -> if(path.startsWith("/api/get")) 404 to "" else 200 to "[]" }
+        Lyrics.fetch(SongIdentity("Song","A x B","Live"),200)
+        assertTrue(requests.size <= 6)
+        requests.clear()
+        Lyrics.fetch(SongIdentity("Song",null),0)
+        assertTrue(requests.none { it.startsWith("/api/get") })
+        assertTrue(requests.size <= 4)
+    }
+    @Test fun emptyTimedLinesArePreservedToClearPreviousLyricsDuringSilence() {
+        val record=org.json.JSONObject(studioRecord()).put("syncedLyrics","[00:01.00]line\n[00:02.00]\n[00:04.00]next").toString()
+        respond={ 200 to record }
+        val result=fetchKnown("Song - Artist",200)
+        assertEquals("",LrcLines.parse(result.text!!)[1].text)
+        assertEquals(1,LrcLines.activeIndex(LrcLines.parse(result.text),3000))
+    }
+    @Test fun positiveNativeOffsetBeyondTheRecordingIsRejectedInBothPaths() {
+        val text="[offset:5000]\n[03:19.00]line"
+        val record=org.json.JSONObject(studioRecord()).put("syncedLyrics",text).toString()
+        respond={ path -> 200 to if(path.startsWith("/api/get")) record else "[$record]" }
+        assertEquals(LyricStatus.NO_MATCH,fetchKnown("Song - Artist",200).status)
+        assertThrows(IllegalArgumentException::class.java) {
+            Lyrics.selectedText(Lyrics.Choice(1,"Song","Artist","",200,text),200000)
+        }
+    }
+
+    @Test fun actualConnectionFailureRetainsConnectivityStatus() {
+        Lyrics.baseUrl="http://127.0.0.1:1"
+        assertEquals(LyricStatus.NETWORK,fetchKnown("Song - Artist",200).status)
+    }
+
+    @Test fun unknownArtistCannotAutoChooseBetweenDifferentAcceptedPerformers() {
+        val a=org.json.JSONObject(studioRecord()).put("artistName","A").toString()
+        val b=org.json.JSONObject(studioRecord()).put("artistName","B").toString()
+        respond={ 200 to "[$a,$b]" }
+        assertEquals(LyricStatus.NO_MATCH,Lyrics.fetch(SongIdentity("Song",null),200).status)
+    }
 }

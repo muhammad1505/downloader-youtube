@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import androidx.core.net.toUri
@@ -47,14 +48,31 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "covers"), 32L * 1024 * 1024)
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "library-covers"), 24L * 1024 * 1024)
             MediaFileOperations.mutex.withLock { runCatching { LyricPublisher(app).recover() } }
-            repository.validateRecent()
+            repository.validateRecent(force=true)
             database.downloads().observe().map { list -> list.filter { it.state == JobState.COMPLETED && it.autoLibrary }.map { it.id to it.outputUri } }.distinctUntilChanged().collect { jobs ->
                 for ((id, _) in jobs.take(200)) runCatching { repository.indexDownload(id) }
             }
         }
+        viewModelScope.launch {
+            callbackFlow {
+                val observer=object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) { trySend(Unit) }
+                }
+                app.contentResolver.registerContentObserver("content://media".toUri(),true,observer)
+                awaitClose { app.contentResolver.unregisterContentObserver(observer) }
+            }.debounce(750).collect { validateAvailability() }
+        }
         updateDeviceStorage()
     }
-    fun validateAvailability() { viewModelScope.launch(Dispatchers.IO) { runCatching { repository.validateRecent() } } }
+    private var availabilityCheck: Job? = null
+    fun validateAvailability() {
+        if (availabilityCheck?.isActive == true) return
+        availabilityCheck=viewModelScope.launch(Dispatchers.IO) {
+            try { repository.validateRecent(force=true) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia." }
+        }
+    }
     fun filter(value: Filter) { filter.value = value.copy(limit = 100) }
     fun more() { filter.update { it.copy(limit = (it.limit + 100).coerceAtMost(3000)) } }
     fun period(days: Int) { since.value = DashboardCharts.since(days, java.time.LocalDate.now(), java.time.ZoneId.systemDefault()) }
@@ -211,7 +229,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                 if (session != lyricsSession) return@launch
                 expectedLyrics=captured.second; expectedJob=captured.third
                 _lyrics.value=_lyrics.value?.copy(item=captured.first,choices=result.choices,loading=false,searched=true,
-                    error=if (result.incomplete) "Sebagian pencarian gagal. Coba lagi jika hasil belum sesuai." else null)
+                    error=result.failureStatus?.let(LyricStatus::label))
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(loading=false,error=failure.message ?: "Pencarian gagal.") }
         }

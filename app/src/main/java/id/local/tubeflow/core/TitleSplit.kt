@@ -34,10 +34,14 @@ object TitleSplit {
         return key.isNotBlank() && key == creditKey(credit)
     }
     fun isRemixTitle(title: String): Boolean = Regex("(?i)\\b(dj|remix|rmx|bootleg|mashup|megamix|slowed|sped|nightcore|reverb)\\b").containsMatchIn(title)
+    private fun withoutPromoSegments(value: String): String = value
+        .split(Regex("\\s+[-–—]\\s+"))
+        .map(::clean).filterNot { promoSegment.matches(it) }.joinToString(" - ")
+
     fun segments(raw: String): List<String> {
         var text = groups.replace(raw) { if (version.containsMatchIn(it.groupValues[1]) || promoGroup.containsMatchIn(it.groupValues[1])) " " else it.value }
         while (promoTail.containsMatchIn(text)) text = clean(text.replace(promoTail, ""))
-        return text.split(Regex("\\s+[-–—]\\s+")).map(::clean).filter { it.isNotBlank() }
+        return withoutPromoSegments(text).split(Regex("\\s+[-–—]\\s+")).map(::clean).filter { it.isNotBlank() }
     }
 
     fun identify(rawTitle: String, channel: String? = null, metadataArtist: String? = null,
@@ -58,6 +62,7 @@ object TitleSplit {
         text = withoutGroups(text)
         text = clean(text)
         while (promoTail.containsMatchIn(text)) text = clean(text.replace(promoTail, ""))
+        text = withoutPromoSegments(text)
         val segments = text.split(Regex("\\s+[-–—]\\s+")).map(::clean).filter { it.isNotEmpty() }
         val chan = knownName(channel.orEmpty().replace(topic, ""))
         var artist = metadataArtist?.takeUnless { it.isBlank() || creditKey(it) in setOf("null", "unknown", "unknownartist") }?.let(::knownName)
@@ -100,12 +105,14 @@ object TitleSplit {
         }
         val credit = remixer.ifBlank { artist.orEmpty() }
         fun withoutCredit(value: String): String {
-            if (credit.isBlank()) return value
-            val escaped = Regex.escape(credit)
-            var result = value.replace(Regex("(?i)^$escaped\\s*[-–—]\\s*|\\s*[-–—]\\s*$escaped$"), "")
-            // A verified artist can be removed at an inline suffix; never strip a name from the middle.
-            if (artist != null && metadataArtist?.isNotBlank() == true)
-                result = result.replace(Regex("(?i)\\s+$escaped$"), "")
+            var result = value
+            // Original artist and remixer can both be explicit; strip each only at a boundary.
+            for (name in listOfNotNull(artist,remixer.takeIf(String::isNotBlank)).distinct()) {
+                val escaped = Regex.escape(name)
+                result = result.replace(Regex("(?i)^$escaped\\s*[-–—]\\s*|\\s*[-–—]\\s*$escaped$"), "")
+                if (name == artist && metadataArtist?.isNotBlank() == true)
+                    result = result.replace(Regex("(?i)\\s+$escaped$"), "")
+            }
             return result
         }
         text = withoutCredit(text)
@@ -113,7 +120,7 @@ object TitleSplit {
         // A pipe may contain an alternative lyric/title, not just a version. Preserve that information.
         val parts = text.split('|').map(::clean).filter { it.isNotEmpty() }
         val trackParts = metadataTrack?.takeIf { it.isNotBlank() && it != "null" }?.let { raw ->
-            var track = clean(withoutCredit(withoutGroups(raw)))
+            var track = clean(withoutCredit(withoutPromoSegments(withoutGroups(raw))))
             while (promoTail.containsMatchIn(track)) track = clean(track.replace(promoTail, ""))
             if (track.startsWith("DJ ", ignoreCase=true)) { bits += "DJ"; track = track.substring(3) }
             track.split('|').map(::clean).filter { it.isNotEmpty() }

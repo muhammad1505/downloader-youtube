@@ -74,6 +74,11 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent terverifikasi langsung putar di HP/pengelola; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
 | BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
 | BUG-050 | P2 | Hapus semua meminta SAF walau Android10 sudah memiliki izin hapus | Diperbaiki1.1.11; 240Kotlin/83Python lulus, pengelola+HP membuktikan langsung bersih tanpa SAF, root tetap/0entri |
+| BUG-051 | P1 | Nama/tag artis tidak konsisten saat sumber dan ekstraksi berbeda | Segmen promosi, kredit deskripsi dan artist sumber terlambat diperbaiki; 260Kotlin/84Python/build lulus,1.1.12 terpasang; tes UI tertahan Norton |
+| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan | Discovery/validasi bersama, status provider dan cooldown; 260Kotlin/84Python lulus,429live teramati; auditori/HP belum selesai |
+| BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus | Probe kehadiran dan observer/lifecycle, empty scan; host lulus,1.1.12 terpasang; tes UI tertahan Norton |
+| BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
+
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -561,3 +566,28 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Pengujian:** enam tes filesystem nyata dalam folder sementara (media+LRC/direktori kosong, sibling, gagal hapus, link luar/root, penambahan bersamaan, root tidak ada), satu tes policy izin dan regresi FolderCleanup lama. Hasil build/perangkat pada [laporan1.1.11](STORAGE_CLEANUP_1_1_11.md).
 
 - **Hasil1.1.11:** 240Kotlin/83Python lulus, build signed/debug berhasil, lint0error/2warning. Update di RealmeAndroid10 mempertahankan70file sampai pengelola menjalankan Hapus semua sendiri. Pengelola menjawab “Langsung bersih tanpa SAF”; pemeriksaan ADB memastikan root masih ada dan isi0entri. Batas Android scoped/provider lain tetap pada laporan.
+
+
+## BUG-051 — P1: Kredit/nama/tag hilang atau tercampur
+
+- **Akar:** DC MUSIK sebagai segmen terpisah tidak dibuang; saat artis+remixer tersedia hanya satu credit dihapus dari judul. Kredit deskripsi dilewati jika track sudah ada, label Artist/Artis/Song tidak dikenali, dan hanya50baris dibaca. Tag snapshot artist kosong menimpa field artist sumber yang baru ditemukan saat download.
+- **Solusi:** TitleSplit/SourceMetadata memakai bukti credit eksplisit dan unik; MetadataTags memakai field artist sumber dengan default kosong tanpa fallback uploader. Judul tag memakai kurung seperti filename; durasi audio aktual dipakai sebelum pencarian lirik.
+- **Batas:** metadata yang tidak disediakan sumber tetap opsional; nama uploader/remixer tidak menjadi artis asli. [Laporan1.1.12](METADATA_LYRICS_LIBRARY_1_1_12.md).
+
+## BUG-052 — P1: Lirik otomatis tidak ditemukan dan gagal provider disebut jaringan
+
+- **Bukti:** LRCLIB nyata mengembalikan429 saat probe; sebelumnya semua kegagalan disebut periksa jaringan. Query otomatis dapat jauh lebih banyak dan berbeda dari manual. Timestamp kosong dibuang pada download otomatis.
+- **Solusi:** satu discovery terbatas dan validasi LRC bersama, status429/provider/respons invalid/jaringan terpisah, cooldown Retry-After dan penghentian batch429. Blank timestamp dipertahankan untuk mengosongkan sorotan saat hening. Identitas/versi/durasi±2detik tetap wajib; hasil manual dari rekaman berbeda memerlukan pilihan sadar pengguna.
+- **Verifikasi:** fixture HTTP mencakup respons provider, fallback bersama, bounds, offset, blank lines, koneksi putus dan rate limit. Sinkronisasi auditori bukan konsekuensi otomatis kelulusan fixture. [Laporan](METADATA_LYRICS_LIBRARY_1_1_12.md).
+
+## BUG-053 — P2: File terhapus masih menjadi kartu peringatan Koleksi
+
+- **Bukti:** HP baseline menampilkan kartu tidak tersedia meski pengelola sudah menghapus file.
+- **Akar:** catch index menyimpan UNAVAILABLE; pengecekan dibatasi1jam/100row, tanpa observer MediaStore; scan kosong gagal sebelum rekonsiliasi.
+- **Solusi:** hanya row dengan bukti hilang dan akses sah dihapus. Izin dicabut/null/query gagal tidak diperlakukan sebagai kehilangan file. Debounce perubahan MediaStore dan cek saat ON_RESUME; validasi kehadiran tidak mengekstrak metadata/LRCLIB lagi. Riwayat dan event aktual dipertahankan.
+- **Batas:** jalur scoped Downloads yang tersembunyi oleh izin bukan bukti hilang. [Laporan](METADATA_LYRICS_LIBRARY_1_1_12.md).
+
+## BUG-054 — P2: Download sumber DJ memberi403 di HP
+
+- **Reproduksi:**1.1.11, MP3128/lirik/sampul, `https://youtu.be/3J1Opi7MVHw` → HTTP403 pada transfer media sebelum hasil dipublikasikan. Host dengan engine yang sama berhasil mengambil10KB format251.
+- **Status:** terbuka; belum membuktikan akar perbedaan IP/format/cache/provider. Jangan menyamakan dengan429LRCLIB atau menyebut download link ini lulus hanya karena inspect metadata berhasil.

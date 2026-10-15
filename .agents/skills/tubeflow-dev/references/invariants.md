@@ -62,7 +62,7 @@ Audio memakai LRCLIB dalam implementasi saat ini; caption/subtitle YouTube untuk
 
 Nilai kecocokan judul/artis/versi/durasi pada seluruh endpoint dan fallback. Penerimaan timed lyrics memakai gerbang ±2 detik dan durasi kedua pihak wajib diketahui; jangan melonggarkan search untuk mengakomodasi intro/outro tanpa bukti offset. Validasi timestamp, pertahankan metadata/offset LRC, dan bedakan hasil tidak cocok dari penyedia tidak punya lirik. Kredit deskripsi performer/track hanya dipakai bila eksplisit, unik dan dicocokkan dengan judul lengkap; songwriter/arranger bukan bukti vokalis. Metadata cocok belum membuktikan timestamp sinkron dengan audio live/cover/remix; dengarkan beberapa posisi lagu pada HP. Lihat temuan terbuka pencocokan dan toleransi durasi sebelum mengklaim sinkronisasi beres.
 
-Bedakan tidak ditemukan, instrumental, kegagalan jaringan dan gagal simpan. Download audio yang berhasil tetap sukses meskipun lirik gagal, dengan status lirik terpisah. Cari ulang lirik memakai lokasi audio yang sudah terbit, bukan folder pengaturan terbaru; penggantian gagal harus mempertahankan lirik lama. Periksa implementasi backup/rollback serta hasil audit terbaru; jangan mengganti jalur aman dengan penulisan langsung yang menghilangkan lirik lama saat gagal.
+Bedakan tidak ditemukan, tidak cocok, instrumental, HTTP429/rate limit, gangguan provider/5xx/akses ditolak, respons invalid, kegagalan koneksi dan gagal simpan. Lookup manual/otomatis memakai discovery dan validasi LRC bersama yang terbatas; hormati Retry-After dan jangan menembus cooldown lewat clear cache. Timestamp kosong harus tetap disimpan untuk mengosongkan sorotan saat hening. Download audio yang berhasil tetap sukses meskipun lirik gagal, dengan status lirik terpisah. Cari ulang lirik memakai lokasi audio yang sudah terbit, bukan folder pengaturan terbaru; penggantian gagal harus mempertahankan lirik lama. Periksa implementasi backup/rollback serta hasil audit terbaru; jangan mengganti jalur aman dengan penulisan langsung yang menghilangkan lirik lama saat gagal.
 
 Pada pencarian fallback, skor identitas lebih kuat tetap prioritas; tie memakai selisih durasi terdekat setelah gerbang versi/durasi. Ini bukan bukti sinkronisasi auditori. Delay tetap perlu koreksi per rekaman dengan pratinjau/backup; jangan menggeser timestamp seluruh lagu karena satu contoh terlambat.
 
@@ -96,3 +96,12 @@ Auto-play 1.1.10: receiver koneksi Bluetooth manifest/runtime memakai exported k
 Sesi media aktif memakai START_STICKY serta marker `player-last/session_active`; X membersihkan marker. Pemulihan tanpa headset harus tetap jeda. Jangan menerapkan PlaybackParams pada player jeda karena dapat memulai audio; simpan pilihan kecepatan dan terapkan sesudah fokus audio saat play. Pemulihan proses mati belum mempersist posisi seek. Kabel HEADSET_PLUG tidak membangunkan proses mati; force-stop dan kebijakan OEM tetap membatasi restart, sehingga klaim auto-play harus menyebut skenario HP yang diuji.
 
 Pencarian antrean memakai posisi asli dari `PlaybackQueueSearch`, bukan indeks hasil filter. Semua aksi jump/move/remove tetap mengacu pada antrean penuh. Full player memakai seek track4dp/thumb12dp dengan target sentuh48dp; jumlah antrean berada di dalam tombol, tanpa badge yang keluar kontainer.
+
+
+Validasi Koleksi1.1.12: hanya MISSING yang terbukti dengan akses sah menghapus row;
+query null/gagal dan izin dicabut adalah UNKNOWN/DENIED, bukan bukti hilang.
+Observer MediaStore didebounce; ON_RESUME memeriksa kehadiran tanpa mengekstrak tag
+atau mencari lirik lagi. Folder kosong bukan galat scan. Nama tag audio memakai
+label versi kurung yang sama dengan filename; artist sumber yang baru muncul saat
+download tidak boleh dihapus oleh snapshot kosong atau diganti uploader. Cari ulang
+memakai nama publikasi/durasi aktual; parameter filename baru bukan artist terverifikasi.

@@ -85,6 +85,14 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val requestRead = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it }) library.scanIfEmpty()
     }
+    val libraryOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(libraryOwner) {
+        val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
+            if (event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) library.validateAvailability()
+        }
+        libraryOwner.lifecycle.addObserver(observer)
+        onDispose { libraryOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(Unit) {
         if (library.hasReadPermission() || library.hasFolderAccess()) library.scanIfEmpty() else requestRead.launch(readPermissions)
     }

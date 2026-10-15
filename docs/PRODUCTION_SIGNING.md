@@ -177,3 +177,15 @@ pada RealmeAndroid10, hashbase.apk cocok;70file utuh saat update. Sesudah itu,
 pengelola menguji Hapus semua tanpa SAF dan root tersisa kosong. Artefak aktif
 outputs/apk/release dan outputs/bundle/release, tanpa salinan distribusi tambahan
 atau publikasi toko. [Checksum semuaABI dan batas tes](STORAGE_CLEANUP_1_1_11.md).
+
+
+## Kandidat1.1.12/code26 — 16 Oktober 2026
+
+Keystore produksi/Room9/dependensi tetap. 260Kotlin/84Python lulus; debug/signed
+APK×3/AAB/R8, lint0error/2warning diketahui, audit certificate/signature/native/
+alignment16KB/refleksiZIP dan AAB jarsigner/bundletool lulus. ARM6470.573.823byte,
+SHA256 `497716d5938b8ef8d8147fe2078a76bab21cf890e95af707828ba9abde617a44`,
+terpasang update-r RMX1821Android10; hashbase.apk cocok. Pengujian UI baru masih
+tertahan halaman hasil Norton yang memerlukan tindakan pengelola. Tidak uninstall/
+clear-data, mematikan keamanan, menambah salinan distribution atau publikasi toko.
+[Checksum semuaABI, hasil dan keterbatasan](METADATA_LYRICS_LIBRARY_1_1_12.md).

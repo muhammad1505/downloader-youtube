@@ -104,4 +104,18 @@ class TitleSplitTest {
         // Judul kosong tidak menghasilkan string kosong — aman untuk nama file.
         assertNotNull(TitleSplit.display(TitleSplit.identify("")))
     }
+
+    @Test fun separatedLabelPromoIsRemovedBeforeEitherOrderIsResolved() {
+        for (raw in listOf("DENNY CAKNAN - PINGAL - DC MUSIK", "PINGAL - DENNY CAKNAN - DC MUSIK")) {
+            val song=TitleSplit.identify(raw,metadataArtist="DENNY CAKNAN")
+            assertEquals("PINGAL",song.title)
+            assertEquals("PINGAL - DENNY CAKNAN",Format.musicFileName(song))
+        }
+    }
+    @Test fun originalArtistAndRemixerAreBothRemovedOnlyFromTitleBoundaries() {
+        val song=TitleSplit.identify("Original Artist - Song - Creator RMX",metadataArtist="Original Artist")
+        assertEquals("Song",song.title)
+        assertEquals("Original Artist",song.artist)
+        assertEquals("Creator RMX",song.remixer)
+    }
 }

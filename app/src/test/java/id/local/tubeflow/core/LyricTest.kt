@@ -93,7 +93,7 @@ class LyricTest {
         // Label harus jelas: "tidak ada di penyedia" berbeda dari "gagal (jaringan)" (permintaan pengguna).
         assertEquals("Lirik tidak tersedia di penyedia lirik", LyricStatus.label(LyricStatus.NOT_FOUND))
         assertEquals("Lirik belum cocok dengan versi audio", LyricStatus.label(LyricStatus.NO_MATCH))
-        assertEquals("Pencarian lirik gagal (periksa jaringan)", LyricStatus.label(LyricStatus.NETWORK))
+        assertEquals("Tidak dapat terhubung ke LRCLIB; coba lagi sebentar", LyricStatus.label(LyricStatus.NETWORK))
         assertEquals("Lagu instrumental — tanpa lirik", LyricStatus.label(LyricStatus.INSTRUMENTAL))
         assertTrue(LyricStatus.retryable(LyricStatus.NETWORK))
         assertTrue(LyricStatus.retryable(LyricStatus.SAVE_FAILED))

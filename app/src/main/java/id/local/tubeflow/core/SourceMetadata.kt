@@ -4,8 +4,8 @@ import org.json.JSONObject
 
 object SourceMetadata {
     private val officialCredit = Regex("""(?i)^official\s+(?:music|audio)(?:\s+live)?\s+from\s+(.+?)\s+[-–—]\s+(.+?)\s*$""")
-    private val trackLabel = Regex("""(?i)^(?:title|song title|track|judul(?: lagu)?)\s*:\s*(.+)$""")
-    private val performerLabel = Regex("""(?i)^(?:voc|vocals?|vokal|vocalist|singer|penyanyi|performed by)\s*:\s*(.+)$""")
+    private val trackLabel = Regex("""(?i)^(?:title|song(?: title)?|track|judul(?: lagu)?)\s*:\s*(.+)$""")
+    private val performerLabel = Regex("""(?i)^(?:artist|artis|voc|vocals?|vokal|vocalist|singer|penyanyi|performed by)\s*:\s*(.+)$""")
     private val collaboration = Regex("""(?i)\s+(?:x|ft\.?|feat\.?|featuring|&)\s+""")
     private fun normalized(value: String) = value.lowercase().replace(Regex("""[^\p{L}\p{N}]+"""), " ").trim()
     private fun creditWords(value: String) = normalized(value.replace(collaboration, " & "))
@@ -19,7 +19,7 @@ object SourceMetadata {
             return artistWords.isNotBlank() && trackWords.isNotBlank() &&
                 titleWords.contains(" $artistWords ") && titleWords.contains(" $trackWords ")
         }
-        val lines = description.lineSequence().take(50).map(String::trim).toList()
+        val lines = description.take(64 * 1024).lineSequence().take(200).map(String::trim).toList()
         val credits = lines.mapNotNull { line ->
             val match = officialCredit.matchEntire(line.trim()) ?: return@mapNotNull null
             val artist = match.groupValues[1].trim()
@@ -39,19 +39,23 @@ object SourceMetadata {
 
     fun parse(json: JSONObject, url: String): VideoMetadata {
         fun text(key: String) = if (json.isNull(key)) "" else json.optString(key).trim().takeUnless { it == "null" }.orEmpty()
-        val artist = text("artist").ifBlank {
+        fun usable(value: String) = value.takeUnless { TitleSplit.creditKey(it) in setOf("null", "unknown", "unknownartist", "variousartists") }.orEmpty()
+        val artist = usable(text("artist")).ifBlank {
             json.optJSONArray("artists")?.let { values ->
-                (0 until values.length()).mapNotNull { values.optString(it).takeIf { value -> value.isNotBlank() && value != "null" } }.joinToString(" & ")
+                (0 until values.length()).mapNotNull { usable(values.optString(it)).takeIf(String::isNotBlank) }.joinToString(" & ")
             }.orEmpty()
         }
         val title = text("title").ifBlank { "Video" }
         val track = text("track")
-        val credit = if (artist.isBlank() && track.isBlank()) descriptionCredit(title, text("description")) else null
+        val credit = descriptionCredit(title, text("description"))?.takeIf { (who, song) ->
+            (artist.isBlank() || creditWords(artist) == creditWords(who)) &&
+                (track.isBlank() || normalized(track) == normalized(song))
+        }
         return VideoMetadata(title, text("uploader").ifBlank { text("channel") },
             json.optLong("duration"), text("thumbnail").ifBlank {
                 json.optJSONArray("thumbnails")?.let { list -> (list.length() - 1 downTo 0).firstNotNullOfOrNull { list.optJSONObject(it)?.optString("url")?.takeIf(String::isNotBlank) } }.orEmpty()
             }, url, artist = artist.ifBlank { credit?.first.orEmpty() }, track = track.ifBlank { credit?.second.orEmpty() }, creator = text("creator").ifBlank { text("uploader") },
             platformId = SourcePlatforms.fromUrl(url).id, sourceId = text("id"), extractor = text("extractor_key").ifBlank { text("extractor") },
-            artistEvidence = if (credit != null) "source_description_credit" else "")
+            artistEvidence = if (artist.isBlank() && credit != null) "source_description_credit" else "")
     }
 }

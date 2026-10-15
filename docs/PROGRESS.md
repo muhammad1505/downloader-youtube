@@ -415,3 +415,29 @@ Pengelola kemudian menjalankan Hapus semua dan mengonfirmasi **langsung bersih
 tanpa SAF**; pemeriksaan ADB sesudahnya rootTubeFlow ada/0entri (file maupun
 subfolder). Agent tidak menekan hapus media pengguna. Android scoped/provider lain
 belum diuji ulang. [Laporan lengkap](STORAGE_CLEANUP_1_1_11.md).
+
+
+## Nama, metadata, LRCLIB dan Koleksi — 1.1.12/code26, 16 Oktober 2026
+
+BUG-051/052/053: kredit deskripsi/track parsial, segmen label, artist asli+remixer,
+artist sumber yang terlambat tersedia dan label title diperbaiki. Lookup LRCLIB
+manual/otomatis memakai discovery terbatas dan parser bersama;429/provider/JSON
+invalid dipisahkan dari koneksi gagal, Retry-After dihormati. Blank timestamp tidak
+dihilangkan. Cari ulang membaca nama publikasi/durasi aktual; artist ambigu tidak
+dipilih otomatis. Koleksi menghapus hanya row yang terbukti kehilangan file,
+mempertahankan DENIED/UNKNOWN, mengamati MediaStore dan memeriksa saat ON_RESUME.
+
+260Kotlin/84Python lulus; build final7m7s, debug/signedAPK×3/AAB/R8, lint0error/
+2warning yang diketahui dan audit paket/native/signature/alignment/refleksiZIP/
+bundletool lulus. Room9/keystore/dependensi tetap. ARM64 70.573.823byte SHA256
+`497716d5938b8ef8d8147fe2078a76bab21cf890e95af707828ba9abde617a44`
+terpasang update-r di RealmeAndroid10 dan hashbase.apk cocok. Folder fisik0file
+sebelum update; agent tidak menghapus data pengguna. Tidak ada TubeFlow pada
+buffer crash setelah launch. Tes UI baru tertahan halaman hasil Norton; agent
+tidak mengubah keamanan dan meminta pengelola membuka TubeFlow kembali.
+
+Baseline1.1.11 membuktikan kartu Koleksi hilang masih tampil dan downloadDJ
+3J1Opi7MVHw memberi403 di HP; host berhasil10KB dengan engine sama (BUG-054 tetap
+terbuka). Probe LRCLIB nyata mendapat429/Retry-After1. DJ248detik vs sumberoriginal
+199detik tidak membuktikan timestamp studio sinkron. Belum ada konfirmasi auditori
+baru atau klaim semua penamaan/lirik universal beres. [Laporan dan batas](METADATA_LYRICS_LIBRARY_1_1_12.md).

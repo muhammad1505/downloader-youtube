@@ -154,7 +154,10 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
      reader.setDataSource(result.absolutePath)
      val updated = job.withNativeAudioMetadata(
       reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty(),
-      reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST).orEmpty(), !sourceTrackAvailable)
+      reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST).orEmpty(), !sourceTrackAvailable).let { refreshed ->
+        val actual = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        if (actual != null && actual > 0) refreshed.copy(durationSeconds=(actual+500)/1000) else refreshed
+      }
      if (dao.metadata(jobId, generation, updated.rawTitle, updated.trackTitle, updated.title, updated.artist,
        updated.creator, updated.remixer, updated.versionTag, updated.artistEvidence, updated.platformId,
        updated.thumbnailUrl, updated.sourceId, updated.extractor, updated.subfolder, updated.durationSeconds) == 0) throw CancellationException()
