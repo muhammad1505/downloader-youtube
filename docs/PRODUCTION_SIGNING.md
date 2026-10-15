@@ -189,3 +189,16 @@ terpasang update-r RMX1821Android10; hashbase.apk cocok. Pengujian UI baru masih
 tertahan halaman hasil Norton yang memerlukan tindakan pengelola. Tidak uninstall/
 clear-data, mematikan keamanan, menambah salinan distribution atau publikasi toko.
 [Checksum semuaABI, hasil dan keterbatasan](METADATA_LYRICS_LIBRARY_1_1_12.md).
+
+
+## Kandidat1.1.13/code27 — 16 Oktober 2026
+
+Keystore produksi, Room9 dan dependensi dipertahankan.271Kotlin/84Python lulus;
+APK×3/AAB signed/R8, lint0error/2warning lama, audit native/certificate/signature/
+alignment16KB/refleksiZIP serta engine/bootstrap lulus. AAB jarsigner/native
+lulus; bundletool tidak dijalankan ulang. ARM64 70.578.919byte, SHA256
+`9ed1d31e2abde344e30f1613da238bc7fc008a50424762e22cfbdbc68c9a6326`.
+Update-r RealmeAndroid10 sukses dan base.apk cocok. Satu audio asli tetap utuh;
+pencarian manual17hasil, perluasan24hasil berhasil. Tidak uninstall/reset,
+mengubah keamanan, menerbitkan ke toko, atau menggandakan distribusi.
+[Checksum semuaABI dan batas pengujian](LYRICS_RATE_LIMIT_1_1_13.md).

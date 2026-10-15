@@ -441,3 +441,26 @@ Baseline1.1.11 membuktikan kartu Koleksi hilang masih tampil dan downloadDJ
 terbuka). Probe LRCLIB nyata mendapat429/Retry-After1. DJ248detik vs sumberoriginal
 199detik tidak membuktikan timestamp studio sinkron. Belum ada konfirmasi auditori
 baru atau klaim semua penamaan/lirik universal beres. [Laporan dan batas](METADATA_LYRICS_LIBRARY_1_1_12.md).
+
+
+## Pencarian LRCLIB1.1.13/code27 — 16 Oktober 2026
+
+Baseline1.1.12 di HP mereproduksi429 sekaligus “Tidak ada hasil” untuk SATRU2Live.
+Query mentah yang sama juga429 di host, sedangkan judul bersih/artis utama200;
+perbedaan ini bukan bukti masalah DNS pengguna. Query bersih didahulukan, permintaan
+jaringan diberi jeda bersama, cache positif dipertahankan, Retry-After/backoff
+persisten dihormati, dan dialog menyediakan countdown serta perluasan hasil manual.
+
+271Kotlin/84Python lulus; lint debug/release0error/2warning lama; signedAPK×3/AAB,
+native/signature/alignment/refleksiZIP/checksum engine/bootstrap lulus. Build9m18s;
+AAB jarsigner/native lulus, bundletool tidak dijalankan ulang. Update-r di
+RealmeAndroid10 berhasil; base.apk cocok SHA256
+`9ed1d31e2abde344e30f1613da238bc7fc008a50424762e22cfbdbc68c9a6326`.
+Cari lirik pada audio sama menampilkan17hasil, perluasan24hasil tanpa galat.
+Satu audio tetap memiliki hash yang sama; tidak ada LRC dipilih/disimpan atau
+file dihapus. Tidak ada FATAL EXCEPTION pada PID yang diperiksa. Tidak mengubah
+pengaturan DNS/keamanan; UI kini bisa diuji tanpa hambatan Norton sesi sebelumnya.
+
+Countdown429/restart terbukti pada fixture, belum teramati di HP setelah update.
+Sinkronisasi auditori, download baru audio/video, dan perangkat16KB belum diuji
+ulang. [Akar, perubahan, checksum seluruh artefak dan batas](LYRICS_RATE_LIMIT_1_1_13.md).

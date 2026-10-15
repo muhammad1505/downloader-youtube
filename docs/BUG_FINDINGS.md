@@ -75,7 +75,7 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
 | BUG-050 | P2 | Hapus semua meminta SAF walau Android10 sudah memiliki izin hapus | Diperbaiki1.1.11; 240Kotlin/83Python lulus, pengelola+HP membuktikan langsung bersih tanpa SAF, root tetap/0entri |
 | BUG-051 | P1 | Nama/tag artis tidak konsisten saat sumber dan ekstraksi berbeda | Segmen promosi, kredit deskripsi dan artist sumber terlambat diperbaiki; 260Kotlin/84Python/build lulus,1.1.12 terpasang; tes UI tertahan Norton |
-| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan | Discovery/validasi bersama, status provider dan cooldown; 260Kotlin/84Python lulus,429live teramati; auditori/HP belum selesai |
+| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.13: query bersih didahulukan, pacing/cache/backoff/countdown;271Kotlin/84Python; HP17→24hasil; auditori/otomatis/429ulang tetap terbatas |
 | BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus | Probe kehadiran dan observer/lifecycle, empty scan; host lulus,1.1.12 terpasang; tes UI tertahan Norton |
 | BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
 
@@ -579,7 +579,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Bukti:** LRCLIB nyata mengembalikan429 saat probe; sebelumnya semua kegagalan disebut periksa jaringan. Query otomatis dapat jauh lebih banyak dan berbeda dari manual. Timestamp kosong dibuang pada download otomatis.
 - **Solusi:** satu discovery terbatas dan validasi LRC bersama, status429/provider/respons invalid/jaringan terpisah, cooldown Retry-After dan penghentian batch429. Blank timestamp dipertahankan untuk mengosongkan sorotan saat hening. Identitas/versi/durasi±2detik tetap wajib; hasil manual dari rekaman berbeda memerlukan pilihan sadar pengguna.
 - **Verifikasi:** fixture HTTP mencakup respons provider, fallback bersama, bounds, offset, blank lines, koneksi putus dan rate limit. Sinkronisasi auditori bukan konsekuensi otomatis kelulusan fixture. [Laporan](METADATA_LYRICS_LIBRARY_1_1_12.md).
-- **Kelanjutan1.1.13:** pengelola masih menemui pembatasan. Audit menemukan request tanpa pacing, invalidasi cache global pada refetch, dan Retry-After terpotong/tanpa persistensi. Gerbang bersama, cache terarah, perluasan manual atas permintaan, countdown dan pembatalan interruptible diterapkan;46tes lirik awal lulus. Build lengkap/perangkat belum selesai pada checkpoint ini. [Rincian dan hasil final](LYRICS_RATE_LIMIT_1_1_13.md).
+- **Kelanjutan1.1.13:** query label versi/kredit lengkap mendapat429 lebih dulu dan menghentikan fallback yang sebenarnya berhasil. Discovery sekarang mendahulukan judul bersih/artis utama; validasi versi/durasi asli tetap. Pacing bersama, cache terarah, backoff persisten/Retry-After lengkap, perluasan manual, countdown dan pembatalan interruptible diterapkan.271Kotlin/84Python, lint0error/2warning lama, signedAPK×3/AAB dan audit lulus. Update HP terverifikasi: pencarian audio sama17hasil, perluasan24hasil tanpa error, sumber tidak berubah.429ulang/countdown di HP, otomatis dan auditori belum dibuktikan dalam sesi ini. [Rincian dan hasil final](LYRICS_RATE_LIMIT_1_1_13.md).
 
 ## BUG-053 — P2: File terhapus masih menjadi kartu peringatan Koleksi
 
