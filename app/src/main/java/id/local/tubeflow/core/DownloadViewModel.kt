@@ -35,6 +35,15 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  val storageError: StateFlow<Boolean> = _storageError.asStateFlow()
  private val _storageFolderAccess=MutableStateFlow(false)
  val storageFolderAccess: StateFlow<Boolean> = _storageFolderAccess.asStateFlow()
+ private val _storageCatalogue=MutableStateFlow(false)
+ /**
+  * True bila angka ukuran berasal dari katalog media (baris yang sudah terindeks, sama seperti layar
+  * Koleksi) sehingga tidak butuh grant folder. Label di Pengaturan ikut dibedakan agar angka ini
+  * tidak pernah diklaim sebagai ukuran folder penuh.
+  */
+ val storageCatalogue: StateFlow<Boolean> = _storageCatalogue.asStateFlow()
+ private val _storageUnknownSizes=MutableStateFlow(0L)
+ val storageUnknownSizes: StateFlow<Long> = _storageUnknownSizes.asStateFlow()
  private val _clearing=MutableStateFlow(false)
  /** True selama "Hapus semua file" berjalan — tombol di Pengaturan dinonaktifkan. */
  val clearing: StateFlow<Boolean> = _clearing.asStateFlow()
@@ -43,6 +52,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   refreshStorage()
   // Angka penyimpanan ikut naik/turun begitu ada unduhan selesai (atau file dihapus) tanpa perlu tombol Segarkan.
   viewModelScope.launch { jobs.map { list -> list.count { it.state == JobState.COMPLETED } }.distinctUntilChanged().collect { refreshStorage() } }
+  // Pemindaian, impor, hapus, dan hasil karaoke mengubah katalog tanpa mengubah riwayat download.
+  viewModelScope.launch {
+   DownloadDatabase.get(application).media().totals()
+    .map { listOf(it.audio, it.video, it.audioBytes, it.videoBytes, it.unknownSizes) }
+    .distinctUntilChanged().collect { refreshStorage() }
+  }
  }
  fun refreshStorage() {
   storageRefresh?.cancel()
@@ -50,17 +65,32 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    _storageError.value=false
    _storageBytes.value=null
    val result=withContext(Dispatchers.IO) { runCatching { measureStorage() } }
-   _storageFolderAccess.value=result.getOrNull()?.second == true
-   _storageBytes.value=result.getOrNull()?.first
+   ensureActive()
+   _storageFolderAccess.value=result.getOrNull()?.folderAccess == true
+   _storageCatalogue.value=result.getOrNull()?.fromCatalogue == true
+   _storageUnknownSizes.value=result.getOrNull()?.unknownSizes ?: 0L
+   _storageBytes.value=result.getOrNull()?.bytes
    _storageError.value=result.isFailure
   }
  }
- private fun measureStorage(): Pair<Long,Boolean> {
-  var total=0L
-  val tree=SettingsStore.storageTree
-  if (tree != null) return measureTree(tree.toUri()) to true
+ private data class StorageMeasurement(val bytes: Long, val folderAccess: Boolean, val fromCatalogue: Boolean, val unknownSizes: Long = 0)
+ private suspend fun measureStorage(): StorageMeasurement {
+  SettingsStore.storageTree?.let { return StorageMeasurement(measureTree(it.toUri()),true,false) }
   // Returning to the default output folder must not discard an existing read grant.
-  defaultTreeGrant()?.let { return measureTree(it) to true }
+  defaultTreeGrant()?.let { return StorageMeasurement(measureTree(it),true,false) }
+  // Tanpa grant: pakai katalog yang sama dengan layar Koleksi (baris media yang sudah terindeks).
+  // Angka ini selalu terbaca — tidak ada enumerasi folder atau izin tambahan yang diminta lebih dulu —
+  // dan labelnya di Pengaturan dibedakan supaya tidak diklaim sebagai ukuran folder penuh.
+  val totals=DownloadDatabase.get(getApplication()).media().totals().first()
+  if (totals.audio > 0 || totals.video > 0) {
+   return StorageMeasurement(Math.addExact(totals.audioBytes ?: 0L,totals.videoBytes ?: 0L),false,true,totals.unknownSizes)
+  }
+  // Katalog masih kosong: pertahankan jalur lama supaya folder yang belum dipindai tetap terbaca.
+  return StorageMeasurement(measureDownloadsFolder(),false,false)
+ }
+ /** Jumlah ukuran baris MediaStore pada folder output; dipakai saat katalog masih kosong. */
+ private fun measureDownloadsFolder(): Long {
+  var total=0L
   // Batas folder HARUS berhenti tepat di folder pilihan: dulu prefix "Download/TubeFlow%" ikut menghitung
   // folder saudara (TubeFlowBackup) dan "_" dalam nama jadi wildcard SQL (BUG-012).
   val folder="Download/${SettingsStore.storageFolder}"
@@ -72,7 +102,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    require(!it.isNull(0) && it.getLong(0) >= 0) { "Ukuran file belum tersedia." }
    total=Math.addExact(total,it.getLong(0))
   } }
-  return total to false
+  return total
  }
  /** Sums file sizes under a picked SAF tree (bounded walk so huge trees stay cheap). */
  private fun measureTree(root: android.net.Uri): Long {
@@ -103,15 +133,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   return total
  }
  /** Grant SAF tersimpan yang menunjuk folder bawaan (pernah dipilih lewat pemilihan folder) — dipakai mengukur ukuran folder penuh dan membersihkan folder kosong. */
- private fun defaultTreeGrant(requireWrite: Boolean = false): android.net.Uri? {
-  val resolver=getApplication<Application>().contentResolver
-  return resolver.persistedUriPermissions.firstOrNull { permission ->
-   permission.isReadPermission && (!requireWrite || permission.isWritePermission) && runCatching {
-    StorageFolderAccess.matchesDefault(permission.uri.authority,
-     android.provider.DocumentsContract.getTreeDocumentId(permission.uri), SettingsStore.storageFolder)
-   }.getOrDefault(false)
-  }?.uri
- }
+ private fun defaultTreeGrant(requireWrite: Boolean = false): android.net.Uri? =
+  StorageFolderAccess.defaultTree(getApplication(), SettingsStore.storageFolder, requireWrite)
  // Old history keeps its original title/output; recover artwork from the actual audio, not a guessed URL.
  private val artworkRecovery = viewModelScope.launch(Dispatchers.IO) {
   val attempted=mutableSetOf<String>()

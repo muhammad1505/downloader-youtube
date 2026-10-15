@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.BuildConfig
@@ -39,6 +40,8 @@ fun SettingsScreen(
     storageBytes: Long?,
     storageError: Boolean,
     storageFolderAccess: Boolean,
+    storageCatalogue: Boolean = false,
+    storageUnknownSizes: Long = 0,
     onRefreshStorage: () -> Unit,
     clearingFiles: Boolean = false,
     onClearStorage: () -> Unit = {},
@@ -201,6 +204,9 @@ fun SettingsScreen(
                             storageError -> "Ukuran belum dapat dibaca"
                             storageBytes == null -> "Menghitung pemakaian…"
                             storageFolderAccess -> "Ukuran folder: ${Format.bytes(storageBytes)}"
+                            // Angka katalog selalu terbaca (sumber yang sama dengan layar Koleksi), tetapi
+                            // sengaja diberi label berbeda dari ukuran folder penuh.
+                            storageCatalogue -> "Ukuran file di koleksi: ${Format.bytes(storageBytes)}"
                             else -> "File yang dapat diakses: ${Format.bytes(storageBytes)}"
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -208,6 +214,10 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     TextButton(onClick = onRefreshStorage) { Text("Segarkan") }
+                }
+                if (storageCatalogue && storageUnknownSizes > 0) {
+                    Text(pluralStringResource(id.local.tubeflow.R.plurals.storage_partial_sizes, storageUnknownSizes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), storageUnknownSizes),
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
         if (storageError) {
             Text("Pilih ulang folder atau tekan Segarkan. Folder yang terlalu besar/dalam atau file tanpa ukuran belum dapat dihitung lengkap.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -218,7 +228,9 @@ fun SettingsScreen(
             Text(if (clearingFiles) "Menghapus file…" else "Hapus semua file…")
         }
                 Text(
-                    if (tree == null && storageFolderAccess)
+                    if (tree == null && storageCatalogue)
+                        "Angka dijumlahkan dari file yang sudah terindeks di Koleksi — tidak butuh izin atau pemilihan folder lebih dulu. Untuk ukuran seluruh folder (termasuk file yang belum terindeks), pilih Downloads/${SettingsStore.storageFolder} lewat Pilih folder."
+                    else if (tree == null && storageFolderAccess)
                         "Download disimpan di Downloads/${SettingsStore.storageFolder}. Ukuran mencakup semua file dan subfolder yang bisa dibaca melalui akses folder yang sudah diberikan."
                     else if (tree == null)
                         "Angka hanya mencakup file yang dapat dibaca TubeFlow. Untuk menghitung semua file lama dan subfolder, pilih Downloads/${SettingsStore.storageFolder} lewat Pilih folder sendiri. Download tetap disimpan di folder ini."

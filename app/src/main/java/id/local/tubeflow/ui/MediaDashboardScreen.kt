@@ -65,7 +65,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
                     Text("Download media baru atau pindai folder yang sudah berisi file.")
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         Button(onClick=downloads) { Text("Mulai download") }
-                        OutlinedButton(onClick=model::scan,enabled=!busy) { Text("Pindai folder") }
+                        TextButton(onClick=model::scan,enabled=!busy) { Text("Segarkan katalog") }
                     }
                 } else CollectionDonut(t.audio, t.video)
                 Text("Hanya media tersedia. ${t.unavailable} file tidak dapat diakses tidak masuk grafik.", style = MaterialTheme.typography.bodySmall)
@@ -223,5 +223,5 @@ private fun DashboardCard(title: String, content: @Composable ColumnScope.() -> 
 @Composable private fun Metric(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall); Text(value, style = MaterialTheme.typography.labelLarge) } }
 private fun eventLabel(action: String) = when (action) {
     "COMPLETED" -> "Download selesai"; "FAILED" -> "Download gagal"; "CANCELLED" -> "Download dibatalkan"; "QUEUED" -> "Diantrekan";
-    "ADDED" -> "Media ditambahkan"; "RENAMED" -> "Nama diperbarui"; "DELETED" -> "Media dihapus"; "INDEX_FAILED" -> "Pengindeksan media gagal"; "UNAVAILABLE" -> "File tidak dapat diakses"; "ACCESS_DENIED" -> "Izin akses file berubah"; "PROCESSING_FAILED" -> "Pemrosesan tambahan gagal"; "LYRIC_TIMING" -> "Waktu lirik diperbarui"; "LYRICS_SELECTED" -> "Lirik pilihan disimpan"; else -> action
+    "ADDED" -> "Media ditambahkan"; "RENAMED" -> "Nama diperbarui"; "DELETED" -> "Media dihapus"; "INDEX_FAILED" -> "Pengindeksan media gagal"; "UNAVAILABLE" -> "File tidak dapat diakses"; "ACCESS_DENIED" -> "Izin akses file berubah"; "PROCESSING_FAILED" -> "Pemrosesan tambahan gagal"; "LYRIC_TIMING" -> "Waktu lirik diperbarui"; "LYRICS_SELECTED" -> "Lirik pilihan disimpan"; "KARAOKE_SAVED" -> "Instrumental disimpan"; else -> action
 }

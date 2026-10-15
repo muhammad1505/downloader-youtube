@@ -146,3 +146,9 @@ Kunci produksi lama dipertahankan. 175 Kotlin/78 Python/lint debug+release 0; si
 ## Release1.1.5 — pilihan lirik manual
 
 Kunci produksi/Room9 dipertahankan, tanpa dependensi baru. 184 Kotlin/78 Python/lint0, signed APK×3/AAB, audit signature/cert/native/alignment16KB/refleksiZIP/manifest dan bundletool validate lulus. ARM64 63.172.747byte, SHA256 `c4aea0927af8bac992036805986fc1e59982e324760ed37a99d800b544154828`; terpasang dan hash base.apk cocok. Distribusi lokal `app/build/outputs/distribution/1.1.5/`; tidak ada publikasi toko. [Laporan](MANUAL_LYRICS_1_1_5_2026-10-14.md).
+
+## Kandidat 1.1.9 / code23 — 15 Oktober 2026
+
+APK akhir memakai kunci produksi yang sama, non-debuggable; sertifikat SHA256 `ebe3b40eb42c9b60fd044a011fc6a9e0cbfcde97c53accb2ea49934f4934dbd0`. ARM64 **70.546.231 byte**, SHA256 `042d64db675617826441da0c0e76e7aab39ecad849d73732aa8279a0d9696af0`, dipasang sebagai update di Realme Android10; hash base.apk cocok. Artefak aktif berada di `app/build/outputs/apk/release/` dan `app/build/outputs/bundle/release/`; tidak menambahkan salinan distribution lama.
+
+SHA256 APK armeabi-v7a `f72fccb063ffe0563c6205416e155fdd32d2d4ce944a5578317f700de45a50b9`, x86_64 `2e3fcdd8a69393b0ad4c3ad6f6a6fa4cd6b5700a508fc10c23b39d8ca3f43d88`; AAB `e8971585bce57e667e476141a3621a344a608903f8c691b847fd6e8df68472f6` (255.574.674 byte). APK×3: signature/zipalign16KB/native/refleksi ZIP lulus. AAB: jarsigner/bundletool/native lulus. 228 unit Kotlin dan79 Python lulus; lint0error/2warning yang diketahui. Ini bukan klaim pengujian runtime semua ABI/Android16KB atau publikasi toko. [Cakupan perangkat](PLAYER_POLISH_2026-10-15.md).

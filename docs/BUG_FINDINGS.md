@@ -68,6 +68,8 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-037 | P1 | Dispatch bootstrap gagal sebelum transfer | Entry point diperbaiki, 76 tes Python lulus; retry video final berhasil, decode penuh lulus |
 | BUG-038 | P1 | Kredit Title/Voc tidak dibaca | Diperbaiki1.1.2; SATRU2 terbit dengan judul/artis/tag/folder benar pada HP |
 | BUG-039 | P2 | Auto Folder mengabaikan remixer teridentifikasi | Diperbaiki1.1.2; seed Mix terbit di folder remixer pada HP, decode/hash lama lulus |
+| BUG-045 | P2 | Angka penyimpanan tertinggal dari Koleksi setelah scan/impor/hapus/karaoke | Pengamatan agregat Room dan label ukuran parsial diterapkan; verifikasi checkpoint pada laporan player |
+| BUG-046 | P2 | Posisi notifikasi tertinggal setelah seek saat jeda dan progres berjalan | Sinkronisasi dibatasi per detik, seek saat jeda dan kecepatan disinkronkan langsung; regresi host lulus, verifikasi APK akhir pada laporan player |
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
 
@@ -509,3 +511,18 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Akar:** pending/commit/sidecars/lyricStatus worker memakai query tanpa generation; loop NonCancellable dapat terus menerbitkan setelah pause/resume.
 - **Solusi1.1.4:** query owned dengan gen, commit/status hanya RUNNING; stale owner berhenti, URI yang dibuatnya dibersihkan tanpa menimpa jurnal baru. URI gagal hapus masuk AtomicFile privat untuk recovery. Media finish tetap mensyaratkan gen/state yang sama.
 - **Status:** SQL guard stale gen/paused lulus; race publikasi/proses mati/provider menolak masih memerlukan uji runtime. Bukan penutupan semua backlog BUG-002/004/008. [Laporan](UPGRADE_1_1_4_2026-10-14.md).
+
+## BUG-045 — P2: Ukuran penyimpanan tidak mengikuti katalog media
+
+- **Akar masalah:** penyegaran angka hanya dipicu jumlah download selesai dan pembukaan Pengaturan. Perubahan katalog dari scan/impor/penghapusan/karaoke tidak selalu mengubah riwayat. Jalur tanpa grant folder harus menggunakan data Koleksi yang sudah dapat dibaca, bukan menunggu grant SAF baru.
+- **Perbaikan:** `DownloadViewModel` mengamati jumlah/ukuran/ukuran tak diketahui dari `MediaDao.totals()`, menyaring perubahan identik, lalu menyegarkan ukuran. Agregat katalog hanya menghitung media tersedia. `SettingsScreen` membedakan ukuran Koleksi, ukuran folder penuh, dan ukuran parsial.
+- **Regresi:** query Room asli diuji SQLite saat insert/impor, ukuran null→diketahui, delete, dan unavailable tanpa mengubah riwayat download. Tidak ada migrasi atau izin tambahan.
+- **Bukti/batas:** lihat [checkpoint player](PLAYER_POLISH_2026-10-15.md). Ukuran katalog tidak mencakup seluruh sidecar atau file yang belum terindeks; akses folder lengkap tetap mengikuti izin Android.
+
+## BUG-046 — P2: Progres notifikasi tidak mengikuti posisi player
+
+- **Reproduksi:** lagu dijeda, posisi digeser lewat slider. UI pemutar menjadi 1:21 tetapi `dumpsys media_session` tetap melaporkan 482 ms. Notifikasi custom juga tidak mendapat pembaruan posisi berjalan.
+- **Akar masalah:** pengamat `PlayerViewModel` hanya memanggil `PlaybackService.sync` ketika track, status putar, atau durasi berubah; seek dan kecepatan tidak termasuk.
+- **Perbaikan:** `PlaybackNotifications.shouldUpdate` membandingkan dengan state terakhir yang diterbitkan. Tick berjalan diterbitkan saat detik berubah; seek ketika jeda, durasi, judul/track, kecepatan, loading/error, serta stop diperbarui segera. Engine dan MediaSession tetap tunggal.
+- **Regresi:** tiga tes memeriksa seek saat jeda (termasuk dalam detik yang sama), pembatasan tick 200 ms, perubahan kecepatan/durasi/identitas/stop, dan perubahan antrean yang tidak perlu membangun ulang notifikasi.
+- **Bukti/batas:** [laporan player](PLAYER_POLISH_2026-10-15.md); perilaku pusat media Android versi lain tetap memerlukan HP terkait.

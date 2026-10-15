@@ -20,13 +20,16 @@ Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-
 - Splash screen mengikuti tema aplikasi (terang/gelap) saat aplikasi dibuka.
 - Folder penyimpanan bisa diubah di Pengaturan → Penyimpanan (nama satu segmen di bawah Downloads/).
 
-- Smart Media: satu katalog Semua/Musik/Video, terpisah dari riwayat; scan folder dan impor dokumen tanpa salinan media. Pencarian, filter folder/artis/album, sortir, detail, thumbnail dan playback melalui pemutar perangkat.
+- Smart Media: satu katalog Semua/Musik/Video, terpisah dari riwayat; pemindaian otomatis tanpa salinan media. Pencarian, filter folder/artis/album, sortir, detail, thumbnail; audio memakai pemutar TubeFlow dan video memakai pemutar perangkat.
+- Pemutar audio: mini player beraksen sampul, swipe sampul/lirik, pencarian/editor lirik, seek, kecepatan, equalizer, antrean yang dapat diurutkan, acak/ulangi, dan kontrol notifikasi dengan tombol tutup. Ukuran file Koleksi terbaca di Pengaturan tanpa grant folder tambahan; ukuran folder lengkap dibedakan dari ukuran katalog.
+- Karaoke opsional di perangkat: model diunduh terpisah dan diverifikasi; pilih cuplikan dengan waktu mulai manual atau lagu penuh, dengarkan lalu simpan instrumental FLAC terpisah. Proses CPU dapat lama dan hasil pengurangan vokal bergantung rekaman; audio asli dipertahankan.
 - Smart Audio: normalisasi nama, tag khusus audio yang menjaga informasi valid, pengaturan otomatis artwork/lirik/katalog. Tahun unggah dan nama uploader tidak dijadikan tahun/artis lagu.
 - Koreksi waktu LRC per lagu (±30 detik), baseline asli, preview dan reset; cocok untuk offset konstan, bukan perbedaan aransemen/drift.
 - Rename pasangan audio–LRC MediaStore dengan verifikasi/rollback, serta hapus permanen berkonfirmasi. Dukungan rename SAF bergantung kemampuan provider.
 - Ringkasan: jumlah/ukuran media tersedia, status metadata/artwork/lirik, penyimpanan internal, aktivitas harian/mingguan/platform sejak upgrade. Riwayat yang dihapus dan statistik lama tidak ditebak.
 
 Detail implementasi, migrasi, hasil tes dan batas cakupan: [laporan Smart Media](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
+Perubahan pemutar terbaru: [polesan player dan penyimpanan](docs/PLAYER_POLISH_2026-10-15.md).
 
 Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio Auto memakai MP3 agar bitrate dapat diterapkan. Bitrate lebih tinggi dan format lossless tidak meningkatkan kualitas sumber. Resolusi manual membatasi kualitas maksimum, bukan menjamin sumber tersedia pada resolusi itu.
 

@@ -2,7 +2,8 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose
 android {
  namespace = "id.local.tubeflow"
  compileSdk = 37
- defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 19; versionName = "1.1.5" }
+ ndkVersion = "27.1.12297006"
+ defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 23; versionName = "1.1.9" }
  splits { abi { isEnable = true; reset(); include("arm64-v8a", "armeabi-v7a", "x86_64"); isUniversalApk = false } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -29,6 +30,9 @@ dependencies {
  implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
  implementation(files("libs/ffmpeg-0.18.1-webp16k.aar"))
  implementation("io.coil-kt:coil-compose:2.7.0")
+ // Pinned after target-device JNI startup failed with 1.31.0; audit a replacement on Android 10 first.
+ //noinspection NewerVersionAvailable
+ implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
  testImplementation("junit:junit:4.13.2")
  // org.json asli untuk unit test: stub android.jar melempar "not mocked" — Lyrics.fetch diuji dengan fixture HTTP (BUG-013/014).
  testImplementation("org.json:json:20260814")

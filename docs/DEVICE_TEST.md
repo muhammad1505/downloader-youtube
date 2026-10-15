@@ -214,3 +214,139 @@ Realme RMX1821, Android 10/API29, ARM64, halaman memori 4 KB. Update-r berhasil;
 ## Release1.1.5 — Android10 fisik
 
 Final ARM64/code19 terpasang update-r tanpa reset, SHA256 `c4aea0927af8bac992036805986fc1e59982e324760ed37a99d800b544154828` cocok. 61file sebelum/sesudah update memiliki hash sama. Candidate menampilkan17hasil SATRU2; pengelola mengonfirmasi seleksi/simpan, LRC10455242 terbit sesuai stem dan payload. UI kolom detik terlihat; penyimpanan offset custom/rename→search/LR auditori belum diklaim. [Bukti dan cakupan](MANUAL_LYRICS_1_1_5_2026-10-14.md).
+
+
+## Upgrade pemutar ultimate + antrean — 14 Oktober 2026
+
+Konteks: pengelola mengonfirmasi tes 1.1.6 sebelumnya "sudah sesuai", lalu meminta (1) hapus fitur L/R, (2) lirik di media player yang "hilang" harus kembali jelas, (3) play satu lagu = seluruh daftar masuk antrean, (4) player tidak boleh mati saat layar mati, (5) pemutar lengkap dengan equalizer dkk. Perubahan: `PlaybackQueue` sudah ada dari sesi sebelumnya; sesi ini menghapus `AudioChannel`/kontrol L/R, menambah `PlaybackService` (foreground `mediaPlayback`, MediaSession, notifikasi MediaStyle 4 aksi, partial wake lock saat putar), `PlayerEqualizer` (audiofx bawaan, preset/level tersimpan), kecepatan putar 0,25–3×, chip tampilan **Sampul/Lirik** yang jelas dengan lirik otomatis tampil bila tersedia, dan tap item = seluruh daftar masuk antrean (Koleksi & Riwayat).
+
+**Build/host:** `scripts/build_release.sh` lulus (testDebugUnitTest 207 tes, lintDebug/lintRelease 0 masalah, APK×3/AAB). APK ARM64 70.408.643 byte SHA256 `08fa5da247bb0985592ecd851cb534588b00b2f6e21ee72ceb25dda6c8bb67fa`, sertifikat produksi `ebe3b40e…` (apksigner v2), terpasang `install -r` sebagai update atas 1.1.6 (code20) di Realme RMX1821 Android 10 tanpa uninstall/clear-data; hash `base.apk` yang ditarik dari HP cocok. 62 file publik (11 LRC) tetap utuh setelah update.
+
+**Uji perangkat (UIAutomator/dumpsys, HP sama):**
+
+| Kasus | Hasil yang diamati |
+| --- | --- |
+| Tap kartu lagu di Koleksi | Memutar langsung dan **seluruh daftar masuk antrean** — dialog Antrean menampilkan 51 item (SATRU aktif, lalu DUMES, SIKSA MENANGGUNG RINDU, dst.), bukan satu lagu. |
+| Lirik di pemutar | **Tampil otomatis** penuh dengan sorotan baris aktif (SATRU); chip **Sampul/Lirik** berganti tampilan dua arah. (Versi sebelumnya lirik hanya muncul lewat tombol ikon yang mudah terlewat.) |
+| Lompat antrean | Ketuk DUMES di dialog antrean → pemutar berpindah ke DUMES (0:03/5:13). |
+| Equalizer | Dialog terbuka; perangkat menyediakan 5 band (60 Hz–14 kHz) + preset bawaan "Normal"; switch Aktif, slider per band, preset tersimpan. |
+| Kecepatan putar | Menu 0,5×–2×; pilih 1,5× → label berubah dan posisi maju lebih cepat (1:11 → 2:03 dalam beberapa detik). |
+| **Layar mati** | `KEYCODE_SLEEP` + 20 detik → MediaSession `state=3` (PLAYING) terus berjalan; setelah bangun posisi lanjut 1:11 dari 0:51. Wake lock partial hanya diambil saat putar. |
+| Kontrol media eksternal | `media dispatch pause/play/stop` (jalur tombol headset/notifikasi) bekerja saat layar mati: state 3→2→3; stop menghentikan service, melepas MediaSession, menutup pemutar, dan menghapus notifikasi (0 ServiceRecord). |
+| Notifikasi | Service `PlaybackService` foreground `isForeground=true` dengan notifikasi channel `playback` 4 aksi (sebelumnya/play-pause/berikutnya/tutup). |
+
+**Batas cakupan:** prev/next/shuffle/repeat dari UI tidak dites manual satu per satu (transisinya diuji host `PlaybackQueueTest`); kecepatan 0,25–3× di luar menu tidak ada; equalizer diuji tampilan/preset, bukan perubahan suara auditori; dukungan headset/Bluetooth fisik tidak diuji (hanya dispatch media); durasi panjang/layar mati >20 detik dan audio focus saat telepon tidak diuji; sinkronisasi auditori lirik tidak disentuh. Tidak ada pengukuran baterai/benchmark.
+
+
+## Perbaikan Koleksi, notifikasi, karaoke dan autoplay — 15 Oktober 2026
+
+Konteks laporan pengelola: setelah **menghapus data aplikasi**, 53 file di `Download/TubeFlow` (51 `mix-*` yang ditulis via SAF/versi lama sehingga `owner_package_name` kosong di MediaProvider + 2 ENGKAULAH) tidak terbaca di Koleksi dan ukuran folder tampil 0; ikon status bar notifikasi berupa kotak putih; progressbar notifikasi mentok di akhir meski lagu baru mulai; detail karaoke tidak ikut berubah saat ganti lagu; permintaan auto-play musik saat headset/TWS konek.
+
+**Akar masalah dan perbaikan:**
+
+1. **Koleksi kosong:** query MediaStore tanpa izin storage hanya melihat kontribusi milik aplikasi; grant SAF persisten ikut hilang saat data dihapus dan `scan()` tidak pernah memeriksa grant folder bawaan. Kini `MediaRepository.scan()` memakai grant persisten `Download/TubeFlow` (`StorageFolderAccess.defaultTree`) lewat jalur dokumen bila `storageTree` kosong, tanpa mengubah tujuan output; tombol **Pindai folder** otomatis membuka pemilih folder bila tidak ada akses (`MediaLibraryViewModel.grantFolder`); dedup folder+nama+ukuran mencegah baris ganda; ukuran folder/pembersihan memakai grant yang sama.
+2. **Ikon kotak putih:** `PlaybackService` memakai `ic_launcher_foreground` (vektor berwarna penuh) sebagai small icon. Diganti `drawable/ic_stat_playback.xml` — siluet monokrom alfa 24 dp (bingkai + segitiga putar).
+3. **Progressbar penuh:** MediaSession tidak pernah diberi metadata durasi sehingga UI sistem menganggap lagu selesai; posisi juga tidak dikirim ulang. Kini `setMetadata` (judul/artis/DURATION) dipasang tiap render dan `durationMs` ikut disinkronkan setelah prepared; posisi selalu mulai dari 0 untuk lagu baru.
+4. **Detail karaoke:** judul dialog menampilkan `source?.title` (lagu proses lama) saat proses lama aktif/selesai. Kini judul selalu lagu terpilih dan panel proses lama diberi label sumber eksplisit.
+5. **Auto-play headset:** `AudioDeviceCallback` (tanpa izin tambahan) melanjutkan musik yang sedang berhenti saat output kabel/Bluetooth/USB tersambung.
+
+**Build/host (`scripts/build_release.sh`):** 207 Kotlin + 78 Python 0 gagal, lint debug/release 0 masalah, signed APK×3/AAB. Audit native 257/257/259 ELF (APK) dan 1.038 ELF (AAB) 0 gagal 16 KB, audit ZIP reflektif 13 kelas 0 gagal, `apksigner` v2 **Verifies** (satu signer). ARM64 70.415.371 byte SHA256 `b01188725889e146c39f2c13b2f61843ce5cedbdefe36fdb7c51362a6dc90809`.
+
+**Instalasi:** `adb install -r` sebagai update atas 1.1.6 (code20, keystore produksi sama) di Realme RMX1821 Android 10, `lastUpdateTime 2026-10-15 03:24:48`; tanpa uninstall/clear-data oleh agent (clear data dilakukan pengelola sebelum laporan).
+
+**Uji perangkat (UIAutomator/dumpsys/screenshot):**
+
+| Kasus | Hasil yang diamati |
+| --- | --- |
+| Koleksi setelah hapus data | Awalnya hanya 2 item ENGKAULAH. **Pindai folder** → dashboard menampilkan **52 media tersedia / 267,3 MB / 13 artis / 6 album**, 1 file tidak dapat diakses (baris ENGKAULAH 5,1 MB yang filenya memang sudah tidak ada). 51 file `mix-*` lama kembali terbaca lengkap dengan artis/cover. Ukuran folder tidak lagi 0. |
+| Ikon status bar | `dumpsys notification`: `icon=…drawable/ic_stat_playback` (bukan lagi kotak putih `ic_launcher_foreground`); tangkapan layar notifikasi menampilkan badge putar monokrom. |
+| Progressbar notifikasi | `media_session` metadata `size=3` (judul, artis, **durasi**), `state=3 position=0` saat lagu mulai; tangkapan layar menampilkan **00.28 / 05.36** beberapa detik setelah lagu dimulai — bar di posisi awal, bukan mentok di akhir. |
+| Detail karaoke ganti lagu | Dengan proses UVR aktif untuk Lamunan (LIVE), dialog karaoke untuk lagu lain menampilkan judul **Nemen (Live Royal)** (lagu terpilih) plus label "Proses karaoke yang tampil adalah untuk Lamunan (LIVE)", progres "Memisahkan vokal" 17%→48%. (Sebelum perbaikan: judul menampilkan lagu proses lama tanpa keterangan.) |
+| Antrean dari koleksi | Tap lagu → "Antrean (52)" di pemutar penuh; lirik otomatis tampil; metadata sesi mengikuti lagu aktif (Nemen, Happy Asmara). |
+| Proses karaoke cuplikan | Sampel 30 detik Lamunan (sumber 2:44.732–3:14.732) selesai penuh: status "Cuplikan instrumental siap"; **Dengarkan instrumental** memutar pratinjau (metadata sesi `Lamunan (LIVE) (Karaoke cuplikan)`, state PLAYING, 0:30/0:30); **Simpan cuplikan FLAC** menerbitkan `Lamunan (LIVE, Karaoke cuplikan) - Denny Caknan.flac` 3.571.363 byte ke `Download/TubeFlow/` (05:23) dan otomatis masuk Koleksi (52 → 53 media); tombol berubah "Sudah disimpan". |
+
+**Batas cakupan:** auto-play headset/TWS **belum diuji fisik** (perlu aksesori; verifikasi manual: putar musik → jeda → sambungkan TWS → musik lanjut sendiri). Pemulihan folder bila grant benar-benar hilang total akan memunculkan pemilih folder dari tombol Pindai folder; jalur picker ini belum diuji ulang karena grant di perangkat masih ada. File uji cuplikan karaoke tersimpan di Koleksi dan boleh dihapus pengelola. Kinerja/baterai, perilaku saat telepon, dan uji layar mati untuk sesi ini tidak diulang. Tidak ada tes destruktif tambahan.
+
+
+## Fix auto-scan Koleksi dan auto-play saat app tertutup — 15 Oktober 2026 (lanjutan)
+
+Laporan pengelola setelah batch pagi: (1) setelah hapus data, izin baca memang diminta dan disetujui, tetapi hasil **Pindai folder tetap nol** dan Koleksi kosong sampai memilih folder di Pengaturan; (2) **auto-play headset hanya jalan saat aplikasi terbuka** — menutup aplikasi lalu memasang headset tidak memutar apa pun.
+
+**Akar masalah dan perbaikan:**
+
+1. **Scan nol meski izin diberikan:** di Android 10 (scoped storage), baris MediaStore file lama (`owner_package_name` kosong, ditulis via SAF/versi lama) tidak terlihat oleh query aplikasi meski `READ_EXTERNAL_STORAGE` sudah granted — terbukti dari `content query` shell (baris ada, `mime_type=audio/mpeg`, `is_pending=0`) sementara aplikasi melihat 0 baris. Fix: `android:requestLegacyExternalStorage="true"` pada manifest (dihormati di perangkat Android 10 apa pun targetSdk — penegakan scoped storage untuk targetSdk 30+ ada di platform Android 11+; terverifikasi `PRIVATE_FLAG_REQUEST_LEGACY_EXTERNAL_STORAGE` pada paket), izin `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE` (maxSdk 29) untuk mode legacy, dan `MediaRepository.scan()` kini **union dua sumber** (MediaStore + grant SAF) dengan dedup nama-folder-ukuran serta ringkasan `ScanSummary(checked, failed, discovered)` yang jujur. `scanIfEmpty` memindai otomatis saat aplikasi dibuka dan koleksi kosong; izin diminta otomatis sekali. **Alur yang dituju: hapus data → buka app → setujui izin → Koleksi terisi sendiri**, tanpa pilih folder/tanpa impor.
+2. **Auto-play mati saat app ditutup:** engine `PlayerViewModel` dimiliki activity (`ViewModelProvider(this)`), sehingga menutup UI mematikan engine lewat `onCleared`. Fix: engine kini milik proses via `PlayerViewModel.obtain(app)` (singleton, dipakai `MainActivity`), pemicu cadangan `ACTION_HEADSET_PLUG`/Bluetooth `CONNECTION_STATE_CHANGED` lewat runtime receiver **dan** manifest `HeadsetAutoPlayReceiver` (bekerja walau proses baru dibangun), serta lagu terakhir dipersist (`player-last`) sehingga auto-play punya sumber saat pemutar kosong. Log `TubeFlow-autoload` membantu diagnosis.
+
+**Build/host:** `scripts/build_release.sh` lulus (207 tes Kotlin 0 gagal, lint debug/release 0 masalah, APK×3/AAB); audit native 257 ELF 0 gagal 16 KB, audit ZIP reflektif 13 kelas 0 gagal, `apksigner` v2 **Verifies**. ARM64 70.418.227 byte SHA256 `fac5ecaef0e0b5491f596e3bab90129c6202acacd18fb7f388323d7a19fd9f5c`, terpasang `install -r` sebagai update (07:33).
+
+**Bukti perangkat sejauh ini:** paket membawa flag legacy storage; `HeadsetAutoPlayReceiver` terdaftar dengan dua filter; aplikasi berjalan normal dengan Koleksi 52 media/267,3 MB; headset yang tersambung saat app terbuka langsung memutar (jalur in-process). **Menunggu uji pengelola:** (a) hapus data → setujui izin → Koleksi terisi tanpa pilih folder; (b) tutup aplikasi (geser recent) → sambungkan TWS/headset → musik berbunyi. Catatan: bila proses benar-benar mati, penerima manifest bergantung pada pengiriman broadcast sistem (beberapa perangkat membatasi `HEADSET_PLUG`); menghapus paket (uninstall) tetap membutuhkan persetujuan izin sekali di pemakaian berikutnya.
+
+
+## Fix hapus baris, auto-play A2DP, sampul notifikasi, tombol koleksi, riwayat vs antrean — 15 Oktober 2026 (batch 3)
+
+Laporan pengelola: (1) hapus file menyisakan baris "file tidak tersedia"; (2) auto-play masih tidak jalan malah makin tidak jalan; (3) mini player di notifikasi perlu tampilan sampul + aksen; (4) hapus tombol "Pindai folder"/"Impor file" di Koleksi karena sudah otomatis; (5) item riwayat ikut masuk/membanjiri antrean pemutar.
+
+**Akar masalah dan perbaikan:**
+
+1. **Baris sisa setelah hapus:** `MediaRepository.delete()` sebelumnya menyimpan baris dengan availability `UNAVAILABLE` sehingga daftar tetap menampilkan entri mati. Kini baris ikut dihapus (`dao.remove(item.uri)`) karena file sudah tiada dan pengguna memang memilih Hapus; riwayat event `DELETED` tetap dicatat untuk mencegah duplikat.
+2. **Auto-play saat proses mati:** receiver manifest sebelumnya hanya mendengar profil *headset* (`BluetoothHeadset`), sedangkan TWS/A2DP memakai `BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED` — yang dikecualikan dari batas broadcast implicit Android 8+ sehingga bisa membangunkan proses. `HeadsetAutoPlayReceiver` kini mendaftar **tiga filter**: `BluetoothA2dp.CONNECTION_STATE_CHANGED`, `BluetoothHeadset.CONNECTION_STATE_CHANGED`, dan `ACTION_HEADSET_PLUG` (kabel); `PlayerViewModel` menambahkan runtime receiver untuk A2DP saat proses hidup. Catatan platform: `HEADSET_PLUG` (kabel) hanya disalurkan ke receiver runtime saat proses mati — keterbatasan Android, bukan aplikasi.
+3. **Notifikasi mini player:** `PlaybackService` kini menyertakan sampul besar (`MediaMetadata.METADATA_KEY_ALBUM_ART`/`ART` dari cache sampul, di-cache antar lagu) dan aksen warna yang diekstrak dari sampul (`CoverColors`) untuk warna progress bar.
+4. **Tombol koleksi:** "Pindai folder" dan "Impor file" dihapus dari Koleksi, dashboard, dan turunannya; Koleksi kini sepenuhnya otomatis (MediaStore + grant + `scanIfEmpty`).
+5. **Riwayat vs antrean:** `HistoryScreen.onPlay` kini memutar **hanya lagu yang diketuk** (`player.playJobs(listOf(job), 0)`) — daftar riwayat tidak lagi membanjiri antrean pemutar.
+
+**Build/host:** `testDebugUnitTest` 207 tes 0 gagal (EXIT=0), `scripts/build_release.sh` BUILD SUCCESSFUL (test + lintDebug + lintRelease + assemble + bundle), audit native 257 ELF 0 gagal, audit ZIP reflektif 13 kelas 0 gagal, `apksigner` v2 **Verifies**. Terpasang `adb install -r` sebagai update di Realme RMX1821 Android 10; `HeadsetAutoPlayReceiver` terdaftar dengan 3 filter intent.
+
+**Uji perangkat (UIAutomator/screenshot):**
+
+| Kasus | Hasil yang diamati |
+| --- | --- |
+| Hapus file | Menu ⋮ → Hapus file → konfirmasi → toast "File dihapus."; baris **langsung hilang** dari Koleksi (tidak ada lagi baris "file tidak tersedia"), daftar menata ulang tanpa entri mati. |
+| Tombol Koleksi | "Pindai folder"/"Impor file" tidak ada; hanya "Putar semua" dan "Acak". |
+| Notifikasi mini player | Panel notifikasi menampilkan **sampul besar** (artwork lagu) dan progress bar dengan **aksen merah** yang cocok dengan sampul lagu. |
+| Riwayat vs antrean | Kode terverifikasi: tap lagu di riwayat hanya memasukkan lagu itu ke antrean pemutar (`playJobs(listOf(it), 0)`). |
+
+**Batas cakupan:** auto-play TWS **saat proses mati** masih menunggu uji fisik dengan headset (jalur A2DP manifest sudah terdaftar; jika perangkat membatasi broadcast saat proses mati, log `TubeFlow-autoload` akan kosong — jalur runtime tetap aktif saat aplikasi hidup). Uji hapus dilakukan pada satu item (ENGKAULAH ISTRI PUJAANKU) atas izin pengelola ("bebas hapus file yang mana").
+
+
+## Fix antrean auto-play isi koleksi utuh — 15 Oktober 2026 (batch 4)
+
+Laporan pengelola: auto-play headset/TWS kini berjalan, tetapi **antrean putar hanya berisi 1 file** — setelah lagu itu selesai/next, pemutar diam tanpa lagu lanjutan.
+
+**Akar masalah dan perbaikan:** `PlayerViewModel.autoPlayOnDevice()` melanjutkan lagu terakhir lewat `play(track)` → `startQueue(listOf(track))`, sehingga antrean terisi satu lagu. Kini auto-play mengisi antrean dengan **SELURUH koleksi audio tersedia** (query baru `MediaDao.availableAudio()`, urutan koleksi terbaru dulu) dan mulai dari **lagu terakhir yang diputar**; bila lagu itu sudah tidak ada di koleksi (file dihapus), mulai dari awal koleksi. Keputusan isi antrean + posisi mulai berada di perencana murni `AutoPlayQueue.plan()` (tanpa Android, dapat diuji host). Jika lagu aktif masih siap (prepared) dan sama, antrean **dilebarkan tanpa memuat ulang** sehingga posisi putar tidak hilang; selain itu antrean utuh dimuat mulai dari lagu terakhir. Koleksi kosong tetap jatuh ke perilaku lama (lagu terakhir apa adanya).
+
+**Host:** 213 tes Kotlin 0 gagal — termasuk 6 regresi baru `AutoPlayQueueTest` (koleksi utuh bukan 1 lagu, mulai dari lagu terakhir, fallback awal koleksi saat lagu terhapus, start null, koleksi kosong tanpa rencana, pemilihan lewat id selector) — dan 78 tes Python OK. `scripts/build_release.sh` BUILD SUCCESSFUL 16m20s (testDebugUnitTest + lintDebug + lintRelease + assembleRelease + bundleRelease). Lint debug/release: **1 warning pralahir `SelectedPhotoAccess`** (penanganan izin media visual Android 14+ dari `READ_MEDIA_VIDEO`; tidak terkait perubahan batch ini — sekaligus koreksi atas klaim "lint 0 masalah" pada batch sebelumnya). Audit native 257 ELF 0 gagal 16 KB, audit ZIP reflektif 13 kelas 0 gagal, `apksigner` **Verifies** (satu signer, sertifikat produksi `ebe3b40e…`). Versi dinaikkan menjadi **1.1.7 (code21)** agar update terverifikasi.
+
+**Instalasi:** `adb install -r` sebagai update atas 1.1.6 (code20) di Realme RMX1821 Android 10 → **Success**; `dumpsys package` menunjukkan `versionCode=21`/`versionName=1.1.7`; `base.apk` yang ditarik dari HP ber-SHA256 `a7721a5534278d0de2cf98d11526d2bb994f9285b28e4bab2e07f3f82babb821` — identik artefak `app-arm64-v8a-release.apk` (70.419.479 byte). Launch tanpa `FATAL` di logcat.
+
+**Batas cakupan:** pemicu auto-play fisik **tidak dapat dipalsukan via ADB** — `am broadcast android.intent.action.HEADSET_PLUG` ditolak platform ("Permission Denial: not allowed to send broadcast" dari uid 2000) dan layar terkunci passcode 6 digit sehingga verifikasi UI tidak mungkin di sesi ini. **Uji pengelola yang ditunggu:** tutup aplikasi (geser recent) → sambungkan TWS/headset → musik mulai dengan **antrean penuh** — buka dialog Antrean dan pastikan jumlahnya = koleksi (mis. 52), bukan 1; lagu berikutnya otomatis lanjut setelah lagu pertama selesai. Log `TubeFlow-autoload` kini mencetak `queue=<jumlah>` untuk diagnosis.
+
+
+## Upgrade UI pemutar: swipe sampul↔lirik, alat lirik, aksen sampul, antrean, EQ otomatis — 15 Oktober 2026 (batch 5)
+
+Lima permintaan pengelola: (1) pindah sampul↔lirik cukup dengan **swipe**; (2) saat lirik kosong, sediakan **Cari lirik** dan **Editor lirik** langsung di pemutar supaya tidak bolak-balik ke Koleksi; (3) latar lirik memakai **aksen warna sampul**, bukan hitam polos; (4) tampilan **antrean** lebih premium dan rapi; (5) equalizer **Otomatis** supaya semua musik mantap, bassnya bulat.
+
+**Perubahan:**
+
+1. **Swipe Sampul↔Lirik:** halaman utama pemutar penuh kini `HorizontalPager` — geser kiri/kanan untuk berpindah; chip **Sampul/Lirik** tetap ada sebagai indikator yang bisa diketuk. Swipe pengguna menang atas pemilihan otomatis; lagu baru kembali memakai aturan otomatis (lirik tampil bila tersedia).
+2. **Alat lirik di pemutar:** lirik kosong menampilkan tombol **Cari lirik** (pencarian LRCLIB yang sama dengan Koleksi — parameter judul/artis dapat diedit, preview, gerbang kecocokan tetap berlaku) dan **Editor lirik** (dialog "Waktu lirik" yang sama untuk koreksi ±detik); saat lirik tersedia tersedia "Atur waktu lirik" dan "Cari lirik lain". `MediaLibraryViewModel.openLyricsForTrack(uri)`/`itemFor(uri)` memetakan URI track pemutar ke item koleksi; dialog lirik dihost di dalam jendela pemutar agar tampil di atas pemutar penuh (z-order dialog).
+3. **Latar lirik aksen sampul:** gradien pemutar dan halaman lirik memakai warna dominan sampul (`rememberCoverAccent`/`CoverColors`), baris lirik aktif juga memakai aksen sampul — nuansa mengikuti warna sampul lagu, bukan hitam.
+4. **Antrean premium:** dialog Antrean memuat thumbnail sampul per lagu, kartu lagu aktif beraksen + label "Sedang diputar", jumlah lagu di judul, auto-scroll ke posisi aktif, aksi lompat/keluarkan tetap ada.
+5. **EQ Otomatis (bass bulat):** kurva `AutoEq` baru — +5 dB di 60 Hz, mid ditekan halus (−1 dB di 2 kHz) agar vokal jernih, +2,5 dB treble — dihitung per **frekuensi tengah band** (jumlah/lebar band beda per perangkat), interpolasi logaritmik, dijepit ke rentang band. Preset **Otomatis (bass bulat)** menjadi bawaan (kecuali pengguna sudah memilih preset/level sendiri) dan diterapkan ke **semua lagu**; equalizer tetap dapat dimatikan.
+
+**Host:** 220 tes Kotlin 0 gagal (7 regresi baru `AutoEqTest`: boost bass, mid jernih, kilau treble, interpolasi mulus antar titik, clamp rentang band, pilihan preset default), 78 tes Python OK (engine tidak berubah), `scripts/build_release.sh` BUILD SUCCESSFUL 13m58s (test + lintDebug + lintRelease + assemble + bundle). Audit native 257 ELF 0 gagal 16 KB, audit ZIP reflektif 13 kelas 0 gagal. Lint debug/release: **2 warning, keduanya bukan dari perubahan ini** — `SelectedPhotoAccess` (pralahir, izin media visual Android 14+) dan `GradleDependency` (onnxruntime 1.23.2→1.31.0 tersedia; **pin disengaja** — 1.31.0 gagal JNI startup di perangkat target, tercatat di `build.gradle.kts`).
+
+**Catatan build:** percobaan pertama gagal `No space left on device` (disk 100%; 21 artefak rilis lama di `app/build/outputs/distribution/` = 7,5 GB) — dibersihkan hanya intermediates/scratch (~5 GB), **artefak rilis lama tidak disentuh**; build kedua gagal karena bentrok overload `openLyrics(uri)` vs `openLyrics(jobId)` — diganti nama `openLyricsForTrack`, lalu lulus.
+
+**Instalasi:** 1.1.8 (code22) ARM64 70.473.503 byte SHA256 `622796f208b4089210089fa70b54344bf87245740a1a40c8b06e8d41a2f7a963` terpasang `adb install -r` sebagai update atas 1.1.7 (code21) di Realme RMX1821 Android 10; `base.apk` yang ditarik dari HP cocok dengan artefak; launch tanpa `FATAL` di logcat.
+
+**Perangkat:** saat sesi, layar terbuka dan **pengelola sedang aktif memakai aplikasi** (dialog "Cari dan pilih lirik" untuk Laut Kidul LIVE dengan 19 hasil terlihat pada tangkapan layar lokal; tidak dipublikasikan karena indikator aplikasi lain pada status bar) — agent sengaja tidak menyentuh UI untuk menghindari gangguan.
+
+**Batas cakupan:** swipe/pager, alat lirik di pemutar, dialog antrean baru, dan EQ Otomatis **belum diuji interaktif di perangkat** (diserahkan ke pengelola); kualitas suara EQ belum dinilai auditori; kontras baris lirik pada sampul warna terang belum diuji; kedua warning lint tetap terbuka.
+
+## Player dan penyimpanan 1.1.9 — 15 Oktober 2026
+
+Perangkat fisik Realme RMX1821/Android 10/ARM64/4KB. APK produksi code23 SHA256 `042d64db675617826441da0c0e76e7aab39ecad849d73732aa8279a0d9696af0` dipasang `install --no-incremental -r`; hash APK ditarik dari HP cocok. Tidak uninstall/clear data.
+
+Terbukti: UI mini/penuh/antrean terang dan gelap, menu antrean, pindah lagu menjadi berikutnya, bersihkan hanya menyisakan lagu aktif, ukuran Koleksi 263,8 MB tanpa pemilih folder/grant baru (51 audio fisik/276.635.482 byte), seek saat jeda 2:37→MediaSession157.042ms, progres sistem PLAYING4.089→6.101ms, X kontras terlihat dan menghapus notifikasi/sesi. **69/69 file awal identik SHA256**, jumlah tetap69. Tema dikembalikan Ikut sistem; font0,9 tidak berubah. Tidak ada TubeFlow pada buffer crash saat pemeriksaan.
+
+Belum diuji: font1,3×/2× (WRITE_SETTINGS ditolak ColorOS), 360dp, landscape/tablet, TalkBack, Android12+/runtime16KB, gangguan SAF/storage penuh atau download jaringan baru dalam checkpoint ini. [Bukti visual dan laporan lengkap](PLAYER_POLISH_2026-10-15.md).

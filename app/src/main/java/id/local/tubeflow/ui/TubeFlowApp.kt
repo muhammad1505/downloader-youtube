@@ -1,6 +1,8 @@
 package id.local.tubeflow.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -27,7 +29,7 @@ import id.local.tubeflow.core.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var previousTab by rememberSaveable { mutableIntStateOf(1) }
@@ -41,8 +43,13 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val storageBytes by model.storageBytes.collectAsStateWithLifecycle()
     val storageError by model.storageError.collectAsStateWithLifecycle()
     val storageFolderAccess by model.storageFolderAccess.collectAsStateWithLifecycle()
+    val storageCatalogue by model.storageCatalogue.collectAsStateWithLifecycle()
+    val storageUnknownSizes by model.storageUnknownSizes.collectAsStateWithLifecycle()
     val clearingFiles by model.clearing.collectAsStateWithLifecycle()
     val libraryMessage by library.message.collectAsStateWithLifecycle()
+    // Riwayat adalah tujuan navigasi sendiri (tab 4), bukan chip di dalam Koleksi; Pengaturan
+    // tetap di luar bilah bawah lewat ikon di app bar sehingga punya indeks terpisah.
+    val settingsTab = 5
     var tab by rememberSaveable { mutableIntStateOf(1) }
     var url by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
@@ -60,27 +67,51 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             // membuat tautan playlist murni memunculkan "tautan tidak valid" sesaat dan video diperiksa dua kali (BUG-022).
         }
     }
+    // Koleksi harus pulih sendiri setelah data aplikasi dihapus: minta izin baca sekali, lalu pindai
+    // otomatis bila koleksi kosong — tanpa pilih folder atau impor file. Izin baca juga membuat file
+    // lama (owner MediaStore kosong/SAF) terbaca; grant SAF hanya fallback bila izin ditolak.
+    val readPermissions = remember {
+        when {
+            android.os.Build.VERSION.SDK_INT >= 33 -> arrayOf(
+                android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO,
+            )
+            // API 29 dengan mode legacy memerlukan izin baca/tulis klasik untuk membaca file lama.
+            android.os.Build.VERSION.SDK_INT <= 29 -> arrayOf(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            )
+            else -> arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+    val requestRead = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) library.scanIfEmpty()
+    }
+    LaunchedEffect(Unit) {
+        if (library.hasReadPermission() || library.hasFolderAccess()) library.scanIfEmpty() else requestRead.launch(readPermissions)
+    }
     LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it); model.clearError() } }
     // Info "Terpakai …" di Pengaturan ikut terbaru tiap tab dibuka, bukan cuma pas aplikasi start.
-    LaunchedEffect(tab) { if (tab == 4) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
+    LaunchedEffect(tab) { if (tab == settingsTab) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
     LaunchedEffect(libraryMessage) { libraryMessage?.let { if (it.startsWith("Waktu lirik disimpan.") || it.startsWith("Lirik pilihan disimpan.")) player.refreshLyrics(); snackbar.showSnackbar(it); library.clearMessage() } }
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
+    val karaokeSource by karaoke.source.collectAsStateWithLifecycle()
     val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
 
-    BackHandler(enabled=tab == 4 && !fullPlayer) { tab=previousTab }
-    LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false }
+    BackHandler(enabled=tab == settingsTab && !fullPlayer) { tab=previousTab }
+    LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false else requestNotifications() }
     val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
         ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
     AccentTheme(accentCover, SettingsStore.artworkAccent) {
-    LyricsSearchDialog(library)
-    if (fullPlayer && playback.track != null) FullPlayer(playback,player) { fullPlayer=false }
+    // Saat pemutar penuh terbuka, dialog lirik dihost di dalam jendela pemutar (z-order dialog).
+    if (!fullPlayer) LyricsSearchDialog(library)
+    KaraokeDialog(karaoke, player, requestNotifications)
+    if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(if (tab == 4) "Pengaturan" else "TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text(if (tab == settingsTab) "Pengaturan" else "TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         Text(
                             if (activeCount > 0) "$activeCount unduhan sedang berjalan" else "Simpan momen. Putar kapan saja.",
                             style = MaterialTheme.typography.labelMedium,
@@ -88,8 +119,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         )
                     }
                 },
-                navigationIcon = { if (tab == 4) IconButton(onClick={ tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Kembali") } },
-                actions = { if (tab != 4) IconButton(onClick={ previousTab=tab; tab=4 }) { Icon(Icons.Outlined.Settings,"Pengaturan") } },
+                navigationIcon = { if (tab == settingsTab) IconButton(onClick={ tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Kembali") } },
+                actions = {
+                    if (karaokeSource != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
+                    if (tab != settingsTab) IconButton(onClick={ previousTab=tab; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -102,8 +136,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             Column {
             if (playback.track != null) MiniPlayer(playback,player) { fullPlayer=true }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi")
-                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic)
+                val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
+                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic, Icons.Outlined.History)
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
@@ -183,19 +217,19 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 3 }, downloads = { tab = 1 })
-                3 -> MediaLibraryScreen(library, onPlay={ player.play(it) }) {
-                    HistoryScreen(
+                3 -> MediaLibraryScreen(library, player)
+                4 -> HistoryScreen(
                     jobs = jobs,
                     listState = historyList,
                     onRetry = { model.retry(it) },
                     onDeleteFile = { model.removeFile(it) },
                     onRefetchLyrics = { model.refetchLyrics(it) },
                     onSearchLyrics = { library.openLyrics(it) },
-                    onPlay = { player.play(it) },
+                    // Riwayat hanya memutar lagu yang diketuk; daftar riwayat tidak boleh membanjiri antrean.
+                    onPlay = { jobs, index -> jobs.getOrNull(index)?.let { player.playJobs(listOf(it), 0) } },
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
-                }
                 else -> SettingsScreen(
                     themeMode = SettingsStore.themeMode,
                     onThemeMode = { SettingsStore.setThemeMode(context, it) },
@@ -204,6 +238,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     storageBytes = storageBytes,
                     storageError = storageError,
                     storageFolderAccess = storageFolderAccess,
+                    storageCatalogue = storageCatalogue,
+                    storageUnknownSizes = storageUnknownSizes,
                     onRefreshStorage = { model.refreshStorage() },
                     clearingFiles = clearingFiles,
                     onClearStorage = { model.clearStorageFolder() },

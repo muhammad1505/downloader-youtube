@@ -131,10 +131,10 @@ fun PlatformIcon(platform: id.local.tubeflow.core.SourcePlatform, modifier: Modi
  * di atas gradien (fallback lama) — item tidak pernah gagal tampil karena gambar.
  */
 @Composable
-fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifier: Modifier = Modifier) {
+fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.small) {
     val model: Any? = coverPath.takeIf { it.isNotBlank() && java.io.File(it).isFile }?.let { java.io.File(it) }
         ?: thumbnailUrl.takeIf { it.isNotBlank() }
-    Box(modifier.clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(shape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
         Icon(if (mode == MediaMode.AUDIO) Icons.Outlined.Headphones else Icons.Outlined.Videocam,
             null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
         if (model != null) coil.compose.AsyncImage(model = model, contentDescription = "Sampul sumber",

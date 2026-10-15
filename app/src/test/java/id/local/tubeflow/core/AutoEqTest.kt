@@ -1,0 +1,60 @@
+package id.local.tubeflow.core
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AutoEqTest {
+    private val min = -15f
+    private val max = 15f
+
+    @Test fun bassBandsGetRoundBoost() {
+        // Regresi: bass harus mantap ("bulat") di band rendah, bukan datar.
+        assertTrue(AutoEq.levelDb(60_000, min, max) >= 4.5f)
+        assertTrue(AutoEq.levelDb(120_000, min, max) >= 3.5f)
+    }
+
+    @Test fun midsStayClearAndTrebleGetsSubtleShine() {
+        assertTrue(AutoEq.levelDb(1_000_000, min, max) <= 0f)
+        assertTrue(AutoEq.levelDb(2_000_000, min, max) <= 0f)
+        assertTrue(AutoEq.levelDb(8_000_000, min, max) > 0f)
+        assertTrue(AutoEq.levelDb(8_000_000, min, max) <= 3f)
+    }
+
+    @Test fun curveDecreasesTowardMidsThenRisesAgain() {
+        val bass = AutoEq.levelDb(60_000, min, max)
+        val lowMid = AutoEq.levelDb(250_000, min, max)
+        val mid = AutoEq.levelDb(1_000_000, min, max)
+        assertTrue(bass > lowMid)
+        assertTrue(lowMid > mid)
+    }
+
+    @Test fun interpolationIsSmoothBetweenAnchors() {
+        val low = AutoEq.levelDb(60_000, min, max)
+        val high = AutoEq.levelDb(120_000, min, max)
+        val between = AutoEq.levelDb(85_000, min, max)
+        assertTrue(between < low && between > high)
+    }
+
+    @Test fun levelsAreClampedToBandRange() {
+        assertEquals(3f, AutoEq.levelDb(60_000, -3f, 3f), 0.05f)
+        assertEquals(1f, AutoEq.levelDb(8_000_000, -1f, 1f), 0.05f)
+        assertEquals(-1f, AutoEq.levelDb(2_000_000, -1f, 1f), 0.05f)
+    }
+
+    @Test fun levelsAlwaysStayInsideRange() {
+        listOf(30, 60_000, 120_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000, 16_000_000, 24_000_000).forEach { frequency ->
+            val level = AutoEq.levelDb(frequency, -6f, 6f)
+            assertTrue("frekuensi $frequency → $level", level in -6f..6f)
+        }
+    }
+
+    @Test fun defaultPresetIsAutoUnlessUserChoseSomething() {
+        assertEquals(AutoEq.AUTO_PRESET, AutoEq.defaultPreset(null, hasCustomLevels = false))
+        // "Kustom" tanpa level tersimpan = datar, belum ada pilihan nyata → aman diganti kurva auto.
+        assertEquals(AutoEq.AUTO_PRESET, AutoEq.defaultPreset(PlayerEqualizer.DEFAULT_PRESET, hasCustomLevels = false))
+        // Pilihan pengguna (level kustom atau preset perangkat) dipertahankan.
+        assertEquals(PlayerEqualizer.DEFAULT_PRESET, AutoEq.defaultPreset(PlayerEqualizer.DEFAULT_PRESET, hasCustomLevels = true))
+        assertEquals("Rock", AutoEq.defaultPreset("Rock", hasCustomLevels = false))
+    }
+}

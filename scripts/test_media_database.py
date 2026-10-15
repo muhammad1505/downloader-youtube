@@ -90,6 +90,23 @@ class MediaDatabaseTest(unittest.TestCase):
         params.update(search='%', artist='Other', limit=1)
         self.assertEqual(['two'], [r['uri'] for r in self.db.execute(self.queries[0], params)])
 
+    def test_storage_totals_follow_catalogue_changes_without_download_events(self):
+        # Scan/import/karaoke can change catalogue bytes while download history stays identical.
+        history = self.db.execute('SELECT count(*) FROM downloads').fetchone()[0]
+        self.media('import', sizeBytes=10)
+        self.media('karaoke', sizeBytes=None)
+        row = self.db.execute(self.queries[1]).fetchone()
+        self.assertEqual((10, 1), (row['audioBytes'], row['unknownSizes']))
+        self.db.execute("UPDATE media_items SET sizeBytes=30 WHERE uri='karaoke'")
+        self.assertEqual(40, self.db.execute(self.queries[1]).fetchone()['audioBytes'])
+        self.db.execute("DELETE FROM media_items WHERE uri='import'")
+        self.assertEqual(30, self.db.execute(self.queries[1]).fetchone()['audioBytes'])
+        self.db.execute("UPDATE media_items SET availability='UNAVAILABLE' WHERE uri='karaoke'")
+        row = self.db.execute(self.queries[1]).fetchone()
+        self.assertEqual(0, row['audio'])
+        self.assertIsNone(row['audioBytes'])
+        self.assertEqual(history, self.db.execute('SELECT count(*) FROM downloads').fetchone()[0])
+
     def test_events_record_new_transitions_not_old_history_and_survive_history_clear(self):
         self.assertEqual(0, self.db.execute('SELECT count(*) FROM media_events').fetchone()[0])
         self.db.execute("UPDATE downloads SET state='QUEUED' WHERE id='old'")

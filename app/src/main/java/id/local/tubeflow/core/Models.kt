@@ -147,6 +147,7 @@ class Converters {
  @TypeConverter fun state(value: JobState) = value.name
 }
 @Dao interface DownloadDao {
+ @Query("SELECT COUNT(*) FROM downloads WHERE state IN ('QUEUED','RUNNING')") suspend fun activeCount(): Int
  @Query("SELECT * FROM downloads ORDER BY createdAt DESC") fun observe(): Flow<List<DownloadJob>>
  @Query("SELECT * FROM downloads WHERE id = :id") suspend fun get(id: String): DownloadJob?
  @Query("UPDATE downloads SET rawTitle = :rawTitle, trackTitle = :trackTitle, title = :title, artist = :artist, creator = :creator, remixer = :remixer, versionTag = :versionTag, artistEvidence = :evidence, platformId = :platform, thumbnailUrl = :thumb, sourceId = :source, extractor = :extractor, subfolder = :folder, durationSeconds = :duration WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING')")

@@ -31,16 +31,15 @@ class MainActivity : ComponentActivity() {
         SettingsStore.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
-        player = ViewModelProvider(this)[PlayerViewModel::class.java]
+        player = PlayerViewModel.obtain(application)
+        val karaoke = ViewModelProvider(this)[id.local.tubeflow.core.KaraokeViewModel::class.java]
         setContent {
             TubeFlowTheme(
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
-            ) { TubeFlowApp(model, library, player, incomingUrl.value, ::requestDownloadNotifications) }
+            ) { TubeFlowApp(model, library, player, karaoke, incomingUrl.value, ::requestDownloadNotifications) }
         }
     }
-    override fun onStart() { super.onStart(); if (::player.isInitialized) player.setForeground(true) }
-    override fun onStop() { if (::player.isInitialized && !isChangingConfigurations) player.setForeground(false); super.onStop() }
     private fun requestDownloadNotifications() {
         val preferences = getSharedPreferences("permissions", MODE_PRIVATE)
         if (Build.VERSION.SDK_INT >= 33 &&

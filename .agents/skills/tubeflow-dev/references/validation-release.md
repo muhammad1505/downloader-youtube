@@ -36,7 +36,10 @@ apksigner verify --verbose --print-certs path/to/final-release.apk
 zipalign -c -P 16 4 path/to/final-release.apk
 ```
 
-Gunakan executable dari Build Tools aktif jika belum ada pada PATH. Periksa metadata versionName/versionCode/package, non-debuggable, engine checksum dan kesamaan bootstrap paket. Untuk AAB, verifikasi `jarsigner`, fingerprint sertifikat, struktur melalui bundletool validate dan audit native. Simpan output besar ke log; laporkan ringkasannya. Lint bersih berbeda dari deprecation Gradle atau warning JAR.
+Gunakan executable dari Build Tools aktif jika belum ada pada PATH. Periksa metadata versionName/versionCode/package, non-debuggable, engine checksum dan kesamaan bootstrap paket. Untuk AAB, verifikasi `jarsigner`, fingerprint sertifikat, struktur melalui bundletool validate dan audit native. Simpan output besar ke log; laporkan ringkasannya. Lint bersih (0 error) berbeda dari deprecation Gradle, warning JAR (`jarsigner` self-signed/timestamp), atau 2 warning lint yang memang diketahui dan dipertahankan sengaja pada codebase saat ini:
+- `SelectedPhotoAccess` pada `AndroidManifest.xml` (izin media visual Android 14+ tanpa pemilih foto parsial, karena aplikasi mengelola folder unduhan penuh).
+- `GradleDependency` pada `onnxruntime-android:1.23.2` (di-pin sengaja karena versi 1.31.0 gagal inisialisasi JNI pada perangkat target Android 10).
+Laporkan jumlah warning aktual dengan jujur; jangan menulis "lint 0 masalah" bila warning tersebut muncul.
 
 ## Pengujian pada HP fisik
 
@@ -57,6 +60,6 @@ Logcat difokuskan pada PID aplikasi; jangan membagikan isi chat/nama file pribad
 
 Pakai keystore produksi yang sudah ada. Lokasi default privat: `$HOME/.local/share/tubeflow/signing/`; script mendukung `TUBEFLOW_SIGNING_ENV` atau empat variabel `TUBEFLOW_KEYSTORE_PATH`, `TUBEFLOW_KEYSTORE_PASSWORD`, `TUBEFLOW_KEY_ALIAS`, `TUBEFLOW_KEY_PASSWORD`. Jangan cetak password, memasukkannya ke argumen command-line, atau menyalin konfigurasi/private key ke repo/distribusi. Jangan regenerate kunci untuk update biasa.
 
-Untuk release yang diminta, naikkan versi yang tepat dan simpan artefak terverifikasi per versi di `app/build/outputs/distribution/<version>/`. Pertahankan release lama. Sertakan `release.json`, SHA256SUMS dan sertifikat publik bila mengikuti format distribusi yang sudah ada. Manifest harus mencerminkan hasil tes aktual; sesudah metadata berubah, hitung ulang checksum.
+Untuk release yang diminta, naikkan versi yang tepat dan simpan artefak terverifikasi di `app/build/outputs/apk/release/` (dan `app/build/outputs/distribution/<version>/` bila pengelola meminta paket distribusi lengkap dengan `release.json`, `SHA256SUMS`, dan sertifikat publik). Karena setiap set APK×3 + AAB berukuran sekitar ~350 MB, **jangan menumpuk banyak rilis lama di `app/build/outputs/distribution/` tanpa batas** agar disk tidak penuh (`No space left on device`); rilis historis 1.0.0–1.1.6 (7,5 GB) telah diarsipkan ukuran dan hash SHA256-nya ke `docs/DISTRIBUTION_ARCHIVED_SHA256.txt` atas permintaan pengelola pada 15 Oktober 2026. Bila mengarsipkan/membersihkan biner rilis lama untuk menghemat ruang disk, catat terlebih dahulu ukuran byte dan SHA256 setiap file ke `docs/DISTRIBUTION_ARCHIVED_SHA256.txt` dan pertahankan APK rilis aktif terkini. Manifest harus mencerminkan hasil tes aktual; sesudah metadata berubah, hitung ulang checksum.
 
 Keystore lokal dan artefak signed tidak membuktikan backup eksternal, publikasi toko, pemenuhan lisensi, atau kompatibilitas Android/16 KB yang belum diuji. Update `docs/PRODUCTION_SIGNING.md` dan laporan perangkat dengan cakupan nyata; publikasi/upload hanya dalam tugas yang mengotorisasinya.

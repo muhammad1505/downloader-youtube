@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">TubeFlow</string>
+    <plurals name="storage_partial_sizes">
+        <item quantity="one">Ukuran sebagian: %1$d file di Koleksi belum memiliki informasi ukuran.</item>
+        <item quantity="other">Ukuran sebagian: %1$d file di Koleksi belum memiliki informasi ukuran.</item>
+    </plurals>
+    <string name="player_queue_next">Putar setelah lagu ini</string>
+    <string name="player_queue_close">Tutup antrean</string>
+    <string name="player_swipe_hint">Geser sampul untuk melihat lirik</string>
+    <string name="player_stop">Tutup pemutar</string>
 </resources>

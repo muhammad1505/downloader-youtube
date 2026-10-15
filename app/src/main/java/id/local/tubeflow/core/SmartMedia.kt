@@ -64,8 +64,12 @@ interface MediaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(item: MediaItem)
     @Query("SELECT * FROM media_items WHERE uri = :uri") suspend fun get(uri: String): MediaItem?
     @Query("SELECT * FROM media_items WHERE accessUri = :raw LIMIT 1") suspend fun getByAccess(raw: String): MediaItem?
+    // Dedup pemindaian SAF: file yang sama dapat punya baris MediaStore dan baris dokumen SAF.
+    @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name ORDER BY (availability = 'AVAILABLE') DESC, checkedAt DESC LIMIT 1") suspend fun findByName(folder: String, name: String): MediaItem?
     @Query("DELETE FROM media_items WHERE uri = :uri") suspend fun remove(uri: String)
     @Query("SELECT * FROM media_items ORDER BY checkedAt ASC LIMIT :limit") suspend fun oldest(limit: Int): List<MediaItem>
+    // Koleksi utuh untuk antrean auto-play: lagu tersedia dalam urutan koleksi (terbaru lebih dulu).
+    @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY addedAt DESC, title COLLATE NOCASE ASC") suspend fun availableAudio(): List<MediaItem>
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name AND uri != :exceptUri AND availability = 'AVAILABLE' LIMIT 1") suspend fun collision(folder: String, name: String, exceptUri: String): MediaItem?
     @Query("SELECT DISTINCT folder FROM media_items ORDER BY folder LIMIT 250") fun folders(): Flow<List<String>>
     @Query("SELECT DISTINCT artist FROM media_items WHERE kind = 'AUDIO' AND artist != '' ORDER BY artist LIMIT 250") fun artists(): Flow<List<String>>

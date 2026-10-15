@@ -9,6 +9,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import androidx.core.net.toUri
+import android.provider.DocumentsContract
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
@@ -68,11 +72,58 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             finally { _busy.value = false; updateDeviceStorage() }
         }
     }
-    fun scan() = operation {
-        val (count, failed) = repository.scan()
+    private suspend fun scanCatalog(): String {
+        val (count, failed, discovered) = repository.scan()
         _lastScan.value = System.currentTimeMillis()
         getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
-        "$count media diperiksa" + if (failed > 0) "; $failed file tidak dapat dibaca. Statistik dapat parsial." else "."
+        if (count == 0 && discovered == 0) return "Tidak ada media terlihat di folder. Bila file memang ada, periksa izin baca atau pilih folder Download/TubeFlow sekali lewat Pengaturan."
+        return "$count media diperiksa" + if (failed > 0) "; $failed file tidak dapat dibaca. Statistik dapat parsial." else "."
+    }
+    fun scan() = operation { scanCatalog() }
+    /** Cukup izin untuk membaca seluruh isi folder: tree pilihan atau grant default Download/TubeFlow. */
+    fun hasFolderAccess(): Boolean = SettingsStore.storageTree != null ||
+        StorageFolderAccess.defaultTree(getApplication(), SettingsStore.storageFolder) != null
+    /** Izin baca media membuat query MediaStore melihat file lama milik versi/SAF lain tanpa grant SAF. */
+    fun hasReadPermission(): Boolean {
+        val app = getApplication<Application>()
+        val permissions = if (Build.VERSION.SDK_INT >= 33) listOf(
+            android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO,
+        ) else listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        return permissions.all { ContextCompat.checkSelfPermission(app, it) == PackageManager.PERMISSION_GRANTED }
+    }
+    /** Pemulihan otomatis: saat koleksi kosong (biasanya setelah data aplikasi dihapus), pindai sendiri tanpa memilih folder. */
+    fun scanIfEmpty() {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (dao.oldest(1).isEmpty()) {
+                    val (count, failed) = repository.scan()
+                    _lastScan.value = System.currentTimeMillis()
+                    getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
+                    if (count > 0 || failed > 0) _message.value =
+                        "$count media dipindai otomatis" + if (failed > 0) "; $failed file tidak dapat dibaca." else "."
+                }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) { _message.value = error.message ?: "Pemindaian otomatis gagal; buka kembali aplikasi untuk mencoba lagi." }
+            finally { _busy.value = false; updateDeviceStorage() }
+        }
+    }
+    fun grantFolder(uri: android.net.Uri?) {
+        if (uri == null) return
+        operation {
+            val app = getApplication<Application>()
+            runCatching { app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+                .recoverCatching { app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                .getOrThrow()
+            // Grant folder bawaan hanya memulihkan akses baca tanpa memindah tujuan output;
+            // folder lain menjadi tujuan output pilihan, sama seperti pemilihan folder di Pengaturan.
+            val default = runCatching {
+                StorageFolderAccess.matchesDefault(uri.authority, DocumentsContract.getTreeDocumentId(uri), SettingsStore.storageFolder)
+            }.getOrDefault(false)
+            SettingsStore.setStorageTree(app, if (default) null else uri.toString())
+            scanCatalog()
+        }
     }
     fun import(uris: List<android.net.Uri>) = operation {
         var count = 0; var failed = 0
@@ -117,6 +168,16 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             openLyrics(item)
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { _message.value=failure.message }
+    } }
+    /** Item koleksi untuk alat lirik di pemutar (cari lirik / atur waktu), dipetakan dari URI track. */
+    suspend fun itemFor(uri: String): MediaItem? = withContext(Dispatchers.IO) { dao.getByAccess(uri) ?: dao.get(uri) }
+    /** Buka pencarian lirik langsung dari pemutar berdasarkan URI track — tanpa kembali ke Koleksi. */
+    fun openLyricsForTrack(uri: String) { viewModelScope.launch {
+        try {
+            val item = itemFor(uri) ?: error("Lagu ini belum tercatat di koleksi.")
+            openLyrics(item)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { _message.value = failure.message }
     } }
     fun openLyrics(item: MediaItem, query: ManualLyricQuery? = null) {
         if (_lyrics.value?.saving == true || item.kind != "AUDIO") return

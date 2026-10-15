@@ -22,6 +22,9 @@ import java.io.FileNotFoundException
 import java.security.MessageDigest
 
 /** One URI catalogue in the existing Room database; scanning never copies or transcodes media. */
+/** Ringkasan pindai: diperiksa, gagal dibaca, dan baris yang benar-benar terlihat dari semua sumber. */
+data class ScanSummary(val checked: Int, val failed: Int, val discovered: Int)
+
 class MediaRepository(private val context: Context) {
     private val resolver = context.contentResolver
     private val database = DownloadDatabase.get(context)
@@ -33,6 +36,23 @@ class MediaRepository(private val context: Context) {
     } ?: error("Nama file tidak dapat dibaca.")
     private fun mediaRename(raw: String, name: String) {
         require(resolver.update(raw.toUri(), ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, name) }, null, null) > 0) { "Rename ditolak provider." }
+    }
+    /**
+     * Baris katalog setelah rename berhasil. Nama file baru sekaligus menjadi `title` supaya judul
+     * di kartu dan pemutar ikut nama yang dipilih pengguna (bukan hanya baris kedua kartu).
+     * Waktu modifikasi diambil ulang dari provider agar jalur "tidak berubah" pada pemindaian
+     * berikutnya mempertahankan judul ini, bukan mengembalikannya ke metadata lama.
+     */
+    private fun renamedRow(item: MediaItem, access: String, name: String): MediaItem {
+        val target = access.toUri()
+        val column = if (target.authority == "media") MediaStore.MediaColumns.DATE_MODIFIED else DocumentsContract.Document.COLUMN_LAST_MODIFIED
+        val modified = runCatching {
+            resolver.query(target, arrayOf(column), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+            }
+        }.getOrNull()
+        return item.copy(title = name.substringBeforeLast('.'), displayName = name,
+            modifiedAt = modified ?: item.modifiedAt, checkedAt = System.currentTimeMillis())
     }
     private fun saveRename(entries: List<RenameBatch.Entry>) {
         val data = JSONArray(); entries.forEach { data.put(JSONObject().put("uri", it.uri).put("before", it.before).put("after", it.after)) }
@@ -98,8 +118,7 @@ class MediaRepository(private val context: Context) {
 
     private suspend fun index(raw: String, job: DownloadJob?, fallbackFolder: String, lrc: String? = null) {
         val computedKey = canonical(raw)
-        val old = dao.get(computedKey) ?: dao.getByAccess(raw)
-        val key = old?.uri ?: computedKey
+        var old = dao.get(computedKey) ?: dao.getByAccess(raw)
         try {
             // Retain a working owned MediaStore location when a picker supplies another alias.
             val access = old?.location?.takeIf { candidate -> candidate.toUri().authority == "media" &&
@@ -119,7 +138,15 @@ class MediaRepository(private val context: Context) {
                 resolver.query(uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.DATE_MODIFIED), null, null, null)?.use { c ->
                     if (c.moveToFirst()) { folder = c.getString(0).orEmpty().trimEnd('/'); if (!c.isNull(1)) modified = c.getLong(1) }
                 }
+            } else if (DocumentsContract.isDocumentUri(context, uri)) runCatching {
+                resolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)?.use { c ->
+                    if (c.moveToFirst() && !c.isNull(0)) modified = c.getLong(0)
+                }
             }
+            // Satu file fisik dapat tercatat dua kali (baris MediaStore + baris dokumen SAF). Sebelum
+            // membuat baris baru, cocokkan folder+nama+ukuran agar koleksi tidak menduplikasi file.
+            if (old == null) old = dao.findByName(folder, name)?.takeIf { it.sizeBytes == null || size == null || it.sizeBytes == size }
+            val key = old?.uri ?: computedKey
             val lyricCandidate = job?.sidecarUris?.lines()?.firstOrNull { line -> line.startsWith("sub|") &&
                 runCatching { displayName(line.substringAfter('|')).endsWith(".lrc", true) }.getOrDefault(false)
             }?.substringAfter('|') ?: lrc ?: old?.lyricUri
@@ -202,34 +229,47 @@ class MediaRepository(private val context: Context) {
         }
     }
 
-    suspend fun scan(): Pair<Int, Int> = withContext(Dispatchers.IO) { operations.withLock {
+    suspend fun scan(): ScanSummary = withContext(Dispatchers.IO) { operations.withLock {
         recoverRename()
         var checked = 0; var failed = 0
         val rows = mutableListOf<Triple<String, String, String>>()
-        val tree = SettingsStore.storageTree
-        if (tree == null) {
+        fun add(uri: String, name: String, folder: String) {
+            if (rows.none { it.second == name && it.third == folder }) {
+                require(rows.size < 4000) { "Folder terlalu besar; impor file pilihan." }
+                rows += Triple(uri, name, folder)
+            }
+        }
+        // Dua sumber digabung: MediaStore (perlu izin baca untuk file lama milik versi/SAF lain) dan
+        // grant SAF bila ada. Beberapa perangkat tetap menyembunyikan baris MediaStore owner-kosong
+        // meski izin baca diberikan, jadi jalur dokumen tidak boleh saling meniadakan.
+        var storeError: Exception? = null
+        try {
             val folder = "Download/${SettingsStore.storageFolder}/"
             val escaped = folder.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                 arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME, MediaStore.Downloads.RELATIVE_PATH),
                 "(${MediaStore.Downloads.RELATIVE_PATH} = ? OR ${MediaStore.Downloads.RELATIVE_PATH} LIKE ? ESCAPE '\\') AND ${MediaStore.Downloads.IS_PENDING} = 0",
                 arrayOf(folder, "$escaped%"), null)?.use { c ->
-                while (c.moveToNext()) { require(rows.size < 4000) { "Folder terlalu besar; impor file pilihan." }; rows += Triple(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/')) }
-            } ?: error("Folder belum dapat dibaca.")
-        } else {
+                while (c.moveToNext()) add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/'))
+            } ?: throw FileNotFoundException("Folder belum dapat dibaca.")
+        } catch (error: Exception) { storeError = error }
+        val tree = SettingsStore.storageTree ?: StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString()
+        var treeError: Exception? = null
+        if (tree != null) {
             val root = tree.toUri()
             fun walk(id: String, folder: String, depth: Int) {
                 require(depth <= 8 && rows.size < 4000) { "Batas pemindaian folder tercapai." }
                 resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(root, id), arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
                     while (c.moveToNext()) {
-                        require(rows.size < 4000) { "Folder terlalu besar." }
                         if (c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) walk(c.getString(0), "$folder/${c.getString(1)}", depth + 1)
-                        else rows += Triple(DocumentsContract.buildDocumentUriUsingTree(root, c.getString(0)).toString(), c.getString(1), folder)
+                        else add(DocumentsContract.buildDocumentUriUsingTree(root, c.getString(0)).toString(), c.getString(1), folder)
                     }
                 } ?: error("Akses folder tidak tersedia.")
             }
-            walk(DocumentsContract.getTreeDocumentId(root), "Folder pilihan", 0)
+            val rootLabel = if (SettingsStore.storageTree != null) "Folder pilihan" else "Download/${SettingsStore.storageFolder}"
+            try { walk(DocumentsContract.getTreeDocumentId(root), rootLabel, 0) } catch (error: Exception) { treeError = error }
         }
+        if (rows.isEmpty()) throw (treeError ?: storeError ?: FileNotFoundException("Tidak ada media terlihat."))
         val jobs = database.downloads().observe().let { flow -> flow.first() }
         val jobsByUri = jobs.filter { it.state == JobState.COMPLETED && it.outputUri != null }.associateBy { canonical(it.outputUri!!) }
         val lyrics = rows.filter { it.second.endsWith(".lrc", true) }.associate { (uri, name, folder) -> (folder to name.substringBeforeLast('.')) to uri }
@@ -241,7 +281,7 @@ class MediaRepository(private val context: Context) {
         for (item in dao.oldest(4000)) if (item.checkedAt < System.currentTimeMillis() - 1000) {
             try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
         }
-        checked to failed
+        ScanSummary(checked, failed, rows.size)
     } }
 
     suspend fun validateRecent(force: Boolean = false) = withContext(Dispatchers.IO) { operations.withLock {
@@ -285,7 +325,7 @@ class MediaRepository(private val context: Context) {
                 if (entries.all { runCatching { displayName(it.uri) == it.before }.getOrDefault(false) }) renameJournal.delete()
                 throw error
             }
-            val changed = item.copy(displayName = name, checkedAt = 0)
+            val changed = renamedRow(item, item.location, name)
             // Stable URIs preserve the lyric baseline and download identity.
             database.withTransaction { dao.put(changed); dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "RENAMED", kind = item.kind, platformId = item.platformId, at = System.currentTimeMillis())) }
             renameJournal.delete()
@@ -305,7 +345,7 @@ class MediaRepository(private val context: Context) {
                 database.withTransaction { dao.put(repaired); if (repaired.uri != item.uri) dao.remove(item.uri); item.jobId?.let { database.downloads().renamedOutput(it, restored) } }
                 error(if (actual == item.displayName) "Provider mengubah nama; nama lama dipulihkan." else "Provider menolak pemulihan nama; file tetap tersedia dengan nama aktual di koleksi.")
             }
-            val changed = item.copy(uri = canonical(renamed), accessUri = renamed, displayName = name, checkedAt = 0)
+            val changed = renamedRow(item, renamed, name).copy(uri = canonical(renamed), accessUri = renamed)
             database.withTransaction { dao.put(changed); if (changed.uri != item.uri) dao.remove(item.uri); item.jobId?.let { database.downloads().renamedOutput(it, renamed) } }
             changed
         } else error("Provider ini belum mendukung rename aman, terutama pasangan media dan lirik. File tetap tersedia.")
@@ -316,7 +356,9 @@ class MediaRepository(private val context: Context) {
         var sidecarFailed = false
         val sidecars = item.jobId?.let { database.downloads().get(it)?.sidecarUris?.lines()?.mapNotNull { line -> line.substringAfter('|', "").takeIf(String::isNotBlank) } }.orEmpty()
         (sidecars + listOfNotNull(item.lyricUri)).distinct().forEach { if (!StorageUris.delete(context, it)) sidecarFailed = true }
-        dao.put(item.copy(availability = "UNAVAILABLE", checkedAt = System.currentTimeMillis()))
+        // Baris ikut dihapus: file sudah tiada dan pengguna memilih Hapus, jadi tampilan harus
+        // bersih. Pencegahan duplikat tetap lewat riwayat download, bukan baris media yang tersisa.
+        dao.remove(item.uri)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "DELETED", kind = item.kind, platformId = item.platformId, at = System.currentTimeMillis()))
         require(!sidecarFailed) { "Media terhapus, tetapi lirik gagal dihapus." }
     } }

@@ -29,7 +29,7 @@ fun HistoryScreen(
     onDeleteFile: (String) -> Unit,
     onRefetchLyrics: (String) -> Unit,
     onSearchLyrics: (String) -> Unit,
-    onPlay: (DownloadJob) -> Unit = {},
+    onPlay: (List<DownloadJob>, Int) -> Unit = { _, _ -> },
     onClearCompleted: () -> Unit,
     onClearUnsuccessful: () -> Unit,
 ) {
@@ -171,7 +171,7 @@ fun HistoryScreen(
                     modifier = Modifier.animateItem(),
                     refetchLyrics = onRefetchLyrics,
                     searchLyrics = onSearchLyrics,
-                    play = { onPlay(job) },
+                    play = { onPlay(filtered, filtered.indexOf(job)) },
                 )
             }
         }

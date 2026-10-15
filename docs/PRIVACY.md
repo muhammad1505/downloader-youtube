@@ -15,4 +15,12 @@ Buka/bagikan file memberikan izin baca sementara untuk URI file kepada aplikasi 
 
 Katalog media dan event aktivitas berada pada database Room yang sama di perangkat. Impor hanya menyimpan URI/grant dan metadata, tanpa menyalin file atau meminta akses semua penyimpanan. Event tidak menggandakan URL/token sumber. Pemindaian manual dibatasi folder yang diizinkan; statistik memakai indeks aktual dan bisa parsial ketika izin/provider berubah.
 
-Cache respons LRCLIB dibatasi10MiB/200entry, cover32MiB dan frame/artwork katalog24MiB. Koreksi LRC menyimpan baseline/jurnal privat (batas32MiB) untuk reset/rollback; audio dan timestamp rekaman lain tidak diubah. Playback menggunakan aplikasi pemutar yang dipilih pengguna. Tidak ada model AI, server baru, atau layanan metadata baru pada upgrade ini.
+Cache respons LRCLIB dibatasi10MiB/200entry, cover32MiB dan frame/artwork katalog24MiB. Koreksi LRC menyimpan baseline/jurnal privat (batas32MiB) untuk reset/rollback; audio dan timestamp rekaman lain tidak diubah. Playback audio dapat menggunakan pemutar lokal TubeFlow atau aplikasi pemutar perangkat. Video tetap memakai pemutar perangkat.
+
+## Karaoke opsional
+
+Saat pengguna meminta pemisahan vokal, model UVR sekitar67MB diunduh dari GitHub Releases (termasuk CDN pengiriman GitHub) dan diverifikasi SHA256. Penyedia unduhan melihat IP/request model; rekaman, judul lagu dan lirik tidak diunggah untuk proses karaoke. Model tersimpan privat dan tidak ada server TubeFlow. ONNX Runtime bekerja di HP, terpisah dari downloader biasa.
+
+Pemrosesan menyalin sumber sementara ke penyimpanan privat, membaca PCM per potongan dan menyiapkan FLAC instrumental. Sumber asli tidak diubah. Input/PCM dibersihkan setelah berhasil atau batal; pratinjau terakhir dipertahankan sampai proses baru menggantikannya. Proses yang dihentikan sistem dapat memulai ulang dengan aman; karaoke belum melanjutkan inference dari potongan terakhir. Model dan pratinjau hilang saat uninstall/reset data; file publik yang sudah disimpan dapat tetap ada.
+
+Simpan hasil hanya dilakukan setelah pengguna memilihnya. Hasil masuk katalog media sebagai file turunan, bukan unduhan jaringan baru. LRC disalin terpisah hanya untuk hasil lagu penuh; cuplikan uji tidak memakai lirik lagu penuh. Tidak ada izin akses seluruh penyimpanan baru.

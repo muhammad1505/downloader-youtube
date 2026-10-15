@@ -16,3 +16,9 @@
 -keepclassmembers class id.local.tubeflow.core.PlayerViewModel {
     public <init>(android.app.Application);
 }
+
+# ONNX Runtime discovers JNI entry points reflectively. Model remains an optional download.
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class id.local.tubeflow.core.KaraokeViewModel {
+    public <init>(android.app.Application);
+}
