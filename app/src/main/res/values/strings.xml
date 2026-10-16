@@ -54,4 +54,5 @@
     <string name="partial_clear_confirm">Hapus data sementara</string>
     <string name="partial_clearing">Membersihkan…</string>
     <string name="size_partial"> (sebagian)</string>
+    <string name="failure_lyrics_details">Detail error lirik</string>
 </resources>

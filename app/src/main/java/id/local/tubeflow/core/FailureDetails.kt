@@ -11,12 +11,12 @@ import java.util.Locale
 
 /** A deliberately small support report. Raw URLs, credentials and local paths never leave here. */
 data class FailureDetails(val category: String, val phase: String, val message: String,
-    val appVersion: String, val engineVersion: String, val at: Long? = null, val http: Int? = null) {
+    val appVersion: String, val engineVersion: String, val at: Long? = null, val http: Int? = null, val status: String? = null) {
     fun text(): String = listOf(
         "TubeFlow: $appVersion", "Engine: $engineVersion", "Tahap: ${safe(phase)}", "Kategori: $category",
         "Waktu: " + (at?.let { SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.ROOT).format(Date(it)) } ?: "Tidak tercatat"),
         "HTTP: ${http ?: "Tidak tercatat"}", "Detail: ${safe(message)}",
-    ).joinToString("\n")
+    ).plus(listOfNotNull(status?.let { "Status: ${safe(it)}" })).joinToString("\n")
 
     val userMessage: String get() = when (category) {
         "rate_limit" -> "Penyedia membatasi permintaan. Tunggu sebelum mencoba lagi."
@@ -30,9 +30,25 @@ data class FailureDetails(val category: String, val phase: String, val message: 
 
     fun json() = JSONObject().put("category", category).put("phase", phase).put("message", safe(message))
         .put("app", appVersion).put("engine", engineVersion).put("at", at ?: JSONObject.NULL)
-        .put("http", http ?: JSONObject.NULL)
+        .put("http", http ?: JSONObject.NULL).put("status", status?.let(::safe) ?: JSONObject.NULL)
 
     companion object {
+        fun isLyricFailure(status: String) = status in setOf(LyricStatus.NETWORK, LyricStatus.RATE_LIMIT,
+            LyricStatus.SERVICE, LyricStatus.INVALID_RESPONSE, LyricStatus.SAVE_FAILED)
+
+        fun lyrics(status: String, app: String = "Tidak tercatat", engine: String = "Tidak tercatat", at: Long? = null): FailureDetails {
+            val category = when (status) {
+                LyricStatus.NETWORK -> "network"
+                LyricStatus.RATE_LIMIT -> "rate_limit"
+                LyricStatus.SERVICE -> "provider"
+                LyricStatus.INVALID_RESPONSE -> "invalid_response"
+                LyricStatus.SAVE_FAILED -> "lyrics_save"
+                else -> "lyrics_status"
+            }
+            // RATE_LIMIT may be local cooldown, not a fresh HTTP429. Never invent a response code.
+            return FailureDetails(category,"LYRICS","LRCLIB: ${LyricStatus.label(status)}",app,engine,at,status=status)
+        }
+
         fun safe(raw: String): String {
             var text = raw.replace(Regex("\u001B\\[[0-9;]*[A-Za-z]"), "")
             text = text.replace(Regex("(?im)(authorization|set-cookie|cookie)\\s*[:=][^\\r\\n]+"), "$1=[disamarkan]")
@@ -59,7 +75,7 @@ data class FailureDetails(val category: String, val phase: String, val message: 
         fun fromJson(raw: String): FailureDetails = JSONObject(raw).let {
             FailureDetails(it.getString("category"), safe(it.getString("phase")), safe(it.getString("message")),
                 it.getString("app"), it.getString("engine"), if (it.isNull("at")) null else it.getLong("at"),
-                if (it.isNull("http")) null else it.getInt("http"))
+                if (it.isNull("http")) null else it.getInt("http"), if (it.isNull("status")) null else it.getString("status"))
         }
     }
 }
@@ -71,11 +87,14 @@ class FailureDetailsStore(private val context: Context) {
         require(id.matches(Regex("[A-Za-z0-9_-]{1,100}")) && generation >= 0)
         return AtomicFile(File(directory, "$id-$generation.json"))
     }
-    fun capture(error: Exception, phase: String): FailureDetails {
-        val engine = runCatching { context.assets.open("engine.json").bufferedReader().use { JSONObject(it.readText()).getString("version") } }.getOrDefault("Tidak terbaca")
-        return FailureDetails.capture("${error.javaClass.simpleName}: ${error.message.orEmpty()}", phase,
-            "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engine, System.currentTimeMillis())
-    }
+    private fun engineVersion(): String = runCatching {
+        context.assets.open("engine.json").bufferedReader().use { JSONObject(it.readText()).getString("version") }
+    }.getOrDefault("Tidak terbaca")
+    fun capture(error: Exception, phase: String): FailureDetails = FailureDetails.capture(
+        "${error.javaClass.simpleName}: ${error.message.orEmpty()}", phase,
+        "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engineVersion(), System.currentTimeMillis())
+    fun captureLyrics(status: String): FailureDetails = FailureDetails.lyrics(status,
+        "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engineVersion(), System.currentTimeMillis())
     fun put(id: String, generation: Int, details: FailureDetails) = synchronized(lock) {
         directory.mkdirs()
         val target = file(id,generation); val stream = target.startWrite()

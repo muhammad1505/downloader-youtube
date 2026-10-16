@@ -250,6 +250,9 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     // Completed only after media, requested sidecars and their outcomes are recorded.
     if(dao.finish(jobId,generation,published.toString(),System.currentTimeMillis()) == 0) throw CancellationException()
     completed=true
+    if (FailureDetails.isLyricFailure(lyricStatus)) runCatching {
+     FailureDetailsStore(applicationContext).let { it.put("$jobId-lyrics",generation,it.captureLyrics(lyricStatus)) }
+    }
     pending=null
     dao.get(jobId)?.processingNotice?.takeIf { it.isNotBlank() }?.let {
      DownloadDatabase.get(applicationContext).media().event(MediaEvent(jobId = jobId, action = "PROCESSING_FAILED", kind = job.mode.name, platformId = job.platformId, at = System.currentTimeMillis()))

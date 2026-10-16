@@ -90,3 +90,52 @@ artefak dari build yang dihentikan tidak dipasang atau dibagikan.
 Suite berikutnya lulus 292 Kotlin; lint menemukan tiga LocalContextGetResourceValueCall
 pada label aksesibilitas/ukuran di Pengaturan. Label dipindahkan ke stringResource
 pada scope Composable (tanpa suppress), lalu pemeriksaan lengkap dijalankan ulang.
+
+
+## Checkpoint HP — kandidat awal 1.1.15
+
+APK ARM64 kandidat awal terpasang dan base.apk cocok SHA256
+6405f64efdce20e905367196539c32f39e49d6ba900387a9166c34aca3b7dd45.
+60 file baseline (51 MP3/9 LRC) identik setelah upgrade. Audit seluruh MP3:
+51 judul, 27 artis; 25 nama cocok literal dan dua lainnya hanya pembersihan
+karakter terlarang. 24 artis kosong, 23 dengan penanda DJ/remix/versi; tidak
+mengarang artis. Dua LRC pasangan valid struktur/durasi, bukan bukti auditori.
+
+Pemulihan force-stop/manual open lulus: PID berubah, antrean51/shuffle/repeatALL
+serta posisi31589ms sama dan tetap jeda. Lima kasus sakelar auto-resume lulus,
+termasuk mematikan ketika pemulihan sudah menunggu; akhir aktif/jeda. Dua tone
+QA berlabel uji diindeks, kemudian hanya file/row miliknya dihapus. Daftar turun
+2→1→0 otomatis tanpa scan ulang atau baris unavailable. Semua file QA tersebut
+sudah hilang; tidak menghapus media pengguna.
+
+Pengaturan membaca cache6,9MB dan sementara0B; clear cache lirik turun menjadi
+5,2MB, cooldown dipertahankan. Dialog cleanup quota/from-zero diuji pada baseline
+sementara0B; cleanup parsial nonzero milik pengguna tidak dilakukan. Host menguji
+file parsial nonzero/symlink/lease worker secara terpisah.
+
+Download sumber rEjSkBl47OY ternyata SATRU2Live (bukan asumsi PINGAL dari pesan
+lama): M4A baru berjudul/artis benar, durasi393,98detik, seluruh audio lulus decode.
+Nama SATRU 2 (Live) - DENNY CAKNAN FT HAPPY ASMARA.m4a sesuai tag. Audio sukses,
+lirik berstatus pembatasan LRCLIB, tidak disebut galat jaringan.
+
+Analisis menemukan fetch otomatis masih mendahulukan /api/get, sedangkan manual
+memakai /api/search. [Dokumentasi resmi LRCLIB](https://www.lrclib.net/docs)
+menjelaskan get dapat mengambil dari sumber eksternal ketika database tidak punya
+signature tersebut; cooldown/Retry-After tetap wajib dihormati. Regresi dibuat
+untuk memakai hasil search valid sebelum exact fallback yang dapat membatasi.
+Kandidat akhir setelah perbaikan discovery belum dibangun/diuji pada checkpoint ini.
+
+
+Regresi HTTP lokal pada kode lama membuktikan expected tersimpan / actual
+ dibatasi_penyedia: exact lookup429 menutup akses ke search200 yang valid. Fetch
+sekarang mendahulukan rencana search yang sama dengan manual, memakai seluruh
+validasi identitas/versi/durasi lama dan memilih kandidat sebelum berhenti. Exact
+lookup tetap fallback bila search belum cocok, dengan album_name kosong eksplisit
+untuk album tidak diketahui. Tidak menambah endpoint yang belum diverifikasi,
+mengosongkan cooldown, memutar IP, atau meneruskan request setelah429.
+
+Tes terarah lirik/diagnostik sesudah perbaikan lulus; tambahan tes memastikan cache
+hasil manual bisa dipakai otomatis saat lagu lain dibatasi tanpa request jaringan.
+Detail error lirik juga tersedia terpisah, per ID/generasi/status; pada histori
+lama waktu/versi/HTTP yang tidak tercatat tetap tidak diketahui. RATE_LIMIT dapat
+berasal dari cooldown lokal sehingga laporan tidak mengarang HTTP429 baru.

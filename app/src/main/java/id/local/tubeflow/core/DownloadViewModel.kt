@@ -624,6 +624,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      catch (failure: Exception) { saveError = failure.message; LyricStatus.SAVE_FAILED }
     }
     dao.lyricStatus(id, result)
+    if (FailureDetails.isLyricFailure(result)) runCatching {
+     FailureDetailsStore(getApplication()).let { it.put("$id-lyrics",job.generation,it.captureLyrics(result)) }
+    }
     result
    }
    MediaRepository(getApplication()).indexDownload(id)

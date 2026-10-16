@@ -61,6 +61,38 @@ class LyricsFetchTest {
     private fun studioRecord() =
         """{"trackName":"Song","artistName":"Artist","duration":200,"instrumental":false,"syncedLyrics":"[00:01.00]line"}"""
 
+    @Test fun automaticSearchFindsLyricsWithoutCallingRateLimitedExactLookup() {
+        respond = { path -> if (path == "/api/search?track_name=Song&artist_name=Artist")
+            200 to studioList().replace("{", "{\"id\":99,") else 429 to "" }
+        val automatic = fetchKnown("Song - Artist", 200)
+        assertEquals(LyricStatus.SAVED, automatic.status)
+        assertEquals(1, requests.size)
+        assertTrue(requests.single().startsWith("/api/search"))
+        val manual = Lyrics.search("Song", "Artist")
+        assertEquals(automatic.text.orEmpty().trim(), manual.choices.single().text.orEmpty().trim())
+    }
+
+    @Test fun automaticLookupCanUseManualSearchCacheWhileAnotherTrackIsLimited() {
+        val directory = java.nio.file.Files.createTempDirectory("lyrics-auto-cache").toFile()
+        try {
+            Lyrics.responseCache = LyricsResponseCache(directory)
+            respond = { 200 to studioList().replace("{", "{\"id\":99,") }
+            assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+            respond = { 429 to "" }
+            assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Other","Artist").failureStatus)
+            assertEquals(LyricStatus.SAVED,fetchKnown("Song - Artist",200).status)
+            assertEquals(2,requests.size) // Cached data is usable; no request bypasses the gate.
+        } finally { Lyrics.responseCache = null; directory.deleteRecursively() }
+    }
+
+    @Test fun emptySearchStillAllowsExactFallbackWithDurationAndUnknownAlbum() {
+        respond = { path -> if (path.startsWith("/api/get?")) 200 to studioRecord() else 200 to "[]" }
+        assertEquals(LyricStatus.SAVED, fetchKnown("Song - Artist",200).status)
+        assertTrue(requests.first().startsWith("/api/search"))
+        val exact = requests.first { it.startsWith("/api/get?") }
+        assertTrue(exact, exact.contains("duration=200") && exact.contains("album_name="))
+    }
+
     @Test fun displayVersionAndCollaborationDoNotForceAnUnnecessaryRawSearchBeforeUsefulResults() {
         respond={ path -> if(path=="/api/search?track_name=Song&artist_name=Denny+Caknan") 200 to
             studioList().replace("{","{\"id\":99,").replace("Artist","Denny Caknan") else 429 to "" }

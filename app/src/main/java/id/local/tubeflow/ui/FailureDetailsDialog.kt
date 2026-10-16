@@ -19,8 +19,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun FailureDetailsDialog(details: FailureDetails, dismiss: () -> Unit) {
     val context = LocalContext.current
-    var copied by remember { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(R.string.failure_details)) },
+    var copied by remember(details) { mutableStateOf(false) }
+    AlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(if (details.phase == "LYRICS") R.string.failure_lyrics_details else R.string.failure_details)) },
         text = { SelectionContainer { Text(details.text(), Modifier.verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) } },
         confirmButton = { TextButton(onClick = {
             context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("TubeFlow", details.text()))
@@ -30,15 +30,17 @@ fun FailureDetailsDialog(details: FailureDetails, dismiss: () -> Unit) {
 }
 
 @Composable
-fun JobFailureDetails(job: DownloadJob) {
+fun JobFailureDetails(job: DownloadJob, lyrics: Boolean = false) {
     val context = LocalContext.current
     var open by remember(job.id, job.generation) { mutableStateOf(false) }
-    TextButton(onClick = { open = true }) { Text(stringResource(R.string.failure_details)) }
+    TextButton(onClick = { open = true }) { Text(stringResource(if (lyrics) R.string.failure_lyrics_details else R.string.failure_details)) }
     if (open) {
-        val details by produceState<FailureDetails?>(null, job.id, job.generation) {
+        val details by produceState<FailureDetails?>(null, job.id, job.generation, job.lyricStatus) {
             value = withContext(Dispatchers.IO) {
-                FailureDetailsStore(context).get(job.id,job.generation) ?: FailureDetails.capture(
-                    job.error.orEmpty(), job.phase, "Tidak tercatat (riwayat lama)", "Tidak tercatat")
+                if (lyrics) FailureDetailsStore(context).get("${job.id}-lyrics",job.generation)?.takeIf { it.status == job.lyricStatus }
+                    ?: FailureDetails.lyrics(job.lyricStatus)
+                else FailureDetailsStore(context).get(job.id,job.generation) ?: FailureDetails.capture(
+                    job.error.orEmpty(), job.phase, "Tidak tercatat", "Tidak tercatat")
             }
         }
         if (details != null) FailureDetailsDialog(requireNotNull(details)) { open = false }

@@ -242,13 +242,14 @@ object Lyrics {
     fun fetch(identity: SongIdentity, durationSeconds: Long, refreshMissing: Boolean = false): LyricOutcome {
         val validation = LyricMatch.Query(identity.lyricTitle, identity.artist.orEmpty(), durationSeconds)
         if (validation.title.isBlank()) return LyricOutcome(LyricStatus.NOT_FOUND)
-        val paths = linkedSetOf<String>()
+        // Use the same cheap discovery as manual search before the exact endpoint, which may
+        // fetch external sources. A valid search result must not incur an unnecessary get/429.
+        val paths = linkedSetOf<String>().apply { addAll(searchPaths(validation.title, validation.artist)) }
         if (validation.artist.isNotBlank() && durationSeconds > 0) {
-            paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(validation.artist)}&duration=$durationSeconds"
+            paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(validation.artist)}&album_name=&duration=$durationSeconds"
             val lead = TitleSplit.primaryArtist(validation.artist)
-            if (lead != validation.artist) paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(lead)}&duration=$durationSeconds"
+            if (lead != validation.artist) paths += "/api/get?track_name=${enc(validation.title)}&artist_name=${enc(lead)}&album_name=&duration=$durationSeconds"
         }
-        paths += searchPaths(validation.title, validation.artist)
         var failure: String? = null
         var unmatched = false
         var bestScore = 0.0

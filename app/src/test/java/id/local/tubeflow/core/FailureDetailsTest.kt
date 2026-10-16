@@ -25,6 +25,17 @@ class FailureDetailsTest {
         }
         assertTrue(safe.contains("HTTP: 403"))
     }
+    @Test fun lyricCooldownIsSeparateFromDownloadFailureAndDoesNotInventHttp() {
+        val details = FailureDetails.lyrics(LyricStatus.RATE_LIMIT)
+        assertEquals("LYRICS",details.phase)
+        assertEquals("rate_limit",details.category)
+        assertEquals(LyricStatus.RATE_LIMIT,details.status)
+        assertNull(details.http); assertNull(details.at)
+        assertEquals(details,FailureDetails.fromJson(details.json().toString()))
+        assertTrue(FailureDetails.isLyricFailure(LyricStatus.SAVE_FAILED))
+        assertFalse(FailureDetails.isLyricFailure(LyricStatus.NO_MATCH))
+        assertFalse(FailureDetails.isLyricFailure(LyricStatus.SAVED))
+    }
     @Test fun persistedReportKeepsActualFailureTimeAndLegacyTimeRemainsUnknown() {
         val before = report("HTTP Error 503")
         assertEquals(before,FailureDetails.fromJson(before.json().toString()))
