@@ -3,15 +3,16 @@
 ## Ringkasan verifikasi terkini
 
 Seluruh lima kelompok implementasi tersedia pada **1.1.15/code 29**. APK final sudah
-dipasang update-r dan hash base.apk cocok. Pengujian host/build selesai; beberapa
-pemeriksaan layar akhir menunggu HP selesai dipakai untuk panggilan. Bagian
+dipasang update-r dan hash base.apk cocok. Pengujian host/build selesai.
+Pemeriksaan dilanjutkan pada HP yang sama pada 17 Oktober: preferensi OFF bertahan setelah restart dan 60 file baseline tetap
+identik. Hasil tambahan dicatat pada bagian kelanjutan di bawah. Bagian
 checkpoint di bawah adalah riwayat pengerjaan, bukan pengganti status pada tabel ini.
 
 | Tahap | Implementasi dan bukti | Batas yang masih terbuka |
 |---|---|---|
-| Penamaan, metadata, lirik, koleksi | Audit 51 MP3; download M4A SATRU2Live benar nama/tag dan decode penuh;2 file QA otomatis hilang dari daftar setelah dihapus; lookup otomatis sekarang search-first dengan gerbang versi/durasi tetap |24 file lama tanpa artis tidak diisi sembarang; LRC baru sumber Live masih mendapat status pembatasan pada kandidat awal; sinkron auditori baru belum terbukti |
+| Penamaan, metadata, lirik, koleksi | Audit 51 MP3; M4A SATRU 2 Live dan Lamunan Live benar nama/tag/decode penuh; Lamunan otomatis menyimpan 32 timestamp LRC; manual 14 hasil; 2 file QA otomatis hilang dari daftar; discovery search-first mempertahankan gerbang versi/durasi |24 file lama tanpa artis tidak diisi sembarang; SATRU 2 Live dibatasi pada kandidat awal; sinkron auditori Lamunan baru belum didengar |
 | Antrean dan posisi | Snapshot atomik ber-revisi,3000 entri/4 MiB; posisi kecil tiap5 detik/pause/seek;51 lagu/acak/ulangi/31589 ms pulih jeda setelah force-stop/manualopen pada kandidat awal; APK final kembali memulihkan51 lagu/jeda44817 ms |Kehilangan proses hanya pulih sampai checkpoint terakhir; bukan bukti semua OEM/low-memory/stickyrestart;1.1.14 tidak menyimpan antrean/seek lama |
-| Preferensi auto-resume | Default aktif; disable langsung membatalkan niat tertunda;5 kasus fokus native pada kandidat awal lulus termasuk transient/permanent/disableketikamenunggu; kode kontrol sama di final |Persistensi OFF lintas restart/final kabel/TWS menunggu layar HP; nilai acak awal aktif telah dikembalikan sesuai baseline |
+| Preferensi auto-resume | Default aktif; disable langsung membatalkan niat tertunda;5 kasus fokus native pada kandidat awal lulus termasuk transient/permanent/disableketikamenunggu; kode kontrol sama di final |Persistensi OFF lintas restart lulus pada APK final 17 Oktober dan dikembalikan aktif; kabel/TWS final belum diuji ulang. Acak checkpoint 16 Oktober telah dikembalikan sesuai baseline |
 | Detail error | Dialog/copy inspeksi nyata unavailable-video lulus; versi/engine/tahap/waktu ada, HTTP tidak ditebak; laporan worker dan lirik dibatasi80 entry/1 MiB dan ID/generasi/status |Dialog lirik final perlu cek layar; fault injection provider/filewrite Android belum menyeluruh |
 | Ruang sementara | Ukuran cache terpisah dari media/parsial; cache 6,9→5,2 MB setelah clear lirik; sementara 0B dan dialog quota/from-zero/noopcleanup diuji; lease/symlink/nonzero deletion diuji host |Tidak menghapus parsial nonzero milik pengguna demi tes; perlindungan worker dibuktikan di host, belum seluruh race native/kill/provider |
 
@@ -37,9 +38,8 @@ ARM64, RAM4 GB, halaman4 KB; bukan perangkat16 KB atau Android15+.
   menerima field status opsional; histori yang tidak mencatat waktu/versi/HTTP
   tetap ditandai tidak diketahui. Default folder tetap Download/TubeFlow.
 - Sampul, data audio, LRC lama, keystore dan pengaturan DNS/keamanan dipertahankan.
- 60 file baseline telah dibandingkan sesudah upgrade kandidat awal; pembandingan
- akhir setelah seluruh tes masih dijadwalkan. Retensi seluruh baris histori lama
- tidak diklaim tanpa baseline database.
+  60 file baseline dibandingkan lagi 17 Oktober: seluruhnya identik, tanpa
+  hilang/berubah. Retensi seluruh baris histori lama tidak diklaim tanpa baseline database.
 
 ### Artefak final yang terpasang
 
@@ -55,6 +55,41 @@ app/build/outputs/bundle/release/. Tidak menambah salinan distribusi atau publik
 toko. ARM64 bertambah98.816 byte dari1.1.14; belum ada benchmark baterai/RAM
 menyeluruh. Snapshot antrean hanya ditulis saat berubah, sedangkan checkpoint
 posisi memakai berkas kecil agar tidak menulis ulang ribuan entri setiap5 detik.
+
+### Kelanjutan pemeriksaan — 17 Oktober 2026
+
+- APK HP masih cocok hash final ARM64 pada tabel. Pada awal sesi, riwayat 0 dan player tertutup;
+  kondisi ini berbeda dari checkpoint 16 Oktober, sehingga antrean lama tidak dipulihkan
+  secara paksa dan histori tidak direkonstruksi. Koleksi fisik tetap terbaca.
+- Preferensi auto-resume dimatikan, aplikasi force-stop saat tidak ada worker aktif,
+  lalu dibuka manual: OFF tetap tersimpan. Nilai awal aktif dikembalikan dan
+  diverifikasi. Tes tidak memulai playback atau mengganggu audio aplikasi lain.
+- Pembandingan SHA256 60 file baseline setelah seluruh tes: 60 identik, 0 berubah, 0 hilang. Bukti privat:
+  `final-pref-restart-oct17.json` dan `original-media-final-oct17.json`.
+- Download baru sumber pengguna `8uWb5QvR95s` selesai pada APK final: `Lamunan (Live) - Sasya Arkhisna.m4a` beserta LRC, tanpa file lama hilang. Tag title/artist
+  sesuai nama, date 2024 berasal dari sumber; durasi 259,374 detik dan ukuran 9.706.413 byte.
+  Decode FFmpeg penuh lulus. 32 timestamp LRC berurutan pada 16,62–257,31 detik berada dalam
+  durasi audio. Pencarian manual menampilkan 14 hasil tanpa memilih/menimpa LRC.
+  Ini membuktikan lookup dan publikasi otomatis berhasil pada satu rekaman; belum
+  membuktikan sinkron auditori atau ketersediaan semua lagu. Bukti privat:
+  `lamunan-final-results.json`, `lamunan-final-ffprobe.json` dan
+  `lamunan-manual-final-results.json`.
+- Duplikat final: URL Lamunan dan seluruh opsi audio/M4A sumber/lirik/sampul yang
+  sama ditolak dengan “File ini sudah pernah diunduh.” Antrean kosong dan daftar
+  file tetap sama. Bukti `duplicate-final-results-oct17.json`. Helper sempat gagal
+  menekan tab Antrean yang sudah terpilih; XML berikutnya membuktikan antrean kosong
+  tanpa pengiriman ulang atau file tambahan.
+- Percobaan regresi video `BaW_jenozKc` berhenti saat inspeksi: sumber menjawab
+  “This video is unavailable”. Download video tidak dijalankan, sehingga playback
+  dan decode video final belum diuji ulang. Dialog detail inspeksi pada APK final
+  berhasil menampilkan kategori/tahap/versi/waktu, HTTP “Tidak tercatat”, dan
+  tombol salin berubah menjadi “Tersalin”. Bukti `final-inspection-copy-oct17.json`.
+- Pada PID aplikasi yang diperiksa, tidak ada `FATAL EXCEPTION` dalam 1.000 baris
+  log terakhir. Ini pemeriksaan terbatas, bukan jaminan tidak ada crash di semua sesi.
+  Helper uji perangkat dihapus; dua file baru Lamunan tetap tersedia di riwayat.
+- Source karaoke lokal memiliki perubahan tambahan BUG-058 dari pekerjaan lain.
+  Perubahan tersebut dipertahankan dan belum termasuk APK final/hash di atas;
+  laporan 296 tes/build release tidak boleh dipakai sebagai bukti untuk perubahan itu.
 
 ### Langkah uji Android10 untuk pengembang berikutnya
 
