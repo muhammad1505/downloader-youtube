@@ -66,14 +66,21 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    setForeground(getForegroundInfo())
    SettingsStore.load(applicationContext)
    acquireSlot()
-   try { return executeDownload(generation) } finally { releaseSlot() }
+   try { return DownloadFileAccess.lock(jobId.orEmpty()).withLock { executeDownload(generation) } } finally { releaseSlot() }
   } catch(cancelled: CancellationException) {
    jobId?.let { withContext(NonCancellable) { handleStop(it, generation) } }
    throw cancelled
   } catch(error: Exception) {
-   jobId?.let { dao.failOwned(it, generation, error.message?.take(500) ?: "Unduhan tidak dapat dimulai.") }
+   jobId?.let { recordFailure(it, generation, error) }
    return Result.success()
   }
+ }
+ private suspend fun recordFailure(jobId: String, generation: Int, error: Exception): String = withContext(Dispatchers.IO) {
+  val current = dao.get(jobId)
+  val store = FailureDetailsStore(applicationContext)
+  val details = store.capture(error, current?.phase ?: DownloadPhase.PREPARING)
+  if (dao.failOwned(jobId, generation, details.userMessage) > 0) runCatching { store.put(jobId,generation,details) }
+  details.userMessage
  }
  private suspend fun executeDownload(generation: Int): Result = withContext(Dispatchers.IO) {
   val jobId = inputData.getString("jobId") ?: return@withContext Result.failure()
@@ -261,8 +268,8 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    if (takenOver || state == JobState.PAUSED || state == JobState.CANCELLED || isStopped) {
     if (!takenOver) withContext(NonCancellable) { handleStop(jobId, generation) }
    } else {
-    dao.failOwned(jobId, generation, error.message?.take(500) ?: "Unduhan gagal.")
-    notifyResult(job, null, error.message?.take(200) ?: "Unduhan gagal.")
+    val message = recordFailure(jobId, generation, error)
+    notifyResult(job, null, message)
    }
    Result.success()
   } finally {

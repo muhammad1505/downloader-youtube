@@ -19,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,11 +45,20 @@ fun SettingsScreen(
     storageCatalogue: Boolean = false,
     storageUnknownSizes: Long = 0,
     onRefreshStorage: () -> Unit,
+    temporaryUsage: id.local.tubeflow.core.PrivateStorage.Usage? = null,
+    cleaningPartial: Boolean = false,
+    onClearPartial: () -> Unit = {},
     clearingFiles: Boolean = false,
     onClearStorage: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
+    var confirmPartial by rememberSaveable { mutableStateOf(false) }
+    if (confirmPartial) AlertDialog(onDismissRequest = { confirmPartial = false },
+        title = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title)) },
+        text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_warning)) },
+        confirmButton = { TextButton(onClick = { confirmPartial = false; onClearPartial() }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_confirm)) } },
+        dismissButton = { TextButton(onClick = { confirmPartial = false }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.action_cancel)) } })
     var confirmClearFiles by rememberSaveable { mutableStateOf(false) }
     val tree = SettingsStore.storageTree
     var folderAccessError by rememberSaveable { mutableStateOf(false) }
@@ -113,6 +124,21 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         PageHeading("Pengaturan", "Dirancang untuk bekerja langsung di perangkatmu.")
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title), style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title))
+                        Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_description),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(SettingsStore.resumeAfterInterruption, onCheckedChange = { SettingsStore.setResumeAfterInterruption(context, it) },
+                        modifier = Modifier.semantics { contentDescription = context.getString(id.local.tubeflow.R.string.resume_interruption_title) })
+                }
+            }
+        }
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -218,6 +244,22 @@ fun SettingsScreen(
         if (storageError) {
             Text("Pilih ulang folder atau tekan Segarkan. Folder yang terlalu besar/dalam atau file tanpa ukuran belum dapat dihitung lengkap.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
+                HorizontalDivider()
+                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_title), style = MaterialTheme.typography.titleSmall)
+                fun sizeLabel(size: id.local.tubeflow.core.PrivateStorage.Size?): String =
+                    size?.let { Format.bytes(it.bytes) + if (!it.complete) context.getString(id.local.tubeflow.R.string.size_partial) else "" } ?: context.getString(id.local.tubeflow.R.string.size_unavailable)
+                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_size_label, sizeLabel(temporaryUsage?.cache)), style = MaterialTheme.typography.bodyMedium)
+                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_size_label, sizeLabel(temporaryUsage?.partial)), style = MaterialTheme.typography.bodyMedium)
+                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = {
+                    smartScope.launch {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() }
+                        onRefreshStorage()
+                    }
+                }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_clear_lyrics)) }
+                OutlinedButton(onClick = { confirmPartial = true }, enabled = !cleaningPartial && temporaryUsage != null, modifier = Modifier.fillMaxWidth()) {
+                    Text(androidx.compose.ui.res.stringResource(if (cleaningPartial) id.local.tubeflow.R.string.partial_clearing else id.local.tubeflow.R.string.partial_clear_title))
+                }
         OutlinedButton(onClick = { confirmClearFiles = true }, enabled = !clearingFiles, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Outlined.DeleteSweep, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -286,7 +328,6 @@ fun SettingsScreen(
                     }
                 }
                 Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { smartScope.launch(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() } }) { Text("Bersihkan cache respons lirik") }
             }
         }
 

@@ -29,6 +29,14 @@ object SettingsStore {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putBoolean("artwork_accent", enabled) }
     }
 
+    var resumeAfterInterruption by mutableStateOf(true); private set
+
+    fun setResumeAfterInterruption(context: Context, enabled: Boolean) {
+        resumeAfterInterruption = enabled
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putBoolean("resume_interruption", enabled) }
+        PlayerViewModel.active?.setInterruptionResume(enabled)
+    }
+
     var storageFolder by mutableStateOf(DEFAULT_FOLDER)
         private set
 
@@ -61,6 +69,7 @@ object SettingsStore {
 
     fun load(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        resumeAfterInterruption = prefs.getBoolean("resume_interruption", true)
         autoRename = prefs.getBoolean("smart_rename", true)
         autoTag = prefs.getBoolean("smart_tag", true)
         autoArtwork = prefs.getBoolean("smart_artwork", true)

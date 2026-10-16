@@ -83,6 +83,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Antrean putar hanya disentuh pada handler thread yang sama dengan MediaPlayer.
     private var queue: PlaybackQueue<Track>? = null
     val equalizer = PlayerEqualizer(application)
+    private val sessionStore = PlayerSessionStore(application)
+    private var lastCheckpoint = 0L
+    private val initialOutputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.id }.toMutableSet()
     private val fx = application.getSharedPreferences("player-fx", 0)
     private var speed = fx.getFloat("speed", 1f).coerceIn(0.25f, 3f)
     // Acak/ulangi adalah preferensi pengguna, bukan milik satu antrean. Antrean baru mewarisinya,
@@ -92,11 +95,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var engineToken = -1L
     private var prepared = false
     private var autoplay = false
+    @Volatile private var allowInterruptionResume = application.getSharedPreferences("settings", 0).getBoolean("resume_interruption", true)
     private val interruption = PlaybackInterruption()
     private var interruptionReadyAt = 0L
     private val observePlayback = Runnable { observeInterruptedPlayback() }
     private val resumeAfterQuiet = Runnable {
-        if (engineToken == token.get() && prepared && !_state.value.playing) {
+        if (allowInterruptionResume && engineToken == token.get() && prepared && !_state.value.playing) {
             // Facebook can request permanent focus, which removes us from Android's focus stack.
             // Reclaim once after observed audio ends; never poll focus or use the headset retry loop.
             if (interruption.takeAfterQuiet(otherAudioActive(), manager.mode == AudioManager.MODE_NORMAL)) {
@@ -118,19 +122,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Headset/TWS baru tersambung: musik yang sedang berhenti dilanjutkan otomatis tanpa sentuhan layar. */
     private val devices = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
-            if (addedDevices.any { it.isSink && it.type in AUTOPLAY_OUTPUTS }) {
+            if (addedDevices.any { it.isSink && it.type in AUTOPLAY_OUTPUTS && it.id !in initialOutputs }) {
                 android.util.Log.i("TubeFlow-autoload", "audio output connected")
                 PlaybackService.requestAutoPlay(getApplication<Application>())
             }
         }
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {}
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) { removedDevices.forEach { initialOutputs.remove(it.id) } }
     }
     /** Pemicu cadangan: sebagian perangkat lebih cepat melaporkan aksi headset/Bluetooth daripada AudioDeviceCallback. */
     private val devicePlug = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             android.util.Log.d("TubeFlow-autoload", "runtime connection action=${intent?.action}")
             when (intent?.action) {
-                Intent.ACTION_HEADSET_PLUG -> if (intent.getIntExtra("state", -1) == 1) PlaybackService.requestAutoPlay(getApplication<Application>())
+                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && intent.getIntExtra("state", -1) == 1) PlaybackService.requestAutoPlay(getApplication<Application>())
                 ACTION_BT_A2DP, ACTION_BT_HEADSET -> if (intent.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1) ==
                     android.bluetooth.BluetoothProfile.STATE_CONNECTED) PlaybackService.requestAutoPlay(getApplication<Application>())
             }
@@ -163,16 +167,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /** Recover only a session the user left active; X clears its marker. */
+    /** Rebuild a process-death snapshot paused. Only an explicit connection event may auto-play. */
     internal suspend fun restorePlaybackSession() {
-        if (_state.value.track != null) return
-        if (manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.isSink && it.type in AUTOPLAY_OUTPUTS }) {
-            resumeForConnectedDevice()
-        } else withContext(engineDispatcher) {
-            if (_state.value.track == null) lastTrack()?.let {
-                load(PlaybackQueue(listOf(it)).withPreferences(shufflePref, repeatPref), playWhenReady = false)
+        if (_state.value.track != null || !hasRestorableSession(getApplication())) return
+        val expected = token.get()
+        val restored = withContext(Dispatchers.IO) {
+            fun readable(track: Track) = runCatching {
+                getApplication<Application>().contentResolver.openFileDescriptor(track.uri.toUri(), "r")?.use { true } == true
+            }.getOrDefault(false)
+            val saved = sessionStore.read()
+            if (saved != null) {
+                PlaybackQueue.restore(saved.queue, ::readable)?.let { planned ->
+                    val same = planned.snapshot().entries[planned.index].first == saved.queue.entries[saved.queue.index].first
+                    planned to if (same) saved.positionMs else 0L
+                }
+            } else lastTrack()?.takeIf(::readable)?.let {
+                PlaybackQueue(listOf(it)).withPreferences(shufflePref, repeatPref) to 0L
             }
         }
+        withContext(engineDispatcher) {
+            if (expected != token.get() || _state.value.track != null) return@withContext
+            if (restored != null) load(restored.first, playWhenReady = false, startPositionMs = restored.second)
+            else {
+                sessionStore.offer(null)
+                getApplication<Application>().getSharedPreferences("player-last", 0).edit { putBoolean("session_active", false) }
+            }
+        }
+    }
+    private fun checkpoint(force: Boolean = false) {
+        if (engineToken != token.get() || _state.value.track == null) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force && now - lastCheckpoint < 5000) return
+        val planned = queue ?: return
+        lastCheckpoint = now
+        sessionStore.offer(PlayerSession.Saved(planned.snapshot(), _state.value.positionMs.coerceAtLeast(0)))
     }
     /** Lagu terakhir dipersist agar auto-play headset tetap punya sumber setelah pemutar kosong. */
     private fun rememberLast(track: Track) {
@@ -190,6 +218,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     init {
         active = this
+        viewModelScope.launch(Dispatchers.IO) { sessionStore.writePending() }
+        viewModelScope.launch { restorePlaybackSession() }
         ContextCompat.registerReceiver(application, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
         ContextCompat.registerReceiver(application, devicePlug, IntentFilter(Intent.ACTION_HEADSET_PLUG).apply {
             addAction(ACTION_BT_A2DP)
@@ -215,7 +245,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun run() {
             val current = media
             if (current != null && prepared && engineToken == token.get()) try {
-                updateEngine { it.copy(positionMs=current.currentPosition.toLong(), playing=current.isPlaying) }
+                updateEngine { it.copy(positionMs=current.currentPosition.toLong(), playing=current.isPlaying) }; checkpoint()
                 if (current.isPlaying) handler.postDelayed(this, 200)
             } catch (_: IllegalStateException) { fail("Pemutaran terhenti. Coba putar ulang.") }
         }
@@ -307,16 +337,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         queue?.previous()?.let { load(it) } ?: seek(0)
     }
-    private fun syncQueue(current: PlaybackQueue<Track>) = updateEngine {
-        it.copy(queueTracks = current.tracks, queueIndex = current.index, queueHasNext = current.hasNext,
-            shuffle = current.shuffled, repeat = current.repeat)
+    private fun syncQueue(current: PlaybackQueue<Track>) {
+        updateEngine { it.copy(queueTracks = current.tracks, queueIndex = current.index, queueHasNext = current.hasNext,
+            shuffle = current.shuffled, repeat = current.repeat) }
+        checkpoint(force = true)
     }
-    private fun load(planned: PlaybackQueue<Track>, playWhenReady: Boolean = true) {
+    private fun load(planned: PlaybackQueue<Track>, playWhenReady: Boolean = true, startPositionMs: Long = 0) {
         queue = planned
         val track = planned.current
         rememberLast(track)
         val id = token.incrementAndGet()
-        _state.value = State(track=track, loading=true, speed=speed, queueTracks=planned.tracks, queueIndex=planned.index,
+        _state.value = State(track=track, loading=true, positionMs=startPositionMs.coerceAtLeast(0), speed=speed, queueTracks=planned.tracks, queueIndex=planned.index,
             queueHasNext=planned.hasNext, shuffle=planned.shuffled, repeat=planned.repeat)
         loadLyrics(track,id)
         handler.post {
@@ -324,15 +355,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             release()
             engineToken = id
             autoplay = playWhenReady
+            checkpoint(force = true)
             val current = MediaPlayer(); media = current
+            var initialSeek = false
+            fun readyToPlay() {
+                prepared = true
+                updateEngine { it.copy(loading = false, positionMs = current.currentPosition.toLong()) }
+                checkpoint(force = true)
+                if (autoplay) start(id)
+            }
             try {
                 current.setAudioAttributes(attributes)
                 current.setOnPreparedListener { ready ->
                     if (media !== ready || token.get() != id) return@setOnPreparedListener
-                    prepared = true
                     equalizer.attach(ready.audioSessionId)
-                    updateEngine { it.copy(loading=false, durationMs=ready.duration.toLong().coerceAtLeast(0)) }
-                    if (autoplay) start(id)
+                    val duration = ready.duration.toLong().coerceAtLeast(0)
+                    val target = startPositionMs.coerceIn(0, (duration - 1).coerceAtLeast(0))
+                    updateEngine { it.copy(durationMs = duration, positionMs = target) }
+                    if (target > 0) {
+                        initialSeek = true
+                        ready.seekTo(target, MediaPlayer.SEEK_CLOSEST)
+                    } else readyToPlay()
                 }
                 current.setOnCompletionListener { completed ->
                     if (media !== completed || token.get() != id) return@setOnCompletionListener
@@ -346,7 +389,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             handler.removeCallbacks(tick); handler.post(tick)
                         } catch (_: IllegalStateException) { fail("Audio tidak dapat diulang. Coba putar ulang.") }
                         advanced != null -> load(advanced)
-                        else -> { updateEngine { it.copy(playing=false, positionMs=it.durationMs) }; abandon() }
+                        else -> { updateEngine { it.copy(playing=false, positionMs=it.durationMs) }; checkpoint(force = true); abandon() }
                     }
                 }
                 current.setOnErrorListener { failed, _, _ ->
@@ -354,7 +397,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     true
                 }
                 current.setOnSeekCompleteListener { sought ->
-                    if (media === sought && prepared && token.get() == id) updateEngine { it.copy(positionMs=sought.currentPosition.toLong()) }
+                    if (media === sought && token.get() == id) {
+                        if (initialSeek) { initialSeek = false; readyToPlay() }
+                        else if (prepared) { updateEngine { it.copy(positionMs=sought.currentPosition.toLong()) }; checkpoint(force = true) }
+                    }
                 }
                 // Data-source I/O and every MediaPlayer method stay off the UI thread.
                 current.setDataSource(getApplication<Application>(), track.uri.toUri())
@@ -400,12 +446,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         .setAudioAttributes(attributes).setWillPauseWhenDucked(true).setOnAudioFocusChangeListener({ change ->
             if (token.get() != id || sequence != focusSequence) return@setOnAudioFocusChangeListener
             when (change) {
-                AudioManager.AUDIOFOCUS_GAIN -> if (interruption.takeFocusGain()) { cancelInterruption(); resumeWithoutFocus() }
+                AudioManager.AUDIOFOCUS_GAIN -> if (allowInterruptionResume && interruption.takeFocusGain()) { cancelInterruption(); resumeWithoutFocus() }
                 AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     val permanent = change == AudioManager.AUDIOFOCUS_LOSS
-                    interruption.lost(permanent, _state.value.playing)
+                    interruption.lost(permanent, _state.value.playing, allowInterruptionResume)
                     pauseInternal(false)
-                    if (permanent) abandon()
+                    if (permanent || !allowInterruptionResume) abandon()
                     // Give our own AudioTrack stop event time to settle before observing the blocker.
                     interruptionReadyAt = android.os.SystemClock.elapsedRealtime() + 250
                     handler.removeCallbacks(observePlayback)
@@ -420,7 +466,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun observeInterruptedPlayback() {
         handler.removeCallbacks(observePlayback)
         handler.removeCallbacks(resumeAfterQuiet)
-        if (!interruption.needsPlaybackEvents || !prepared || engineToken != token.get() || _state.value.playing) return
+        if (!allowInterruptionResume || !interruption.needsPlaybackEvents || !prepared || engineToken != token.get() || _state.value.playing) return
         val settling = interruptionReadyAt - android.os.SystemClock.elapsedRealtime()
         if (settling > 0) {
             handler.removeCallbacks(observePlayback)
@@ -431,6 +477,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Native AudioTrack users may not publish Java playback callbacks (reproduced on Android10).
         // Check only while this track awaits recovery; this never repeatedly requests audio focus.
         else handler.postDelayed(observePlayback, 1000)
+    }
+    fun setInterruptionResume(enabled: Boolean) {
+        allowInterruptionResume = enabled
+        handler.post {
+            if (!allowInterruptionResume) {
+                cancelInterruption()
+                if (!_state.value.playing) abandon()
+            }
+        }
     }
     private fun cancelInterruption() {
         interruption.cancel()
@@ -483,7 +538,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun pauseInternal(relinquish: Boolean) {
         autoplay=false
         if (prepared) try { media?.pause() } catch (_: IllegalStateException) { }
-        handler.removeCallbacks(tick); updateEngine { it.copy(playing=false) }
+        handler.removeCallbacks(tick); updateEngine { it.copy(playing=false) }; checkpoint(force = true)
         if (relinquish) { cancelInterruption(); abandon() }
     }
     fun seek(positionMs: Long) { val id=token.get(); handler.post {
@@ -495,7 +550,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun skip(deltaMs: Long) = seek(_state.value.positionMs + deltaMs)
     fun stop() {
         getApplication<Application>().getSharedPreferences("player-last", 0).edit { putBoolean("session_active", false) }
-        token.incrementAndGet(); _state.value=State(); handler.post { queue=null; equalizer.release(); release() }
+        token.incrementAndGet(); _state.value=State(); handler.post { queue=null; sessionStore.offer(null); equalizer.release(); release() }
     }
     private fun abandon() { focusSequence++; request?.let(manager::abandonAudioFocusRequest); request=null }
     private fun release() { handler.removeCallbacks(tick); cancelInterruption(); abandon(); prepared=false; autoplay=false; equalizer.release(); media?.release(); media=null }

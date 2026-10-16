@@ -7,7 +7,8 @@ class PlaybackInterruption {
     private var heardOtherAudio = false
     val needsPlaybackEvents: Boolean get() = pending && permanent
 
-    fun lost(permanentLoss: Boolean, wasPlaying: Boolean) {
+    fun lost(permanentLoss: Boolean, wasPlaying: Boolean, enabled: Boolean = true) {
+        if (!enabled) { cancel(); return }
         // Repeated loss/duck callbacks arrive after we have paused. Preserve the original intent.
         pending = pending || wasPlaying
         permanent = permanent || permanentLoss

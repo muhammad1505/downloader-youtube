@@ -22,6 +22,26 @@ class PlaybackQueue<T> private constructor(
         require(index in items.indices) { "Posisi antrean tidak valid." }
     }
 
+    data class Snapshot<T>(val entries: List<Pair<Long, T>>, val index: Int, val repeat: Repeat,
+        val shuffled: Boolean, val lastId: Long)
+
+    fun snapshot() = Snapshot(items.map { it.id to it.track }, index, repeat, shuffled, lastId)
+
+    companion object {
+        /** Filtering unavailable tracks preserves the selected occurrence, not just its URI. */
+        fun <T> restore(saved: Snapshot<T>, available: (T) -> Boolean = { true }): PlaybackQueue<T>? {
+            require(saved.entries.isNotEmpty() && saved.index in saved.entries.indices)
+            val ids = saved.entries.map { it.first }
+            require(ids.distinct().size == ids.size && ids.all { it >= 0 && it <= saved.lastId })
+            require(saved.lastId < Long.MAX_VALUE)
+            val remaining = saved.entries.mapIndexedNotNull { i, entry -> if (available(entry.second)) i to entry else null }
+            if (remaining.isEmpty()) return null
+            val selected = remaining.indexOfFirst { it.first >= saved.index }.takeIf { it >= 0 } ?: remaining.lastIndex
+            return PlaybackQueue(remaining.map { Item(it.second.first, it.second.second) }, selected,
+                saved.repeat, saved.shuffled, saved.lastId)
+        }
+    }
+
     constructor(tracks: List<T>, startAt: Int = 0) : this(
         tracks.mapIndexed { position, track -> Item(position.toLong(), track) },
         startAt.coerceIn(0, (tracks.size - 1).coerceAtLeast(0)),

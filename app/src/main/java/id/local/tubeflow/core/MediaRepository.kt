@@ -293,7 +293,9 @@ class MediaRepository(private val context: Context) {
     /** Cheap presence checks; no metadata extraction/LRCLIB request for unchanged media. */
     suspend fun validateRecent(force: Boolean = false) = withContext(Dispatchers.IO) { operations.withLock {
         recoverRename()
+        val checked = mutableListOf<String>()
         for (item in dao.oldest(if (force) 4000 else 100)) {
+            checked += item.uri
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             when (MediaAvailability.probe(context,item)) {
                 MediaAvailability.State.MISSING -> {
@@ -304,9 +306,12 @@ class MediaRepository(private val context: Context) {
                     dao.put(item.copy(availability="ACCESS_DENIED",checkedAt=System.currentTimeMillis()))
                 MediaAvailability.State.PRESENT -> if (item.availability != "AVAILABLE")
                     index(item.location,item.jobId?.let { database.downloads().get(it) },item.folder)
+
                 MediaAvailability.State.UNKNOWN -> Unit // Failure to inspect is never proof of deletion.
             }
         }
+        // Rotate the bounded window without invalidating observers once per healthy file.
+        checked.chunked(500).forEach { dao.checked(it,System.currentTimeMillis()) }
     } }
 
     suspend fun refresh(raw: String) = withContext(Dispatchers.IO) { operations.withLock {

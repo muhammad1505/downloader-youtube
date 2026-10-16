@@ -27,6 +27,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private val _inspectError=MutableStateFlow<String?>(null)
  /** Alasan inspeksi terakhir gagal — menyalakan tombol "Coba lagi" untuk URL yang sama (BUG-006). */
  val inspectError: StateFlow<String?> = _inspectError.asStateFlow()
+ private val _inspectDetails = MutableStateFlow<FailureDetails?>(null)
+ val inspectDetails = _inspectDetails.asStateFlow()
  private val _notice=MutableStateFlow<String?>(null)
  val notice: StateFlow<String?> = _notice.asStateFlow()
  private val _storageBytes=MutableStateFlow<Long?>(null)
@@ -47,6 +49,39 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private val _clearing=MutableStateFlow(false)
  /** True selama "Hapus semua file" berjalan — tombol di Pengaturan dinonaktifkan. */
  val clearing: StateFlow<Boolean> = _clearing.asStateFlow()
+ private val _temporaryUsage = MutableStateFlow<PrivateStorage.Usage?>(null)
+ val temporaryUsage = _temporaryUsage.asStateFlow()
+ private val _cleaningPartial = MutableStateFlow(false)
+ val cleaningPartial = _cleaningPartial.asStateFlow()
+ fun clearPartialFiles() {
+  if (_cleaningPartial.value) return
+  _cleaningPartial.value = true
+  viewModelScope.launch(Dispatchers.IO) {
+   var removed = 0; var skipped = 0; var failed = 0
+   try {
+    val app = getApplication<Application>()
+    val root = java.io.File(app.noBackupFilesDir, "downloads")
+    val entries = if (root.exists()) root.listFiles() ?: error("Folder sementara belum dapat dibaca.") else emptyArray()
+    for (directory in entries) {
+     ensureActive()
+     val id = directory.name
+     val lease = DownloadFileAccess.lock(id)
+     if (!lease.tryLock()) { skipped++; continue }
+     try {
+      val row = dao.get(id)
+      if (Engine.isRunning(id) || hasActiveWork(id) || row?.state in setOf(JobState.QUEUED,JobState.RUNNING,JobState.COMPLETED)) { skipped++; continue }
+      if (PrivateStorage.deleteJob(root,directory)) {
+       row?.let { dao.discardedPartial(id,it.generation) }
+       removed++
+      } else failed++
+     } finally { lease.unlock() }
+    }
+    _notice.value="$removed folder sementara dibersihkan; $skipped job aktif/dilindungi dilewati; $failed gagal. Media hasil download tetap tersimpan."
+   } catch (cancelled: CancellationException) { throw cancelled }
+   catch (_: Exception) { _error.value="Berkas sementara belum dapat dibersihkan seluruhnya. Coba lagi." }
+   finally { _cleaningPartial.value=false; refreshStorage() }
+  }
+ }
  private var storageRefresh: Job? = null
  init {
   refreshStorage()
@@ -64,8 +99,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   storageRefresh=viewModelScope.launch {
    _storageError.value=false
    _storageBytes.value=null
-   val result=withContext(Dispatchers.IO) { runCatching { measureStorage() } }
+   val (result, temporary)=withContext(Dispatchers.IO) {
+    runCatching { measureStorage() } to runCatching { PrivateStorage.summary(getApplication<Application>().cacheDir,getApplication<Application>().noBackupFilesDir) }.getOrNull()
+   }
    ensureActive()
+   _temporaryUsage.value=temporary
    _storageFolderAccess.value=result.getOrNull()?.folderAccess == true
    _storageCatalogue.value=result.getOrNull()?.fromCatalogue == true
    _storageUnknownSizes.value=result.getOrNull()?.unknownSizes ?: 0L
@@ -193,10 +231,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   lastInspectPlaylist=false
   val id=UUID.randomUUID().toString(); inspectionId=id
   inspection=viewModelScope.launch {
-   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null
+   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null; _inspectDetails.value=null
    try { _metadata.value=Engine.inspect(getApplication(),url,id) }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
+    _inspectDetails.value=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
     val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca video.")
     _error.value=message; _inspectError.value=message
    }
@@ -213,7 +252,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   val canonical=Selection.playlistInspectionUrl(original) ?: original
   val cachedSeed=_metadata.value?.takeIf { Selection.videoId(it.url) == Selection.videoId(canonical) }
   inspection=viewModelScope.launch {
-   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null
+   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null; _inspectDetails.value=null
    try {
     val result=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original)
     val seed=if (Selection.isMix(original)) cachedSeed ?: try {
@@ -224,6 +263,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
+    _inspectDetails.value=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "PLAYLIST_INSPECTION") }
     val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca playlist.")
     _error.value=message; _inspectError.value=message
    }
@@ -233,7 +273,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  fun clearPlaylist() { _playlist.value=null }
  /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
  private fun inspectErrorMessage(url: String, message: String): String {
-  if(Selection.platform(url) != "Facebook") return message
+  if(Selection.platform(url) != "Facebook") return _inspectDetails.value?.userMessage ?: FailureDetails.safe(message)
   return "Tautan Facebook tidak dapat dibaca — video mungkin privat, butuh login, atau tautannya sudah kedaluwarsa. Coba salin tautan video publik langsung dari aplikasi Facebook."
  }
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang

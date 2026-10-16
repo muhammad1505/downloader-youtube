@@ -38,6 +38,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val playlist by model.playlist.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val inspectError by model.inspectError.collectAsStateWithLifecycle()
+    val inspectDetails by model.inspectDetails.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
     val notice by model.notice.collectAsStateWithLifecycle()
     val storageBytes by model.storageBytes.collectAsStateWithLifecycle()
@@ -46,6 +47,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val storageCatalogue by model.storageCatalogue.collectAsStateWithLifecycle()
     val storageUnknownSizes by model.storageUnknownSizes.collectAsStateWithLifecycle()
     val clearingFiles by model.clearing.collectAsStateWithLifecycle()
+    val temporaryUsage by model.temporaryUsage.collectAsStateWithLifecycle()
+    val cleaningPartial by model.cleaningPartial.collectAsStateWithLifecycle()
     val libraryMessage by library.message.collectAsStateWithLifecycle()
     // Riwayat adalah tujuan navigasi sendiri (tab 4), bukan chip di dalam Koleksi; Pengaturan
     // tetap di luar bilah bawah lewat ikon di app bar sehingga punya indeks terpisah.
@@ -189,6 +192,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     playlist = playlist,
                     busy = busy,
                     inspectError = inspectError,
+                    inspectDetails = inspectDetails,
                     listState = downloadList,
                     inspect = { model.inspect(url.trim()) },
                     inspectPlaylist = { model.inspectPlaylist(url.trim()) },
@@ -249,6 +253,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     storageCatalogue = storageCatalogue,
                     storageUnknownSizes = storageUnknownSizes,
                     onRefreshStorage = { model.refreshStorage() },
+                    temporaryUsage = temporaryUsage,
+                    cleaningPartial = cleaningPartial,
+                    onClearPartial = model::clearPartialFiles,
                     clearingFiles = clearingFiles,
                     onClearStorage = { model.clearStorageFolder() },
                 )

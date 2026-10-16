@@ -65,11 +65,18 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         updateDeviceStorage()
     }
     private var availabilityCheck: Job? = null
+    private var availabilityRequested = false
     fun validateAvailability() {
+        // Calls and this flag belong to Main; retain events arriving during provider I/O.
+        availabilityRequested = true
         if (availabilityCheck?.isActive == true) return
-        availabilityCheck=viewModelScope.launch(Dispatchers.IO) {
-            try { repository.validateRecent(force=true) }
-            catch (cancelled: CancellationException) { throw cancelled }
+        availabilityCheck = viewModelScope.launch {
+            try {
+                do {
+                    availabilityRequested = false
+                    repository.validateRecent(force = true)
+                } while (availabilityRequested)
+            } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia." }
         }
     }

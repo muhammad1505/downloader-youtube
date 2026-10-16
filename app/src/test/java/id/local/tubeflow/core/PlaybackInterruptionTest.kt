@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlaybackInterruptionTest {
+    @Test fun disabledPreferenceCannotArmResumeAndClearsExistingIntent() {
+        val policy = PlaybackInterruption()
+        policy.lost(true, true)
+        policy.playbackChanged(true)
+        policy.lost(false, false, enabled = false)
+        assertFalse(policy.needsPlaybackEvents)
+        assertFalse(policy.takeAfterQuiet(false, true))
+        assertFalse(policy.takeFocusGain())
+    }
+
     @Test fun repeatedTransientLossDoesNotEraseResumeIntent() {
         val policy = PlaybackInterruption()
         policy.lost(false, true)

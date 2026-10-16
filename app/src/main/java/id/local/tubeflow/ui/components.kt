@@ -216,6 +216,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 JobState.FAILED -> {
+                    JobFailureDetails(job)
                     job.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     if (job.partialBytes > 0) Text(
                         "${Format.bytes(job.partialBytes)} disimpan; Coba lagi memeriksa dukungan lanjut dari sumber.",

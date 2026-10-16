@@ -69,6 +69,7 @@ fun DownloadScreen(
     playlist: PlaylistMetadata?,
     busy: Boolean,
     inspectError: String?,
+    inspectDetails: id.local.tubeflow.core.FailureDetails? = null,
     listState: LazyListState,
     inspect: () -> Unit,
     inspectPlaylist: () -> Unit,
@@ -87,6 +88,8 @@ fun DownloadScreen(
     var preset by rememberSaveable { mutableStateOf("") }
     var selectedIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var playlistQuery by rememberSaveable { mutableStateOf("") }
+    var showFailureDetails by remember { mutableStateOf(false) }
+    if (showFailureDetails && inspectDetails != null) FailureDetailsDialog(inspectDetails) { showFailureDetails = false }
     var inspectedUrl by rememberSaveable { mutableStateOf("") }
 
     var subtitleLang by rememberSaveable { mutableStateOf("") }
@@ -204,6 +207,7 @@ fun DownloadScreen(
                 }
             }
             // Inspeksi gagal untuk URL ini: sediakan coba lagi tanpa perlu mengganti tautan (BUG-006).
+            if (inspectDetails != null && !busy) TextButton(onClick = { showFailureDetails = true }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.failure_details)) }
             if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isPlaylistLink)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)

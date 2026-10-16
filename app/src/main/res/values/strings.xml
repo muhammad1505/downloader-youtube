@@ -35,4 +35,23 @@
     <string name="autoplay_bluetooth_missing">Izin sambungan Bluetooth belum tersedia.</string>
     <string name="autoplay_bluetooth_enable">Izinkan sambungan Bluetooth</string>
     <string name="autoplay_bluetooth_app_settings">Buka pengaturan aplikasi</string>
+    <string name="playback_settings_title">Pemutaran</string>
+    <string name="resume_interruption_title">Lanjut otomatis setelah interupsi</string>
+    <string name="resume_interruption_description">Lanjutkan musik setelah audio aplikasi lain berhenti. Jeda manual tetap diutamakan. Sambungan headset memiliki pemicu auto-play tersendiri.</string>
+    <string name="failure_details">Detail error</string>
+    <string name="failure_copy">Salin detail error</string>
+    <string name="failure_copied">Tersalin</string>
+    <string name="action_close">Tutup</string>
+    <string name="action_cancel">Batal</string>
+    <string name="temporary_storage_title">Ruang sementara aplikasi</string>
+    <string name="cache_size_label">Cache lirik, metadata dan sampul: %1$s</string>
+    <string name="partial_size_label">Berkas sementara download: %1$s</string>
+    <string name="size_unavailable">Belum tersedia</string>
+    <string name="temporary_storage_scope">Terpisah dari media di Koleksi. Termasuk data sementara unduhan aktif. Model karaoke dan jurnal pemulihan tidak termasuk; cache sampul dan metadata dibatasi otomatis.</string>
+    <string name="cache_clear_lyrics">Bersihkan cache lirik</string>
+    <string name="partial_clear_title">Hapus berkas sementara…</string>
+    <string name="partial_clear_warning">Hapus data sementara unduhan dijeda/gagal yang sudah berhenti? Lanjutkan atau Coba lagi akan mengunduh dari awal dan memakai kuota lagi. Unduhan aktif dilewati; file media hasil download tetap tersimpan.</string>
+    <string name="partial_clear_confirm">Hapus data sementara</string>
+    <string name="partial_clearing">Membersihkan…</string>
+    <string name="size_partial"> (sebagian)</string>
 </resources>
