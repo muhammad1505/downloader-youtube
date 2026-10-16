@@ -105,7 +105,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(libraryMessage) { libraryMessage?.let { if (it.startsWith("Waktu lirik disimpan.") || it.startsWith("Lirik pilihan disimpan.")) player.refreshLyrics(); snackbar.showSnackbar(it); library.clearMessage() } }
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
-    val karaokeSource by karaoke.source.collectAsStateWithLifecycle()
+    val karaokeRequest by karaoke.requestId.collectAsStateWithLifecycle()
     val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
 
     BackHandler(enabled=tab == settingsTab && !fullPlayer) { tab=previousTab }
@@ -132,7 +132,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 },
                 navigationIcon = { if (tab == settingsTab) IconButton(onClick={ tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Kembali") } },
                 actions = {
-                    if (karaokeSource != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
+                    if (karaokeRequest != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
                     if (tab != settingsTab) IconButton(onClick={ previousTab=tab; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

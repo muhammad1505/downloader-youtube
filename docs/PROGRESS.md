@@ -499,3 +499,37 @@ APK final hash4e2ce13b649d93e072402f3bdf8688f44c78c46334cd8541bd619116ca2e58d4
 terpasang dan memulihkan51queue/jeda44817ms. Tes layar akhir tertunda saat HP
 menerima panggilan; interaksi dihentikan. Lirik Live masih berstatus pembatasan
 pada kandidat awal, belum klaim sinkron. [Status per tahap dan checksum](IMPROVEMENTS_1_1_15.md).
+
+## Proses karaoke tidak nyangkut saat ganti lagu — BUG-058, 16 Oktober 2026
+
+Laporan pengelola: status proses karaoke sebelumnya tetap tersimpan saat beralih
+lagu dan tidak ada tombol batal yang membersihkannya. Akar: guard `start()` hanya
+memeriksa id tersimpan sehingga permintaan baru bisa dibuang `KEEP` diam-diam
+selama proses lama berjalan tak terlihat, dan status selesai/gagal tidak pernah
+bisa dibersihkan. Keputusan status kini di `KaraokeProcessPolicy` (ganti lagu
+membersihkan proses yang tidak berjalan; proses berjalan tetap dengan label sumber
++ tombol batal eksplisit); `start()` menolak saat pekerjaan unique masih berjalan
+dan mengadopsinya; `cancel()` membatalkan unique work + id dan menghapus
+`karaoke-request.json`; dialog punya tombol batal/bersihkan di semua status.
+299 Kotlin (3 regresi baru) 0 gagal, lint 0 masalah, assembleDebug lulus; 84 Python
+tetap OK. Verifikasi perangkat menunggu — lihat [BUG-058](BUG_FINDINGS.md).
+
+
+## Alur dan cleanup karaoke 1.1.16/code30 — 17 Oktober 2026
+
+Menggantikan checkpoint lokal BUG-058 sebelumnya: hasil lama dipertahankan dengan
+label konteks, bukan dihapus diam-diam saat ganti lagu. Aksi hasil diikat pada
+ID/sumber/mode/posisi; preview untuk evaluasi, proses penuh terpisah dan simpan
+cuplikan berkonfirmasi. Cancel/Buang memakai lease dan jurnal intent, membersihkan
+private job + fragmen model, memeriksa penghapusan dan memblokir start bila gagal.
+Model terverifikasi/asli/hasil Koleksi tetap ada. Notifikasi CANCELLED juga ditangani.
+
+306 Kotlin/84 Python lulus; debug+signed release APK×3/AAB/R8 selesai10m8s,
+lint0error/2warninglama. Audit signature/native/alignment16KB/refleksiZIP/engine
+lulus; AAB jarsigner/native lulus, bundletool belum diulang. ARM64 hash
+c0e472d74978739b6588d10a53ecf9f351ab1f8f8e499eed91352e5b35144b7c
+terpasang dan base.apk cocok. HP membuktikan mismatch mode/lagu, modal simpan,
+batal dialog/notifikasi, clip0,877687s decode penuh, buang privat dengan publik
+terjaga, cleanup QA, seek/queue terjaga dan restart tanpa status lama.63file
+baseline identik. Batas/fault yang belum diuji tetap terbuka di
+[laporan1.1.16](KARAOKE_LOGIC_1_1_16.md).

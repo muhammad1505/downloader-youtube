@@ -10,6 +10,7 @@ import android.provider.OpenableColumns
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.work.*
+import id.local.tubeflow.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -31,14 +33,17 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
         applicationContext.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel("karaoke", "Pemrosesan karaoke", NotificationManager.IMPORTANCE_LOW))
         val notification = NotificationCompat.Builder(applicationContext, "karaoke")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("TubeFlow · Karaoke")
+            .setSmallIcon(R.drawable.ic_stat_karaoke).setContentTitle("TubeFlow · Karaoke")
             .setContentText(label).setOnlyAlertOnce(true).setOngoing(true).setProgress(100, percent.coerceAtLeast(0), percent < 0)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Batalkan", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)).build()
         return ForegroundInfo(id.hashCode().let { if (it == 0) 1 else it }, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
+    private fun resultData(vararg values: Pair<String, Any?>): Data =
+        Data.Builder().putAll(inputData).putAll(workDataOf(*values)).build()
+
     private suspend fun report(label: String, percent: Int = -1) {
         currentCoroutineContext().ensureActive()
-        setProgress(workDataOf("phase" to label, "percent" to percent))
+        setProgress(resultData("phase" to label, "percent" to percent))
         setForeground(foreground(label, percent))
     }
     override suspend fun doWork(): Result = coroutineScope {
@@ -48,7 +53,9 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
         var complete = false
         try {
             require(runAttemptCount < 2) { "Sistem menghentikan proses karaoke berulang kali. Coba cuplikan atau kosongkan RAM." }
-            setForeground(getForegroundInfo())
+            report("Menyiapkan karaoke")
+            // Resolve a pending publication before replacing any old private preview.
+            KaraokePublication(applicationContext).recover()
             require(android.os.Process.is64Bit()) { "Karaoke membutuhkan aplikasi/perangkat 64-bit. Downloader tetap dapat digunakan." }
             val memory = ActivityManager.MemoryInfo().also { applicationContext.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }
             require(!memory.lowMemory && memory.availMem >= 512L * 1024 * 1024) { "RAM tersedia kurang dari 512 MB. Tutup aplikasi lain lalu coba lagi." }
@@ -74,7 +81,11 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
             val model = KaraokeModel.obtain(applicationContext) { report("Mengunduh model UVR", it) }
             report("Membaca audio")
             // Starting a new request replaces only old private previews; never touches published media.
-            root(applicationContext).listFiles()?.filter { it.isDirectory && it != directory }?.forEach { it.deleteRecursively() }
+            root(applicationContext).listFiles()?.filter { it.isDirectory && it != directory }?.forEach {
+                require(KaraokeResult.discard(root(applicationContext), it.name)) {
+                    "Pratinjau lama belum dapat dibersihkan. Buka status karaoke dan buang pratinjau terlebih dahulu."
+                }
+            }
             val original = File(directory, "source.bin")
             MediaFileOperations.mutex.withLock {
                 resolver.openInputStream(source)?.use { input -> original.outputStream().use { output ->
@@ -109,13 +120,18 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
             File(directory, "result.json").writeText(manifest.toString())
             currentCoroutineContext().ensureActive()
             complete = true
-            Result.success(workDataOf("path" to result.path, "name" to name, "durationMs" to actual, "sample" to sample, "startMs" to startMs))
+            Result.success(resultData("path" to result.path, "name" to name, "durationMs" to actual, "sample" to sample, "startMs" to startMs))
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { Result.failure(workDataOf("error" to (failure.message ?: "Pemrosesan karaoke gagal.").take(500))) }
-        catch (_: LinkageError) { Result.failure(workDataOf("error" to "Runtime karaoke tidak dapat dimuat pada perangkat ini.")) }
+        catch (failure: Exception) { Result.failure(resultData("error" to (failure.message ?: "Pemrosesan karaoke gagal.").take(500))) }
+        catch (_: LinkageError) { Result.failure(resultData("error" to "Runtime karaoke tidak dapat dimuat pada perangkat ini.")) }
         finally {
             engine.cancel()
-            if (!complete) directory.deleteRecursively()
+            if (!KaraokeResult.discardModelPartials(KaraokeModel.directory(applicationContext)))
+                android.util.Log.w("KaraokeCleanup", "Model fragments need another cleanup attempt")
+            if (!complete || isStopped || !currentCoroutineContext().isActive) {
+                if (!KaraokeResult.discard(root(applicationContext), id.toString()))
+                    android.util.Log.w("KaraokeCleanup", "Private job data needs another cleanup attempt")
+            }
             else directory.listFiles()?.filter { it.name !in setOf("instrumental.flac", "result.json") }?.forEach { it.delete() }
         }
     } } } finally { cancellation.cancel() }

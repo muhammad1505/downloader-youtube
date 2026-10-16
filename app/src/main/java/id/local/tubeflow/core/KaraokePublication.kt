@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.AtomicFile
 import androidx.core.net.toUri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -44,11 +45,14 @@ class KaraokePublication(private val context: Context) {
         KaraokeWorker.lock.withLock {
             recover()
             val directory = KaraokeWorker.directory(context, workId)
+            val result = KaraokeResult.verify(directory, track.uri, sample)
             val previous = File(directory, "saved.json").takeIf { it.isFile }?.let { JSONObject(it.readText()).getString("uri") }
-            if (previous != null && StorageUris.exists(context, previous.toUri())) return@withLock previous to true
-            val result = File(directory, "instrumental.flac")
+            if (previous != null && StorageUris.exists(context, previous.toUri())) {
+                val item = database.media().getByAccess(previous) ?: database.media().get(previous)
+                val lyricsPresent = track.lyricUri == null || item?.lyricUri?.let { StorageUris.exists(context, it.toUri()) } == true
+                return@withLock previous to lyricsPresent
+            }
             val proof = JSONObject(File(directory, "result.json").readText())
-            require(result.isFile && KaraokeModel.digest(result) == proof.getString("resultSha256")) { "Pratinjau berubah atau hilang; proses ulang karaoke." }
             val requested = KaraokeNaming.fileName(track.title.ifBlank { name.substringBeforeLast('.') }, track.artist, sample)
             var pending: String? = null
             var indexed = false
@@ -91,7 +95,7 @@ class KaraokePublication(private val context: Context) {
                 }
                 var lyricCopied = track.lyricUri == null
                 if (track.lyricUri != null) MediaFileOperations.mutex.withLock {
-                    lyricCopied = runCatching {
+                    lyricCopied = try {
                         val text = context.contentResolver.openInputStream(track.lyricUri.toUri())?.use { input ->
                             val bytes = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
                             while (true) { val n = input.read(buffer); if (n < 0) break; require(bytes.size() + n <= 1024 * 1024); bytes.write(buffer, 0, n) }
@@ -101,7 +105,8 @@ class KaraokePublication(private val context: Context) {
                         val item = requireNotNull(database.media().getByAccess(raw) ?: database.media().get(raw))
                         LyricPublisher(context).publish(item, text, emptyMap())
                         true
-                    }.getOrDefault(false)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { false }
                 }
                 raw to lyricCopied
             } finally {

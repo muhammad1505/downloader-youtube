@@ -81,6 +81,8 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | 1.1.14 terpasang;279Kotlin/84Python dan6 skenario fokus di HP lulus; pemulihan native diperbaiki setelah kandidat pertama gagal; pengelola mengonfirmasi Facebook asli otomatis lanjut |
 | BUG-056 | P2 | Antrean/seek hilang setelah proses pemutar mati | Snapshot privat atomik ber-revisi1.1.15;51lagu/acak/ulangi/31589ms pulih jeda setelah force-stop/manualopen; finalupgradejeda44817ms. OEM/low-memory belum diuji |
 | BUG-057 | P2 | Perubahan koleksi saat validasi berjalan terlewat | Permintaan digabung sampai selesai; checkedAt batch memajukan jendela pemeriksaan;2QAfile terhapus otomatis di HP. Koleksi>4000/provider lambat belum diuji |
+| BUG-058 | P2 | Hasil karaoke lama bercampur dengan pilihan lagu/mode/waktu baru | 1.1.16 mengikat aksi hasil ke request/sumber/mode/posisi; alur cuplikan/penuh dipisahkan dan simpan cuplikan dikonfirmasi; 306Kotlin/84Python, debug/release/R8 dan uji HP per skenario lulus; batas pada laporan1.1.16 |
+| BUG-059 | P2 | Bersihkan/batal meninggalkan pratinjau dan fragmen model | Cleanup memegang lease, intent dipersistenkan, direktori job dan fragmen model diverifikasi terhapus sebelum status bersih; tes host, batal dialog/notifikasi dan buang preview selesai di HP lulus; 63 file publik identik. Process death di tengah cleanup belum diinjeksi |
 
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
@@ -631,6 +633,21 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
   lewat MediaStore. HP memperlihatkan2→1→0 secara otomatis tanpa scan ulang dan
   tanpa row unavailable. Ini bukan uji semua race provider atau koleksi>4000.
 - **Rujukan:** [hasil dan batas1.1.15](IMPROVEMENTS_1_1_15.md).
+
+## BUG-058 — P2: Hasil karaoke lama bercampur dengan pilihan baru
+
+- **Pemicu:** membuka karaoke lagu B/mengubah mode atau posisi setelah cuplikan A selesai masih menampilkan tombol dengarkan/simpan hasil A. Pada 1.1.15 di HP, topbar membuka cuplikan DJ lama sementara mini player berisi Lamunan. Mode cuplikan juga belum disimpan pada jurnal.
+- **Akar:** UI menganggap semua `SUCCEEDED` cocok dengan formulir saat ini; state WorkManager, source, dan pembacaan saved.json dapat tertinggal secara asinkron. Start menutup player sebelum enqueue diterima. Adopsi worker hanya mengganti ID tanpa sumber. Publikasi belum memvalidasi sumber/mode manifest.
+- **Perbaikan 1.1.16:** guard ID dan kecocokan URI/mode/posisi, source dipulihkan dari progres/output milik request; semua command diserialkan. Hasil berbeda diberi label dan aksi Buka hasil sebelumnya. Cuplikan dipakai untuk preview lalu Buat lagu penuh; simpan cuplikan memerlukan konfirmasi rentang. Membuka lagu lain mempertahankan hasil belum disimpan sampai proses baru/buang dipilih. Start hanya menjeda player setelah diterima, mempertahankan antrean/seek. Preview/save memverifikasi identitas, rentang, dan hash manifest.
+- **Regresi:** `KaraokeProcessPolicyTest` dan `KaraokeResultTest`; [akar, alur, hasil dan batas](KARAOKE_LOGIC_1_1_16.md). Perubahan lokal 16 Oktober digabung dan diperbaiki, bukan diklaim sudah terpasang sebelumnya.
+- [x] **Verifikasi final scoped:** ganti lagu/mode, konfirmasi simpan, cuplikan posisi manual dan antrean/seek setelah cancel diuji pada 1.1.16 di Realme Android10. Sumber/posisi/hash/range negatif diuji host; bukan bukti semua race/OEM.
+
+## BUG-059 — P2: Bersihkan/batal meninggalkan data karaoke privat
+
+- **Akar:** clear menghapus jurnal/status saja; cancel melepas identitas sebelum native selesai. Race sesudah preview siap menyisakan FLAC. Process death saat model diunduh dapat meninggalkan `model.part`/`model-adapted.part` di luar direktori job.
+- **Solusi:** cancel/clear menunggu lease worker, memulihkan publikasi tertunda, membuang direktori privat job dan fragmen model, lalu memverifikasi penghapusan jurnal. Intent cleanup ditulis lebih dulu dan diteruskan saat startup. Kegagalan tetap terlihat dan menahan proses baru. Model `.onnx` terverifikasi, audio asli dan hasil Koleksi dipertahankan. Tutup dialog tidak berarti batal.
+- **Regresi host:** private source/PCM/FLAC/manifest/log dihapus, cleanup idempoten setelah preview selesai, model/asli/publik tetap identik, symlink/traversal ditolak, fragmen model dibuang dan bentuk fragmen tak valid tidak dilaporkan bersih.
+- [x] **Verifikasi HP scoped:** batal dialog/notifikasi saat aktif, buang cuplikan selesai, file publik tersimpan tetap ada, restart tanpa hasil lama muncul lagi.63file baseline identik. Pemulihan intent tepat setelah process death dan fault filesystem Android masih belum diinjeksi. [Laporan](KARAOKE_LOGIC_1_1_16.md).
 
 ### Pembaruan BUG-052 — discovery1.1.15
 

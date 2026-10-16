@@ -470,3 +470,21 @@ menunggu panggilan selesai; agent tidak menjawab/menolak panggilan atau mengungg
 screenshot pribadi. Tidak uninstall/reset/DNS/securitychanges. LRCLive pembatasan
 pada kandidat awal; auditori baru/TWS/Android15+/runtime16KB/low-memory/OEM belum
 terbukti. [Matriks bukti dan batas](IMPROVEMENTS_1_1_15.md).
+
+
+## Karaoke1.1.16/code30 — 17 Oktober 2026
+
+Signed release ARM64 SHA256
+`c0e472d74978739b6588d10a53ecf9f351ab1f8f8e499eed91352e5b35144b7c`
+terpasang update-r dan hash base.apk cocok pada RealmeAndroid10/API29/RAM4GB/4KB.
+306Kotlin/84Python dan build debug/release/R8/APK×3/AAB lulus (10m8s),
+lint0error/2warninglama. Audit APK signature/cert/native/alignment16KB/refleksiZIP/
+engine lulus; AAB jarsigner/native lulus, bundletool belum diulang. Room9, model,
+keystore/dependensi/izin tetap. Tidak uninstall/reset atau publikasi toko.
+
+Uji HP: hasil beda lagu/mode berlabel, simpan cuplikan terkonfirmasi, batal dialog
+dan notifikasi di tahap pemisahan, cuplikan0,877687s valid/decode penuh, buang
+privat mempertahankan FLAC publik tersimpan, hapus hanya QA lewat Koleksi,
+queue1/seek143381ms terjaga, restart tanpa status karaoke lama.63file baseline
+identik. Source model/inference tidak diubah dan kualitas vokal tidak diklaim
+meningkat. [Semua artefak, langkah, bukti dan batas](KARAOKE_LOGIC_1_1_16.md).
