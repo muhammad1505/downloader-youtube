@@ -437,3 +437,20 @@ pengaturan DNS/keamanan; UI kini bisa diuji tanpa hambatan Norton sesi sebelumny
 Countdown429/restart terbukti pada fixture, belum teramati di HP setelah update.
 Sinkronisasi auditori, download baru audio/video, dan perangkat16KB belum diuji
 ulang. [Akar, perubahan, checksum seluruh artefak dan batas](LYRICS_RATE_LIMIT_1_1_13.md).
+
+
+## Pemulihan interupsi audio 1.1.14/code28 — 16 Oktober 2026
+
+Final ARM64 dipasang update-r di Realme RMX1821/Android 10/API29/4 KB/RAM4 GB.
+Hash base.apk cocok `0aef3db354514119812ea4e0119299f708d1a71f7aee3b06d0a113d24751e99d`.
+Probe shell media native senyap/fokus nyata mereproduksi kegagalan 1.1.13 serta
+kandidat callback-only. Final lulus enam skenario dengan Activity di Home:
+permanen, sementara, sementara berulang/duck, sementara→permanen, Pause eksplisit
+selama interupsi, dan lagu yang sudah paused. Empat pertama lanjut dari posisi
+terakhir; dua terakhir tetap paused. Pemutar ditinggalkan jeda.
+
+58 file baseline mempertahankan SHA256; tidak ada FATAL EXCEPTION pada log proses
+yang diperiksa. Tidak uninstall/reset atau mengubah keamanan/DNS. Konfirmasi
+video Facebook asli setelah update masih menunggu. Panggilan/TWS/proses mati/
+deep sleep/Android15+/runtime16KB/download baru belum diuji ulang pada sesi ini.
+[Protokol, hasil terukur dan artefak](AUDIO_FOCUS_1_1_14.md).

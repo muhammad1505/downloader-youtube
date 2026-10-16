@@ -202,3 +202,16 @@ Update-r RealmeAndroid10 sukses dan base.apk cocok. Satu audio asli tetap utuh;
 pencarian manual17hasil, perluasan24hasil berhasil. Tidak uninstall/reset,
 mengubah keamanan, menerbitkan ke toko, atau menggandakan distribusi.
 [Checksum semuaABI dan batas pengujian](LYRICS_RATE_LIMIT_1_1_13.md).
+
+
+## Kandidat 1.1.14/code28 — 16 Oktober 2026
+
+Keystore produksi, Room9, manifest dan dependensi tetap. Build release 8m55s,
+debug 58s; 279 Kotlin/84 Python lulus, lint 0 error/2 warning lama. Signed APK×3
+lulus signature/certificate/native/alignment16KB/refleksiZIP/engine/bootstrap;
+AAB jarsigner/native lulus, bundletool tidak dijalankan ulang. ARM64 70.580.383 byte,
+SHA256 `0aef3db354514119812ea4e0119299f708d1a71f7aee3b06d0a113d24751e99d`.
+Update-r dan hash base.apk Realme Android 10 cocok; enam skenario fokus terkontrol
+lulus, 58 file media identik. Tidak menggandakan distribusi atau publikasi toko.
+Konfirmasi Facebook asli serta cakupan perangkat lain tetap terpisah dari build.
+[Checksum semua ABI/AAB dan batas pengujian](AUDIO_FOCUS_1_1_14.md).

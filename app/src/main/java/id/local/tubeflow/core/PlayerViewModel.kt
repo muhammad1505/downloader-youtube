@@ -96,11 +96,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var interruptionReadyAt = 0L
     private val observePlayback = Runnable { observeInterruptedPlayback() }
     private val resumeAfterQuiet = Runnable {
-        if (engineToken == token.get() && prepared && !_state.value.playing &&
-            interruption.takeAfterQuiet(otherAudioActive(), manager.mode == AudioManager.MODE_NORMAL)) {
+        if (engineToken == token.get() && prepared && !_state.value.playing) {
             // Facebook can request permanent focus, which removes us from Android's focus stack.
             // Reclaim once after observed audio ends; never poll focus or use the headset retry loop.
-            if (claimFocus(engineToken)) resumeWithoutFocus()
+            if (interruption.takeAfterQuiet(otherAudioActive(), manager.mode == AudioManager.MODE_NORMAL)) {
+                if (claimFocus(engineToken)) resumeWithoutFocus()
+            } else if (interruption.needsPlaybackEvents) handler.postDelayed(observePlayback, 1000)
         }
     }
     private val playbackActivity = object : AudioManager.AudioPlaybackCallback() {
@@ -417,6 +418,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         manager.isMusicActive || manager.activePlaybackConfigurations.isNotEmpty()
     } catch (_: RuntimeException) { true } // Unknown playback state must not steal focus.
     private fun observeInterruptedPlayback() {
+        handler.removeCallbacks(observePlayback)
         handler.removeCallbacks(resumeAfterQuiet)
         if (!interruption.needsPlaybackEvents || !prepared || engineToken != token.get() || _state.value.playing) return
         val settling = interruptionReadyAt - android.os.SystemClock.elapsedRealtime()
@@ -426,6 +428,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
         if (interruption.playbackChanged(otherAudioActive())) handler.postDelayed(resumeAfterQuiet, 750)
+        // Native AudioTrack users may not publish Java playback callbacks (reproduced on Android10).
+        // Check only while this track awaits recovery; this never repeatedly requests audio focus.
+        else handler.postDelayed(observePlayback, 1000)
     }
     private fun cancelInterruption() {
         interruption.cancel()

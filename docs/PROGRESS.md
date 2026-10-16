@@ -464,3 +464,19 @@ pengaturan DNS/keamanan; UI kini bisa diuji tanpa hambatan Norton sesi sebelumny
 Countdown429/restart terbukti pada fixture, belum teramati di HP setelah update.
 Sinkronisasi auditori, download baru audio/video, dan perangkat16KB belum diuji
 ulang. [Akar, perubahan, checksum seluruh artefak dan batas](LYRICS_RATE_LIMIT_1_1_13.md).
+
+
+## Pemulihan interupsi audio 1.1.14/code28 — 16 Oktober 2026
+
+Log Facebook pada 1.1.13 dan probe HP membuktikan loss fokus permanen tidak
+menghasilkan GAIN kembali. Kebijakan baru mempertahankan niat track aktif,
+mengamati audio lain berhenti, lalu meminta fokus sekali. Pause eksplisit tetap
+membatalkan pemulihan. Kandidat callback-only masih gagal pada media native;
+final menambah pemeriksaan status 1 detik selama penantian, tanpa loop request fokus.
+
+279 Kotlin/84 Python lulus; debug dan signed release/R8/APK×3/AAB berhasil,
+lint 0 error/2 warning lama. Audit APK/signature/native/ZIP/alignment/checksum
+lulus; AAB jarsigner/native lulus, bundletool tidak dijalankan ulang. Update-r
+Realme Android 10 berhasil dan base.apk cocok. Enam skenario fokus di latar
+lulus; 58 file media tetap identik. Konfirmasi Facebook asli masih ditunggu.
+[Akar, hasil per skenario, checksum dan batas](AUDIO_FOCUS_1_1_14.md).

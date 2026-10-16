@@ -78,7 +78,7 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.13: query bersih didahulukan, pacing/cache/backoff/countdown;271Kotlin/84Python; HP17→24hasil; auditori/otomatis/429ulang tetap terbatas |
 | BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus | Probe kehadiran dan observer/lifecycle, empty scan; host lulus,1.1.12 terpasang; tes UI tertahan Norton |
 | BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
-| BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | Log Facebook/permanen dan probeHP1.1.13 membuktikan; pemulihan berbasis aktivitas audio + otoritas jeda manual diterapkan;279Kotlin/84Python lulus; APK/HP final menunggu |
+| BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | 1.1.14 terpasang;279Kotlin/84Python dan6 skenario fokus di HP lulus; pemulihan native diperbaiki setelah kandidat pertama gagal; konfirmasi Facebook asli menunggu |
 
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
@@ -599,4 +599,4 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Bukti:** log HP1.1.13 menunjukkan Facebook meminta fokus permanen, TubeFlow abandon dan tetap paused setelah Facebook abandon. Probe fokus/media senyap6detik mereproduksi PLAYING→PAUSED tanpa lanjut pada versi lama.
 - **Akar:** loss permanen diperlakukan seperti jeda manual; tidak ada callback GAIN kembali. Loss sementara berulang juga menimpa penanda lanjut menjadi false. Pause MediaSession ketika sudah paused diabaikan, sehingga perlu diperbaiki agar dapat membatalkan pemulihan baru.
 - **Solusi1.1.14:** PlaybackInterruption mempertahankan niat track aktif; transient menunggu GAIN, permanent mengamati audio aktif→sunyi dan mencoba fokus sekali setelah debounce/preflight. Jeda manual/stop/ganti track/headset/error membatalkan. Tanpa izin baru atau engine tambahan.
-- **Checkpoint:**279Kotlin/84Python lulus; minify/build dan APK final di HP masih berjalan. [Akar, protokol dan hasil final](AUDIO_FOCUS_1_1_14.md).
+- **Verifikasi:** 279 Kotlin/84 Python, debug/signed release/R8, lint 0 error/2 warning lama dan audit APK lulus. Kandidat callback-only masih gagal pada media native; final melengkapinya dengan pemeriksaan status 1 detik selama niat lanjut masih aktif, tanpa retry fokus. Final terpasang di Realme Android 10 dan hash cocok; keenam skenario fokus di latar lulus, termasuk jeda manual yang tetap dihormati. Konfirmasi video Facebook asli masih menunggu. [Akar, protokol, checksum dan batas](AUDIO_FOCUS_1_1_14.md).
