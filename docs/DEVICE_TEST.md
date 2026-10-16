@@ -451,6 +451,6 @@ terakhir; dua terakhir tetap paused. Pemutar ditinggalkan jeda.
 
 58 file baseline mempertahankan SHA256; tidak ada FATAL EXCEPTION pada log proses
 yang diperiksa. Tidak uninstall/reset atau mengubah keamanan/DNS. Konfirmasi
-video Facebook asli setelah update masih menunggu. Panggilan/TWS/proses mati/
+video Facebook asli oleh pengelola: “Ya, otomatis lanjut”. Panggilan/TWS/proses mati/
 deep sleep/Android15+/runtime16KB/download baru belum diuji ulang pada sesi ini.
 [Protokol, hasil terukur dan artefak](AUDIO_FOCUS_1_1_14.md).

@@ -213,5 +213,6 @@ AAB jarsigner/native lulus, bundletool tidak dijalankan ulang. ARM64 70.580.383 
 SHA256 `0aef3db354514119812ea4e0119299f708d1a71f7aee3b06d0a113d24751e99d`.
 Update-r dan hash base.apk Realme Android 10 cocok; enam skenario fokus terkontrol
 lulus, 58 file media identik. Tidak menggandakan distribusi atau publikasi toko.
-Konfirmasi Facebook asli serta cakupan perangkat lain tetap terpisah dari build.
+Pengelola mengonfirmasi Facebook asli otomatis lanjut. Cakupan perangkat lain
+tetap terpisah dari kelulusan build.
 [Checksum semua ABI/AAB dan batas pengujian](AUDIO_FOCUS_1_1_14.md).

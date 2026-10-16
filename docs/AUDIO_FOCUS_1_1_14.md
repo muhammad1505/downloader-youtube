@@ -45,8 +45,9 @@ Probe dijalankan dengan Activity di Home, memakai media native senyap selama 6 d
 | Fokus sementara berubah menjadi permanen | PLAYING → PAUSED → PLAYING |
 | Pause MediaSession eksplisit ketika sudah terinterupsi | Tetap PAUSED sesudah interupsi berakhir; posisi tetap 44.204 ms |
 | Lagu sudah dijeda manual sebelum media lain dimulai | Tetap PAUSED |
+| Video Facebook asli: musik TubeFlow → putar video → jeda video | Pengelola mengonfirmasi “Ya, otomatis lanjut” setelah final terpasang |
 
-Keenam skenario lulus pada APK release yang di-minify. Pemutar ditinggalkan dalam keadaan jeda. Pengelola diminta mengonfirmasi urutan video Facebook asli; hasil terkontrol ini belum menyatakan semua versi Facebook/OEM telah diuji.
+Keenam skenario lulus pada APK release yang di-minify. Pemutar ditinggalkan dalam keadaan jeda. Pengelola juga mengonfirmasi urutan Facebook asli pada HP yang sama: musik otomatis lanjut. Konfirmasi ini merupakan laporan pengguna, terpisah dari enam pengamatan MediaSession terkontrol; belum menyatakan semua versi Facebook/OEM telah diuji.
 
 ## Artefak final
 
@@ -65,4 +66,4 @@ APK ARM64 bertambah 1.464 byte dibanding 1.1.13. Tidak ada migrasi database, izi
 
 Tidak ada jaminan bila aplikasi lain terus melaporkan audio aktif setelah tombol jedanya ditekan. Pemeriksaan setiap detik berjalan pada Handler audio, bukan alarm yang membangunkan perangkat; pemulihan saat deep sleep belum dibuktikan. Media yang belum teramati aktif tidak memicu perebutan fokus. Niat lanjut tidak dipersistenkan melewati proses mati. Mode komunikasi atau status audio tidak diketahui menghalangi request otomatis. Android15+ memerlukan aplikasi di depan atau foreground service untuk meminta fokus; gunakan PlaybackService yang sudah ada.
 
-Yang belum diuji ulang pada sesi ini: urutan Facebook asli setelah pembaruan, panggilan nyata, TWS/cabut-pasang kabel, proses mati/deep sleep, Android 15+, perangkat dengan halaman memori 16 KB, serta download audio/video baru. Downloader dan LRCLIB tidak diubah selain User-Agent versi; kelulusan host bukan bukti runtime semua alur tersebut.
+Yang belum diuji ulang pada sesi ini: panggilan nyata, TWS/cabut-pasang kabel, proses mati/deep sleep, Android 15+, perangkat dengan halaman memori 16 KB, serta download audio/video baru. Downloader dan LRCLIB tidak diubah selain User-Agent versi; kelulusan host bukan bukti runtime semua alur tersebut.
