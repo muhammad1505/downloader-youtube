@@ -38,3 +38,25 @@ ini. Android10–11 memakai izin Bluetooth normal. Aplikasi tidak meminta izin
 pemindaian Bluetooth/lokasi untuk fitur ini dan tidak mengunggah informasi
 perangkat. Penanda sesi player disimpan lokal agar sesi aktif dapat dipulihkan
 setelah proses dihentikan sistem; tombol X mengakhiri sesi tersebut.
+
+
+## Snapshot player dan detail kegagalan
+
+Antrean/track/URI lokal/posisi disimpan privat di noBackupFilesDir, maksimal3000
+entri/4MiB ditambah checkpoint posisi kecil; tombol X menutup sesi. Pemulihan
+proses dibuka jeda; sambungan headset baru tetap memiliki pemicu auto-play sendiri.
+Preferensi lanjut setelah interupsi dapat dimatikan dan membatalkan niat tertunda.
+Snapshot tidak diunggah; parameter pencarian lirik tetap mengikuti penjelasan LRCLIB.
+
+Diagnostik kegagalan tersimpan lokal, dibatasi80entry/1MiB, berisi versi, tahap,
+waktu yang tercatat, status/kategori dan HTTP bila tersedia. URL, header kredensial,
+pola token dan path lokal disamarkan sebelum disimpan/disalin. Histori yang tidak
+mencatat suatu nilai tidak direkonstruksi dengan tebakan. Pengguna meninjau dan
+menyalin sendiri; tidak ada pengiriman laporan otomatis. Status lirik/cooldown
+terpisah dari kegagalan media dan tidak berarti ada respons HTTP baru.
+
+Ukuran cache yang ditampilkan mencakup respons lirik, metadata extractor, covers
+dan library-covers; angka terpisah dari data sementara downloads dan media Koleksi.
+Bersihkan cache lirik tidak mengosongkan cooldown penyedia. Hapus sementara hanya
+melalui konfirmasi; worker aktif, model karaoke, baseline/jurnal LRC dan output
+media tidak dihapus oleh aksi tersebut.

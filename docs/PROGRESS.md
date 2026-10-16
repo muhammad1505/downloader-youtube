@@ -481,3 +481,21 @@ Realme Android 10 berhasil dan base.apk cocok. Enam skenario fokus di latar
 lulus; 58 file media tetap identik. Pengelola mengonfirmasi musik otomatis lanjut
 setelah video Facebook asli dijeda; BUG-055 terverifikasi pada HP ini.
 [Akar, hasil per skenario, checksum dan batas](AUDIO_FOCUS_1_1_14.md).
+
+
+## Lima perbaikan bertahap1.1.15/code29 — 16 Oktober 2026
+
+Snapshot antrean/seek ber-revisi, preferensi auto-resume, detail error media/
+inspeksi/lirik, ukuran cache/parsial dan cleanup eksplisit berlease tersedia;
+validasi koleksi menyimpan event selama pass. Discovery lirik search-first
+memakai jalur manual/cache sebelum exact fallback, tanpa bypass429 atau perubahan
+syarat versi/durasi.296Kotlin/84Python dan build debug/signedrelease/R8 lulus;
+lint0error/2warninglama; auditAPK/AAB terbatas sesuai laporan.
+
+HP kandidat awal membuktikan51queue/31589ms/jeda pulih,5kasus fokus preferensi,
+2QAfile hilang otomatis, cache6,9→5,2MB/emptycleanup, dialogcopyerror nyata, serta
+M4A SATRU2Live nama/tag/decode penuh.60file baseline identik sesudah upgrade.
+APK final hash4e2ce13b649d93e072402f3bdf8688f44c78c46334cd8541bd619116ca2e58d4
+terpasang dan memulihkan51queue/jeda44817ms. Tes layar akhir tertunda saat HP
+menerima panggilan; interaksi dihentikan. Lirik Live masih berstatus pembatasan
+pada kandidat awal, belum klaim sinkron. [Status per tahap dan checksum](IMPROVEMENTS_1_1_15.md).

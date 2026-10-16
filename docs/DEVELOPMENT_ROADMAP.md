@@ -14,8 +14,8 @@ Tabel ini menggantikan status historis9–13Oktober di bawah. Pemeriksaan mencoc
 | OPT-004 | Implementasi tersedia dan teruji terbatas | `LrcTiming`/`LyricEditor`, ±30detik/langkah0,5detik dan input detik1.1.5 (presisi1ms), baseline/reset/jurnal/read-back/rollback; Ya Sudahlah−2detik dikonfirmasi pengguna. Fault injection Android/process death/provider berbeda dan interaksi refetch belum terbukti; tidak menjamin semua lagu sinkron |
 | OPT-005 | Sebagian, bukan belum dimulai | Cache respons LRCLIB10MiB/200entry, positif24jam/4041jam, clear/refresh dan regresi TTL/error tersedia. `extractor-cache` yt-dlp bukan cache snapshot metadata app berdasarkan engine/TTL. Snapshot metadata, benchmark request/waktu, serta tes permintaan bersamaan/coalescing belum lengkap |
 | OPT-006 | Diterapkan; progres per tahap telah diuji host/Realme | Cakupan callback terlambat/stop-resume cepat dan proses mati tetap terkait BUG-002/008; bukan kembali ke heartbeat lama |
-| OPT-007 | Belum diimplementasikan | UI Salin detail error, kategori/persistensi, versi/tahap/waktu/HTTP dan redaksi rahasia; pesan error biasa bukan fitur ini |
-| OPT-008 | Sebagian | Budget/prune cache cover/library/lirik dan tombol clear cache lirik tersedia; angka ukuran cache/parsial terpisah serta cleanup aman lintas restart/owner belum lengkap. FAILED menyimpan parsial untuk retry; jangan menghapusnya otomatis hanya untuk memenuhi kalimat historis |
+| OPT-007 | Diterapkan1.1.15; host dan dialog/copy inspeksi nyata di HP lulus | Laporan perjob/generasi/status, redaksi dan data waktu/HTTP tidak ditebak; dialog lirik final/fault injection Android luas tetap perlu; lihat laporan1.1.15 |
+| OPT-008 | Diterapkan1.1.15; ukuran cache/parsial dan cleanup eksplisit berlease | HP cache6,9→5,2MB/emptycleanup; nonzero/symlink/lease diuji host. PAUSED/FAILED tetap disimpan otomatis, hanya dihapus setelah konfirmasi pengguna; race native/kill luas belum seluruhnya terbukti |
 | OPT-009 | Diterapkan; kompresi cover teruji | JPEG maksimum800px/rasio/paket audio; format/provider lain tetap bagian matriks runtime, bukan bukti seluruh codec |
 
 Urutan lanjut (diperbarui 13 Okt setelah 1.1.1): penguatan BUG-016/OPT-002 sudah masuk rilis 1.1.1 di tingkat host — sisa langkahnya fault injection Android/provider + refetch live → jurnal recovery BUG-008/003 (create→journal, proses mati) → ownership/konkurensi BUG-002/004 → uji fixture SAF/publish/collision → BUG-006 retry jaringan terakhir sesuai permintaan lama → OPT-003/007, sisa OPT-005/008 dan benchmark. Usulan fitur tetap memerlukan penugasan implementasi; audit status ini tidak mengubah media.
@@ -107,7 +107,7 @@ Selesaikan dulu jalur penyimpanan/penghapusan SAF, cleanup sidecar, dan race pau
 **Tujuan:** Memberi pengguna cara melihat dan mengurangi penggunaan ruang sementara dengan aman.
 
 - **Titik kode:** [SettingsScreen.kt](../app/src/main/java/id/local/tubeflow/ui/SettingsScreen.kt), penyimpanan; recovery/cancel di [DownloadViewModel.kt](../app/src/main/java/id/local/tubeflow/core/DownloadViewModel.kt); direktori `noBackupFilesDir/downloads/<jobId>` dan cache OPT-005.
-- **Lingkup awal:** Pisahkan angka cache metadata/lirik, berkas parsial yang dipertahankan, dan berkas sementara yang bisa dihapus. Bersihkan hanya entri cache/berkas job yang tidak aktif dan sudah boleh dihapus. Job `PAUSED` tetap dilindungi agar bisa dilanjutkan.
+- **Lingkup awal:** Pisahkan angka cache metadata/lirik, berkas parsial yang dipertahankan, dan berkas sementara yang bisa dihapus. Bersihkan hanya entri cache/berkas job yang tidak aktif dan sudah boleh dihapus. Job `PAUSED` tetap dilindungi pada cleanup otomatis. Pada1.1.15 pengelola mengotorisasi cleanup manual berkonfirmasi untuk membuang parsial PAUSED/FAILED idle dan memulai retry dari nol.
 - **Koordinasi:** Gunakan perlindungan kepemilikan dan penghentian coroutine/engine dari BUG-002/BUG-004. Status WorkManager finished saja tidak cukup untuk menjamin tidak ada cleanup lama. Jangan menghapus file media hasil download melalui aksi bersihkan cache.
 - **Catatan 11 Okt 2026:** aksi EKSPLISIT "Hapus semua file" (kartu Penyimpanan, dialog konfirmasi, `clearStorageFolder`) dan pembersihan parsial `noBackupFilesDir` job non-aktif sudah dihadirkan terpisah dari aksi bersihkan cache — aksi eksplisit menghapus media hasil download atas konfirmasi pengguna dan diblokir saat ada job QUEUED/RUNNING/PAUSED. Yang tersisa untuk OPT-008: pemisahan/angka ukuran cache metadata & lirik (OPT-005) dari berkas parsial.
 - [ ] **Kriteria selesai:** Tes bersihkan saat download aktif, jeda, resume, batal, dan restart tidak menghapus berkas yang masih diperlukan. Job gagal/dibatalkan tidak meninggalkan parsial permanen; angka penggunaan ruang diperbarui sesuai byte yang benar-benar dihapus.
@@ -141,3 +141,13 @@ Tes akhir SoundCloud Ya Sudahlah 1.0.11 mengungkap delay auditori ±0,5 detik (B
 OPT-003 diterapkan; OPT-004 menerima input signed decimal seconds. 184 Kotlin/78 Python/lint0 dan build/audit lulus; seleksi/simpan lirik oleh pengelola serta artefak fisik diperiksa. [Laporan dan cakupan](MANUAL_LYRICS_1_1_5_2026-10-14.md). Status historis belum-diimplementasikan di bagian lama digantikan pembaruan ini; kriteria fault injection/provider tetap terbuka.
 
 **Karaoke opsional — status diperbarui 16 Oktober 2026:** engine lokal UVR/ONNX, cuplikan dengan waktu mulai, lagu penuh, pratinjau dan publikasi instrumental terpisah sudah tersedia; kontrol L/R telah dihapus. Lihat [laporan implementasi](KARAOKE_1_1_6_2026-10-14.md). Atas permintaan pengelola, opsi gratis untuk memindahkan inference keluar HP sedang dikaji: [temuan layanan dan rancangan integrasi](KARAOKE_REMOTE_FREE_2026-10-16.md). Demucs/ZeroGPU merupakan kandidat percobaan berkuota, belum terintegrasi atau diuji dengan unggahan audio. Kualitas pengurangan vokal tidak dijamin untuk semua rekaman.
+
+
+## Penugasan bertahap 1.1.15 — 16 Oktober 2026
+
+Pengelola mengotorisasi kelima usulan: verifikasi metadata/lirik/koleksi, snapshot
+antrean/seek, preferensi auto-resume, OPT-007 dan sisa ukuran/cleanup OPT-008.
+Implementasi tersedia;296Kotlin/84Python/build/audit lulus. Bukti HP dan batas
+setiap tahap ada pada [laporan1.1.15](IMPROVEMENTS_1_1_15.md). Catatan lama
+melindungi PAUSED tetap berlaku pada cleanup otomatis; konfirmasi cleanup manual
+baru secara eksplisit mengizinkan membuang parsial idle dan memulai retry dari nol.

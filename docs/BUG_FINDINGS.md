@@ -74,11 +74,13 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent terverifikasi langsung putar di HP/pengelola; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
 | BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
 | BUG-050 | P2 | Hapus semua meminta SAF walau Android10 sudah memiliki izin hapus | Diperbaiki1.1.11; 240Kotlin/83Python lulus, pengelola+HP membuktikan langsung bersih tanpa SAF, root tetap/0entri |
-| BUG-051 | P1 | Nama/tag artis tidak konsisten saat sumber dan ekstraksi berbeda | Segmen promosi, kredit deskripsi dan artist sumber terlambat diperbaiki; 260Kotlin/84Python/build lulus,1.1.12 terpasang; tes UI tertahan Norton |
-| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.13: query bersih didahulukan, pacing/cache/backoff/countdown;271Kotlin/84Python; HP17→24hasil; auditori/otomatis/429ulang tetap terbatas |
-| BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus | Probe kehadiran dan observer/lifecycle, empty scan; host lulus,1.1.12 terpasang; tes UI tertahan Norton |
+| BUG-051 | P1 | Nama/tag artis tidak konsisten saat sumber dan ekstraksi berbeda |1.1.15: audit51MP3 dan M4A SATRU2Live baru membuktikan format/tag;24artis lama kosong tanpa bukti tidak ditebak. Bukan klaim semua sumber/metadata lengkap |
+| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.15: search-first bersama sebelum exact get, cache manual dipakai otomatis;296Kotlin/84Python. HP membedakan status pembatasan dari sukses audio; keberhasilan lirik Live/auditori terbaru belum terbukti |
+| BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus |1.1.15: dua file QA di HP hilang otomatis2→1→0 setelah MediaStore delete, tanpa scan/row unavailable; event validasi digabung (BUG-057). DENIED/UNKNOWN tetap dipertahankan |
 | BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
 | BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | 1.1.14 terpasang;279Kotlin/84Python dan6 skenario fokus di HP lulus; pemulihan native diperbaiki setelah kandidat pertama gagal; pengelola mengonfirmasi Facebook asli otomatis lanjut |
+| BUG-056 | P2 | Antrean/seek hilang setelah proses pemutar mati | Snapshot privat atomik ber-revisi1.1.15;51lagu/acak/ulangi/31589ms pulih jeda setelah force-stop/manualopen; finalupgradejeda44817ms. OEM/low-memory belum diuji |
+| BUG-057 | P2 | Perubahan koleksi saat validasi berjalan terlewat | Permintaan digabung sampai selesai; checkedAt batch memajukan jendela pemeriksaan;2QAfile terhapus otomatis di HP. Koleksi>4000/provider lambat belum diuji |
 
 
 Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut audit ulang):
@@ -600,3 +602,45 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Akar:** loss permanen diperlakukan seperti jeda manual; tidak ada callback GAIN kembali. Loss sementara berulang juga menimpa penanda lanjut menjadi false. Pause MediaSession ketika sudah paused diabaikan, sehingga perlu diperbaiki agar dapat membatalkan pemulihan baru.
 - **Solusi1.1.14:** PlaybackInterruption mempertahankan niat track aktif; transient menunggu GAIN, permanent mengamati audio aktif→sunyi dan mencoba fokus sekali setelah debounce/preflight. Jeda manual/stop/ganti track/headset/error membatalkan. Tanpa izin baru atau engine tambahan.
 - **Verifikasi:** 279 Kotlin/84 Python, debug/signed release/R8, lint 0 error/2 warning lama dan audit APK lulus. Kandidat callback-only masih gagal pada media native; final melengkapinya dengan pemeriksaan status 1 detik selama niat lanjut masih aktif, tanpa retry fokus. Final terpasang di Realme Android 10 dan hash cocok; keenam skenario fokus di latar lulus, termasuk jeda manual yang tetap dihormati. Pengelola juga mengonfirmasi video Facebook asli: musik otomatis lanjut setelah video dijeda. BUG-055 terverifikasi pada HP ini; cakupan OEM/Android lain tetap terbatas. [Akar, protokol, checksum dan batas](AUDIO_FOCUS_1_1_14.md).
+
+
+## BUG-056 — P2: Antrean dan posisi tidak dipulihkan setelah proses mati
+
+- **Akar:** player-last hanya menyimpan satu Track dan session_active; antrean,
+  urutan asli shuffle, indeks dan posisi ada di RAM.
+- **Solusi1.1.15:** PlaybackQueue.Snapshot dan PlayerSession/Store; queue atomik
+  ketika berubah, checkpoint seek kecil ber-revisi setiap5detik/pause/seek;
+  cap3000entri/4MiB. Tolak snapshot rusak/remoteURI, lewati file tak terbaca,
+  pertahankan kemunculan URI berulang. Pemulihan jeda; initial/sticky device bukan
+  koneksi baru. X menutup sesi, sambungan headset nyata tetap jalur auto-play.
+- **Bukti:** codec/filter/revisi/urutan shuffle diuji host; HP51lagu,31589ms,
+  acak/repeatALL sama setelah PID berubah dan manualopen, tetap jeda. APK final
+  setelah update kembali memulihkan51lagu/44817ms/jeda. Bukan bukti semua
+  low-memory/stickyrestart/OEM atau retrofit data1.1.14 yang tidak pernah disimpan.
+- **Rujukan:** [hasil dan batas1.1.15](IMPROVEMENTS_1_1_15.md).
+
+## BUG-057 — P2: Permintaan validasi hilang ketika pemeriksaan sedang berjalan
+
+- **Akar:** validateAvailability langsung return jika Job masih aktif, sehingga
+  event baru tidak disimpan. checkedAt media PRESENT/AVAILABLE tidak maju sehingga
+  jendela oldest selalu dapat memeriksa kelompok sama.
+- **Solusi:** flag permintaan di Main, ulang setelah pass jika ada event baru;
+  checkedAt dibatch500URI untuk memajukan jendela tanpa invalidasi per file.
+  Hanya MISSING menghapus row; DENIED/UNKNOWN tidak dianggap file hilang.
+- **Bukti:** dua tone QA yang diindeks muncul, lalu hanya row/file miliknya dihapus
+  lewat MediaStore. HP memperlihatkan2→1→0 secara otomatis tanpa scan ulang dan
+  tanpa row unavailable. Ini bukan uji semua race provider atau koleksi>4000.
+- **Rujukan:** [hasil dan batas1.1.15](IMPROVEMENTS_1_1_15.md).
+
+### Pembaruan BUG-052 — discovery1.1.15
+
+Kandidat awal mengunduh M4A SATRU2Live berhasil dengan nama/tag benar, tetapi lirik
+berstatus pembatasan. Kode fetch mendahulukan exact get, manual memakai search.
+Fixture get429/search200 mereproduksi kegagalan pada kode lama. Fetch kini search
+lebih dulu, berhenti setelah kandidat tervalidasi, dan memakai cache search manual
+bahkan selama lagu lain dibatasi, tanpa request melewati cooldown. Exact fallback
+mempertahankan durasi dan album_name kosong bila album tidak diketahui. Gerbang
+identitas/versi/durasi tetap; respons429 yang sungguh diterima tetap menghentikan
+fallback. Diagnostik lirik tersendiri tidak mengubah audio sukses menjadi FAILED.
+Status pembatasan HP belum membuktikan akar semua limit penyedia atau sinkronisasi
+positif sumber Live; jangan reset cooldown, memutar IP atau melonggarkan versi.

@@ -216,3 +216,16 @@ lulus, 58 file media identik. Tidak menggandakan distribusi atau publikasi toko.
 Pengelola mengonfirmasi Facebook asli otomatis lanjut. Cakupan perangkat lain
 tetap terpisah dari kelulusan build.
 [Checksum semua ABI/AAB dan batas pengujian](AUDIO_FOCUS_1_1_14.md).
+
+
+## Kandidat1.1.15/code29 — 16 Oktober 2026
+
+Keystore produksi/Room9/dependensi/manifest dipertahankan. Build final9m55s,
+296Kotlin/84Python lulus; debug+signedAPK×3/AAB/R8; lint0error/2warninglama.
+APK signature/certificate/native/alignment16KB/refleksiZIP/engine/bootstrap lulus;
+AAB jarsigner/native lulus, bundletool tidak dijalankan ulang. ARM64 70.679.199byte,
+SHA2564e2ce13b649d93e072402f3bdf8688f44c78c46334cd8541bd619116ca2e58d4,
+terpasang update-r RealmeAndroid10 dan base.apk cocok. Finalupgrade memulihkan
+queue51/jeda44817ms; bukti HP kandidat awal dibedakan dari APK final. Tes layar
+akhir tertunda oleh panggilan, bukan klaim semua gerbang produksi terpenuhi.
+Tanpa salinan distribusi/publikasi toko. [SemuaABI/AAB dan status](IMPROVEMENTS_1_1_15.md).

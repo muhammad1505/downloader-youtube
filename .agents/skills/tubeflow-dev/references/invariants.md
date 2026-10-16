@@ -93,7 +93,7 @@ Ukuran katalog di Pengaturan mengikuti agregat `MediaDao.totals()` termasuk peru
 
 Auto-play 1.1.10: receiver koneksi Bluetooth manifest/runtime memakai exported karena sender dapat berada pada UID Bluetooth tersendiri; action dibatasi pada broadcast sistem terproteksi. Service pemutar tetap tidak diekspor. Izin BLUETOOTH berlaku sampai API30, BLUETOOTH_CONNECT diminta lewat Pengaturan pada API31+; jangan menambahkan discovery/lokasi untuk menerima sambungan. Receiver menyerahkan pekerjaan ke foreground service sebelum Room/fokus audio, dengan bootstrap terbatas dan fallback ketuk-untuk-putar bila start ditolak.
 
-Sesi media aktif memakai START_STICKY serta marker `player-last/session_active`; X membersihkan marker. Pemulihan tanpa headset harus tetap jeda. Jangan menerapkan PlaybackParams pada player jeda karena dapat memulai audio; simpan pilihan kecepatan dan terapkan sesudah fokus audio saat play. Pemulihan proses mati belum mempersist posisi seek. Kabel HEADSET_PLUG tidak membangunkan proses mati; force-stop dan kebijakan OEM tetap membatasi restart, sehingga klaim auto-play harus menyebut skenario HP yang diuji.
+Sesi media aktif memakai START_STICKY serta marker `player-last/session_active`; X membersihkan marker. Pemulihan tanpa headset harus tetap jeda. Jangan menerapkan PlaybackParams pada player jeda karena dapat memulai audio; simpan pilihan kecepatan dan terapkan sesudah fokus audio saat play. Pemulihan antrean/seek memakai PlayerSession privat (3000entri/4MiB), ID urutan asli shuffle, indeks/repeat dan checkpoint posisi kecil ber-revisi tiap5detik/pause/seek. Snapshot antrean hanya ditulis ketika berubah. Pemulihan proses dibuka jeda; initial/sticky headset ketika registrasi bukan sambungan baru. Format1.1.14 tidak menyimpan antrean/seek sehingga data tersebut tidak dapat dipulihkan retroaktif. Kabel HEADSET_PLUG tidak membangunkan proses mati; force-stop dan kebijakan OEM tetap membatasi restart, sehingga klaim auto-play harus menyebut skenario HP yang diuji.
 
 Pencarian antrean memakai posisi asli dari `PlaybackQueueSearch`, bukan indeks hasil filter. Semua aksi jump/move/remove tetap mengacu pada antrean penuh. Full player memakai seek track4dp/thumb12dp dengan target sentuh48dp; jumlah antrean berada di dalam tombol, tanpa badge yang keluar kontainer.
 
@@ -105,3 +105,25 @@ atau mencari lirik lagi. Folder kosong bukan galat scan. Nama tag audio memakai
 label versi kurung yang sama dengan filename; artist sumber yang baru muncul saat
 download tidak boleh dihapus oleh snapshot kosong atau diganti uploader. Cari ulang
 memakai nama publikasi/durasi aktual; parameter filename baru bukan artist terverifikasi.
+
+
+Preferensi lanjut setelah interupsi (SettingsStore.resumeAfterInterruption) default
+aktif; mematikannya membatalkan niat/fokus tertunda saat itu juga. Pengaturan ini
+terpisah dari pemicu sambungan headset. PlaybackInterruption/permanent recovery
+hanya meminta fokus sekali setelah audio lain teramati aktif→sunyi; mode komunikasi,
+status tidak diketahui, jeda manual/stop/release/ganti track membatalkan atau menahan.
+
+PrivateStorage memisahkan cache lirik/metadata/sampul dan sementara downloads dari
+media. Cleanup eksplisit berkonfirmasi boleh membuang PAUSED/FAILED idle, dengan
+peringatan quota/retry dari nol; cleanup otomatis tetap mempertahankannya. Pakai
+DownloadFileAccess lease yang dipegang worker melalui finally, periksa engine/WM/
+generasi/status, tolak symlink/traversal tidak lengkap dan jangan menghapus output
+media/model/jurnal LRC. WorkManager finished saja bukan izin menghapus file.
+
+FailureDetails/Store adalah satu jalur diagnostik tersanitasi, perjob/generasi/status
+lirik,80entry/1MiB. Tampilkan detail teknis di dialog copy yang dipicu pengguna;
+waktu/versi/HTTP yang tidak tercatat tetap unknown. RATE_LIMIT bisa berasal dari
+cooldown lokal: jangan mengarang HTTP429 baru. Laporan lirik tidak mengubah sukses
+media menjadi FAILED. Fetch otomatis mendahulukan searchPaths yang sama dengan
+manual; exact get hanya fallback. Pertahankan gerbang identitas/versi/durasi±2detik,
+cache positif dan kepatuhan Retry-After; jangan menembus cooldown untuk mengisi statistik.

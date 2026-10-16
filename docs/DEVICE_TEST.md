@@ -454,3 +454,19 @@ yang diperiksa. Tidak uninstall/reset atau mengubah keamanan/DNS. Konfirmasi
 video Facebook asli oleh pengelola: “Ya, otomatis lanjut”. Panggilan/TWS/proses mati/
 deep sleep/Android15+/runtime16KB/download baru belum diuji ulang pada sesi ini.
 [Protokol, hasil terukur dan artefak](AUDIO_FOCUS_1_1_14.md).
+
+
+## Perbaikan bertahap1.1.15/code29 — 16 Oktober 2026
+
+RealmeRMX1821/Android10/API29/ARM64/RAM4GB/4KB. Kandidat awal hash6405f64efdce20e905367196539c32f39e49d6ba900387a9166c34aca3b7dd45
+lulus: force-stop/manualopen51lagu/acak/repeatALL/31589ms sama dan paused;
+5kasus preferensi fokus native; dua file QA2→1→0 otomatis; cache6,9→5,2MB,
+parsial0B/konfirmasi/noopcleanup; inspeksi unavailable-video dan copyreport;
+M4A baru SATRU2Live nama/tag/durasi393,98s/decode penuh.60baselinefiles utuh.
+
+APK final hash4e2ce13b649d93e072402f3bdf8688f44c78c46334cd8541bd619116ca2e58d4
+terpasang-r, base.apk cocok dan51queue/44817ms dipulihkan paused. Tes UI akhir
+menunggu panggilan selesai; agent tidak menjawab/menolak panggilan atau mengunggah
+screenshot pribadi. Tidak uninstall/reset/DNS/securitychanges. LRCLive pembatasan
+pada kandidat awal; auditori baru/TWS/Android15+/runtime16KB/low-memory/OEM belum
+terbukti. [Matriks bukti dan batas](IMPROVEMENTS_1_1_15.md).
