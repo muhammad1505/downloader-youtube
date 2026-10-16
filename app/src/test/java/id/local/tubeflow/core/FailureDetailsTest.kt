@@ -17,10 +17,10 @@ class FailureDetailsTest {
     @Test fun tokensHeadersUrlsAndPrivatePathsAreRedacted() {
         val raw = "HTTP Error 403 https://user:PASS@example.com/file?secret_token=SECRET\n"+
             "Authorization: Bearer TOPSECRET\nCookie: sid=COOKIE\n"+
-            "token=TOKEN signature='SIGN' api_key=API\n"+
+            "token=TOKEN signature='SIGN' api_key=API access_token=ACCESS client_secret=CLIENT po_token=POKEY refresh_token=REFRESH client_id=CLIENTID\n"+
             "content://media/private file:///storage/emulated/0/private /data/user/0/private /home/zaki/private"
         val safe = report(raw).text()
-        for (secret in listOf("PASS","SECRET","TOPSECRET","COOKIE","TOKEN","SIGN","API","example.com","/data/user","/home/zaki","content://","file://")) {
+        for (secret in listOf("PASS","SECRET","TOPSECRET","COOKIE","TOKEN","SIGN","API","ACCESS","CLIENT","POKEY","REFRESH","CLIENTID","example.com","/data/user","/home/zaki","content://","file://")) {
             assertFalse(secret,safe.contains(secret))
         }
         assertTrue(safe.contains("HTTP: 403"))

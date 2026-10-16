@@ -37,7 +37,7 @@ data class FailureDetails(val category: String, val phase: String, val message: 
             var text = raw.replace(Regex("\u001B\\[[0-9;]*[A-Za-z]"), "")
             text = text.replace(Regex("(?im)(authorization|set-cookie|cookie)\\s*[:=][^\\r\\n]+"), "$1=[disamarkan]")
             text = text.replace(Regex("(?i)\\b(?:https?|content|file)://[^\\s<>]+"), "[alamat disamarkan]")
-            text = text.replace(Regex("(?i)\\b(token|secret_token|signature|sig|password|passwd|api[_-]?key|credential)\\s*[:=]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)"), "$1=[disamarkan]")
+            text = text.replace(Regex("(?i)\\b((?:[a-z0-9]+[_-])*(?:token|secret|signature|sig|password|passwd|api[_-]?key|credential)|client_id)\\s*[:=]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)"), "$1=[disamarkan]")
             text = text.replace(Regex("(?:/(?:data|storage|sdcard|home|mnt|tmp)/[^\\s\"']+|[A-Za-z]:\\\\[^\\s]+)"), "[path disamarkan]")
             return text.filter { it == '\n' || it == '\t' || !it.isISOControl() }.take(2000)
         }

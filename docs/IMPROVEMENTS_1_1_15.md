@@ -82,3 +82,7 @@ tersendiri. Tidak ada dependensi, izin, tabel atau migrasi Room baru.
 
 Bukti sementara privat: build/reports/improvements-1115/. File APK final,
 checksum, hasil perangkat, dan batas aktual ditambahkan setelah pengujian.
+
+Build kandidat sesudah checkpoint dihentikan lebih awal untuk memperluas redaksi
+access_token/client_secret/po_token/refresh_token/client_id beserta tesnya;
+artefak dari build yang dihentikan tidak dipasang atau dibagikan.
