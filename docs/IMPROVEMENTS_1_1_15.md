@@ -86,3 +86,7 @@ checksum, hasil perangkat, dan batas aktual ditambahkan setelah pengujian.
 Build kandidat sesudah checkpoint dihentikan lebih awal untuk memperluas redaksi
 access_token/client_secret/po_token/refresh_token/client_id beserta tesnya;
 artefak dari build yang dihentikan tidak dipasang atau dibagikan.
+
+Suite berikutnya lulus 292 Kotlin; lint menemukan tiga LocalContextGetResourceValueCall
+pada label aksesibilitas/ukuran di Pengaturan. Label dipindahkan ke stringResource
+pada scope Composable (tanpa suppress), lalu pemeriksaan lengkap dijalankan ulang.

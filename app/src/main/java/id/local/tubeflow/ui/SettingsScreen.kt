@@ -53,6 +53,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
+    val resumeLabel = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title)
+    val partialSuffix = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_partial)
+    val unavailableSize = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_unavailable)
     var confirmPartial by rememberSaveable { mutableStateOf(false) }
     if (confirmPartial) AlertDialog(onDismissRequest = { confirmPartial = false },
         title = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title)) },
@@ -135,7 +138,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(SettingsStore.resumeAfterInterruption, onCheckedChange = { SettingsStore.setResumeAfterInterruption(context, it) },
-                        modifier = Modifier.semantics { contentDescription = context.getString(id.local.tubeflow.R.string.resume_interruption_title) })
+                        modifier = Modifier.semantics { contentDescription = resumeLabel })
                 }
             }
         }
@@ -247,7 +250,7 @@ fun SettingsScreen(
                 HorizontalDivider()
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_title), style = MaterialTheme.typography.titleSmall)
                 fun sizeLabel(size: id.local.tubeflow.core.PrivateStorage.Size?): String =
-                    size?.let { Format.bytes(it.bytes) + if (!it.complete) context.getString(id.local.tubeflow.R.string.size_partial) else "" } ?: context.getString(id.local.tubeflow.R.string.size_unavailable)
+                    size?.let { Format.bytes(it.bytes) + if (!it.complete) " $partialSuffix" else "" } ?: unavailableSize
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_size_label, sizeLabel(temporaryUsage?.cache)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_size_label, sizeLabel(temporaryUsage?.partial)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
