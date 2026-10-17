@@ -71,6 +71,16 @@ class LyricEditor(private val context: Context) {
     }
 
     suspend fun preview(item: MediaItem): Preview = withContext(Dispatchers.IO) { edits.withLock { previewLocked(item) } }
+    /** Shared file lock is held by the backup coordinator; do not nest it. */
+    internal fun backupLocked(item: MediaItem): Preview = previewLocked(item)
+    internal fun restoreBaselineLocked(uri: String, original: String, offset: Long, text: String, durationMs: Long?) {
+        require(LrcTiming.shift(original, offset, durationMs) == text && read(uri).contentEquals(text.toByteArray()))
+        dir.mkdirs()
+        val file = state(uri)
+        val value = JSONObject().put("uri", uri).put("original", original).put("offset", offset).put("hash", hash(text.toByteArray()))
+        require((dir.listFiles()?.sumOf(File::length) ?: 0) + value.toString().toByteArray().size - file.baseFile.length() <= 32L * 1024 * 1024)
+        save(file, value)
+    }
     private fun previewLocked(item: MediaItem): Preview {
         require(item.kind == "AUDIO" && item.availability == "AVAILABLE") { "Pilih audio yang tersedia." }
         val uri = item.lyricUri ?: error("Lirik tersinkron belum tersedia.")

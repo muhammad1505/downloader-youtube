@@ -247,3 +247,15 @@ privat mempertahankan FLAC publik tersimpan, hapus hanya QA lewat Koleksi,
 queue1/seek143381ms terjaga, restart tanpa status karaoke lama.63file baseline
 identik. Source model/inference tidak diubah dan kualitas vokal tidak diklaim
 meningkat. [Semua artefak, langkah, bukti dan batas](KARAOKE_LOGIC_1_1_16.md).
+
+
+## Release 1.1.18/code32 — 18 Oktober 2026
+
+Kunci produksi dipertahankan, APK non-debuggable. ARM64 70,857,827byte,
+SHA256 `489b0349e2c1c01bb43ea0ed91353c2894b51bdf1c0f43eb3adc83c959581795`. Update-r di RealmeAndroid10 dan hash base.apk cocok; tanpa reset.
+Build debug/unit/lint debug+release/R8/APK×3/AAB9m45s berhasil;339Kotlin/90Python lulus,
+lint0error/2warning lama. Audit APK signature/sertifikat/native/zipalign16KB/
+refleksiZIP/engine/bootstrap dan AAB jarsigner/native lulus. Bundletool tidak
+ diulang, runtime16KB belum diuji; bukan publikasi toko atau klaim produksi penuh.
+Data62file awal identik, QA video dihapus terarah. Room10 membawa playlist/favorit
+melalui migrasi9→10, tanpa dependensi/izin baru. [Hash semua artefak dan pengujian](REPAIR_2026-10-18.md).

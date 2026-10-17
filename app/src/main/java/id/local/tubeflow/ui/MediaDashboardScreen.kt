@@ -47,9 +47,9 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
     val finished = counts.firstOrNull { it.action == "COMPLETED" }?.count ?: 0
     val failed = counts.firstOrNull { it.action == "FAILED" }?.count ?: 0
     val cancelled = counts.firstOrNull { it.action == "CANCELLED" }?.count ?: 0
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
         item { PageHeading("Ringkasan media", "Koleksi di perangkat dan aktivitas yang benar-benar tercatat.") }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { collection("AUDIO") }) { Text("Musik") }
             OutlinedButton(onClick = { collection("VIDEO") }) { Text("Video") }
             OutlinedButton(onClick = downloads) { Text("Download") }
@@ -63,7 +63,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
                 if (t.audio + t.video == 0L) {
                     Text("Koleksi masih kosong",style=MaterialTheme.typography.titleMedium)
                     Text("Download media baru atau pindai folder yang sudah berisi file.")
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         Button(onClick=downloads) { Text("Mulai download") }
                         TextButton(onClick=model::scan,enabled=!busy) { Text("Segarkan katalog") }
                     }
@@ -218,9 +218,18 @@ private fun ActivityChart(points: List<DashboardCharts.Point>, cumulative: Boole
 
 @Composable
 private fun DashboardCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); content() } }
+    SectionCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); content() } }
 }
-@Composable private fun Metric(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall); Text(value, style = MaterialTheme.typography.labelLarge) } }
+@Composable private fun Metric(label: String, value: String) {
+    val largeText=androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
+    if (largeText) Column(Modifier.fillMaxWidth(), verticalArrangement=Arrangement.spacedBy(4.dp)) {
+        Text(label, style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style=MaterialTheme.typography.titleSmall)
+    } else Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+        Text(label, Modifier.weight(1f), style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, Modifier.widthIn(max=160.dp), style=MaterialTheme.typography.labelLarge)
+    }
+}
 private fun eventLabel(action: String) = when (action) {
     "COMPLETED" -> "Download selesai"; "FAILED" -> "Download gagal"; "CANCELLED" -> "Download dibatalkan"; "QUEUED" -> "Diantrekan";
     "ADDED" -> "Media ditambahkan"; "RENAMED" -> "Nama diperbarui"; "DELETED" -> "Media dihapus"; "INDEX_FAILED" -> "Pengindeksan media gagal"; "UNAVAILABLE" -> "File tidak dapat diakses"; "ACCESS_DENIED" -> "Izin akses file berubah"; "PROCESSING_FAILED" -> "Pemrosesan tambahan gagal"; "LYRIC_TIMING" -> "Waktu lirik diperbarui"; "LYRICS_SELECTED" -> "Lirik pilihan disimpan"; "KARAOKE_SAVED" -> "Instrumental disimpan"; else -> action

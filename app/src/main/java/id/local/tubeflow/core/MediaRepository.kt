@@ -32,6 +32,9 @@ class MediaRepository(private val context: Context) {
     private val dao = database.media()
     companion object { private val operations get() = MediaFileOperations.mutex }
     private val renameJournal = AtomicFile(File(context.noBackupFilesDir, "library-rename.json"))
+    private suspend fun removeCatalog(uri: String) = database.withTransaction {
+        database.personal().removeMedia(uri); dao.remove(uri)
+    }
     private fun displayName(raw: String): String = resolver.query(raw.toUri(), arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
         require(c.moveToFirst()) { "File tidak tersedia." }; c.getString(0).orEmpty()
     } ?: error("Nama file tidak dapat dibaca.")
@@ -223,7 +226,7 @@ class MediaRepository(private val context: Context) {
             if (error is CancellationException) throw error
             if (old != null) {
                 if (MediaAvailability.probe(context,old) == MediaAvailability.State.MISSING) {
-                    dao.remove(old.uri)
+                    removeCatalog(old.uri)
                     dao.event(MediaEvent(jobId=old.jobId.orEmpty(),action="UNAVAILABLE",kind=old.kind,platformId=old.platformId,at=System.currentTimeMillis()))
                     return
                 }
@@ -299,7 +302,7 @@ class MediaRepository(private val context: Context) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             when (MediaAvailability.probe(context,item)) {
                 MediaAvailability.State.MISSING -> {
-                    dao.remove(item.uri)
+                    removeCatalog(item.uri)
                     dao.event(MediaEvent(jobId=item.jobId.orEmpty(),action="UNAVAILABLE",kind=item.kind,platformId=item.platformId,at=System.currentTimeMillis()))
                 }
                 MediaAvailability.State.DENIED -> if (item.availability != "ACCESS_DENIED")
@@ -365,11 +368,11 @@ class MediaRepository(private val context: Context) {
                 val restored = runCatching { DocumentsContract.renameDocument(resolver, renamed.toUri(), item.displayName)?.toString() }.getOrNull() ?: renamed
                 val actual = displayName(restored)
                 val repaired = item.copy(uri = canonical(restored), accessUri = restored, displayName = actual, checkedAt = 0)
-                database.withTransaction { dao.put(repaired); if (repaired.uri != item.uri) dao.remove(item.uri); item.jobId?.let { database.downloads().renamedOutput(it, restored) } }
+                database.withTransaction { dao.put(repaired); if (repaired.uri != item.uri) { database.personal().relink(item.uri, repaired.uri); database.personal().removeMedia(item.uri); dao.remove(item.uri) }; item.jobId?.let { database.downloads().renamedOutput(it, restored) } }
                 error(if (actual == item.displayName) "Provider mengubah nama; nama lama dipulihkan." else "Provider menolak pemulihan nama; file tetap tersedia dengan nama aktual di koleksi.")
             }
             val changed = renamedRow(item, renamed, name).copy(uri = canonical(renamed), accessUri = renamed)
-            database.withTransaction { dao.put(changed); if (changed.uri != item.uri) dao.remove(item.uri); item.jobId?.let { database.downloads().renamedOutput(it, renamed) } }
+            database.withTransaction { dao.put(changed); if (changed.uri != item.uri) { database.personal().relink(item.uri, changed.uri); database.personal().removeMedia(item.uri); dao.remove(item.uri) }; item.jobId?.let { database.downloads().renamedOutput(it, renamed) } }
             changed
         } else error("Provider ini belum mendukung rename aman, terutama pasangan media dan lirik. File tetap tersedia.")
     } }
@@ -381,7 +384,7 @@ class MediaRepository(private val context: Context) {
         (sidecars + listOfNotNull(item.lyricUri)).distinct().forEach { if (!StorageUris.delete(context, it)) sidecarFailed = true }
         // Baris ikut dihapus: file sudah tiada dan pengguna memilih Hapus, jadi tampilan harus
         // bersih. Pencegahan duplikat tetap lewat riwayat download, bukan baris media yang tersisa.
-        dao.remove(item.uri)
+        removeCatalog(item.uri)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "DELETED", kind = item.kind, platformId = item.platformId, at = System.currentTimeMillis()))
         require(!sidecarFailed) { "Media terhapus, tetapi lirik gagal dihapus." }
     } }

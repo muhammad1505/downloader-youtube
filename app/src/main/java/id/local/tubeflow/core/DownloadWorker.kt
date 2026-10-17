@@ -251,7 +251,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     if(dao.finish(jobId,generation,published.toString(),System.currentTimeMillis()) == 0) throw CancellationException()
     completed=true
     if (FailureDetails.isLyricFailure(lyricStatus)) runCatching {
-     FailureDetailsStore(applicationContext).let { it.put("$jobId-lyrics",generation,it.captureLyrics(lyricStatus)) }
+     FailureDetailsStore(applicationContext).let { it.put("$jobId-lyrics",generation,it.captureLyrics(lyricStatus,lyricOutcome?.httpCode)) }
     }
     pending=null
     dao.get(jobId)?.processingNotice?.takeIf { it.isNotBlank() }?.let {

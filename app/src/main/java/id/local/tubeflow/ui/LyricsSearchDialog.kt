@@ -48,6 +48,9 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
                 if (current.failureStatus != LyricStatus.RATE_LIMIT) Text(it,color=MaterialTheme.colorScheme.error)
                 else if (retrySeconds == 0L) Text(stringResource(R.string.lyrics_retry_ready),style=MaterialTheme.typography.bodySmall)
             }
+            if (current.failureStatus != null) current.httpCode?.let { code ->
+                Text(stringResource(R.string.lyrics_http_detail,code),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (current.searched && current.choices.isEmpty() && current.error == null) Text("Tidak ada hasil. Coba judul/artis lain.")
             if (current.choices.isNotEmpty()) {
                 Text("${current.choices.size} hasil · pilih lirik bertimestamp",style=MaterialTheme.typography.labelMedium)

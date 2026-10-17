@@ -90,10 +90,10 @@ fun HistoryScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { PageHeading("Koleksi kamu", "Audio dan video yang berhasil disimpan di perangkat ini.") }
+        item { PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_history), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_history_help)) }
 
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -137,7 +137,7 @@ fun HistoryScreen(
 
         if (completed.isNotEmpty() || unsuccessful > 0) {
             item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                FlowRow(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("${filtered.size} entri ditampilkan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row {
                         if (unsuccessful > 0) TextButton(onClick = onClearUnsuccessful) { Text("Hapus gagal ($unsuccessful)") }

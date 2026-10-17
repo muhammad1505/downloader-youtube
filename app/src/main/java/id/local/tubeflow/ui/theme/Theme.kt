@@ -22,30 +22,41 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-private val DarkPalette = darkColorScheme(
-    primary = Color(0xFFC6B7FF), onPrimary = Color(0xFF251B46),
-    primaryContainer = Color(0xFF3C305F), onPrimaryContainer = Color(0xFFE9DDFF),
-    secondary = Color(0xFFACDCCE), onSecondary = Color(0xFF12392E),
-    secondaryContainer = Color(0xFF2F4A41), onSecondaryContainer = Color(0xFFCFF2E5),
-    background = Color(0xFF000000), onBackground = Color(0xFFF0EDF4),
-    surface = Color(0xFF111113), onSurface = Color(0xFFF0EDF4),
-    surfaceVariant = Color(0xFF252528), onSurfaceVariant = Color(0xFFBFC3D0),
-    surfaceContainerLowest=Color(0xFF000000), surfaceContainerLow=Color(0xFF0D0D0F),
-    surfaceContainer=Color(0xFF171719), surfaceContainerHigh=Color(0xFF212124), surfaceContainerHighest=Color(0xFF2B2B2E),
-    outline = Color(0xFF858B9D), outlineVariant = Color(0xFF3B404F),
+// Nuansa pemutar musik modern: latar gelap netral, teks putih-redup, dan aksen hijau sebagai
+// satu-satunya warna kuat. Nilai hijau dipilih sendiri (bukan warna merek aplikasi mana pun).
+// internal agar pasangan warna dapat diuji kontrasnya (ThemeContrastTest).
+internal val DarkPalette = darkColorScheme(
+    primary = Color(0xFF33D07C), onPrimary = Color(0xFF00391C),
+    primaryContainer = Color(0xFF1E5B39), onPrimaryContainer = Color(0xFFB9F2D3),
+    secondary = Color(0xFF7ED8A8), onSecondary = Color(0xFF0B3B26),
+    secondaryContainer = Color(0xFF22443A), onSecondaryContainer = Color(0xFFBFF0D8),
+    tertiary = Color(0xFFAFC6E8), onTertiary = Color(0xFF17304B),
+    tertiaryContainer = Color(0xFF2D4561), onTertiaryContainer = Color(0xFFD4E4FF),
+    background = Color(0xFF121212), onBackground = Color(0xFFF1F1F1),
+    surface = Color(0xFF161616), onSurface = Color(0xFFF1F1F1),
+    surfaceVariant = Color(0xFF2A2A2A), onSurfaceVariant = Color(0xFFB3B3B3),
+    surfaceContainerLowest=Color(0xFF0A0A0A), surfaceContainerLow=Color(0xFF131313),
+    surfaceContainer=Color(0xFF1D1D1D), surfaceContainerHigh=Color(0xFF282828), surfaceContainerHighest=Color(0xFF333333),
+    outline = Color(0xFF8A8A8A), outlineVariant = Color(0xFF3E3E3E),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
 )
 
-private val LightPalette = lightColorScheme(
-    primary = Color(0xFF4B2FD1), onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE4DBFF), onPrimaryContainer = Color(0xFF12005E),
-    secondary = Color(0xFF00695B), onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFF9CF2DF), onSecondaryContainer = Color(0xFF00201A),
-    background = Color(0xFFF7F5FF), onBackground = Color(0xFF1C1B22),
-    surface = Color(0xFFFCFAFF), onSurface = Color(0xFF1C1B22),
-    surfaceVariant = Color(0xFFE7E0EC), onSurfaceVariant = Color(0xFF49454E),
-    outline = Color(0xFF7A757F), outlineVariant = Color(0xFFCAC4CF),
+internal val LightPalette = lightColorScheme(
+    // Hijau lebih tua di mode terang agar teks aksen mencapai kontras 4,5:1 di atas latar terang.
+    primary = Color(0xFF0B7A42), onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFB4F0CE), onPrimaryContainer = Color(0xFF04331C),
+    secondary = Color(0xFF0B7A50), onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFB4F0CE), onSecondaryContainer = Color(0xFF04331C),
+    tertiary = Color(0xFF3B608F), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFD4E4FF), onTertiaryContainer = Color(0xFF17304B),
+    background = Color(0xFFF4F6F4), onBackground = Color(0xFF161A17),
+    surface = Color(0xFFFAFBFA), onSurface = Color(0xFF161A17),
+    surfaceVariant = Color(0xFFE2E6E2), onSurfaceVariant = Color(0xFF4A524D),
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF5F8F5),
+    surfaceContainer = Color(0xFFEDF1ED), surfaceContainerHigh = Color(0xFFE6EBE6),
+    surfaceContainerHighest = Color(0xFFE0E6E0),
+    outline = Color(0xFF727A75), outlineVariant = Color(0xFFC6CCC7),
     error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF410002),
 )
@@ -64,6 +75,7 @@ private val AppTypography = Typography(
 )
 
 private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(12.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(20.dp),
     large = RoundedCornerShape(24.dp),

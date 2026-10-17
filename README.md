@@ -17,6 +17,7 @@ Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-
 - Riwayat lokal dengan pencarian dan filter, statistik unduhan, hapus per entri atau bersihkan.
 - Buka/bagikan hasil dan file subtitle melalui URI MediaStore; info pemakaian penyimpanan per folder.
 - Tema terang/gelap mengikuti sistem atau pilihan manual, plus warna dinamis (Material You) di Android 12+.
+- Semua menu memakai token/panel bersama; font besar dapat membungkus metrik dan tindakan. Rincian perbaikan pembukaan video serta LRCLIB ada pada [laporan 1.1.18](docs/REPAIR_2026-10-18.md).
 - Splash screen mengikuti tema aplikasi (terang/gelap) saat aplikasi dibuka.
 - Folder penyimpanan bisa diubah di Pengaturan → Penyimpanan (nama satu segmen di bawah Downloads/).
 
@@ -25,13 +26,16 @@ Aplikasi Android Kotlin/Compose untuk mengunduh dan mengelola audio/video multi-
 - Detail error inspeksi/download/lirik dapat disalin secara manual dengan redaksi URL/token/path; tidak dikirim otomatis. Pengaturan membedakan cache dan berkas sementara download dari media; cleanup parsial berkonfirmasi memulai retry dari nol dan melewati worker aktif.
 - Pemutar audio: mini player beraksen sampul, swipe sampul/lirik, pencarian/editor lirik, seek, kecepatan, equalizer, antrean dengan pencarian judul/artis dan pengaturan urutan, acak/ulangi, dan kontrol notifikasi dengan tombol tutup. Ukuran file Koleksi terbaca di Pengaturan tanpa grant folder tambahan; ukuran folder lengkap dibedakan dari ukuran katalog.
 - Karaoke opsional di perangkat: pilih waktu cuplikan, dengarkan, lalu buat lagu penuh atau simpan cuplikan dengan konfirmasi. Hasil terikat pada lagu/mode/posisi; Batalkan/Buang pratinjau membersihkan data privat setelah proses berhenti, termasuk fragmen model. Audio asli, model terverifikasi dan hasil Koleksi dipertahankan. Model diunduh terpisah; proses CPU dapat lama dan pengurangan vokal bergantung rekaman.
+- Perbandingan Asli/Instrumental memakai player yang sama dan dapat kembali ke antrean sebelumnya. Hasil karaoke dapat disimpan sebagai FLAC, MP3 atau AAC/M4A; penyimpanan model, pratinjau dan data sementara terpisah di Pengaturan.
+- Favorit dan playlist pribadi menyimpan referensi tanpa menggandakan musik. Timer tidur menyediakan durasi 1–180 menit atau selesai lagu, dengan fade pada akhir countdown.
+- Cadangan JSON terverifikasi melalui pemilih dokumen: pengaturan portabel, Favorit/playlist, metadata katalog dan pilihan/koreksi lirik. Pratinjau pemulihan melaporkan media hilang/ambigu; penggantian LRC lama memerlukan pilihan eksplisit. Audio/video dan izin folder tidak disalin.
 - Smart Audio: normalisasi nama, tag khusus audio yang menjaga informasi valid, pengaturan otomatis artwork/lirik/katalog. Tahun unggah dan nama uploader tidak dijadikan tahun/artis lagu.
 - Koreksi waktu LRC per lagu (±30 detik), baseline asli, preview dan reset; cocok untuk offset konstan, bukan perbedaan aransemen/drift.
 - Rename pasangan audio–LRC MediaStore dengan verifikasi/rollback, serta hapus permanen berkonfirmasi. Dukungan rename SAF bergantung kemampuan provider.
 - Ringkasan: jumlah/ukuran media tersedia, status metadata/artwork/lirik, penyimpanan internal, aktivitas harian/mingguan/platform sejak upgrade. Riwayat yang dihapus dan statistik lama tidak ditebak.
 
 Detail implementasi, migrasi, hasil tes dan batas cakupan: [laporan Smart Media](docs/SMART_MEDIA_UPGRADE_2026-10-13.md).
-Perbaikan terbaru: [alur cuplikan, identitas hasil dan cleanup karaoke 1.1.16](docs/KARAOKE_LOGIC_1_1_16.md); [pemulihan player, diagnostik, cache/parsial dan lookup lirik1.1.15](docs/IMPROVEMENTS_1_1_15.md); [lanjut musik setelah interupsi audio1.1.14](docs/AUDIO_FOCUS_1_1_14.md); [pacing, cache dan waktu tunggu LRCLIB1.1.13](docs/LYRICS_RATE_LIMIT_1_1_13.md); [nama, metadata, lirik dan pemulihan Koleksi1.1.12](docs/METADATA_LYRICS_LIBRARY_1_1_12.md). Pemutar: [pencarian antrean dan auto-play1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
+Perbaikan terbaru: [enam peningkatan media1.1.17](docs/MEDIA_FEATURES_1_1_17.md); [alur cuplikan, identitas hasil dan cleanup karaoke 1.1.16](docs/KARAOKE_LOGIC_1_1_16.md); [pemulihan player, diagnostik, cache/parsial dan lookup lirik1.1.15](docs/IMPROVEMENTS_1_1_15.md); [lanjut musik setelah interupsi audio1.1.14](docs/AUDIO_FOCUS_1_1_14.md); [pacing, cache dan waktu tunggu LRCLIB1.1.13](docs/LYRICS_RATE_LIMIT_1_1_13.md); [nama, metadata, lirik dan pemulihan Koleksi1.1.12](docs/METADATA_LYRICS_LIBRARY_1_1_12.md). Pemutar: [pencarian antrean dan auto-play1.1.10](docs/PLAYER_AUTOPLAY_1_1_10.md).
 
 Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio Auto memakai MP3 agar bitrate dapat diterapkan. Bitrate lebih tinggi dan format lossless tidak meningkatkan kualitas sumber. Resolusi manual membatasi kualitas maksimum, bukan menjamin sumber tersedia pada resolusi itu.
 

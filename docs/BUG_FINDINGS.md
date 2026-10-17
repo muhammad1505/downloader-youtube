@@ -29,6 +29,13 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 
 | ID | Prioritas | Temuan | Status |
 | --- | --- | --- | --- |
+| BUG-066 | P2 | Pilihan timer terpotong di landscape/font besar | Reproduksi pada HP setelah pemutaran video; dialog diberi scroll; retest release final menjangkau custom/selesai lagu dan timer berhenti sebelum repeat |
+| BUG-064 | P2 | Detail galat inspeksi tertinggal setelah link dikosongkan/diganti | Pemilik sesi inspeksi diikat token; clear membatalkan dan menghapus galat, callback lama ditolak; 3 regresi dan retest HP error/busy lulus |
+| BUG-065 | P3 | Label navigasi terpotong pada font besar | Teramati pada 360dp/font1,35×; ambang ikon bernama disesuaikan; retest lima tujuan pada release final 1,35×/360dp lulus |
+| BUG-060 | P2 | Riwayat melaporkan file hilang setelah video berhasil dibuka | Perbaikan source 18 Okt; regresi buka/bagikan audio/video lulus host; video terbuka tanpa pesan palsu pada release final di HP |
+| BUG-061 | P2 | JSON galat LRCLIB dapat tersimpan sebagai cache positif | Validasi skema per endpoint dan pemulihan cache lama diperbaiki 18 Okt; fixture HTTP lulus; belum dibuktikan sebagai penyebab galat pengguna |
+| BUG-062 | P2 | Judul lagu bernomor bisa cocok dengan lagu lain | Gerbang angka judul ditambahkan; Satru/Satru 2/Satru 3 dibedakan walau artis/durasi sama; uji host lulus |
+| BUG-063 | P3 | Detail galat lirik tidak menyimpan respons HTTP sebenarnya | Kode HTTP diteruskan dari pencarian/cache ke dialog dan laporan worker/refetch; cooldown lokal tetap tanpa HTTP rekaan; fixture lulus |
 | BUG-001 | P1 | URI induk SAF untuk pembuatan dokumen | Perbaikan tersedia; audio + LRC Despacito pernah diuji SAF; video/subtitle/provider lain masih perlu uji |
 | BUG-002 | P2 | Worker lama membatalkan unduhan yang dilanjutkan | Sebagian: mutasi utama bergaris generasi, engine ownership dan resume normal teruji; sidecar/status lirik + race cleanup/lanjut cepat belum aman terbukti |
 | BUG-003 | P2 | Penghapusan dokumen SAF salah jalur | Helper tersedia; recovery masih dapat melepas jejak meskipun delete gagal; provider menolak/izin dicabut belum diuji penuh |
@@ -661,3 +668,52 @@ identitas/versi/durasi tetap; respons429 yang sungguh diterima tetap menghentika
 fallback. Diagnostik lirik tersendiri tidak mengubah audio sukses menjadi FAILED.
 Status pembatasan HP belum membuktikan akar semua limit penyedia atau sinkronisasi
 positif sumber Live; jangan reset cooldown, memutar IP atau melonggarkan versi.
+
+
+## BUG-060 — P2: Pesan file tidak tersedia setelah pemutar video dibuka
+
+- **Akar:** `ui/components.kt:launchFile` memakai Elvis pada hasil `launchMedia`, padahal `null` berarti pemutaran/berbagi berhasil. Akibatnya jalur sukses selalu menjadi pesan file tidak tersedia.
+- **Perbaikan:** periksa URI yang hilang/kosong lebih dulu, lalu kembalikan hasil launcher apa adanya. Pembukaan dan berbagi audio/video memakai jalur yang sama.
+- **Bukti:** `ui/MediaLaunchTest.kt` menguji empat kombinasi jenis/aksi, URI kosong, serta kegagalan launcher. Semua lulus pada host. Retest release final 1.1.18 di Realme Android 10 memutar MP4 di player eksternal lalu kembali tanpa pesan file hilang palsu.
+
+## BUG-061 — P2: Cache positif untuk JSON LRCLIB yang tidak sesuai kontrak
+
+- **Akar:** cache menganggap setiap objek/array JSON pada HTTP 200 valid, termasuk objek galat pada endpoint pencarian yang seharusnya mengembalikan array lagu. Respons itu dapat bertahan 24 jam meski provider sudah pulih; respons get tanpa identitas lagu bisa dianggap tidak ditemukan.
+- **Perbaikan:** validasi bentuk respons dan judul rekaman sesuai endpoint sebelum cache; cache lama dinilai ulang per permintaan. Tidak menghapus seluruh cache maupun cooldown 429. Varian pencarian selanjutnya juga boleh melengkapi lirik bertimestamp untuk ID yang sebelumnya tidak punya timestamp.
+- **Bukti:** fixture HTTP menguji respons salah skema, retry yang pulih, cache lama salah bentuk, dan pelengkapan ID sama. Lulus host. Ini temuan kode; belum ada bukti respons salah skema terjadi pada riwayat HP pengguna.
+
+## BUG-062 — P2: Lagu bernomor tertukar dalam pencocokan otomatis
+
+- **Akar:** skor substring menganggap Satru dan Satru 2 mirip. Artis dan durasi yang dekat dapat meloloskan lagu berbeda tersebut.
+- **Perbaikan:** angka pada judul inti harus sama; label kualitas seperti 4K tetap dibuang sebagai informasi video. Durasi ±2 detik, artis, dan versi tetap diperiksa. Ejaan angka berbeda yang meragukan dapat dipilih manual dengan pengakuan perbedaan.
+- **Bukti:** `LyricTest.numberedSongsAreDifferentEvenWithMatchingArtistAndDuration` lulus host. Ini penguatan kandidat, bukan klaim timestamp seluruh lagu kini sinkron.
+
+
+## BUG-063 — P3: Detail galat lirik kehilangan kode HTTP
+
+- **Bukti HP:** laporan SATRU pada 1.1.17 menampilkan kategori provider dan HTTP tidak tercatat. Pencarian manual berikutnya memberi 20 pilihan. Laporan lama tidak cukup untuk menyimpulkan apakah terjadi403 atau gangguan server.
+- **Akar:** `Res.Fail` hanya membawa status umum; adaptor cache mengganti kategori dengan kode sintetis. Laporan lirik menerima status saja.
+- **Perbaikan1.1.18:** kode HTTP aktual berjalan bersama hasil pencarian hingga dialog manual dan diagnostik worker/refetch. Kode hanya dicatat jika benar-benar ada respons. Cooldown lokal tidak ditandai sebagai respons HTTP429 baru. Respons gagal tidak masuk cache positif.
+- **Bukti host:** regresi403→laporan akses,503→provider, persistensi JSON, serta429 jaringan dibanding cooldown lokal lulus. Tidak merekonstruksi kode HTTP untuk laporan lama.
+
+
+## BUG-064 — P2: Detail error berasal dari link yang sudah dibersihkan
+
+- **Bukti HP kandidat1.1.18:** sesudah link video tidak tersedia dihapus, kolom kosong tetapi tombol Detail error tetap terlihat.
+- **Akar:** `clearPlaylist()` hanya mengosongkan playlist. Error/detail dan proses inspeksi lama masih hidup; hasil atau galat terlambat juga belum terikat kepemilikan sesi pada semua mutasi.
+- **Perbaikan:** `InspectionState` menjadi satu sumber status inspeksi. Token dibatalkan sebelum cancel engine/coroutine, input baru membersihkan status, dan hasil/galat/finally milik token lama ditolak. Metadata video selesai tetap menjadi cache yang diperiksa URL-nya untuk enqueue. Dialog detail lokal direset saat URL berganti.
+- **Bukti host:** 3tes memastikan clear menghapus galat, callback lama tidak menimpa/menyelesaikan sesi baru, dan cache enqueue tetap tersedia. Retest release final di HP lulus: clear setelah gagal dan clear saat “Membaca detail link…” tetap kosong setelah ditunggu. Lihat laporan perbaikan.
+
+## BUG-065 — P3: Teks navigasi mengecil ruangnya pada font besar
+
+- **Bukti HP:** kandidat1.1.18 pada360dp/font1,35× menampilkan Ringka… dan Downl…; pada1,6× cabang ikon sudah terbaca.
+- **Perbaikan:** font di atas1,2× menggunakan ikon dengan nama aksesibilitas lengkap. Urutan lima tujuan tetap sama; label pada skala normal dipertahankan.
+- **Verifikasi:** screenshot sebelum perbaikan tersedia pada log privat. Retest final 1,35×/360dp pada lima tujuan navigasi lulus; nama aksesibilitas lengkap, label tidak lagi terpotong.
+
+
+## BUG-066 — P2: Opsi timer tidak dapat dijangkau dalam layar pendek
+
+- **Bukti HP:** setelah video eksternal memutar layar ke landscape, dialog Timer tidur hanya menampilkan15/30/60menit. Input custom dan opsi selesai lagu berada di bawah viewport tanpa scroll.
+- **Akar:** isi dialog berupa Column yang tidak dapat digulir.
+- **Perbaikan:** viewport dibatasi dan diberi verticalScroll; header dan tombol Tutup tetap pada dialog Material. Logika timer dan volume tidak diubah.
+- **Verifikasi:** countdown satu menit di latar lulus pada kandidat. Release final membuktikan scroll landscape menjangkau input custom dan selesai lagu; opsi selesai lagu menghentikan pemutar sebelum shuffle/repeat. Posisi awal dipulihkan.

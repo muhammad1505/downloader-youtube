@@ -16,19 +16,15 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private val dao = DownloadDatabase.get(application).downloads()
  private val work = WorkManager.getInstance(application)
  val jobs = dao.observe().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
- private val _metadata=MutableStateFlow<VideoMetadata?>(null)
- val metadata: StateFlow<VideoMetadata?> = _metadata.asStateFlow()
- private val _playlist=MutableStateFlow<PlaylistMetadata?>(null)
- val playlist: StateFlow<PlaylistMetadata?> = _playlist.asStateFlow()
- private val _busy=MutableStateFlow(false)
- val busy: StateFlow<Boolean> = _busy.asStateFlow()
+ private val inspectionState=InspectionState()
+ val metadata = inspectionState.state.map { it.metadata }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
+ val playlist = inspectionState.state.map { it.playlist }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
+ val busy = inspectionState.state.map { it.busy }.stateIn(viewModelScope,SharingStarted.Eagerly,false)
  private val _error=MutableStateFlow<String?>(null)
  val error: StateFlow<String?> = _error.asStateFlow()
- private val _inspectError=MutableStateFlow<String?>(null)
  /** Alasan inspeksi terakhir gagal — menyalakan tombol "Coba lagi" untuk URL yang sama (BUG-006). */
- val inspectError: StateFlow<String?> = _inspectError.asStateFlow()
- private val _inspectDetails = MutableStateFlow<FailureDetails?>(null)
- val inspectDetails = _inspectDetails.asStateFlow()
+ val inspectError = inspectionState.state.map { it.error }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
+ val inspectDetails = inspectionState.state.map { it.details }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
  private val _notice=MutableStateFlow<String?>(null)
  val notice: StateFlow<String?> = _notice.asStateFlow()
  private val _storageBytes=MutableStateFlow<Long?>(null)
@@ -187,7 +183,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   }
  }
  private var inspection: Job?=null
- private var inspectionId: String?=null
+ private val inspectionId: String? get()=inspectionState.token
  /** Jenis inspeksi terakhir — retry harus mengulang operasi yang sama, bukan yang lain (BUG-006/R6). */
  private var lastInspectPlaylist=false
  private val recovery = viewModelScope.launch(Dispatchers.IO) {
@@ -229,51 +225,53 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  fun inspect(url: String) {
   inspectionId?.let(Engine::cancel); inspection?.cancel()
   lastInspectPlaylist=false
-  val id=UUID.randomUUID().toString(); inspectionId=id
+  val id=UUID.randomUUID().toString(); inspectionState.begin(id); _error.value=null
   inspection=viewModelScope.launch {
-   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null; _inspectDetails.value=null
-   try { _metadata.value=Engine.inspect(getApplication(),url,id) }
+   try { inspectionState.video(id,Engine.inspect(getApplication(),url,id)) }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
-    _inspectDetails.value=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
-    val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca video.")
-    _error.value=message; _inspectError.value=message
+    val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
+    val message=inspectErrorMessage(url,details)
+    if (inspectionState.fail(id,message,details)) _error.value=message
    }
-   finally { if(inspectionId==id) _busy.value=false }
+   finally { inspectionState.finish(id) }
   }
  }
  fun inspectPlaylist(url: String) {
   inspectionId?.let(Engine::cancel); inspection?.cancel()
   lastInspectPlaylist=true
-  val id=UUID.randomUUID().toString(); inspectionId=id
+  val id=UUID.randomUUID().toString()
   // Playlist biasa dinormalkan; Mix mempertahankan video awal (BUG-007/018).
   // identitas metadata tetap URL asli agar cocok dengan input pengguna di layar.
   val original=url.trim()
   val canonical=Selection.playlistInspectionUrl(original) ?: original
-  val cachedSeed=_metadata.value?.takeIf { Selection.videoId(it.url) == Selection.videoId(canonical) }
+  val cachedSeed=inspectionState.state.value.metadata?.takeIf { Selection.videoId(it.url) == Selection.videoId(canonical) }
+  inspectionState.begin(id); _error.value=null
   inspection=viewModelScope.launch {
-   _busy.value=true; _metadata.value=null; _playlist.value=null; _error.value=null; _inspectError.value=null; _inspectDetails.value=null
    try {
     val result=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original)
     val seed=if (Selection.isMix(original)) cachedSeed ?: try {
      Engine.inspect(getApplication(), "https://www.youtube.com/watch?v=${Selection.videoId(canonical)}", id)
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { null } else null
-    _playlist.value=result.copy(folderName=Selection.collectionFolder(result, seed), seedMetadata=seed)
+    inspectionState.playlist(id,result.copy(folderName=Selection.collectionFolder(result, seed), seedMetadata=seed))
    }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
-    _inspectDetails.value=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "PLAYLIST_INSPECTION") }
-    val message=inspectErrorMessage(url, error.message ?: "Tidak dapat membaca playlist.")
-    _error.value=message; _inspectError.value=message
+    val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "PLAYLIST_INSPECTION") }
+    val message=inspectErrorMessage(url,details)
+    if (inspectionState.fail(id,message,details)) _error.value=message
    }
-   finally { if(inspectionId==id) _busy.value=false }
+   finally { inspectionState.finish(id) }
   }
  }
- fun clearPlaylist() { _playlist.value=null }
+ fun clearPlaylist() {
+  inspectionState.clear()?.let(Engine::cancel)
+  inspection?.cancel(); inspection=null; _error.value=null
+ }
  /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
- private fun inspectErrorMessage(url: String, message: String): String {
-  if(Selection.platform(url) != "Facebook") return _inspectDetails.value?.userMessage ?: FailureDetails.safe(message)
+ private fun inspectErrorMessage(url: String, details: FailureDetails): String {
+  if(Selection.platform(url) != "Facebook") return details.userMessage
   return "Tautan Facebook tidak dapat dibaca — video mungkin privat, butuh login, atau tautannya sudah kedaluwarsa. Coba salin tautan video publik langsung dari aplikasi Facebook."
  }
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang
@@ -339,7 +337,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    val previous=keepId?.let { dao.get(it) }
    val done=dao.observe().first().firstOrNull { it.id != keepId && it.matchesOutput(url, options) && it.state == JobState.COMPLETED && outputStillExists(it) }
    require(done == null) { "File ini sudah pernah diunduh." }
-   val meta=entryMetadata ?: _metadata.value?.takeIf { it.url==url }
+   val meta=entryMetadata ?: inspectionState.state.value.metadata?.takeIf { it.url==url }
    val base = previous ?: DownloadJob(id,url,titleHint ?: "Video",options.mode,options.format,options.quality,options.bitrate,
        subtitles=options.subtitles, embedSubs=options.embedSubs, thumbnail=options.thumbnail, embedThumb=options.embedThumb,
        durationSeconds=durationSeconds ?: 0L, subfolder=subfolder.orEmpty(), autoFolder=autoFolder,
@@ -625,7 +623,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     }
     dao.lyricStatus(id, result)
     if (FailureDetails.isLyricFailure(result)) runCatching {
-     FailureDetailsStore(getApplication()).let { it.put("$id-lyrics",job.generation,it.captureLyrics(result)) }
+     FailureDetailsStore(getApplication()).let { it.put("$id-lyrics",job.generation,it.captureLyrics(result,outcome.httpCode)) }
     }
     result
    }

@@ -1,9 +1,7 @@
 package id.local.tubeflow.ui
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,6 +32,10 @@ import kotlinx.coroutines.withContext
 fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
     LaunchedEffect(Unit) { model.validateAvailability() }
     val media by model.items.collectAsStateWithLifecycle()
+    val playlists by model.playlists.collectAsStateWithLifecycle()
+    val favorites by model.favorites.collectAsStateWithLifecycle()
+    var managePlaylists by remember { mutableStateOf(false) }
+    var addPlaylist by remember { mutableStateOf<MediaItem?>(null) }
     val filter by model.selectedFilter.collectAsStateWithLifecycle()
     val folders by model.folders.collectAsStateWithLifecycle()
     val artists by model.artists.collectAsStateWithLifecycle()
@@ -55,15 +59,15 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
             }
         }
         LazyColumn(
-            Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
         ) {
             item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.") }
             val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
             // Kontrol koleksi berupa tombol ikon: putar, putar acak, dan pencarian yang hanya
             // membuka kolom teks saat dibutuhkan sehingga daftar tetap menjadi fokus layar.
             item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { player.playAll(playable, shuffle = false) }, enabled = playable.isNotEmpty()) { Icon(Icons.Outlined.PlayArrow, "Putar semua lagu") }
-                IconButton(onClick = { player.playAll(playable, shuffle = true) }, enabled = playable.size > 1) { Icon(Icons.Outlined.Shuffle, "Putar acak") }
+                IconButton(onClick = { model.playSelection(player, shuffle = false) }, enabled = playable.isNotEmpty()) { Icon(Icons.Outlined.PlayArrow, "Putar semua lagu") }
+                IconButton(onClick = { model.playSelection(player, shuffle = true) }, enabled = playable.size > 1) { Icon(Icons.Outlined.Shuffle, "Putar acak") }
                 IconButton(onClick = { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen }) {
                     Icon(if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search, if (searchOpen) "Tutup pencarian" else "Cari di koleksi")
                 }
@@ -74,6 +78,13 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     trailingIcon = { if (filter.query.isNotEmpty()) IconButton(onClick = { model.filter(filter.copy(query = "")) }) { Icon(Icons.Outlined.Close, "Bersihkan pencarian") } })
             }
+            item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(filter.playlistId == PersonalLibrary.FAVORITES, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = if (filter.playlistId == PersonalLibrary.FAVORITES) "" else PersonalLibrary.FAVORITES)) }, label = { Text(stringResource(R.string.library_favorites)) })
+                ChoiceMenu(stringResource(R.string.library_playlists), listOf("" to stringResource(R.string.library_all_playlists)) + playlists.filter { it.id != PersonalLibrary.FAVORITES }.map { it.id to it.name }, filter.playlistId) {
+                    model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = it))
+                }
+                TextButton(onClick = { managePlaylists = true }) { Text(stringResource(R.string.library_manage_playlists)) }
+            } }
             item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChoiceMenu("Urut", listOf("recent" to "Terbaru", "name" to "Nama", "size" to "Ukuran", "duration" to "Durasi"), filter.sort) { model.filter(filter.copy(sort = it)) }
                 ChoiceMenu("Folder", listOf("" to "Semua folder") + folders.map { it to it }, filter.folder) { model.filter(filter.copy(folder = it)) }
@@ -83,22 +94,25 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                 }
             } }
             openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
-            if (media.isEmpty() && !busy) item { EmptyState(Icons.Outlined.Folder, "Belum ada media yang cocok", "Folder Download/TubeFlow dipindai otomatis saat aplikasi dibuka. File tidak disalin.") }
+            if (media.isEmpty() && !busy) item {
+                if (filter.playlistId.isNotBlank()) EmptyState(Icons.Outlined.LibraryMusic, stringResource(if (filter.playlistId == PersonalLibrary.FAVORITES) R.string.library_favorites_empty else R.string.library_playlist_empty), stringResource(R.string.library_playlist_empty_help))
+                else EmptyState(Icons.Outlined.Folder, "Belum ada media yang cocok", "Folder Download/TubeFlow dipindai otomatis saat aplikasi dibuka. File tidak disalin.")
+            }
             items(media, key = { it.uri }) { item ->
                 val accent=rememberCoverAccent(item.coverPath)
                 var menu by remember(item.uri) { mutableStateOf(false) }
                 Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
                     // Satu tap = seluruh daftar masuk antrean, mulai dari item ini.
-                    if (item.kind == "AUDIO") player.playAll(media, media.indexOf(item)) else open(item)
-                },colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=0.06f).compositeOver(MaterialTheme.colorScheme.surface)),border=BorderStroke(1.dp,accent.copy(alpha=0.18f))) {
+                    if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item)
+                },colors=mediaCardColors(accent)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
                         Column(Modifier.weight(1f)) {
                             Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                             if (item.displayName.substringBeforeLast('.') != item.title) Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
-                            if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall)
-                            Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+                            if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 PlatformIcon(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
                             }
@@ -109,8 +123,14 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text(if (item.kind == "AUDIO") "Putar sekarang" else "Buka di pemutar") },
                                 leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
-                                onClick = { menu = false; if (item.kind == "AUDIO") player.playAll(media, media.indexOf(item)) else open(item) })
+                                onClick = { menu = false; if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item) })
                             if (item.kind == "AUDIO") {
+                                DropdownMenuItem(text = { Text(stringResource(if (item.uri in favorites) R.string.library_unfavorite else R.string.library_favorite)) }, onClick = {
+                                    menu = false
+                                    if (item.uri in favorites) model.removeFromPlaylist(item, PersonalLibrary.FAVORITES) else model.addToPlaylist(item, PersonalLibrary.FAVORITES)
+                                })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.library_add_playlist)) }, onClick = { menu = false; addPlaylist = item })
+                                if (filter.playlistId.isNotBlank()) DropdownMenuItem(text = { Text(stringResource(R.string.library_remove_playlist)) }, onClick = { menu = false; model.removeFromPlaylist(item, filter.playlistId) })
                                 DropdownMenuItem(text = { Text("Putar berikutnya") }, onClick = { menu = false; player.playNext(item) })
                                 DropdownMenuItem(text = { Text("Tambah ke antrean") }, onClick = { menu = false; player.enqueue(item) })
                             }
@@ -130,6 +150,17 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
             if (media.size >= filter.limit && filter.limit < 3000) item { TextButton(onClick = model::more) { Text("Muat lebih banyak") } }
         }
     }
+    if (managePlaylists) PersonalPlaylistDialog(model) { managePlaylists = false }
+    addPlaylist?.let { selected -> AlertDialog(onDismissRequest = { addPlaylist = null },
+        title = { Text(stringResource(R.string.library_add_playlist)) }, text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(selected.title)
+                playlists.filter { it.id != PersonalLibrary.FAVORITES }.forEach { entry ->
+                    OutlinedButton(onClick = { model.addToPlaylist(selected, entry.id); addPlaylist = null }, modifier = Modifier.fillMaxWidth()) { Text(entry.name) }
+                }
+                TextButton(onClick = { addPlaylist = null; managePlaylists = true }) { Text(stringResource(R.string.library_create_playlist)) }
+            }
+        }, confirmButton = { TextButton(onClick = { addPlaylist = null }) { Text(stringResource(R.string.action_cancel)) } }) }
     detail?.let { item -> AlertDialog(onDismissRequest = { detail = null }, title = { Text("Detail media") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(item.displayName); Text(item.folder); Text("MIME: ${item.mime.ifBlank { "Belum diketahui" }}")

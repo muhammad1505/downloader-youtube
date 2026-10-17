@@ -77,11 +77,13 @@ interface MediaDao {
     @Query("SELECT DISTINCT album FROM media_items WHERE kind = 'AUDIO' AND album != '' ORDER BY album LIMIT 250") fun albums(): Flow<List<String>>
     @Query("""SELECT * FROM media_items WHERE (:kind = '' OR kind = :kind)
         AND (:folder = '' OR folder = :folder) AND (:artist = '' OR artist = :artist) AND (:album = '' OR album = :album)
+        AND (:playlistId = '' OR EXISTS (SELECT 1 FROM playlist_members WHERE playlistId = :playlistId AND mediaUri = media_items.uri))
         AND (title LIKE :search ESCAPE '\' OR displayName LIKE :search ESCAPE '\' OR artist LIKE :search ESCAPE '\')
-        ORDER BY CASE WHEN :sort = 'name' THEN title END COLLATE NOCASE ASC,
+        ORDER BY CASE WHEN :playlistId != '' AND :sort = 'recent' THEN (SELECT position FROM playlist_members WHERE playlistId = :playlistId AND mediaUri = media_items.uri) END ASC,
+        CASE WHEN :sort = 'name' THEN title END COLLATE NOCASE ASC,
         CASE WHEN :sort = 'size' THEN sizeBytes END DESC,
         CASE WHEN :sort = 'duration' THEN durationMs END DESC, addedAt DESC LIMIT :limit""")
-    fun page(kind: String, folder: String, artist: String, album: String, search: String, sort: String, limit: Int): Flow<List<MediaItem>>
+    fun page(kind: String, folder: String, artist: String, album: String, search: String, sort: String, limit: Int, playlistId: String = ""): Flow<List<MediaItem>>
     @Query("""SELECT COALESCE(SUM(kind='AUDIO' AND availability='AVAILABLE'),0) AS audio,
         COALESCE(SUM(kind='VIDEO' AND availability='AVAILABLE'),0) AS video,
         COALESCE(SUM(availability!='AVAILABLE'),0) AS unavailable,

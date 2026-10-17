@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import id.local.tubeflow.core.DownloadOptions
 import id.local.tubeflow.core.Format
@@ -88,7 +89,7 @@ fun DownloadScreen(
     var preset by rememberSaveable { mutableStateOf("") }
     var selectedIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var playlistQuery by rememberSaveable { mutableStateOf("") }
-    var showFailureDetails by remember { mutableStateOf(false) }
+    var showFailureDetails by remember(url.trim()) { mutableStateOf(false) }
     if (showFailureDetails && inspectDetails != null) FailureDetailsDialog(inspectDetails) { showFailureDetails = false }
     var inspectedUrl by rememberSaveable { mutableStateOf("") }
 
@@ -149,18 +150,11 @@ fun DownloadScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Masukkan URL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Tempel link video atau playlist — YouTube, TikTok, Instagram, SoundCloud, dan lainnya. Detailnya otomatis terbaca.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            PageHeading(stringResource(id.local.tubeflow.R.string.page_download), stringResource(id.local.tubeflow.R.string.page_download_help))
         }
 
         item {
@@ -207,7 +201,7 @@ fun DownloadScreen(
                 }
             }
             // Inspeksi gagal untuk URL ini: sediakan coba lagi tanpa perlu mengganti tautan (BUG-006).
-            if (inspectDetails != null && !busy) TextButton(onClick = { showFailureDetails = true }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.failure_details)) }
+            if (inspectDetails != null && !busy && trimmed.isNotBlank()) TextButton(onClick = { showFailureDetails = true }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.failure_details)) }
             if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isPlaylistLink)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
@@ -238,7 +232,7 @@ fun DownloadScreen(
 
         if (shownPlaylist != null) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                SectionCard {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.AutoMirrored.Outlined.FeaturedPlayList, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -314,7 +308,7 @@ fun DownloadScreen(
 
         if (shownVideo != null || shownPlaylist != null) {
         item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            SectionCard {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (shownPlaylist != null) Text(
@@ -503,7 +497,7 @@ fun DownloadScreen(
 
 @Composable
 private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    SectionCard {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)) {
                 AsyncImage(

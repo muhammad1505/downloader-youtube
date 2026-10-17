@@ -19,6 +19,8 @@ Tujuan skill ini: menghasilkan TubeFlow yang benar, aman bagi data pengguna, sta
 
 ## Pilih panduan yang dibutuhkan
 
+Untuk pekerjaan UI/UX atau teks, baca juga [supporting-skills.md](references/supporting-skills.md). Pengelola meminta tujuh sumber skill pendukung dipasang dan dipakai sesuai cakupannya; gunakan pemetaan itu agar panduan web, tulisan, dan Android tidak tercampur.
+
 | Jenis pekerjaan | Baca sebelum mengedit |
 |---|---|
 | Download, database, penyimpanan, playlist, identitas/metadata, progres, sampul, lirik, player lokal, karaoke | [invariants.md](references/invariants.md), bagian terkait |

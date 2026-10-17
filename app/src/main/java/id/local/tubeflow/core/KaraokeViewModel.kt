@@ -233,7 +233,13 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
                 current?.let(::recordDiscard)
                 KaraokeWorker.lock.withLock {
                     KaraokePublication(getApplication()).recover()
-                    current?.let { discard(it, onDiscard) }
+                    val root = KaraokeWorker.root(getApplication())
+                    root.listFiles()?.filter { it.isDirectory }?.forEach { directory ->
+                        val owned = runCatching { UUID.fromString(directory.name) }.getOrNull()
+                            ?: error("Folder proses tidak dikenal; data tidak dihapus.")
+                        require(owned.toString().equals(directory.name, true)) { "Nama folder proses tidak dikenal; data tidak dihapus." }
+                        discard(owned, onDiscard)
+                    }
                     clearState()
                 }
             } }; _message.value = "Pratinjau privat dibuang. Audio asli dan hasil di Koleksi tetap tersedia." }
@@ -289,7 +295,29 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
             finally { _busy.value = false }
         }
     }
-    fun save(expectedId: UUID? = id.value) {
+    fun compare(player: PlayerViewModel, instrumental: Boolean) {
+        val current = currentInfo()?.takeIf { it.state == WorkInfo.State.SUCCEEDED } ?: return
+        val source = _source.value ?: return
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { requests.withLock { KaraokeWorker.lock.withLock {
+                    require(id.value == current.id)
+                    KaraokeResult.verify(KaraokeWorker.directory(getApplication(), current.id.toString()), source.uri, current.outputData.getBoolean("sample", false))
+                } } }
+                if (id.value == current.id) {
+                    val uri = android.net.Uri.fromFile(result).toString()
+                    val track = if (instrumental) source.copy(uri = uri, title = source.title + if (current.outputData.getBoolean("sample", false)) " (Karaoke cuplikan)" else " (Karaoke)",
+                        lyricUri = if (current.outputData.getBoolean("sample", false)) null else source.lyricUri) else source
+                    player.compare(track, source.uri, uri, current.outputData.getLong("startMs", 0), current.outputData.getLong("durationMs", 0))
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { _message.value = failure.message ?: "Perbandingan belum dapat diputar." }
+            finally { _busy.value = false }
+        }
+    }
+    fun save(expectedId: UUID? = id.value, format: KaraokeOutput = KaraokeOutput.FLAC) {
         val current = currentInfo()?.takeIf { it.state == WorkInfo.State.SUCCEEDED && it.id == expectedId } ?: return
         val track = _source.value ?: return
         if (_busy.value) return
@@ -299,7 +327,7 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
                 val (uri, lyrics) = withContext(Dispatchers.IO) { requests.withLock {
                     require(id.value == current.id)
                     KaraokePublication(getApplication()).publish(current.id.toString(), current.outputData.getString("name").orEmpty(),
-                        if (current.outputData.getBoolean("sample", false)) track.copy(lyricUri = null) else track, current.outputData.getBoolean("sample", false))
+                        if (current.outputData.getBoolean("sample", false)) track.copy(lyricUri = null) else track, current.outputData.getBoolean("sample", false), format)
                 } }
                 if (id.value == current.id) {
                     _saved.value = uri
@@ -310,5 +338,5 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
             finally { _busy.value = false }
         }
     }
-    companion object { private val requests = Mutex() }
+    companion object { internal val requests = Mutex() }
 }

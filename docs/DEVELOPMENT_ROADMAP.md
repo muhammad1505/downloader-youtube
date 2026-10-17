@@ -151,3 +151,22 @@ Implementasi tersedia;296Kotlin/84Python/build/audit lulus. Bukti HP dan batas
 setiap tahap ada pada [laporan1.1.15](IMPROVEMENTS_1_1_15.md). Catatan lama
 melindungi PAUSED tetap berlaku pada cleanup otomatis; konfirmasi cleanup manual
 baru secara eksplisit mengizinkan membuang parsial idle dan memulai retry dari nol.
+
+## Enam fitur media — 17 Oktober 2026, kandidat1.1.17
+
+Diminta pengelola: A/B karaoke pada posisi selaras, pengelola model/temporary,
+format hasil FLAC/MP3/AAC, Favorit/playlist pribadi, sleep timer, dan cadangan
+pengaturan/playlist/metadata/lirik. Implementasi dan keputusan di
+[MEDIA_FEATURES_1_1_17.md](MEDIA_FEATURES_1_1_17.md); status build/perangkat harus
+mengikuti hasil aktual di laporan tersebut, bukan checklist rencana lama.
+Room10 menambah dua tabel referensi tanpa reset data; tidak menambah engine
+pemutar, model atau server. Cloud karaoke gratis tetap riset terpisah.
+
+
+### Checkpoint UI dan diagnostik 1.1.18 — 18 Oktober 2026
+
+Komponen visual bersama, peluncuran video, kepemilikan inspeksi, cache/identitas
+lirik, HTTP aktual, font besar dan dialog timer diperbaiki. Release dipasang dan
+retest terfokus lulus;339Kotlin/90Python. Backlog tetap: keselarasan lirik per rekaman,
+verifikasi A/B akhir/fault storage, TalkBack/font2×/tablet dan perangkat16KB.
+[Laporan dan batas cakupan](REPAIR_2026-10-18.md).

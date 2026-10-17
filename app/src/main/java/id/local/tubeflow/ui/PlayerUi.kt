@@ -50,17 +50,17 @@ import id.local.tubeflow.core.PlaybackQueue
 import id.local.tubeflow.core.PlaybackQueueSearch
 import id.local.tubeflow.core.PlayerEqualizer
 import id.local.tubeflow.core.PlayerViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 @Composable
 fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: () -> Unit) {
     val track=state.track ?: return
-    // Sengaja memakai bahasa visual kartu lagu di Koleksi (radius medium, tepi tipis, latar bernuansa
+    // Sengaja memakai bahasa visual kartu lagu di Koleksi (radius medium, latar datar bernuansa
     // aksen sampul) supaya mini player terbaca sebagai bagian dari daftar, bukan panel terpisah.
     val accent=rememberCoverAccent(track.cover)
     Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)) {
-        Card(colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=0.10f).compositeOver(MaterialTheme.colorScheme.surface)),
-            border=BorderStroke(1.dp,accent.copy(alpha=0.22f))) {
+        Card(colors=mediaCardColors(accent)) {
             Column {
                 Row(Modifier.fillMaxWidth().padding(start=10.dp,end=2.dp,top=6.dp,bottom=6.dp), verticalAlignment=Alignment.CenterVertically) {
                     Row(Modifier.weight(1f).clickable(onClickLabel="Buka pemutar",onClick=expand).padding(end=6.dp), verticalAlignment=Alignment.CenterVertically) {
@@ -91,6 +91,7 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
 @Composable
 fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: MediaLibraryViewModel, karaoke: () -> Unit, dismiss: () -> Unit) {
     val track=state.track ?: return
+    val timer by player.sleep.collectAsStateWithLifecycle()
     val accent=MaterialTheme.colorScheme.primary
     // Aksen diambil dari sampul lagu: latar pemutar dan lirik ikut bernuansa sampul, bukan hitam polos.
     val coverAccent=rememberCoverAccent(track.cover)
@@ -101,6 +102,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     var queueOpen by remember { mutableStateOf(false) }
     var equalizerOpen by remember { mutableStateOf(false) }
     var speedOpen by remember { mutableStateOf(false) }
+    var sleepOpen by remember { mutableStateOf(false) }
     var timing by remember { mutableStateOf<MediaItem?>(null) }
     var lyricToolError by remember { mutableStateOf<String?>(null) }
     val pager=rememberPagerState(pageCount={ 2 })
@@ -149,6 +151,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                             }
                         }
                     }
+                    IconButton(onClick={ sleepOpen=true }) { Icon(Icons.Outlined.Bedtime, stringResource(id.local.tubeflow.R.string.sleep_title)) }
                     IconButton(onClick={ equalizerOpen=true }) { Icon(Icons.Outlined.Tune,"Equalizer") }
                 }
                 // Halaman utama dapat digeser: sampul ↔ lirik, tanpa harus mencari tombol.
@@ -186,9 +189,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                             }
                         }
                     } else {
-                        Box(Modifier.fillMaxSize().padding(16.dp),contentAlignment=Alignment.Center) {
+                        Box(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
                             CoverThumb(track.cover,"",MediaMode.AUDIO,
-                                Modifier.widthIn(max=340.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
+                                Modifier.widthIn(max=380.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
                         }
                     }
                 }
@@ -201,22 +204,28 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                 if (state.queueTracks.size>1) Text(
                     "Lagu ${state.queueIndex+1} dari ${state.queueTracks.size}" + (if (state.shuffle) " · acak" else "") + (if (state.repeat!=PlaybackQueue.Repeat.OFF) " · ulangi ${repeatLabel(state.repeat)}" else ""),
                     style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                if (timer.remainingMs > 0 || timer.afterTrack) Text(
+                    if (timer.afterTrack) stringResource(id.local.tubeflow.R.string.sleep_after_track) else stringResource(id.local.tubeflow.R.string.sleep_remaining, duration(timer.remainingMs)),
+                    modifier = Modifier.clickable { sleepOpen = true }.padding(vertical = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-                val seekColors=SliderDefaults.colors(thumbColor=accent,activeTrackColor=accent,inactiveTrackColor=accent.copy(alpha=0.18f))
+                // Bilah progres putih tipis di atas latar gelap — aksen hijau disimpan untuk tombol putar.
+                val seekTint=MaterialTheme.colorScheme.onBackground
+                val seekColors=SliderDefaults.colors(thumbColor=seekTint,activeTrackColor=seekTint,inactiveTrackColor=seekTint.copy(alpha=0.22f))
                 Slider(value=dragging ?: state.positionMs.toFloat().coerceIn(0f,state.durationMs.coerceAtLeast(1).toFloat()),
                     onValueChange={ dragging=it }, onValueChangeFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
                     modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),
                     valueRange=0f..state.durationMs.coerceAtLeast(1).toFloat(),enabled=!state.loading && state.durationMs>0,
                     colors=seekColors,
-                    thumb={ Box(Modifier.size(12.dp).background(accent,CircleShape)) },
+                    thumb={ Box(Modifier.size(12.dp).background(seekTint,CircleShape)) },
                     track={ sliderState -> SliderDefaults.Track(sliderState,modifier=Modifier.height(4.dp),
                         colors=seekColors,thumbTrackGapSize=0.dp,drawStopIndicator=null) })
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium); Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium) }
                 Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
                     IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }
                     IconButton(onClick=player::previous,enabled=!state.loading) { Icon(Icons.Outlined.SkipPrevious,"Lagu sebelumnya") }
-                    FilledIconButton(onClick=player::toggle,modifier=Modifier.size(64.dp),enabled=!state.loading) {
-                        Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",Modifier.size(32.dp))
+                    FilledIconButton(onClick=player::toggle,modifier=Modifier.size(72.dp),enabled=!state.loading,
+                        colors=IconButtonDefaults.filledIconButtonColors(containerColor=accent,contentColor=AccentContrast.ink(accent))) {
+                        Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",Modifier.size(34.dp))
                     }
                     IconButton(onClick=player::next,enabled=!state.loading && state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
                     IconButton(onClick={ player.skip(10000) },enabled=!state.loading) { Icon(Icons.Outlined.Forward10,"Maju 10 detik") }
@@ -254,6 +263,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     }
                 }
             }
+            if (sleepOpen) SleepTimerDialog(player) { sleepOpen=false }
             if (queueOpen) QueueDialog(state,player) { queueOpen=false }
             if (equalizerOpen) EqualizerDialog(player) { equalizerOpen=false }
             // Dialog lirik dihost DI DALAM jendela pemutar agar tampil di atas pemutar penuh.

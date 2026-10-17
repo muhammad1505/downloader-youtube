@@ -2,6 +2,7 @@ package id.local.tubeflow.core
 
 import android.app.Application
 import android.content.Intent
+import androidx.room.withTransaction
 import androidx.lifecycle.AndroidViewModel
 import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
@@ -21,11 +22,41 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = database.media()
     val repository = MediaRepository(app)
     val lyricEditor = LyricEditor(app)
-    data class Filter(val kind: String = "", val query: String = "", val sort: String = "recent", val folder: String = "", val artist: String = "", val album: String = "", val limit: Int = 100)
+    data class Filter(val kind: String = "", val query: String = "", val sort: String = "recent", val folder: String = "", val artist: String = "", val album: String = "", val limit: Int = 100, val playlistId: String = "")
     private val filter = MutableStateFlow(Filter())
     val selectedFilter = filter.asStateFlow()
-    val items = filter.debounce(180).flatMapLatest { f -> dao.page(f.kind, f.folder, f.artist, f.album, SmartMedia.search(f.query), f.sort, f.limit) }
+    val items = filter.debounce(180).flatMapLatest { f -> dao.page(f.kind, f.folder, f.artist, f.album, SmartMedia.search(f.query), f.sort, f.limit, f.playlistId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val playlists = database.personal().observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val favorites = database.personal().references(PersonalLibrary.FAVORITES).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    fun createPlaylist(name: String) = operation {
+        require(database.personal().all().count { it.id != PersonalLibrary.FAVORITES } < 200) { "Maksimum 200 playlist." }
+        database.personal().insert(PersonalLibrary.create(name)); "Playlist dibuat."
+    }
+    fun renamePlaylist(id: String, name: String) = operation {
+        require(id != PersonalLibrary.FAVORITES)
+        database.personal().rename(id, PersonalLibrary.name(name)); "Nama playlist diperbarui."
+    }
+    fun deletePlaylist(id: String) = operation {
+        require(id != PersonalLibrary.FAVORITES)
+        database.personal().delete(id)
+        withContext(Dispatchers.Main) { if (filter.value.playlistId == id) filter.value = Filter(kind = "AUDIO") }
+        "Playlist dihapus. File lagu tetap tersedia."
+    }
+    fun addToPlaylist(item: MediaItem, id: String) = operation {
+        database.withTransaction {
+            require(dao.get(item.uri)?.kind == "AUDIO") { "Pilih lagu yang masih ada di Koleksi." }
+            if (id == PersonalLibrary.FAVORITES) database.personal().insert(PersonalPlaylist(id, "Favorit", 0))
+            if (!database.personal().contains(id, item.uri)) {
+                require(database.personal().count(id) < 3000) { "Maksimum 3000 lagu per playlist." }
+                database.personal().add(PlaylistMember(id, item.uri, database.personal().nextPosition(id)))
+            }
+        }
+        "Lagu ditambahkan."
+    }
+    fun removeFromPlaylist(item: MediaItem, id: String) = operation {
+        database.personal().remove(id, item.uri); "Lagu dikeluarkan dari daftar. File tetap tersedia."
+    }
     val totals = dao.totals().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val folders = dao.folders().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val artists = dao.artists().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -47,7 +78,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "covers"), 32L * 1024 * 1024)
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "library-covers"), 24L * 1024 * 1024)
-            MediaFileOperations.mutex.withLock { runCatching { LyricPublisher(app).recover() } }
+            MediaFileOperations.mutex.withLock { runCatching { LyricPublisher(app).recover(); MediaBackup(app).recoverLocked() } }
             repository.validateRecent(force=true)
             database.downloads().observe().map { list -> list.filter { it.state == JobState.COMPLETED && it.autoLibrary }.map { it.id to it.outputUri } }.distinctUntilChanged().collect { jobs ->
                 for ((id, _) in jobs.take(200)) runCatching { repository.indexDownload(id) }
@@ -78,6 +109,23 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                 } while (availabilityRequested)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia." }
+        }
+    }
+    private var playbackRequest: Job? = null
+    /** Explicit playback loads the selected list, not just its first visible page. No bitmaps are loaded. */
+    fun playSelection(player: PlayerViewModel, startUri: String? = null, shuffle: Boolean? = null) {
+        val captured = filter.value
+        playbackRequest?.cancel()
+        playbackRequest = viewModelScope.launch {
+            try {
+                val selected = withContext(Dispatchers.IO) { dao.page(captured.kind, captured.folder, captured.artist,
+                    captured.album, SmartMedia.search(captured.query), captured.sort, 3000, captured.playlistId).first() }
+                if (filter.value.copy(limit = captured.limit) != captured) return@launch
+                val start = startUri?.let { uri -> selected.indexOfFirst { it.uri == uri } } ?: 0
+                if (selected.isEmpty() || start < 0) { _message.value = "Lagu tidak lagi cocok dengan daftar. Pilih ulang."; return@launch }
+                player.playAll(selected, start, shuffle)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _message.value = "Daftar belum dapat diputar. Periksa akses file lalu coba lagi." }
         }
     }
     fun filter(value: Filter) { filter.value = value.copy(limit = 100) }
@@ -175,7 +223,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     data class LyricsState(val item: MediaItem, val title: String, val artist: String,
         val choices: List<Lyrics.Choice> = emptyList(), val loading: Boolean = false,
         val saving: Boolean = false, val searched: Boolean = false, val error: String? = null,
-        val canExpand: Boolean = false, val failureStatus: String? = null) {
+        val canExpand: Boolean = false, val failureStatus: String? = null, val httpCode: Int? = null) {
         val query get() = LyricMatch.Query(TitleSplit.identify(item.title,metadataArtist=item.artist,recognizeCollaboration=false).lyricTitle,item.artist,(item.durationMs ?: 0)/1000)
     }
     private val _lyrics=MutableStateFlow<LyricsState?>(null)
@@ -223,7 +271,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         val previous=_lyrics.value ?: return
         if (previous.loading || previous.saving) return
         val session=++lyricsSession
-        _lyrics.value=previous.copy(title=title.trim(),artist=artist.trim(),loading=true,choices=emptyList(),error=null,searched=false,canExpand=false,failureStatus=null)
+        _lyrics.value=previous.copy(title=title.trim(),artist=artist.trim(),loading=true,choices=emptyList(),error=null,searched=false,canExpand=false,failureStatus=null,httpCode=null)
         lyricsRequest=viewModelScope.launch {
             try {
                 val captured=withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
@@ -241,7 +289,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                 if (session != lyricsSession) return@launch
                 expectedLyrics=captured.second; expectedJob=captured.third
                 _lyrics.value=_lyrics.value?.copy(item=captured.first,choices=result.choices,loading=false,searched=true,
-                    error=result.failureStatus?.let(LyricStatus::label),canExpand=result.canExpand,failureStatus=result.failureStatus)
+                    error=result.failureStatus?.let(LyricStatus::label),canExpand=result.canExpand,failureStatus=result.failureStatus,httpCode=result.httpCode)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(loading=false,error=failure.message ?: "Pencarian gagal.") }
         }

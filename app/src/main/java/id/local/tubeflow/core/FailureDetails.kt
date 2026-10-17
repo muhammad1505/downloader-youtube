@@ -36,17 +36,17 @@ data class FailureDetails(val category: String, val phase: String, val message: 
         fun isLyricFailure(status: String) = status in setOf(LyricStatus.NETWORK, LyricStatus.RATE_LIMIT,
             LyricStatus.SERVICE, LyricStatus.INVALID_RESPONSE, LyricStatus.SAVE_FAILED)
 
-        fun lyrics(status: String, app: String = "Tidak tercatat", engine: String = "Tidak tercatat", at: Long? = null): FailureDetails {
+        fun lyrics(status: String, app: String = "Tidak tercatat", engine: String = "Tidak tercatat", at: Long? = null, httpCode: Int? = null): FailureDetails {
             val category = when (status) {
                 LyricStatus.NETWORK -> "network"
                 LyricStatus.RATE_LIMIT -> "rate_limit"
-                LyricStatus.SERVICE -> "provider"
+                LyricStatus.SERVICE -> if (httpCode == 401 || httpCode == 403) "access" else "provider"
                 LyricStatus.INVALID_RESPONSE -> "invalid_response"
                 LyricStatus.SAVE_FAILED -> "lyrics_save"
                 else -> "lyrics_status"
             }
             // RATE_LIMIT may be local cooldown, not a fresh HTTP429. Never invent a response code.
-            return FailureDetails(category,"LYRICS","LRCLIB: ${LyricStatus.label(status)}",app,engine,at,status=status)
+            return FailureDetails(category,"LYRICS","LRCLIB: ${LyricStatus.label(status)}",app,engine,at,http=httpCode?.takeIf { it in 100..599 },status=status)
         }
 
         fun safe(raw: String): String {
@@ -93,8 +93,8 @@ class FailureDetailsStore(private val context: Context) {
     fun capture(error: Exception, phase: String): FailureDetails = FailureDetails.capture(
         "${error.javaClass.simpleName}: ${error.message.orEmpty()}", phase,
         "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engineVersion(), System.currentTimeMillis())
-    fun captureLyrics(status: String): FailureDetails = FailureDetails.lyrics(status,
-        "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engineVersion(), System.currentTimeMillis())
+    fun captureLyrics(status: String, httpCode: Int? = null): FailureDetails = FailureDetails.lyrics(status,
+        "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", engineVersion(), System.currentTimeMillis(),httpCode)
     fun put(id: String, generation: Int, details: FailureDetails) = synchronized(lock) {
         directory.mkdirs()
         val target = file(id,generation); val stream = target.startWrite()

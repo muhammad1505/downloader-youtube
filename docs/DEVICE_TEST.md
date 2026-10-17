@@ -488,3 +488,39 @@ privat mempertahankan FLAC publik tersimpan, hapus hanya QA lewat Koleksi,
 queue1/seek143381ms terjaga, restart tanpa status karaoke lama.63file baseline
 identik. Source model/inference tidak diubah dan kualitas vokal tidak diklaim
 meningkat. [Semua artefak, langkah, bukti dan batas](KARAOKE_LOGIC_1_1_16.md).
+
+## Refresh visual dan pasang release 1.1.17/code31, 17 Oktober 2026
+
+Signed release ARM64 SHA256
+`ce45874515de4d78f7bac5acbf53ff6bb7194f15f3e6686f1034d9f71d8e2dab`
+terpasang update-r (tanpa uninstall/reset) dan hash base.apk cocok pada Realme
+Android 10/API 29/arm64/4KB page. Kunci sama dengan rilis sebelumnya (CN=TubeFlow
+Release). Python 90/Kotlin 326 (termasuk regresi kontras ThemeContrastTest)
+0 gagal; build release signed APK×3+AAB 20m21s, lint 0 error/2 warning lama.
+Audit native 257 ELF, refleksi ZIP 13 kelas, apksigner, zipalign 16KB lulus.
+Cakupan perangkat baru sebatas smoke launch tanpa crash; matriks screenshot
+(terang/gelap, font 1,3x/2,0x, sempit, kosong/galat) dan uji fungsional UI
+belum dijalankan — lihat [PROGRESS](PROGRESS.md) dan ui-design-system.
+
+
+## Konsistensi menu dan perbaikan 1.1.18/code32 — 18 Oktober 2026
+
+Release ARM64 non-debuggable terpasang update-r di Realme RMX1821 Android10/API29,
+RAM4GB/4KiB. SHA256 `489b0349e2c1c01bb43ea0ed91353c2894b51bdf1c0f43eb3adc83c959581795` cocok dengan base.apk dari HP. Tidak uninstall/reset.
+339 Kotlin/90 Python lulus; build final9m45s, lint debug/release0error/2warning lama.
+Audit APK×3 signature/native/zipalign/refleksiZIP/engine serta AAB jarsigner/native lulus.
+
+Kandidat:24 screenshot enam menu×terang/gelap×font1,35/1,6 pada360dp; pencarian
+manual SATRU memberi20pilihan; timer1menit di Home berhenti otomatis; storage252,8MB
+terbaca tanpa SAF. Final:enam menu font1,35× ditest ulang, navigasi tak terpotong;
+clear inspeksi gagal dan busy tidak meninggalkan hasil/detail lama; video MP4 QA
+terbuka tanpa pesan palsu; dialog timer landscape bergulir dan mode selesai lagu
+mendahului shuffle/repeat. Hanya video QA berhash tercatat dihapus lewat aplikasi.
+Tepat62path+hash awal identik; riwayat77/koleksi51audio0video. Player paused20142ms,
+font0,9/density272/tema Ikut sistem/portrait dipulihkan. Helper QA remote dibuang.
+Log PID akhir tidak memuat FATAL/ANR; ini bukan pembuktian seluruh stabilitas.
+
+Batas:font2× tidak tersedia dari UI ColorOS (maks1,6), TalkBack/keyboard eksternal,
+tablet/Android12+ dynamic color, runtime16KB, semua error/storage fault dan alignment
+A/B akhir belum diuji. Tidak mengklaim semua timestamp LRCLIB sinkron.
+[Laporan lengkap, hash semua ABI/AAB dan checkpoint kandidat/final](REPAIR_2026-10-18.md).

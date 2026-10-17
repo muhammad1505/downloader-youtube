@@ -120,7 +120,7 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
             File(directory, "result.json").writeText(manifest.toString())
             currentCoroutineContext().ensureActive()
             complete = true
-            Result.success(resultData("path" to result.path, "name" to name, "durationMs" to actual, "sample" to sample, "startMs" to startMs))
+            Result.success(resultData("path" to result.path, "name" to name, "resultBytes" to result.length(), "durationMs" to actual, "sample" to sample, "startMs" to startMs))
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { Result.failure(resultData("error" to (failure.message ?: "Pemrosesan karaoke gagal.").take(500))) }
         catch (_: LinkageError) { Result.failure(resultData("error" to "Runtime karaoke tidak dapat dimuat pada perangkat ini.")) }

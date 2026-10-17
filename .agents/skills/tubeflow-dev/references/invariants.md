@@ -56,6 +56,8 @@ Root Kotlin: `app/src/main/java/id/local/tubeflow/`.
 - Kompresi sampul saat ini JPEG dengan sisi maksimum 800 px dan rasio aspek tetap. Jaga payload audio; uji perubahan sampul dengan ukuran/dimensi dan metadata/paket audio, bukan screenshot saja.
 - Dua salinan bootstrap harus sama; perubahan pada `scripts/engine_bootstrap.py` ikut diperbarui pada asset Android dan diuji host.
 
+- Inspeksi link memakai `InspectionState` sebagai sumber status dan pemilik token. Mengganti/mengosongkan input membatalkan pemilik sebelum menghentikan engine; callback/error/finally lama tidak boleh mengubah sesi baru. Cache metadata video selesai boleh dipakai enqueue hanya bila URL cocok. Membersihkan input juga membersihkan detail galat dan dialog milik input lama.
+
 ## Lirik
 
 Audio memakai LRCLIB dalam implementasi saat ini; caption/subtitle YouTube untuk mode video. Jangan menyebut LRCLIB sebagai Musixmatch atau penyedia berlisensi tanpa integrasi/bukti. Jika sumber diganti, tinjau kontrak API, atribusi dan privasi yang berlaku.
@@ -129,3 +131,11 @@ cooldown lokal: jangan mengarang HTTP429 baru. Laporan lirik tidak mengubah suks
 media menjadi FAILED. Fetch otomatis mendahulukan searchPaths yang sama dengan
 manual; exact get hanya fallback. Pertahankan gerbang identitas/versi/durasi±2detik,
 cache positif dan kepatuhan Retry-After; jangan menembus cooldown untuk mengisi statistik.
+
+## Media pribadi, perbandingan dan cadangan (1.1.17)
+
+- Favorit/playlist adalah referensi pada Room yang sama, bukan salinan media. Jangan membuat FK ke `media_items` tanpa mengubah REPLACE pemindaian: REPLACE bisa menghapus keanggotaan. Relink URI SAF dan hapus katalog+referensi dalam satu transaksi. Kapasitas memakai jumlah anggota saat ini, bukan MAX(position). Pemutaran eksplisit mengambil seluruh filter hingga3000 referensi, sementara tampilan tetap berpaginasi.
+- A/B karaoke memakai engine player yang sama dan memetakan posisi absolut sumber ke posisi lokal cuplikan. Snapshot antrean publik dipertahankan; checkpoint privat/perbandingan tidak mengganti sesi publik. Jeda eksplisit harus menang atas callback completion yang sudah terantre. Finish perbandingan tidak boleh membatalkan jeda/timer. Koneksi headset keluar dari konteks cuplikan sebelum merencanakan antrean publik.
+- Timer durasi memakai elapsedRealtime, bukan jam kalender; deadline tetap berjalan saat jeda. Countdown meredupkan gain MediaPlayer, bukan volume sistem. Mode selesai lagu diputus sebelum repeat/next. Timer tidak dipulihkan setelah proses mati; sesi tetap dipulihkan paused.
+- Format simpan karaoke hanya mengonversi hasil turunan privat atas pilihan pengguna. MIME, ekstensi, estimasi dan dialog konfirmasi harus menyebut format yang sama. Cuplikan tidak menerima LRC lagu penuh. Publikasi/hash/read-back/jurnal dan lease worker tetap dipakai bersama.
+- Cadangan bukan database/file media/grant/keystore. Jangan menerima URI/path operasi dari dokumen impor. Cocokkan identitas file aktual secara unik; fingerprint awal+akhir bukan hash seluruh media. Pertahankan validasi ukuran/kedalaman/checksum dan pemilihan pemulihan. Metadata katalog tidak sama dengan penulisan tag file. LRC memakai LyricPublisher/CAS/jurnal yang sama, baseline dan offset dipulihkan lewat intent privat perfile; recovery harus memverifikasi identitas sumber dan byte LRC sebelum mengaitkan ulang.

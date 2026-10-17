@@ -7,7 +7,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.compositeOver
 import id.local.tubeflow.core.songIdentity
 import androidx.compose.foundation.background
@@ -42,9 +41,31 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Bahasa kartu media (gaya pemutar musik modern): latar datar dengan nuansa aksen tipis dari sampul,
+ * tanpa garis tepi — dipakai kartu unduhan, kartu koleksi, dan mini player agar konsisten.
+ */
+@Composable
+fun mediaCardColors(accent: Color): CardColors = CardDefaults.cardColors(
+    containerColor = accent.copy(alpha = 0.07f).compositeOver(MaterialTheme.colorScheme.surfaceContainer),
+)
+
+object UiSpacing {
+    val screen = 16.dp
+    val panel = 16.dp
+    val item = 12.dp
+    val group = 24.dp
+}
+
+@Composable
+fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.medium, content = content)
+}
+
 @Composable
 fun PageHeading(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -52,21 +73,16 @@ fun PageHeading(title: String, subtitle: String) {
 
 @Composable
 fun EmptyState(icon: ImageVector, title: String, description: String) {
-    Card(Modifier.fillMaxWidth()) {
+    SectionCard(Modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                Modifier.size(72.dp).background(
-                    Brush.radialGradient(
-                        listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)),
-                    ),
-                    CircleShape,
-                ),
+                Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { Icon(icon, null, Modifier.size(34.dp), tint = MaterialTheme.colorScheme.primary) }
+            ) { Icon(icon, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 description,
@@ -80,13 +96,11 @@ fun EmptyState(icon: ImageVector, title: String, description: String) {
 
 @Composable
 fun StatPill(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
-    Card(modifier) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(34.dp).background(tint.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(18.dp), tint = tint) }
-            Column {
-                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+    SectionCard(modifier) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, Modifier.size(20.dp), tint = tint)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -166,7 +180,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
     var openError by remember { mutableStateOf<String?>(null) }
     val accent=rememberCoverAccent(job.coverPath)
     val song=job.songIdentity()
-    Card(modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=0.06f).compositeOver(MaterialTheme.colorScheme.surface)), border=BorderStroke(1.dp,accent.copy(alpha=0.18f))) {
+    Card(modifier.fillMaxWidth(), colors=mediaCardColors(accent)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(56.dp))
@@ -273,7 +287,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
             }
             openError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 when (job.state) {
                     JobState.QUEUED, JobState.RUNNING -> {
                         pause?.let { onClick -> TextButton(onClick = onClick) { Icon(Icons.Outlined.Pause, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Jeda") } }
@@ -298,7 +312,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
             }
             if (job.state == JobState.COMPLETED && !job.sidecarUris.isNullOrBlank()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     job.sidecarUris.lines().forEach { line ->
                         val kind = line.substringBefore('|')
                         val uri = line.substringAfter('|', "")
@@ -365,7 +379,12 @@ fun concreteMime(context: Context, uri: Uri, fallback: String): String {
 }
 
 fun launchFile(context: Context, job: DownloadJob, share: Boolean): String? =
-    job.outputUri?.let { launchMedia(context, it, job.mode == MediaMode.AUDIO, share) } ?: "File tidak tersedia."
+    launchFile(job, share) { raw, audio, sharing -> launchMedia(context, raw, audio, sharing) }
+
+internal fun launchFile(job: DownloadJob, share: Boolean, launch: (String, Boolean, Boolean) -> String?): String? {
+    val uri = job.outputUri?.takeIf { it.isNotBlank() } ?: return "File tidak tersedia."
+    return launch(uri, job.mode == MediaMode.AUDIO, share)
+}
 
 fun launchMedia(context: Context, raw: String, audio: Boolean, share: Boolean): String? = try {
     val uri = raw.toUri()

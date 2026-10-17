@@ -83,6 +83,73 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Antrean putar hanya disentuh pada handler thread yang sama dengan MediaPlayer.
     private var queue: PlaybackQueue<Track>? = null
     val equalizer = PlayerEqualizer(application)
+    private val sleeper = SleepTimer()
+    data class SleepState(val remainingMs: Long = 0, val afterTrack: Boolean = false)
+    private val _sleep = MutableStateFlow(SleepState())
+    val sleep = _sleep.asStateFlow()
+    private val sleepTick = object : Runnable {
+        override fun run() {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (sleeper.due(now)) {
+                sleeper.clear(); _sleep.value = SleepState(); pauseInternal(true)
+                if (prepared) runCatching { media?.setVolume(1f, 1f) }
+                return
+            }
+            _sleep.value = SleepState(sleeper.remaining(now), sleeper.afterTrack)
+            if (prepared) runCatching { val gain = sleeper.gain(now); media?.setVolume(gain, gain) }
+            if (sleeper.deadlineMs > 0) handler.postDelayed(this, 250)
+        }
+    }
+    private fun stopAtTrackBoundary(): Boolean {
+        if (!sleeper.finishTrack()) return false
+        _sleep.value = SleepState(); pauseInternal(true)
+        return true
+    }
+    fun setSleepTimer(minutes: Int?, afterTrack: Boolean = false) = handler.post {
+        handler.removeCallbacks(sleepTick)
+        when {
+            afterTrack -> sleeper.endOfTrack()
+            minutes != null -> sleeper.minutes(minutes, android.os.SystemClock.elapsedRealtime())
+            else -> sleeper.clear()
+        }
+        sleepTick.run()
+    }
+    private data class ComparisonSession(val source: String, val instrumental: String, val startMs: Long, val durationMs: Long,
+        val previous: PlaybackQueue<Track>?, val positionMs: Long, val playing: Boolean)
+    private var comparison: ComparisonSession? = null
+    private val _comparing = MutableStateFlow(false)
+    val comparing = _comparing.asStateFlow()
+    /** The same engine reloads at an aligned position; the original queue snapshot is retained. */
+    fun compare(track: Track, sourceUri: String, instrumentalUri: String, startMs: Long, durationMs: Long) = handler.post {
+        val current = _state.value
+        val first = comparison?.instrumental != instrumentalUri
+        if (first) {
+            finishComparisonInternal()
+            val previous = _state.value
+            comparison = ComparisonSession(sourceUri, instrumentalUri, startMs, durationMs, queue, previous.positionMs, previous.playing)
+        }
+        _comparing.value = true
+        val fromInstrumental = current.track?.uri == instrumentalUri
+        val position = if (current.track?.uri in setOf(sourceUri, instrumentalUri)) current.positionMs else startMs
+        val target = KaraokeComparison.target(position, fromInstrumental, track.uri == instrumentalUri, startMs, durationMs)
+        load(PlaybackQueue(listOf(track)), playWhenReady = first || current.playing, startPositionMs = target)
+    }
+    fun finishComparison() = handler.post { finishComparisonInternal() }
+    /** Cleanup can release the preview even when the original side of A/B is currently playing. */
+    fun discardComparison(uri: String) = handler.post {
+        if (comparison?.instrumental == uri) finishComparisonInternal()
+        else if (_state.value.track?.uri == uri) stop()
+    }
+    private fun finishComparisonInternal() {
+        val saved = comparison ?: return
+        val current = _state.value
+        comparison = null; _comparing.value = false
+        val sourcePosition = if (current.track?.uri == saved.instrumental) current.positionMs + saved.startMs else current.positionMs
+        val previous = saved.previous
+        if (previous != null) load(previous, playWhenReady = saved.playing && current.playing,
+            startPositionMs = if (previous.current.uri == saved.source) sourcePosition else saved.positionMs)
+        else { token.incrementAndGet(); _state.value = State(); queue = null; release() }
+    }
     private val sessionStore = PlayerSessionStore(application)
     private var lastCheckpoint = 0L
     private val initialOutputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.id }.toMutableSet()
@@ -149,9 +216,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         withContext(engineDispatcher) {
             val current = _state.value
             if (current.playing || current.loading) return@withContext
-            val last = current.track ?: lastTrack()
+            // A fresh headset connection returns to public playback, never a looping private preview.
+            val preview = comparison
+            val last = if (preview != null) collection.firstOrNull { it.uri == preview.source }
+                ?: preview.previous?.current ?: lastTrack() else current.track ?: lastTrack()
+            comparison = null; _comparing.value = false
             val planned = AutoPlayQueue.plan(collection, last?.uri) { it.uri }
             when {
+                planned == null && preview != null -> if (last != null) {
+                    load(PlaybackQueue(listOf(last)).withPreferences(shufflePref, repeatPref))
+                } else stop()
                 planned == null -> if (current.track != null && prepared) {
                     autoplay = true; start(token.get())
                 } else last?.let { load(PlaybackQueue(listOf(it)).withPreferences(shufflePref, repeatPref)) }
@@ -162,7 +236,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     autoplay = true
                     start(token.get())
                 }
-                else -> load(PlaybackQueue(planned.first, planned.second).withPreferences(shufflePref, repeatPref))
+                else -> load(PlaybackQueue(planned.first, planned.second).withPreferences(shufflePref, repeatPref),
+                    startPositionMs = if (preview != null && current.track?.uri == preview.instrumental && last?.uri == preview.source)
+                        KaraokeComparison.target(current.positionMs, true, false, preview.startMs, preview.durationMs) else 0)
             }
         }
     }
@@ -195,7 +271,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
     private fun checkpoint(force: Boolean = false) {
-        if (engineToken != token.get() || _state.value.track == null) return
+        if (engineToken != token.get() || _state.value.track == null || _state.value.track?.uri?.startsWith("file:") == true || comparison != null) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (!force && now - lastCheckpoint < 5000) return
         val planned = queue ?: return
@@ -204,6 +280,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     /** Lagu terakhir dipersist agar auto-play headset tetap punya sumber setelah pemutar kosong. */
     private fun rememberLast(track: Track) {
+        if (track.uri.startsWith("file:") || comparison != null) return
         getApplication<Application>().getSharedPreferences("player-last", 0).edit {
             putBoolean("session_active", true)
             putString("uri", track.uri).putString("title", track.title).putString("artist", track.artist)
@@ -245,7 +322,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun run() {
             val current = media
             if (current != null && prepared && engineToken == token.get()) try {
-                updateEngine { it.copy(positionMs=current.currentPosition.toLong(), playing=current.isPlaying) }; checkpoint()
+                val position = current.currentPosition.toLong()
+                val preview = comparison
+                if (preview != null && _state.value.track?.uri == preview.source && position >= preview.startMs + preview.durationMs) {
+                    if (!stopAtTrackBoundary()) current.seekTo(preview.startMs, MediaPlayer.SEEK_CLOSEST)
+                }
+                updateEngine { it.copy(positionMs = position, playing = current.isPlaying) }; checkpoint()
                 if (current.isPlaying) handler.postDelayed(this, 200)
             } catch (_: IllegalStateException) { fail("Pemutaran terhenti. Coba putar ulang.") }
         }
@@ -275,6 +357,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val index = start?.let { wanted -> tracks.indexOfFirst { it.uri == wanted.uri }.coerceAtLeast(0) } ?: 0
         if (shuffle == true) persistShuffle(true)
         handler.post {
+            comparison = null; _comparing.value = false
             load(PlaybackQueue(tracks, index).withPreferences(shuffle ?: shufflePref, repeatPref))
         }
     }
@@ -379,6 +462,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 current.setOnCompletionListener { completed ->
                     if (media !== completed || token.get() != id) return@setOnCompletionListener
+                    if (stopAtTrackBoundary()) {
+                        updateEngine { it.copy(positionMs = it.durationMs) }
+                        return@setOnCompletionListener
+                    }
+                    // Completion may already be queued when the user pauses a short preview.
+                    // Never let repeat/next override that explicit intent.
+                    if (!autoplay) { updateEngine { it.copy(playing = false) }; checkpoint(force = true); return@setOnCompletionListener }
+                    if (comparison != null) {
+                        completed.seekTo(if (_state.value.track?.uri == comparison?.source) comparison!!.startMs else 0, MediaPlayer.SEEK_CLOSEST)
+                        completed.start(); updateEngine { it.copy(playing = true) }
+                        handler.removeCallbacks(tick); handler.post(tick)
+                        return@setOnCompletionListener
+                    }
                     val advanced = queue?.onCompleted()
                     when {
                         // Repeat ONE memutar ulang lagu yang sama tanpa membuat engine baru.
@@ -519,6 +615,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (!prepared || engineToken != token.get()) return
             if (_state.value.durationMs > 0 && current.currentPosition.toLong() >= _state.value.durationMs) current.seekTo(0)
             runCatching { current.playbackParams = current.playbackParams.setSpeed(speed) }
+            val gain = sleeper.gain(android.os.SystemClock.elapsedRealtime()); current.setVolume(gain, gain)
             current.start(); autoplay=true; updateEngine { it.copy(playing=true, error=null) }
             handler.removeCallbacks(tick); handler.post(tick)
         } catch (_: IllegalStateException) { fail("Audio tidak dapat dilanjutkan. Coba putar ulang.") }
@@ -550,7 +647,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun skip(deltaMs: Long) = seek(_state.value.positionMs + deltaMs)
     fun stop() {
         getApplication<Application>().getSharedPreferences("player-last", 0).edit { putBoolean("session_active", false) }
-        token.incrementAndGet(); _state.value=State(); handler.post { queue=null; sessionStore.offer(null); equalizer.release(); release() }
+        token.incrementAndGet(); _state.value=State(); handler.post { comparison = null; _comparing.value = false; sleeper.clear(); handler.removeCallbacks(sleepTick); _sleep.value = SleepState(); queue=null; sessionStore.offer(null); equalizer.release(); release() }
     }
     private fun abandon() { focusSequence++; request?.let(manager::abandonAudioFocusRequest); request=null }
     private fun release() { handler.removeCallbacks(tick); cancelInterruption(); abandon(); prepared=false; autoplay=false; equalizer.release(); media?.release(); media=null }
@@ -563,6 +660,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         manager.unregisterAudioDeviceCallback(devices)
         manager.unregisterAudioPlaybackCallback(playbackActivity)
         PlaybackService.sync(getApplication<Application>(), State())
-        handler.post { release(); thread.quitSafely() }
+        handler.post { handler.removeCallbacks(sleepTick); release(); thread.quitSafely() }
     }
 }

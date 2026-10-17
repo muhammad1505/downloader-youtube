@@ -44,4 +44,12 @@ class FailureDetailsTest {
         assertTrue(legacy.text().contains("Waktu: Tidak tercatat"))
         assertTrue(FailureDetails.safe("x".repeat(5000)).length <= 2000)
     }
+    @Test fun lyricHttpEvidenceSurvivesPersistenceAndSeparatesAccessFromServerErrors() {
+        val denied=FailureDetails.lyrics(LyricStatus.SERVICE,httpCode=403)
+        assertEquals("access",denied.category)
+        assertEquals(403,denied.http)
+        assertEquals(denied,FailureDetails.fromJson(denied.json().toString()))
+        assertEquals("provider",FailureDetails.lyrics(LyricStatus.SERVICE,httpCode=503).category)
+        assertNull(FailureDetails.lyrics(LyricStatus.RATE_LIMIT).http)
+    }
 }

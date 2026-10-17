@@ -41,19 +41,31 @@ class KaraokePublication(private val context: Context) {
         else require(StorageUris.delete(context, raw)) { "File karaoke parsial belum dapat dibersihkan. Periksa izin folder." }
         journal.delete()
     }
-    suspend fun publish(workId: String, name: String, track: PlayerViewModel.Track, sample: Boolean = false): Pair<String, Boolean> = withContext(Dispatchers.IO) {
+    suspend fun publish(workId: String, name: String, track: PlayerViewModel.Track, sample: Boolean = false, format: KaraokeOutput = KaraokeOutput.FLAC): Pair<String, Boolean> = withContext(Dispatchers.IO) {
         KaraokeWorker.lock.withLock {
             recover()
             val directory = KaraokeWorker.directory(context, workId)
-            val result = KaraokeResult.verify(directory, track.uri, sample)
+            val originalResult = KaraokeResult.verify(directory, track.uri, sample)
             val previous = File(directory, "saved.json").takeIf { it.isFile }?.let { JSONObject(it.readText()).getString("uri") }
             if (previous != null && StorageUris.exists(context, previous.toUri())) {
                 val item = database.media().getByAccess(previous) ?: database.media().get(previous)
                 val lyricsPresent = track.lyricUri == null || item?.lyricUri?.let { StorageUris.exists(context, it.toUri()) } == true
                 return@withLock previous to lyricsPresent
             }
-            val proof = JSONObject(File(directory, "result.json").readText())
-            val requested = KaraokeNaming.fileName(track.title.ifBlank { name.substringBeforeLast('.') }, track.artist, sample)
+            val encoded = File(directory, "export.${format.extension}")
+            val result = if (format == KaraokeOutput.FLAC) originalResult else {
+                try {
+                    KaraokeEngine(context).ffmpeg(directory, format.arguments(originalResult.path, encoded.path))
+                    val reader = android.media.MediaMetadataRetriever()
+                    val actual = try { reader.setDataSource(encoded.path); reader.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() }
+                        finally { reader.release() }
+                    val expected = JSONObject(File(directory, "result.json").readText()).getLong("durationMs")
+                    require(encoded.length() > 0 && actual != null && kotlin.math.abs(actual - expected) <= 150) { "Verifikasi format karaoke gagal." }
+                    encoded
+                } catch (failure: Exception) { encoded.delete(); throw failure }
+            }
+            val expectedHash = KaraokeModel.digest(result)
+            val requested = KaraokeNaming.fileName(track.title.ifBlank { name.substringBeforeLast('.') }, track.artist, sample).substringBeforeLast('.') + "." + format.extension
             var pending: String? = null
             var indexed = false
             try {
@@ -63,9 +75,9 @@ class KaraokePublication(private val context: Context) {
                     val uri = if (tree != null) {
                         val selected = tree.toUri()
                         val parent = DocumentsContract.buildDocumentUriUsingTree(selected, DocumentsContract.getTreeDocumentId(selected))
-                        DocumentsContract.createDocument(resolver, parent, "audio/flac", requested)
+                        DocumentsContract.createDocument(resolver, parent, format.mime, requested)
                     } else resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, requested); put(MediaStore.MediaColumns.MIME_TYPE, "audio/flac")
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, requested); put(MediaStore.MediaColumns.MIME_TYPE, format.mime)
                         put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/${SettingsStore.storageFolder}/")
                         put(MediaStore.MediaColumns.IS_PENDING, 1)
                     })
@@ -77,7 +89,7 @@ class KaraokePublication(private val context: Context) {
                     } } ?: error("File karaoke tidak dapat ditulis.")
                     val hash = MessageDigest.getInstance("SHA-256")
                     resolver.openInputStream(uri)?.use { input -> val buffer = ByteArray(65536); while (true) { currentCoroutineContext().ensureActive(); val n = input.read(buffer); if (n < 0) break; hash.update(buffer, 0, n) } } ?: error("Hasil tidak dapat diverifikasi.")
-                    require(hash.digest().joinToString("") { "%02x".format(it.toInt() and 255) } == proof.getString("resultSha256")) { "Verifikasi hasil simpan karaoke gagal." }
+                    require(hash.digest().joinToString("") { "%02x".format(it.toInt() and 255) } == expectedHash) { "Verifikasi hasil simpan karaoke gagal." }
                     if (tree == null) require(resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null) > 0)
                 }
                 val raw = requireNotNull(pending)
@@ -110,6 +122,7 @@ class KaraokePublication(private val context: Context) {
                 }
                 raw to lyricCopied
             } finally {
+                encoded.delete(); File(directory, "ffmpeg.log").delete()
                 if (!indexed && pending != null) withContext(NonCancellable) {
                     if (StorageUris.delete(context, requireNotNull(pending))) journal.delete()
                 }

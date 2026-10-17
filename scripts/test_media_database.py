@@ -85,7 +85,7 @@ class MediaDatabaseTest(unittest.TestCase):
         self.media('one', title='100%_Song', sizeBytes=123, artist='Artist')
         self.media('two', title='100XXSong', sizeBytes=456, artist='Other')
         self.media('video', kind='VIDEO', title='100%_Song')
-        params = dict(kind='AUDIO', folder='', artist='', album='', search=r'%100\%\_Song%', sort='size', limit=100)
+        params = dict(playlistId='', kind='AUDIO', folder='', artist='', album='', search=r'%100\%\_Song%', sort='size', limit=100)
         self.assertEqual(['one'], [r['uri'] for r in self.db.execute(self.queries[0], params)])
         params.update(search='%', artist='Other', limit=1)
         self.assertEqual(['two'], [r['uri'] for r in self.db.execute(self.queries[0], params)])

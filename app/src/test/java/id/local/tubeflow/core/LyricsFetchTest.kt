@@ -5,6 +5,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import java.net.InetSocketAddress
@@ -430,6 +431,52 @@ class LyricsFetchTest {
     @Test fun actualConnectionFailureRetainsConnectivityStatus() {
         Lyrics.baseUrl="http://127.0.0.1:1"
         assertEquals(LyricStatus.NETWORK,fetchKnown("Song - Artist",200).status)
+    }
+
+    @Test fun actualHttpCodeIsRetainedButLocalCooldownDoesNotInventAResponse() {
+        val dir=java.nio.file.Files.createTempDirectory("lyrics-http-code").toFile()
+        try {
+            Lyrics.responseCache=LyricsResponseCache(dir)
+            respond={ 403 to "" }
+            assertEquals(403,fetchKnown("Song - Artist",200).httpCode)
+            assertEquals(403,Lyrics.search("Song","Artist").httpCode)
+            respond={ 429 to "" }
+            assertEquals(429,Lyrics.search("Other","Artist").httpCode)
+            assertNull(Lyrics.search("Another","Artist").httpCode)
+        } finally { Lyrics.responseCache=null; dir.deleteRecursively() }
+    }
+
+    @Test fun wrongResponseShapeIsInvalidAndDoesNotPoisonRetryCache() {
+        val dir=java.nio.file.Files.createTempDirectory("lyrics-wrong-shape").toFile()
+        try {
+            Lyrics.responseCache=LyricsResponseCache(dir)
+            respond={ 200 to "{\"message\":\"temporary upstream error\"}" }
+            assertEquals(LyricStatus.INVALID_RESPONSE,Lyrics.search("Song","Artist").failureStatus)
+            respond={ 200 to studioList().replace("{", "{\"id\":99,") }
+            assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+        } finally { Lyrics.responseCache=null; dir.deleteRecursively() }
+    }
+
+    @Test fun invalidOldCacheEntryIsReplacedWithoutClearingUsefulCachedSongs() {
+        val dir=java.nio.file.Files.createTempDirectory("lyrics-old-cache").toFile()
+        try {
+            val cache=LyricsResponseCache(dir)
+            val key="${Lyrics.baseUrl}/api/search?track_name=Song&artist_name=Artist"
+            cache.request(key) { LyricsResponseCache.Response(200,"{\"error\":\"bad proxy\"}") }
+            Lyrics.responseCache=cache
+            respond={ 200 to studioList().replace("{", "{\"id\":99,") }
+            assertEquals(1,Lyrics.search("Song","Artist").choices.size)
+            assertEquals(1,requests.size)
+        } finally { Lyrics.responseCache=null; dir.deleteRecursively() }
+    }
+
+    @Test fun laterSearchVariantCanSupplyTimedTextForTheSameRecord() {
+        respond={ path ->
+            if (path == "/api/search?track_name=Song&artist_name=Artist") 200 to
+                """[{"id":99,"trackName":"Song","artistName":"Artist","duration":200,"syncedLyrics":null}]"""
+            else 200 to studioList().replace("{", "{\"id\":99,")
+        }
+        assertTrue(Lyrics.search("Song","Artist").choices.single().hasSyncedLyrics)
     }
 
     @Test fun unknownArtistCannotAutoChooseBetweenDifferentAcceptedPerformers() {

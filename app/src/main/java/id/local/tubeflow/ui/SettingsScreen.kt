@@ -35,6 +35,8 @@ import id.local.tubeflow.core.StorageFolderAccess
 
 @Composable
 fun SettingsScreen(
+    karaoke: id.local.tubeflow.core.KaraokeViewModel,
+    player: id.local.tubeflow.core.PlayerViewModel,
     themeMode: String,
     onThemeMode: (String) -> Unit,
     dynamicColor: Boolean,
@@ -123,12 +125,13 @@ fun SettingsScreen(
     }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        PageHeading("Pengaturan", "Dirancang untuk bekerja langsung di perangkatmu.")
+        PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
+        MediaToolsSettings(karaoke, player)
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title), style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -143,7 +146,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Tampilan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Pilih mode tema yang paling nyaman untuk mata kamu.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -176,7 +179,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Penyimpanan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -283,7 +286,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Notifikasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Izinkan notifikasi agar progres download tetap terlihat saat aplikasi ditutup.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,7 +299,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Antrean", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Unduhan yang boleh berjalan bersamaan.", style = MaterialTheme.typography.bodyMedium)
@@ -314,7 +317,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Smart Media", style = MaterialTheme.typography.titleMedium)
                 Text("Berlaku untuk download baru. Lirik dan sampul di panel download tetap dapat dipilih secara eksplisit.", style = MaterialTheme.typography.bodySmall)
@@ -334,7 +337,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Mesin download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("yt-dlp + FFmpeg", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
@@ -348,7 +351,7 @@ fun SettingsScreen(
 
         if (Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Privasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -359,7 +362,7 @@ fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        SectionCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Tentang TubeFlow", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
@@ -401,7 +404,7 @@ private fun BluetoothAutoPlaySettings() {
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    Card(Modifier.fillMaxWidth()) {
+    SectionCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_title),
                 style=MaterialTheme.typography.titleMedium)

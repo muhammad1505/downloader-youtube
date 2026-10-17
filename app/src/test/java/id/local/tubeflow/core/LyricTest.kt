@@ -87,6 +87,13 @@ class LyricTest {
         assertTrue(LyricMatch.score(query("Kuwi Teri", "Denny Caknan"), candidate("Gangnam Style", "PSY")) < 0.0)
     }
 
+    @Test fun numberedSongsAreDifferentEvenWithMatchingArtistAndDuration() {
+        for ((requested, found) in listOf("Satru 2" to "Satru", "Satru 2" to "Satru 3", "Song Part 1" to "Song Part 2")) {
+            assertFalse(LyricMatch.acceptsTimedLyrics(query(requested,"Artist",200),candidate(found,"Artist",200)))
+        }
+        assertTrue(LyricMatch.acceptsTimedLyrics(query("Satru 2 (Official 4K Video)","Artist",200),candidate("Satru 2","Artist",200)))
+    }
+
     @Test
     fun lyricStatusReportingAndRetryRules() {
         assertEquals("Lirik tersimpan", LyricStatus.label(LyricStatus.SAVED))

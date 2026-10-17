@@ -203,10 +203,11 @@ class Converters {
   */
  @Query("UPDATE downloads SET state = 'QUEUED', progress = 0, phase = 'PREPARING', speed = '', eta = '', error = NULL, outputUri = NULL, pendingUri = NULL, sidecarUris = NULL, lyricStatus = '', completedAt = 0, generation = generation + 1, createdAt = :now WHERE id = :id AND state = 'COMPLETED'") suspend fun requeueCompleted(id: String, now: Long): Int
 }
-@Database(entities = [DownloadJob::class, MediaItem::class, MediaEvent::class], version = 9, exportSchema = true)
+@Database(entities = [DownloadJob::class, MediaItem::class, MediaEvent::class, PersonalPlaylist::class, PlaylistMember::class], version = 10, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class DownloadDatabase : RoomDatabase() {
  abstract fun downloads(): DownloadDao
+ abstract fun personal(): PersonalLibraryDao
  abstract fun media(): MediaDao
  companion object {
   private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -276,6 +277,13 @@ abstract class DownloadDatabase : RoomDatabase() {
     createMediaTables(db)
    }
   }
+  private val MIGRATION_9_10 = object : Migration(9, 10) {
+   override fun migrate(db: SupportSQLiteDatabase) {
+    db.execSQL("CREATE TABLE IF NOT EXISTS personal_playlists (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+    db.execSQL("CREATE TABLE IF NOT EXISTS playlist_members (`playlistId` TEXT NOT NULL, `mediaUri` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`playlistId`, `mediaUri`), FOREIGN KEY(`playlistId`) REFERENCES `personal_playlists`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+    db.execSQL("CREATE INDEX IF NOT EXISTS index_playlist_members_mediaUri ON playlist_members(mediaUri)")
+   }
+  }
   private fun createMediaTables(db: SupportSQLiteDatabase) {
     db.execSQL("CREATE TABLE IF NOT EXISTS media_items (`uri` TEXT NOT NULL, `jobId` TEXT, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `displayName` TEXT NOT NULL, `mime` TEXT NOT NULL, `folder` TEXT NOT NULL, `sizeBytes` INTEGER, `durationMs` INTEGER, `artist` TEXT NOT NULL, `album` TEXT NOT NULL, `albumArtist` TEXT NOT NULL, `genre` TEXT NOT NULL, `track` TEXT NOT NULL, `year` TEXT NOT NULL, `creator` TEXT NOT NULL, `platformId` TEXT NOT NULL, `coverPath` TEXT NOT NULL, `width` INTEGER, `height` INTEGER, `availability` TEXT NOT NULL, `metadataStatus` TEXT NOT NULL, `artworkStatus` TEXT NOT NULL, `lyricUri` TEXT, `lyricStatus` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `checkedAt` INTEGER NOT NULL, `modifiedAt` INTEGER, `accessUri` TEXT NOT NULL, PRIMARY KEY(`uri`))")
     db.execSQL("CREATE INDEX IF NOT EXISTS index_media_items_jobId ON media_items(jobId)")
@@ -291,7 +299,7 @@ abstract class DownloadDatabase : RoomDatabase() {
     }
   }
   @Volatile private var instance: DownloadDatabase? = null
-  fun get(context: android.content.Context) = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, DownloadDatabase::class.java, "downloads.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).addCallback(eventCallback).build().also { instance = it } }
+  fun get(context: android.content.Context) = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, DownloadDatabase::class.java, "downloads.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).addCallback(eventCallback).build().also { instance = it } }
  }
 }
 object Selection {

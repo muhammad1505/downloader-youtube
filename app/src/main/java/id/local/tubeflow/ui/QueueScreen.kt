@@ -58,7 +58,7 @@ fun QueueScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {

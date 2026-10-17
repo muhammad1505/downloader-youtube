@@ -16,7 +16,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkInfo
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import id.local.tubeflow.R
+import id.local.tubeflow.core.KaraokeOutput
+import id.local.tubeflow.core.Format
 import id.local.tubeflow.core.KaraokeInterval
 import id.local.tubeflow.core.KaraokeProcessPolicy
 import id.local.tubeflow.core.KaraokeViewModel
@@ -31,6 +35,9 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
     val observed by model.info.collectAsStateWithLifecycle()
     val work = observed?.takeIf { it.id == requestId }
     val source by model.source.collectAsStateWithLifecycle()
+    val comparing by player.comparing.collectAsStateWithLifecycle()
+    val comparisonPlayback by remember(player) { player.state.map { it.track?.uri to it.playing }.distinctUntilChanged() }.collectAsStateWithLifecycle(initialValue = null to false)
+    val playingUri = comparisonPlayback.first
     val busy by model.busy.collectAsStateWithLifecycle()
     val stopping by model.stopping.collectAsStateWithLifecycle()
     val cleanupPending by model.cleanupPending.collectAsStateWithLifecycle()
@@ -46,11 +53,13 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
     val beginning = work?.outputData?.getLong("startMs", 0) ?: 0
     val length = work?.outputData?.getLong("durationMs", 0) ?: 0
     val matches = ready && KaraokeProcessPolicy.matchesSelection(source?.uri, track?.uri, resultSample, sample, beginning, position)
+    var format by remember(requestId) { mutableStateOf(KaraokeOutput.FLAC) }
     var confirmSampleSave by remember(requestId, track?.uri) { mutableStateOf(false) }
     var confirmDiscard by remember(requestId, track?.uri) { mutableStateOf(false) }
-    val discardPlayback: (String) -> Unit = { uri -> if (player.state.value.track?.uri == uri) player.stop() }
+    val discardPlayback: (String) -> Unit = player::discardComparison
     val startProcessing = { notifications(); model.start {
-        if (model.isPrivatePreview(player.state.value.track?.uri)) player.stop() else player.pause()
+        if (comparing) { player.finishComparison(); player.pause() }
+        else if (model.isPrivatePreview(player.state.value.track?.uri)) player.stop() else player.pause()
     } }
 
     AlertDialog(onDismissRequest = model::close, title = { Text(stringResource(R.string.karaoke_title)) }, text = {
@@ -76,12 +85,29 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                         Text(source?.title ?: stringResource(R.string.karaoke_source_loading), style = MaterialTheme.typography.bodySmall)
                         Text(if (resultSample) stringResource(R.string.karaoke_sample_range, KaraokeInterval.formatStart(beginning), KaraokeInterval.formatStart(beginning + length)) else stringResource(R.string.karaoke_full_ready), style = MaterialTheme.typography.bodySmall)
                         if (matches) {
-                            Button(onClick = { model.preview(player::play) }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(if (resultSample) R.string.karaoke_listen_sample else R.string.karaoke_listen_full)) }
+                            Text(stringResource(R.string.karaoke_compare_help), style = MaterialTheme.typography.bodySmall)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(selected = comparing && playingUri == source?.uri, onClick = { model.compare(player, false) }, enabled = actionsEnabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp), label = { Text(stringResource(R.string.karaoke_compare_original)) })
+                                FilterChip(selected = comparing && playingUri == work.outputData.getString("path")?.let { android.net.Uri.fromFile(java.io.File(it)).toString() }, onClick = { model.compare(player, true) }, enabled = actionsEnabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp), label = { Text(stringResource(R.string.karaoke_compare_instrumental)) })
+                            }
+                            if (comparing) {
+                                Button(onClick = { player.toggle() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(if (comparisonPlayback.second) R.string.karaoke_compare_pause else R.string.karaoke_compare_play)) }
+                                TextButton(onClick = { player.finishComparison() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_compare_done)) }
+                            }
+                            if (saved == null) {
+                                KaraokeOutput.entries.forEach { option ->
+                                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = format == option, enabled = actionsEnabled, role = Role.RadioButton, onValueChange = { format = option }), verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(format == option, null, enabled = actionsEnabled)
+                                        Text(stringResource(option.labelRes), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                                Text(stringResource(R.string.karaoke_output_estimate, if (format == KaraokeOutput.FLAC && work.outputData.getLong("resultBytes", 0) <= 0) stringResource(R.string.size_unavailable) else Format.bytes(format.estimate(length, work.outputData.getLong("resultBytes", 0)))), style = MaterialTheme.typography.bodySmall)
+                            }
                             if (resultSample) {
                                 Button(onClick = { model.sample(false); startProcessing() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_make_full)) }
                                 if (saved == null) Text(stringResource(R.string.karaoke_sample_private), style = MaterialTheme.typography.bodySmall)
                             }
-                            OutlinedButton(onClick = { if (resultSample) confirmSampleSave = true else model.save(work.id) }, enabled = actionsEnabled && saved == null, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { if (resultSample) confirmSampleSave = true else model.save(work.id, format) }, enabled = actionsEnabled && saved == null, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(if (saved != null) R.string.karaoke_saved else if (resultSample) R.string.karaoke_save_sample else R.string.karaoke_save_full))
                             }
                         } else {
@@ -127,8 +153,8 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
 
     if (confirmSampleSave && matches && resultSample) AlertDialog(onDismissRequest = { confirmSampleSave = false },
         title = { Text(stringResource(R.string.karaoke_save_sample_title)) },
-        text = { Text(stringResource(R.string.karaoke_save_sample_description, KaraokeInterval.formatStart(beginning), KaraokeInterval.formatStart(beginning + length))) },
-        confirmButton = { TextButton(onClick = { confirmSampleSave = false; model.save(work.id) }, enabled = !busy) { Text(stringResource(R.string.karaoke_save_sample_confirm)) } },
+        text = { Text(stringResource(R.string.karaoke_save_sample_description, KaraokeInterval.formatStart(beginning), KaraokeInterval.formatStart(beginning + length), format.extension.uppercase(java.util.Locale.ROOT))) },
+        confirmButton = { TextButton(onClick = { confirmSampleSave = false; model.save(work.id, format) }, enabled = !busy) { Text(stringResource(R.string.karaoke_save_sample_confirm, format.extension.uppercase(java.util.Locale.ROOT))) } },
         dismissButton = { TextButton(onClick = { confirmSampleSave = false }) { Text(stringResource(R.string.karaoke_back)) } })
     if (confirmDiscard) AlertDialog(onDismissRequest = { confirmDiscard = false },
         title = { Text(stringResource(R.string.karaoke_discard)) }, text = { Text(stringResource(R.string.karaoke_discard_description)) },

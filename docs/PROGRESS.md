@@ -533,3 +533,57 @@ batal dialog/notifikasi, clip0,877687s decode penuh, buang privat dengan publik
 terjaga, cleanup QA, seek/queue terjaga dan restart tanpa status lama.63file
 baseline identik. Batas/fault yang belum diuji tetap terbuka di
 [laporan1.1.16](KARAOKE_LOGIC_1_1_16.md).
+
+
+## Refresh visual nuansa pemutar musik — 17 Oktober 2026
+
+Upgrade UI/UX bertahap (sistem visual → kartu → pemutar → navigasi) dengan arah
+gelap-aksen-hijau; nilai warna dipilih sendiri, bukan menyalin warna merek
+aplikasi lain. [Theme.kt](../app/src/main/java/id/local/tubeflow/ui/theme/Theme.kt):
+palet gelap netral + aksen hijau, palet terang hijau tua. Bahasa kartu datar
+`mediaCardColors` dipakai bersama oleh kartu unduhan, kartu koleksi, dan mini
+player (tanpa garis tepi, hierarki teks artis/meta ke onSurfaceVariant). Pemutar
+penuh: sampul 380dp, bilah progres putih tipis, tombol putar hijau 72dp.
+Bilah bawah: tab aktif putih tanpa pil indikator.
+Rencana token: Ink #121212, kartu #1D1D1D, teks redup #B3B3B3, hijau aksi
+#33D07C (gelap)/#0B7A42 (terang), wadah hijau #1E5B39. Kritik pola generik
+"gelap + hijau": hijau hanya untuk SATU aksi utama (tombol putar) dan tab aktif;
+identitas per-lagu tetap dari aksen sampul (`rememberCoverAccent`) pada kartu,
+mini player dan gradien pemutar. Regresi kontras `ThemeContrastTest` mengunci
+pasangan teks ≥4,5:1 di kedua palet (primary terang digelapkan dari #0E8F4F
+karena hanya ~4,0:1).
+Bukti 17 Okt: Python 90 OK; Kotlin 326 0 gagal; lint debug+release 0 error,
+2 warning yang diketahui (SelectedPhotoAccess, GradleDependency onnxruntime);
+`build_release.sh` BUILD SUCCESSFUL 20m21s (APK×3 + AAB signed); audit native
+257 ELF 0 gagal 16KB, refleksi ZIP 13 kelas 0 gagal, apksigner cert
+CN=TubeFlow Release, zipalign OK. Terpasang di HP Realme RMX1821 (Android 10,
+arm64): versionName 1.1.17/code31, hash base.apk di HP == artefak
+ce45874515de4d78f7bac5acbf53ff6bb7194f15f3e6686f1034d9f71d8e2dab,
+smoke launch tanpa crash. Matriks screenshot (terang/gelap, font 1,3x/2,0x,
+lebar sempit, status kosong/galat) masih menunggu — lihat ui-design-system.
+
+## Perbaikan video dan LRCLIB — 18 Oktober 2026
+
+BUG-060 memisahkan URI kosong dari hasil sukses launcher, sehingga membuka atau
+membagikan media tidak menghasilkan pesan file hilang palsu. BUG-061 memvalidasi
+kontrak JSON LRCLIB sebelum cache dan saat membaca cache lama; hasil manual dengan
+ID sama dapat dilengkapi timestamp oleh varian berikut. BUG-062 membedakan angka
+judul lagu (Satru/Satru 2) walau artis dan durasinya mirip. 333 Kotlin/90 Python
+lulus; lint debug nol error/dua warning lama, assembleDebug lulus. Release baru,
+pemasangan, dan riwayat HP belum diperiksa untuk perubahan ini. Pilihan mode
+Anti Slop masih menunggu jawaban; HP terdeteksi tetapi terkunci. Rincian dan
+langkah berikutnya: [checkpoint perbaikan](REPAIR_2026-10-18.md).
+
+
+## Penyelesaian checkpoint 1.1.18 — 18 Oktober 2026
+
+Menggantikan status tertunda pada entri sebelumnya: release1.1.18/code32 sudah
+terpasang tanpa reset dan hash cocok. BUG-060–066 diperbaiki, dengan batas bukti
+penyedia lirik dicatat. Seluruh menu memakai panel, spasi, judul dan tema bersama;
+font besar, dialog pendek dan state inspeksi diuji di HP. 339Kotlin/90Python lulus,
+build signed APK×3/AAB9m45s, lint0error/2warning lama, audit paket lulus.
+24screenshot kandidat dan enam layar final1,35×; video, clear inspeksi, timer1menit
+serta selesai lagu diuji.62file awal identik setelah hanya video QA dibersihkan.
+Room10/enam fitur media dibawa tanpa dependensi baru. Tidak mengklaim audit produksi
+penuh, seluruh lirik sinkron, TalkBack atau runtime16KB sudah lulus.
+[Laporan akhir dan pekerjaan tersisa](REPAIR_2026-10-18.md).

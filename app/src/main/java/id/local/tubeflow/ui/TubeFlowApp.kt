@@ -64,6 +64,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
 
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
+            if (url != incomingUrl) model.clearPlaylist()
             url = incomingUrl
             tab = 1
             // Inspeksi diserahkan ke efek DownloadScreen (video vs playlist) — memanggil inspect langsung di sini
@@ -122,9 +123,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             TopAppBar(
                 title = {
                     Column {
-                        Text(if (tab == settingsTab) "Pengaturan" else "TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            if (activeCount > 0) "$activeCount unduhan sedang berjalan" else "Simpan momen. Putar kapan saja.",
+                        Text("TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        if (activeCount > 0) Text(
+                            "$activeCount unduhan sedang berjalan",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -147,6 +148,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             Column {
             if (playback.track != null) MiniPlayer(playback,player) { fullPlayer=true }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                val showLabels=androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f
                 val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
                 val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic, Icons.Outlined.History)
                 tabs.forEachIndexed { index, title ->
@@ -156,17 +158,20 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         icon = {
                             if (index == 2 && activeCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (activeCount > 99) "99+" else "$activeCount") } }) {
-                                    Icon(icons[index], contentDescription = null)
+                                    Icon(icons[index], contentDescription = if (showLabels) null else title)
                                 }
                             } else {
-                                Icon(icons[index], contentDescription = null)
+                                Icon(icons[index], contentDescription = if (showLabels) null else title)
                             }
                         },
-                        label = { Text(title) },
+                        label = if (showLabels) ({ Text(title, maxLines=1, overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis) }) else null,
+                        // Tab aktif disorot putih tanpa pil indikator — bahasa navigasi pemutar musik modern.
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                         ),
                     )
                 }
@@ -187,7 +192,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             when (current) {
                 1 -> DownloadScreen(
                     url = url,
-                    onUrl = { url = it },
+                    onUrl = { if (url != it) model.clearPlaylist(); url = it },
                     metadata = metadata,
                     playlist = playlist,
                     busy = busy,
@@ -243,6 +248,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                 )
                 else -> SettingsScreen(
+                    karaoke = karaoke,
+                    player = player,
                     themeMode = SettingsStore.themeMode,
                     onThemeMode = { SettingsStore.setThemeMode(context, it) },
                     dynamicColor = SettingsStore.dynamicColor,
