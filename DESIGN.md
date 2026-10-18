@@ -13,6 +13,23 @@ cukup kuat, daftar mudah dipindai, gerak hanya untuk perubahan status.
 
 ## Token
 
+Kontrol Koleksi Putar/Acak/Cari dan Bersihkan di Riwayat memakai `ActionChip`
+yang sama dengan deret filter: tinggi visual mengikuti chip Material, target
+sentuh tetap minimal48dp. Tombol formulir/dialog tetap memakai `ActionButton`.
+Kelola playlist mengikuti kartu koleksi: ikon playlist bawaan, nama dua baris,
+dan ikon Ubah/Hapus48dp. Tidak memakai sampul atau jumlah lagu rekaan.
+
+```text
+[Semua] [Musik] [Video]
+[▷ Putar] [⤨ Acak] [⌕ Cari]       ← ukuran chip yang sama
+
+Kelola playlist
+  [ikon] Nama playlist          [ubah] [hapus]
+```
+
+Pengaturan memisahkan total cache menjadi lirik, metadata, dan sampul. Hasil
+bersihkan lirik tidak menyiratkan cache sampul atau file LRC juga dihapus.
+
 | Peran | Gelap | Terang |
 |---|---|---|
 | Latar | `#121212` | `#F4F6F4` |

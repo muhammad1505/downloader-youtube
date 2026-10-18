@@ -95,11 +95,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   storageRefresh=viewModelScope.launch {
    _storageError.value=false
    _storageBytes.value=null
-   val (result, temporary)=withContext(Dispatchers.IO) {
-    runCatching { measureStorage() } to runCatching { PrivateStorage.summary(getApplication<Application>().cacheDir,getApplication<Application>().noBackupFilesDir) }.getOrNull()
+   _temporaryUsage.value=withContext(Dispatchers.IO) {
+    runCatching { PrivateStorage.summary(getApplication<Application>().cacheDir,getApplication<Application>().noBackupFilesDir) }.getOrNull()
    }
+   val result=withContext(Dispatchers.IO) { runCatching { measureStorage() } }
    ensureActive()
-   _temporaryUsage.value=temporary
    _storageFolderAccess.value=result.getOrNull()?.folderAccess == true
    _storageCatalogue.value=result.getOrNull()?.fromCatalogue == true
    _storageUnknownSizes.value=result.getOrNull()?.unknownSizes ?: 0L

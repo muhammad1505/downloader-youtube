@@ -752,3 +752,18 @@ Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
 - **Host:** `./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease --no-daemon --max-workers=2`, dengan signing produksi, lulus dalam 10m32s; 345 tes Kotlin lulus, lint debug/release 0 error dan 2 warning lama. Audit ARM64: signature, zipalign16KB, 257 ELF dan 13 kelas refleksi ZIP lulus.
 - **HP:** update `adb install -r` berhasil pada Realme RMX1821 Android10; versi 1.1.21/code35 dan hash APK terpasang cocok. Kolom kosong menampilkan paste tanpa X. Uji paste/clear lanjutan tertunda ketika layar berpindah ke Pengaturan saat HP dipakai pengelola.
 - **Artefak ARM64:** 70.870.112 byte, SHA256 `f2dc1413fc57bc297664ede6ebf51dda3078bbb1a5875e86ed980d32eb981272`. Bukti privat pada `build/reports/download-input-1121/`. Tidak ada perubahan database, dependensi atau izin; tes Python dan build AAB tidak diulang untuk perubahan kondisi UI ini.
+
+## BUG-073 — P3: Ukuran aksi di Koleksi/Riwayat dan baris playlist tidak konsisten
+
+- **Akar:** Putar/Acak/Cari dan Bersihkan memakai `ActionButton`48dp, sedangkan filter memakai chip Material. Kartu Kelola playlist menumpuk dua tombol berlabel di bawah nama.
+- **Perbaikan 1.1.22:** gunakan `ActionChip` bersama untuk deret kontrol di dekat filter, dengan warna galat pada aksi destruktif. Playlist memakai kartu baris dengan ikon, nama dua baris, dan ikon Ubah/Hapus48dp; deskripsi menyebut nama playlist dan konfirmasi hapus dipertahankan.
+- **Bukti dan cakupan:** [laporan kontrol/cache](CONTROLS_CACHE_1_1_22.md).
+- **HP 1.1.22:** enam kontrol Koleksi masing-masing82px, Bersihkan Riwayat juga82px seperti filter. Playlist QA berhasil dibuat, diubah/batal, serta dihapus/batal melalui ikon, lalu dibersihkan. Tema dan pengaturan layar dipertahankan.
+
+## BUG-074 — P3: Total cache dianggap sebagai ukuran cache lirik
+
+- **Keluhan:** angka6,6MB tidak terlihat turun setelah Bersihkan cache lirik.
+- **Akar kode:** angka tersebut menjumlahkan respons lirik, metadata, serta sampul; tombol hanya menghapus respons lirik. Pembulatan total juga menyamarkan perubahan kecil. Pembaruan cache sebelumnya menunggu pengukuran folder penyimpanan selesai.
+- **Perbaikan 1.1.22:** `PrivateStorage.Usage` memisahkan tiga komponen dengan total turunan; UI menampilkan rincian serta hasil pembersihan yang menjelaskan cakupannya. Ukuran privat diterbitkan sebelum mengukur folder. Tidak menghapus sampul atau metadata untuk memaksa total nol.
+- **Regresi:** `PrivateStorageTest` memeriksa rincian, ukuran setelah clear, metadata/sampul/LRC tetap ada, dan status parsial tanpa mengikuti symlink. [Hasil build/perangkat](CONTROLS_CACHE_1_1_22.md).
+- **HP 1.1.22:** lirik0B, metadata433B, sampul6,7MB; klik bersihkan menampilkan pesan sudah kosong dan mempertahankan cache lain. Penghapusan cache berisi diuji host; 347 tes lulus, lint0error/2warning lama, signed ARM64 terpasang dan hash cocok.

@@ -99,6 +99,11 @@ Ukuran katalog di Pengaturan mengikuti agregat `MediaDao.totals()` termasuk peru
 
 Clear cache lirik memakai direktori privat eksplisit, juga sebelum Engine menginisialisasi Lyrics. Lock permintaan menjaga cache-hit/deduplikasi; lock disk terpisah agar clear tidak menunggu jaringan. Generasi mencegah respons sebelum clear menulis cache kembali. Pertahankan cooldown privat di luar cache dan LRC pengguna; hasil parsial harus dilaporkan, bukan dianggap sukses.
 
+Ukuran cache di Pengaturan memisahkan lirik, metadata, dan sampul; total memakai
+komponen yang sama. Bersihkan cache lirik hanya menghapus respons lirik. Jangan
+menghapus sampul atau metadata untuk memaksa total menjadi nol. Terbitkan ukuran
+privat sebelum menunggu pengukuran folder agar hasil pembersihan cepat terlihat.
+
 Auto-play 1.1.10: receiver koneksi Bluetooth manifest/runtime memakai exported karena sender dapat berada pada UID Bluetooth tersendiri; action dibatasi pada broadcast sistem terproteksi. Service pemutar tetap tidak diekspor. Izin BLUETOOTH berlaku sampai API30, BLUETOOTH_CONNECT diminta lewat Pengaturan pada API31+; jangan menambahkan discovery/lokasi untuk menerima sambungan. Receiver menyerahkan pekerjaan ke foreground service sebelum Room/fokus audio, dengan bootstrap terbatas dan fallback ketuk-untuk-putar bila start ditolak.
 
 Sesi media aktif memakai START_STICKY serta marker `player-last/session_active`; X membersihkan marker. Pemulihan tanpa headset harus tetap jeda. Jangan menerapkan PlaybackParams pada player jeda karena dapat memulai audio; simpan pilihan kecepatan dan terapkan sesudah fokus audio saat play. Pemulihan antrean/seek memakai PlayerSession privat (3000entri/4MiB), ID urutan asli shuffle, indeks/repeat dan checkpoint posisi kecil ber-revisi tiap5detik/pause/seek. Snapshot antrean hanya ditulis ketika berubah. Pemulihan proses dibuka jeda; initial/sticky headset ketika registrasi bukan sambungan baru. Format1.1.14 tidak menyimpan antrean/seek sehingga data tersebut tidak dapat dipulihkan retroaktif. Kabel HEADSET_PLUG tidak membangunkan proses mati; force-stop dan kebijakan OEM tetap membatasi restart, sehingga klaim auto-play harus menyebut skenario HP yang diuji.

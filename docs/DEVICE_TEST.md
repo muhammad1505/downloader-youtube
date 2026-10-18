@@ -567,3 +567,17 @@ menampilkan paste dan X bersama. Sesudah update, kolom kosong menampilkan
 paste tanpa X. Uji paste/clear berikutnya tertunda karena HP sedang dipakai
 pengelola dan layar berpindah ke Pengaturan. Tidak menekan download atau
 menghapus file. [Akar, hasil build dan checksum BUG-072](BUG_FINDINGS.md#bug-072--p3-ikon-paste-tetap-muncul-ketika-kolom-link-terisi).
+
+## Kontrol dan rincian cache 1.1.22 — 18 Oktober 2026
+
+Release1.1.22/code36 terpasang update-r pada Realme Android10, hash base.apk
+cocok. Koleksi: target Semua/Musik/Video/Putar/Acak/Cari masing-masing82px;
+Riwayat: Bersihkan dan filter82px. Playlist QA berhasil dibuat, ubah/batal,
+simpan, hapus/batal; setelah tes playlist QA dihapus. Tidak menekan Bersihkan
+riwayat atau hapus media.
+
+Cache terukur: lirik0B, metadata433B, sampul6,7MB. Klik bersihkan memberi
+pesan sudah kosong dan cache lain tetap sama. Kasus nonempty diuji host saja.
+Gulir ADB sempat gagal255; setelah pembacaan layar baru, uji cache selesai.
+Tidak ada FATAL pada AndroidRuntime PID yang diperiksa. Screenshot/log privat;
+tema/font/density pengguna tidak diubah. [Laporan dan batas](CONTROLS_CACHE_1_1_22.md).

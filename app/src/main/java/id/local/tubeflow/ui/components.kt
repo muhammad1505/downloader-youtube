@@ -262,6 +262,7 @@ fun ActionChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     enabled: Boolean = true,
+    destructive: Boolean = false,
 ) {
     AssistChip(
         onClick = onClick,
@@ -269,6 +270,10 @@ fun ActionChip(
         enabled = enabled,
         label = { Text(label, maxLines = 1) },
         leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
+        colors = if (destructive) AssistChipDefaults.assistChipColors(
+            labelColor = MaterialTheme.colorScheme.error,
+            leadingIconContentColor = MaterialTheme.colorScheme.error,
+        ) else AssistChipDefaults.assistChipColors(),
     )
 }
 

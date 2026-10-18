@@ -12,7 +12,10 @@ object DownloadFileAccess {
 
 object PrivateStorage {
     data class Size(val bytes: Long, val complete: Boolean)
-    data class Usage(val cache: Size, val partial: Size)
+    data class Usage(val lyrics: Size, val metadata: Size, val artwork: Size, val partial: Size) {
+        val cache: Size get() = Size(lyrics.bytes + metadata.bytes + artwork.bytes,
+            lyrics.complete && metadata.complete && artwork.complete)
+    }
     private const val MAX_ENTRIES = 20000
 
     /** Walks only regular files beneath a private root, never following a symlink. */
@@ -54,8 +57,12 @@ object PrivateStorage {
     }
 
     fun summary(cacheRoot: File, privateRoot: File): Usage {
-        val caches = listOf(File(cacheRoot,"lyrics-responses"),File(cacheRoot,"extractor-cache"),
-            File(privateRoot,"covers"),File(privateRoot,"library-covers")).map { measure(it) }
-        return Usage(Size(caches.sumOf { it.bytes },caches.all { it.complete }),measure(File(privateRoot,"downloads")))
+        val covers = listOf(File(privateRoot,"covers"),File(privateRoot,"library-covers")).map { measure(it) }
+        return Usage(
+            lyrics = measure(File(cacheRoot,"lyrics-responses")),
+            metadata = measure(File(cacheRoot,"extractor-cache")),
+            artwork = Size(covers.sumOf { it.bytes },covers.all { it.complete }),
+            partial = measure(File(privateRoot,"downloads")),
+        )
     }
 }

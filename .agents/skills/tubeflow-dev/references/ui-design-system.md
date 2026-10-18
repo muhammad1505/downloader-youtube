@@ -32,6 +32,12 @@ Definisikan sekali di tema, pakai di mana-mana. Nilai literal di composable adal
 - **Ikon.** Satu keluarga ikon dengan ketebalan garis konsisten; ikon tanpa label hanya untuk makna yang universal.
 - **Target sentuh.** Minimal 48dp, dengan jarak cukup antar aksi yang berdekatan (mis. jeda/batal pada item antrean).
 
+Untuk deret kontrol di dekat tab/filter, gunakan `ActionChip` agar tinggi visual,
+bentuk dan padding mengikuti chip Material. Putar/Acak/Cari di Koleksi dan
+Bersihkan di Riwayat memakai pola ini; tombol formulir/dialog tetap memakai
+`ActionButton`. Baris Kelola playlist mengikuti kartu koleksi dengan nama dan
+ikon Ubah/Hapus48dp, beserta deskripsi aksesibilitas yang menyebut playlist.
+
 ## Status antarmuka
 
 Aplikasi terasa profesional ketika semua status dirancang, bukan hanya jalur sukses. Setiap layar atau komponen data menyediakan:

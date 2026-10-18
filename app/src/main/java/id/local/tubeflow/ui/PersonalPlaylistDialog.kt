@@ -5,10 +5,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.dp
@@ -16,7 +19,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.R
 import id.local.tubeflow.core.*
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PersonalPlaylistDialog(model: MediaLibraryViewModel, dismiss: () -> Unit) {
     val playlists by model.playlists.collectAsStateWithLifecycle()
@@ -78,15 +80,24 @@ fun PersonalPlaylistDialog(model: MediaLibraryViewModel, dismiss: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 items(filtered, key = { it.id }) { entry ->
-                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                        Column(Modifier.fillMaxWidth().padding(UiSpacing.item), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
-                            Text(entry.name, style = MaterialTheme.typography.titleMedium)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(UiSpacing.row), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
-                                ActionButton(stringResource(R.string.library_rename_playlist),
+                    Card(Modifier.fillMaxWidth(), colors = mediaCardColors(MaterialTheme.colorScheme.primary)) {
+                        Row(Modifier.fillMaxWidth().padding(UiSpacing.item),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
+                            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.AutoMirrored.Outlined.QueueMusic, null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                            Text(entry.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Row {
+                                IconAction(Icons.Outlined.Edit, stringResource(R.string.playlist_rename_action, entry.name),
                                     { editing = entry; name = entry.name; formError = null },
-                                    icon = Icons.Outlined.Edit, enabled = !busy)
-                                ActionButton(stringResource(R.string.library_delete_playlist), { deleting = entry },
-                                    icon = Icons.Outlined.Delete, destructive = true, enabled = !busy)
+                                    enabled = !busy)
+                                IconAction(Icons.Outlined.Delete, stringResource(R.string.playlist_delete_action, entry.name),
+                                    { deleting = entry }, destructive = true, enabled = !busy)
                             }
                         }
                     }

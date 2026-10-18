@@ -65,13 +65,12 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
         val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
         // Aksi koleksi berlabel supaya tujuan setiap tombol jelas tanpa menebak ikon.
         item { ScrollRow {
-            ActionButton("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
-            ActionButton("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
-            ActionButton(
+            ActionChip("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
+            ActionChip("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
+            ActionChip(
                 if (searchOpen) "Tutup" else "Cari",
                 { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen },
                 icon = if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search,
-                emphasis = ActionEmphasis.Quiet,
             )
         } }
         if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Memeriksa media…") }

@@ -675,3 +675,12 @@ dilewati untuk membuat pipeline hijau.
 
 Baseline 1.1.19/1d7caf3 dipertahankan. Cache lirik bekerja sebelum Engine dengan status hasil; MainActivity singleTask dan tujuan notifikasi bersama, MediaStyle native; tombol outlined serta Kelola playlist diselaraskan. 345 Kotlin/93 Python lulus, signed APK×3/AAB 11m24s, lint0error/2warning lama. Release ARM64 terpasang dan hash cocok. Pengelola mengonfirmasi notifikasi sesuai; rincian tes dan batas pada laporan.
 [Laporan, checksum dan pengujian](NOTIFICATIONS_PLAYLIST_1_1_20.md).
+
+## Kontrol dan rincian cache 1.1.22/code36
+
+Aksi Koleksi dan Bersihkan Riwayat mengikuti ukuran chip; Kelola playlist memakai
+baris dengan ikon Ubah/Hapus. Cache dirinci lirik/metadata/sampul dan diperbarui
+sebelum pengukuran folder. Signed APK terpasang di Realme Android10 dan hash cocok;
+347Kotlin, lint0error/2warning lama, audit ARM64 lulus. Uji HP membuktikan target
+aksi/filter82px, operasi playlist QA, serta respons clear lirik0B sementara
+sampul6,7MB tetap ada. Playlist QA dibersihkan. [Laporan dan batas](CONTROLS_CACHE_1_1_22.md).

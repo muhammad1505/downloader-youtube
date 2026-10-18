@@ -252,6 +252,11 @@ fun SettingsScreen(
                 fun sizeLabel(size: id.local.tubeflow.core.PrivateStorage.Size?): String =
                     size?.let { Format.bytes(it.bytes) + if (!it.complete) " $partialSuffix" else "" } ?: unavailableSize
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_size_label, sizeLabel(temporaryUsage?.cache)), style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_lyrics_size, sizeLabel(temporaryUsage?.lyrics)), style = MaterialTheme.typography.bodySmall)
+                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_metadata_size, sizeLabel(temporaryUsage?.metadata)), style = MaterialTheme.typography.bodySmall)
+                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_artwork_size, sizeLabel(temporaryUsage?.artwork)), style = MaterialTheme.typography.bodySmall)
+                }
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_size_label, sizeLabel(temporaryUsage?.partial)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ActionButton(

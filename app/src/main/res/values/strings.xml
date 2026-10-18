@@ -44,7 +44,10 @@
     <string name="action_close">Tutup</string>
     <string name="action_cancel">Batal</string>
     <string name="temporary_storage_title">Ruang sementara aplikasi</string>
-    <string name="cache_size_label">Cache lirik, metadata dan sampul: %1$s</string>
+    <string name="cache_size_label">Total cache: %1$s</string>
+    <string name="cache_lyrics_size">Lirik: %1$s</string>
+    <string name="cache_metadata_size">Metadata: %1$s</string>
+    <string name="cache_artwork_size">Sampul koleksi: %1$s</string>
     <string name="partial_size_label">Berkas sementara download: %1$s</string>
     <string name="size_unavailable">Belum tersedia</string>
     <string name="temporary_storage_scope">Terpisah dari media di Koleksi. Termasuk data sementara unduhan aktif. Model karaoke dan jurnal pemulihan tidak termasuk; cache sampul dan metadata dibatasi otomatis.</string>
@@ -103,7 +106,6 @@
     <string name="library_add_playlist">Tambah ke playlist</string>
     <string name="library_remove_playlist">Keluarkan dari playlist</string>
     <string name="library_create_playlist">Buat playlist</string>
-    <string name="library_rename_playlist">Ubah nama</string>
     <string name="library_delete_playlist">Hapus playlist</string>
     <string name="library_playlist_name">Nama playlist</string>
     <string name="library_playlist_scope">Playlist menyimpan referensi lagu. Menghapus playlist tidak menghapus file musik.</string>
@@ -167,8 +169,8 @@
     <string name="page_settings_help">Atur pemutaran, penyimpanan, tampilan, dan pemrosesan media.</string>
     <string name="lyrics_http_detail">Respons LRCLIB: HTTP %1$d</string>
     <string name="cache_clearing_lyrics">Membersihkan cache lirik…</string>
-    <string name="cache_lyrics_cleared">Cache lirik dibersihkan. File LRC dan batas permintaan penyedia tetap dipertahankan.</string>
-    <string name="cache_lyrics_empty">Cache lirik sudah kosong. File LRC tetap tersedia.</string>
+    <string name="cache_lyrics_cleared">Cache lirik dibersihkan. Cache metadata dan sampul, file LRC, serta batas permintaan penyedia tetap dipertahankan.</string>
+    <string name="cache_lyrics_empty">Cache lirik sudah kosong. Cache metadata dan sampul tidak ikut dibersihkan; file LRC tetap tersedia.</string>
     <string name="cache_clear_failed">Sebagian cache lirik belum dapat dibersihkan. Coba lagi.</string>
     <string name="notification_retry_play">Coba putar</string>
     <string name="notification_open_history">Ketuk untuk melihat Riwayat download.</string>
@@ -178,6 +180,8 @@
     <string name="playlist_clear_search">Bersihkan pencarian playlist</string>
     <string name="playlist_none">Belum ada playlist pribadi. Buat daftar pertama melalui nama di atas.</string>
     <string name="playlist_no_results">Tidak ada playlist yang cocok.</string>
+    <string name="playlist_rename_action">Ubah nama playlist %1$s</string>
+    <string name="playlist_delete_action">Hapus playlist %1$s</string>
     <plurals name="playlist_count">
         <item quantity="other">%d playlist pribadi</item>
     </plurals>

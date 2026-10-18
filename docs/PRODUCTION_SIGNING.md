@@ -276,3 +276,15 @@ lint debug/release lulus dengan 0 error/2 warning lama. Audit signature,
 zipalign16KB, native dan refleksi ZIP dijalankan pada ARM64 dan lulus.
 AAB/Python tidak diulang; retest UI HP baru membuktikan kolom kosong.
 [Hasil dan batas BUG-072](BUG_FINDINGS.md#bug-072--p3-ikon-paste-tetap-muncul-ketika-kolom-link-terisi).
+
+## Release 1.1.22/code36 — 18 Oktober 2026
+
+Kunci produksi tetap, non-debuggable, Room10 tanpa migrasi/dependensi/izin baru.
+ARM64 70.873.540byte, SHA256
+`a74ddfd647215cfc6cb00b301c430f55c1c69024506e27fe733df27264b5f574`;
+update-r berhasil dan hash base.apk cocok. Build APK tiga ABI9m38s,347Kotlin,
+lint debug/release0error/2warning lama. Audit ARM64 signature/zipalign16KB/
+native257ELF/refleksiZIP13kelas lulus. AAB/Python tidak diulang. HP: ukuran
+chip/aksi sama, playlist QA buat/ubah/batal/hapus, rincian cache dan respons
+clear kosong diperiksa. Runtime16KB, ABI lain dan font besar belum diuji ulang.
+[Hasil dan cakupan](CONTROLS_CACHE_1_1_22.md).
