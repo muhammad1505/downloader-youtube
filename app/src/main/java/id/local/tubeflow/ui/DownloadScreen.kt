@@ -180,7 +180,7 @@ fun DownloadScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (busy) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
+                        } else if (url.isEmpty()) {
                             IconButton(onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 val text = runCatching { clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString() }.getOrNull()

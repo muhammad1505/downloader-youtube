@@ -558,3 +558,12 @@ Penutupan sesi:62path+hash awal identik, hanya video/playlist QA dihapus. Tema
 Ikut sistem dipulihkan, font0,9/density272 tetap. SATRU pengguna paused72960ms
 dan antreannya dipertahankan; helper QA remote dibuang. Tidak ada FATAL/ANR pada
 log PID yang diperiksa. Font besar modal baru tetap belum diuji.
+
+## Ikon input download 1.1.21 — 18 Oktober 2026
+
+Release produksi 1.1.21/code35 terpasang sebagai update pada Realme Android10;
+hash base.apk cocok dengan artefak ARM64. Sebelum perbaikan, kolom terisi
+menampilkan paste dan X bersama. Sesudah update, kolom kosong menampilkan
+paste tanpa X. Uji paste/clear berikutnya tertunda karena HP sedang dipakai
+pengelola dan layar berpindah ke Pengaturan. Tidak menekan download atau
+menghapus file. [Akar, hasil build dan checksum BUG-072](BUG_FINDINGS.md#bug-072--p3-ikon-paste-tetap-muncul-ketika-kolom-link-terisi).

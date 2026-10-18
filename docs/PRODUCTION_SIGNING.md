@@ -265,3 +265,14 @@ melalui migrasi9→10, tanpa dependensi/izin baru. [Hash semua artefak dan pengu
 
 Keystore produksi tetap, non-debuggable, Room10 tanpa migrasi/dependensi/izin baru. ARM64 70.870.104byte, SHA256 c82ff6934889a3ae67e693b3ac6e0143f9c378acf52506e635b3ffa023b6e583; update-r dan hash base.apk cocok. Build11m24s,345Kotlin/93Python, lint0error/2warning lama. APK×3 signature/native/zipalign/refleksiZIP/engine dan AAB jarsigner/native lulus; bundletool tidak diulang, runtime16KB belum diuji. Tidak publikasi toko.
 [Laporan, checksum dan pengujian](NOTIFICATIONS_PLAYLIST_1_1_20.md).
+
+## Release 1.1.21/code35 — 18 Oktober 2026
+
+Perbaikan kondisi ikon paste/X, kunci produksi tetap, APK non-debuggable.
+ARM64 70.870.112 byte, SHA256
+`f2dc1413fc57bc297664ede6ebf51dda3078bbb1a5875e86ed980d32eb981272`;
+update-r berhasil dan hash base.apk cocok. Build APK tiga ABI, 345 tes Kotlin,
+lint debug/release lulus dengan 0 error/2 warning lama. Audit signature,
+zipalign16KB, native dan refleksi ZIP dijalankan pada ARM64 dan lulus.
+AAB/Python tidak diulang; retest UI HP baru membuktikan kolom kosong.
+[Hasil dan batas BUG-072](BUG_FINDINGS.md#bug-072--p3-ikon-paste-tetap-muncul-ketika-kolom-link-terisi).

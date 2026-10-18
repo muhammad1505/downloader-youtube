@@ -743,3 +743,12 @@ lint0error/2warning lama. HP: cache128→0/cooldown identik, Activity2→1,
 playlist buat/ubah/batal/persistensi, konfirmasi Bersihkan, serta konfirmasi
 pengelola untuk notifikasi. [Akar, file, hash, hasil dan batas](NOTIFICATIONS_PLAYLIST_1_1_20.md).
 Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
+
+## BUG-072 — P3: Ikon paste tetap muncul ketika kolom link terisi
+
+- **Bukti sebelum perbaikan:** HP dengan 1.1.20 menampilkan ikon paste dan X bersamaan pada kolom berisi link, sesudah inspeksi selesai.
+- **Akar:** `DownloadScreen.kt` menampilkan paste berdasarkan `!busy` saja; isi kolom tidak diperiksa.
+- **Perbaikan 1.1.21/code35:** paste hanya muncul ketika kolom kosong dan tidak sedang inspeksi. Kolom terisi menyediakan X; indikator inspeksi tetap mengikuti proses aktual. Menekan X mengosongkan kolom sehingga paste tersedia kembali. Pembacaan clipboard dan pembatalan inspeksi tidak diubah.
+- **Host:** `./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease --no-daemon --max-workers=2`, dengan signing produksi, lulus dalam 10m32s; 345 tes Kotlin lulus, lint debug/release 0 error dan 2 warning lama. Audit ARM64: signature, zipalign16KB, 257 ELF dan 13 kelas refleksi ZIP lulus.
+- **HP:** update `adb install -r` berhasil pada Realme RMX1821 Android10; versi 1.1.21/code35 dan hash APK terpasang cocok. Kolom kosong menampilkan paste tanpa X. Uji paste/clear lanjutan tertunda ketika layar berpindah ke Pengaturan saat HP dipakai pengelola.
+- **Artefak ARM64:** 70.870.112 byte, SHA256 `f2dc1413fc57bc297664ede6ebf51dda3078bbb1a5875e86ed980d32eb981272`. Bukti privat pada `build/reports/download-input-1121/`. Tidak ada perubahan database, dependensi atau izin; tes Python dan build AAB tidak diulang untuk perubahan kondisi UI ini.
