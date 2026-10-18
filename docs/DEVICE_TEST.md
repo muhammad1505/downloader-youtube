@@ -1,6 +1,11 @@
 # Pengujian perangkat fisik
 
-Hasil terbaru19Oktober2026: [aksi koleksi, kontrol dan EQ1.1.23](ACTIONS_EQ_1_1_23.md).
+Pembaruan1.1.24/code38: [kontrol ringkas seluruh menu](COMPACT_CONTROLS_1_1_24.md).
+24sampel kontrol82px seperti tab, Pengaturan terang/gelap, playlist QA,
+timer/karaoke idle, lirik serta opsi Download diperiksa pada HP; hash cocok.
+Tema dipulihkan dan playlist QA dihapus. HTTP503 LRCLIB tercatat terpisah.
+
+Hasil1.1.23 pada19Oktober2026: [aksi koleksi, kontrol dan EQ](ACTIONS_EQ_1_1_23.md).
 Release ARM64/code37 terpasang dan hash cocok; chip antrean, lima aksi video,
 share audio/video, konfirmasi berkas, playback video dan preset EQ diperiksa.
 Data/sesi tidak direset; karakter suara headset dan Hi-Res belum diverifikasi.

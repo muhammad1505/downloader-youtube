@@ -9,7 +9,6 @@ import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.compositeOver
 import id.local.tubeflow.core.songIdentity
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -108,52 +107,32 @@ fun ActionButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val base = if (fillWidth) modifier.fillMaxWidth() else modifier
-    val content: @Composable RowScope.() -> Unit = {
-        if (icon != null) {
-            Icon(icon, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-        }
-        Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val primary = emphasis == ActionEmphasis.Primary
+    val foreground = when {
+        primary && destructive -> scheme.onErrorContainer
+        primary -> scheme.onPrimary
+        destructive -> scheme.error
+        emphasis == ActionEmphasis.Quiet -> scheme.primary
+        else -> scheme.onSurfaceVariant
     }
-    when (emphasis) {
-        ActionEmphasis.Primary -> Button(
-            onClick = onClick,
-            modifier = base.heightIn(min = 52.dp),
-            enabled = enabled,
-            shape = CircleShape,
-            colors = if (destructive) ButtonDefaults.buttonColors(containerColor = scheme.errorContainer, contentColor = scheme.onErrorContainer)
-            else ButtonDefaults.buttonColors(),
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            content = content,
-        )
-        ActionEmphasis.Secondary -> OutlinedButton(
-            onClick = onClick,
-            modifier = base.heightIn(min = 48.dp),
-            enabled = enabled,
-            shape = CircleShape,
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = if (destructive) scheme.error else scheme.primary,
-            ),
-            border = BorderStroke(1.dp, when {
-                !enabled -> scheme.onSurface.copy(alpha = 0.12f)
-                destructive -> scheme.error.copy(alpha = 0.55f)
-                else -> scheme.outline
-            }),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            content = content,
-        )
-        ActionEmphasis.Quiet -> TextButton(
-            onClick = onClick,
-            modifier = base.heightIn(min = 48.dp),
-            enabled = enabled,
-            shape = CircleShape,
-            colors = ButtonDefaults.textButtonColors(
-                contentColor = if (destructive) scheme.error else scheme.primary,
-            ),
-            contentPadding = PaddingValues(horizontal = 12.dp),
-            content = content,
-        )
-    }
+    AssistChip(
+        onClick = onClick,
+        modifier = base,
+        enabled = enabled,
+        label = { Text(text, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
+        border = if (emphasis == ActionEmphasis.Secondary) AssistChipDefaults.assistChipBorder(enabled) else null,
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = when {
+                primary && destructive -> scheme.errorContainer
+                primary -> scheme.primary
+                else -> Color.Transparent
+            },
+            labelColor = foreground,
+            leadingIconContentColor = foreground,
+            disabledContainerColor = if (primary) scheme.onSurface.copy(alpha = 0.12f) else Color.Transparent,
+        ),
+    )
 }
 
 /** Baris kontrol penuh: satu fokus TalkBack, target 48dp, status tidak hanya warna. */
@@ -264,17 +243,7 @@ fun ActionChip(
     enabled: Boolean = true,
     destructive: Boolean = false,
 ) {
-    AssistChip(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        label = { Text(label, maxLines = 1) },
-        leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
-        colors = if (destructive) AssistChipDefaults.assistChipColors(
-            labelColor = MaterialTheme.colorScheme.error,
-            leadingIconContentColor = MaterialTheme.colorScheme.error,
-        ) else AssistChipDefaults.assistChipColors(),
-    )
+    ActionButton(label, onClick, modifier, icon, enabled, destructive = destructive)
 }
 
 /** Deretan kontrol yang dapat digulir: satu jarak 8dp untuk chip, filter, dan aksi. */
@@ -658,22 +627,15 @@ fun <T> OptionMenu(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(
+        AssistChip(
             onClick = { expanded = true },
-            modifier = if (showLabel) modifier.fillMaxWidth() else modifier.heightIn(min = 48.dp),
-            shape = MaterialTheme.shapes.small,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            if (showLabel) {
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(options.firstOrNull { it.first == selected }?.second.orEmpty(), style = MaterialTheme.typography.bodyMedium)
-                }
-            } else {
-                Text(options.firstOrNull { it.first == selected }?.second ?: label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-            }
-            Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp))
-        }
+            modifier = modifier,
+            label = {
+                val value = options.firstOrNull { it.first == selected }?.second.orEmpty()
+                Text(if (showLabel) "$label: $value" else value.ifBlank { label }, style = MaterialTheme.typography.labelLarge)
+            },
+            trailingIcon = { Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp)) },
+        )
         DropdownMenu(expanded, { expanded = false }) {
             options.forEach { (value, text) ->
                 DropdownMenuItem(

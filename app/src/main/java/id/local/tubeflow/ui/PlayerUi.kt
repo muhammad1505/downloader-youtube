@@ -233,26 +233,26 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                 }
                 Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                     IconToggleButton(checked=state.shuffle,onCheckedChange={ player.toggleShuffle() },
-                        enabled=state.queueTracks.size>1,modifier=Modifier.weight(1f).height(64.dp)) {
+                        enabled=state.queueTracks.size>1,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
                         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Icon(Icons.Outlined.Shuffle,null,tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(stringResource(id.local.tubeflow.R.string.player_shuffle),style=MaterialTheme.typography.labelSmall)
                         }
                     }
-                    IconButton(onClick=player::cycleRepeat,modifier=Modifier.weight(1f).height(64.dp)) {
+                    IconButton(onClick=player::cycleRepeat,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
                         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
                                 "Ulangi: ${repeatLabel(state.repeat)}",tint=if (state.repeat==PlaybackQueue.Repeat.OFF) MaterialTheme.colorScheme.onSurfaceVariant else accent)
                             Text(stringResource(id.local.tubeflow.R.string.player_repeat),style=MaterialTheme.typography.labelSmall)
                         }
                     }
-                    IconButton(onClick=karaoke,modifier=Modifier.weight(1f).height(64.dp)) {
+                    IconButton(onClick=karaoke,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
                         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Icon(Icons.Outlined.MicOff,null)
                             Text(stringResource(id.local.tubeflow.R.string.player_karaoke),style=MaterialTheme.typography.labelSmall)
                         }
                     }
-                    IconButton(onClick={ queueOpen=true },modifier=Modifier.weight(1f).height(64.dp)
+                    IconButton(onClick={ queueOpen=true },modifier=Modifier.weight(1f).heightIn(min=48.dp)
                         .semantics { contentDescription="Antrean putar, ${state.queueTracks.size} lagu" }) {
                         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {

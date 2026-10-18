@@ -35,7 +35,13 @@ Definisikan sekali di tema, pakai di mana-mana. Nilai literal di composable adal
 Untuk deret kontrol di dekat tab/filter, gunakan `ActionChip` agar tinggi visual,
 bentuk dan padding mengikuti chip Material. Putar/Acak/Cari di Koleksi dan
 Bersihkan di Riwayat memakai pola ini; tombol formulir/dialog tetap memakai
-`ActionButton`. Baris Kelola playlist mengikuti kartu koleksi dengan nama dan
+`ActionButton`. Sejak1.1.24 komponen ActionButton sendiri memakai AssistChip
+bersama ActionChip: visual32dp minimum dan target48dp, dengan warna/border
+sesuai peran. Label panjang membungkus. OptionMenu menampilkan label:nilai
+dalam chip yang sama, bukan tombol dua baris berpadding besar. Ini berlaku
+untuk Pengaturan, Download, lirik, timer, karaoke, playlist dan empty state;
+tinggi52/48dp pada catatan desain lama sudah digantikan.
+Baris Kelola playlist mengikuti kartu koleksi dengan nama dan
 ikon Ubah/Hapus48dp, beserta deskripsi aksesibilitas yang menyebut playlist.
 Antrean putar dan aksi massal antrean download mengikuti chip yang sama.
 Kartu video memakai baris ikon Putar/Bagikan/Detail/Ubah/Hapus; kartu audio

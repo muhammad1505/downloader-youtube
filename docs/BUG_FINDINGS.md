@@ -773,3 +773,9 @@ Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
 - **Akar:** Bersihkan antrean putar masih memakai tombol besar di sebelah chip; aksi langsung Koleksi berada seluruhnya dalam cabang audio. Bagikan belum dipaparkan pada kartu Koleksi meskipun helper publikasi intent sudah tersedia.
 - **Perbaikan1.1.23:** Bersihkan serta aksi massal antrean download memakai ActionChip; video mendapat ikon Putar/Bagikan/Detail/Ubah/Hapus, audio mendapat Bagikan. Target sentuh48dp, konfirmasi, MIME aktual dan grant URI tetap dipertahankan; video tidak diberi aksi khusus audio.
 - **Verifikasi:** [laporan aksi dan EQ](ACTIONS_EQ_1_1_23.md) memisahkan hasil host, build dan perangkat yang benar-benar dijalankan.
+
+## BUG-076 — P3: Tombol besar masih tersebar di berbagai menu
+
+- **Akar:** perubahan sebelumnya mengganti sebagian pemanggil menjadi ActionChip, sedangkan komponen ActionButton bersama tetap48/52dp. OptionMenu memakai tombol dua baris dengan padding besar; timer, karaoke, pengaturan, lirik dan formulir masih mengikuti ukuran lama.
+- **Perbaikan1.1.24:** ActionButton/ActionChip memakai AssistChip bersama dengan peran warna yang tetap berbeda, minimum visual32dp dan target48dp. OptionMenu menjadi chip label:nilai; label panjang membungkus. Kontrol sekunder player memakai tinggi minimum48dp.
+- **Cakupan dan bukti:** [laporan kontrol menyeluruh](COMPACT_CONTROLS_1_1_24.md). EQ tidak diubah; umpan balik suara pengguna dengan QKZ AK6 Pro dicatat terpisah dari pengukuran teknis.

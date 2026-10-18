@@ -13,6 +13,27 @@ cukup kuat, daftar mudah dipindai, gerak hanya untuk perubahan status.
 
 ## Token
 
+### Kontrol ringkas menyeluruh (1.1.24)
+
+ActionButton dan ActionChip menggunakan komponen chip Material yang sama:
+tinggi visual minimum32dp, ikon18dp, labelLarge, bentuk chip tema dan target
+sentuh minimum48dp. Aksi utama dibedakan lewat warna filled, sekunder outline,
+dan aksi tenang tanpa border. Label panjang/font besar boleh membungkus.
+OptionMenu menampilkan label dan nilai dalam satu chip, bukan tombol dua baris
+dengan padding10dp. Dropdown tetap memakai menu Material yang sama.
+
+```text
+Pengaturan: [Tema: Gelap ▾] [Segarkan] [Bersihkan cache lirik]
+Lirik:      [Cari lirik] [Muat hasil lain]
+Form:       [Simpan] [Batal]
+```
+
+Palet, tipografi, jarak8/12/16dp, radius kartu dan ENERGY2/RHYTHM1/MOTION1
+dipertahankan. Kritik: mengecilkan seluruh area sentuh akan mempersulit pemakaian;
+yang disamakan adalah ukuran visual. Kontrol transport utama player, switch,
+radio, field input dan target ikon tetap mengikuti kebutuhan interaksinya.
+Aturan ini menggantikan tinggi tombol52/48dp pada catatan versi sebelumnya.
+
 Polesan 1.1.23 mempertahankan ENERGY2/RHYTHM1/MOTION1, palet, tipografi,
 radius kartu20dp dan ritme8/12/16dp. Antrean putar memakai ActionChip seperti
 filter Acak/Ulangi. Aksi kartu audio dan video memakai IconAction48dp agar

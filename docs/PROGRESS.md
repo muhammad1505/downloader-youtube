@@ -695,3 +695,15 @@ lulus. Update fisik/code37/hash cocok; tes antrean, share, dialog video,
 playback video dan preset EQ lulus dalam cakupan yang dicatat.
 Hi-Res/ANC masih penilaian kemampuan, bukan fitur baru yang diklaim selesai.
 [Laporan dan batas verifikasi](ACTIONS_EQ_1_1_23.md).
+
+## Pembaruan 19 Oktober 2026: kontrol menyeluruh 1.1.24
+
+ActionButton dan ActionChip memakai AssistChip bersama; OptionMenu menjadi
+chip label:nilai. Ukuran visual ringkas berlaku bagi seluruh pemanggil,
+termasuk Pengaturan, Download, lirik, timer, karaoke dan playlist. EQ tetap
+sesuai umpan balik pengguna dengan QKZ AK6 Pro. 348Kotlin, lint0error/2warning
+lama, build debug/release dan audit ARM64 lulus. HP/code38/hash cocok;
+24kontrol target82px, tema terang/gelap, form playlist dan dialog alat media
+diperiksa. QA playlist dibersihkan dan tema dipulihkan. Pencarian lirik
+mencatat HTTP503 pada salah satu jalur; belum dianggap selesai oleh polesan UI.
+[Hasil dan batas](COMPACT_CONTROLS_1_1_24.md).
