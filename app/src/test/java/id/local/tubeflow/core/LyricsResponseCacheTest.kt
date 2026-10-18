@@ -5,6 +5,61 @@ import org.junit.Test
 import java.nio.file.Files
 
 class LyricsResponseCacheTest {
+    @Test fun clearDoesNotWaitForNetworkAndOldResponseCannotRepopulateCache() {
+        val dir = Files.createTempDirectory("lyrics-clear-race").toFile()
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        try {
+            val cache = LyricsResponseCache(dir)
+            val pending = executor.submit<LyricsResponseCache.Response> {
+                cache.request("old") {
+                    entered.countDown()
+                    check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    LyricsResponseCache.Response(200, "[]")
+                }
+            }
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            val cleared = executor.submit<LyricsResponseCache.ClearResult> { cache.clear() }
+            assertTrue(cleared.get(1, java.util.concurrent.TimeUnit.SECONDS).complete)
+            release.countDown()
+            assertEquals(200, pending.get(2, java.util.concurrent.TimeUnit.SECONDS).code)
+            assertTrue(dir.listFiles()!!.isEmpty())
+            var calls = 0
+            cache.request("old") { calls++; LyricsResponseCache.Response(200, "[]") }
+            assertEquals(1, calls)
+        } finally { release.countDown(); executor.shutdownNow(); dir.deleteRecursively() }
+    }
+
+    @Test fun clearBeforeEngineInitializationRemovesDiskCacheAndPreservesProviderCooldown() {
+        val root = Files.createTempDirectory("lyrics-clear-startup").toFile()
+        val previous = Lyrics.responseCache
+        try {
+            val dir = java.io.File(root, "lyrics-responses").apply { mkdirs() }
+            java.io.File(dir, "old.json").writeText("cached")
+            val cooldown = java.io.File(root, "lyrics-cooldown.json").apply { writeText("keep") }
+            Lyrics.responseCache = null
+            val result = Lyrics.clearCache(dir)
+            assertTrue(result.complete)
+            assertEquals(1, result.removed)
+            assertTrue(dir.listFiles()!!.isEmpty())
+            assertEquals("keep", cooldown.readText())
+            assertEquals(0, Lyrics.clearCache(dir).removed)
+        } finally { Lyrics.responseCache = previous; root.deleteRecursively() }
+    }
+
+    @Test fun unremovableOrUnexpectedCacheEntriesAreNotReportedAsClean() {
+        val dir = Files.createTempDirectory("lyrics-clear-partial").toFile()
+        try {
+            java.io.File(dir, "unexpected").mkdirs()
+            java.io.File(dir, "old.json").writeText("cached")
+            val result = LyricsResponseCache(dir).clear()
+            assertFalse(result.complete)
+            assertEquals(1, result.removed)
+            assertTrue(java.io.File(dir, "unexpected").isDirectory)
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test fun explicitRetryRefreshesOnlyMissingResponsesAndKeepsPositiveCache() {
         val dir=Files.createTempDirectory("lyrics-refresh").toFile()
         try {

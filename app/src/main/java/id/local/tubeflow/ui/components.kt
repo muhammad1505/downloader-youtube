@@ -134,7 +134,11 @@ fun ActionButton(
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = if (destructive) scheme.error else scheme.primary,
             ),
-            border = if (destructive) BorderStroke(1.dp, scheme.error.copy(alpha = 0.55f)) else null,
+            border = BorderStroke(1.dp, when {
+                !enabled -> scheme.onSurface.copy(alpha = 0.12f)
+                destructive -> scheme.error.copy(alpha = 0.55f)
+                else -> scheme.outline
+            }),
             contentPadding = PaddingValues(horizontal = 16.dp),
             content = content,
         )

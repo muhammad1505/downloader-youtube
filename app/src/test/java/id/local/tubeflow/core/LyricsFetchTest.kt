@@ -17,6 +17,7 @@ import java.net.InetSocketAddress
  */
 class LyricsFetchTest {
     private lateinit var server: HttpServer
+    private lateinit var cacheDirectory: java.io.File
     private val requests = mutableListOf<String>()
 
     /** Kode HTTP + badan per jalur; diatur ulang oleh tiap tes. */
@@ -27,6 +28,7 @@ class LyricsFetchTest {
     fun start() {
         Lyrics.requestGate = LyricsRequestGate(minimumGapMs=0)
         Lyrics.responseCache = null
+        cacheDirectory = java.nio.file.Files.createTempDirectory("lyrics-fixture").toFile()
         requests.clear()
         respond = { 404 to "" }
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -51,6 +53,7 @@ class LyricsFetchTest {
         Lyrics.responseCache = null
         Lyrics.baseUrl = "https://lrclib.net"
         server.stop(0)
+        cacheDirectory.deleteRecursively()
     }
 
     private fun fetchKnown(display: String, duration: Long) = Lyrics.fetch(
@@ -120,7 +123,7 @@ class LyricsFetchTest {
         respond={ 429 to "" }
         assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Song","Artist").failureStatus)
         assertEquals(600L,Lyrics.retryAfterSeconds())
-        Lyrics.clearCache()
+        Lyrics.clearCache(cacheDirectory)
         assertEquals(LyricStatus.RATE_LIMIT,Lyrics.search("Song","Artist").failureStatus)
         assertEquals(1,requests.size)
         now += 600_000
@@ -162,7 +165,7 @@ class LyricsFetchTest {
         }
         assertEquals(LyricStatus.SAVED,Lyrics.fetch(SongIdentity("Song","Denny Caknan x Happy Asmara"),200).status)
         assertTrue(requests.any { it.contains("artist_name=Denny+Caknan") && !it.contains("Happy") })
-        Lyrics.clearCache()
+        Lyrics.clearCache(cacheDirectory)
         assertEquals(LyricStatus.NO_MATCH,Lyrics.fetch(SongIdentity("Song","Denny Caknan x Happy Asmara"),220).status)
     }
 

@@ -16,18 +16,24 @@ import androidx.compose.runtime.mutableStateOf
 import id.local.tubeflow.core.DownloadViewModel
 import id.local.tubeflow.core.SettingsStore
 import id.local.tubeflow.core.PlayerViewModel
+import id.local.tubeflow.core.AppDestination
+import id.local.tubeflow.core.AppNavigationRequest
 import id.local.tubeflow.ui.TubeFlowApp
 import id.local.tubeflow.ui.theme.TubeFlowTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var player: PlayerViewModel
     private val incomingUrl = mutableStateOf("")
+    private val navigation = mutableStateOf<AppNavigationRequest?>(null)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) readSharedLink(intent)
+        if (savedInstanceState == null) readLaunchIntent(intent)
+        else AppDestination.fromAction(savedInstanceState.getString("pending_destination"))?.let {
+            navigation.value = AppNavigationRequest(it)
+        }
         SettingsStore.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
@@ -37,7 +43,11 @@ class MainActivity : ComponentActivity() {
             TubeFlowTheme(
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
-            ) { TubeFlowApp(model, library, player, karaoke, incomingUrl.value, ::requestDownloadNotifications) }
+            ) {
+                TubeFlowApp(model, library, player, karaoke, incomingUrl.value, ::requestDownloadNotifications,
+                    navigation = navigation.value,
+                    onNavigationHandled = { id -> if (navigation.value?.id == id) navigation.value = null })
+            }
         }
     }
     private fun requestDownloadNotifications() {
@@ -52,6 +62,18 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        readLaunchIntent(intent)
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        navigation.value?.let { outState.putString("pending_destination", it.destination.action) }
+        super.onSaveInstanceState(outState)
+    }
+    private fun readLaunchIntent(intent: Intent?) {
+        val destination = AppDestination.fromAction(intent?.action)
+        if (destination != null) {
+            navigation.value = AppNavigationRequest(destination)
+            return
+        }
         readSharedLink(intent)
     }
     private fun readSharedLink(intent: Intent?) {
@@ -60,6 +82,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> intent.dataString
             else -> null
         } ?: return
+        navigation.value = AppNavigationRequest(AppDestination.DOWNLOAD)
         incomingUrl.value = Regex("https?://[^\\s]+").find(text)?.value ?: text.trim()
     }
 }

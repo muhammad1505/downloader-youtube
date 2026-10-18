@@ -369,12 +369,19 @@ object Lyrics {
      */
     @Volatile internal var responseCache: LyricsResponseCache? = null
     @Volatile internal var requestGate = LyricsRequestGate()
-    @Synchronized fun initialize(cacheDirectory: java.io.File, cooldownFile: java.io.File) {
+    fun initialize(cacheDirectory: java.io.File, cooldownFile: java.io.File) {
         requestGate.attach(cooldownFile)
-        if (responseCache == null) responseCache = LyricsResponseCache(cacheDirectory)
+        synchronized(this) {
+            if (responseCache == null) responseCache = LyricsResponseCache(cacheDirectory)
+        }
     }
     fun retryAfterSeconds(): Long = requestGate.remainingSeconds()
-    fun clearCache() { responseCache?.clear() }
+    fun clearCache(cacheDirectory: java.io.File): LyricsResponseCache.ClearResult {
+        val cache = synchronized(this) {
+            responseCache ?: LyricsResponseCache(cacheDirectory).also { responseCache = it }
+        }
+        return cache.clear()
+    }
     private fun validProviderBody(path: String, text: String): Boolean = runCatching {
         fun validRecord(record: org.json.JSONObject) = !record.isNull("trackName") &&
             record.opt("trackName") is String && record.getString("trackName").isNotBlank()

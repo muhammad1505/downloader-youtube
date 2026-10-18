@@ -133,7 +133,7 @@ fun HistoryScreen(
                     Text("${filtered.size} entri ditampilkan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ScrollRow {
                         if (unsuccessful > 0) ActionButton("Hapus gagal ($unsuccessful)", onClearUnsuccessful, emphasis = ActionEmphasis.Quiet, destructive = true)
-                        if (completed.isNotEmpty()) ActionButton("Bersihkan", { confirmClear = true }, emphasis = ActionEmphasis.Quiet, destructive = true)
+                        if (completed.isNotEmpty()) ActionButton("Bersihkan", { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, destructive = true)
                     }
                 }
             }

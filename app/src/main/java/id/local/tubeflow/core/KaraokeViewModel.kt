@@ -42,6 +42,8 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
     private val _source = MutableStateFlow<PlayerViewModel.Track?>(null); val source = _source.asStateFlow()
     private fun currentInfo() = info.value?.takeIf { it.id == id.value }
 
+    private val initialized = kotlinx.coroutines.CompletableDeferred<Unit>()
+
     init {
         viewModelScope.launch {
             try { withContext(Dispatchers.IO) { requests.withLock {
@@ -94,7 +96,7 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } } } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _message.value = "Status karaoke belum dapat dimuat. Coba buka lagi." }
-            finally { _busy.value = false }
+            finally { _busy.value = false; initialized.complete(Unit) }
         }
         viewModelScope.launch(Dispatchers.IO) { KaraokeWorker.lock.withLock {
             try { KaraokePublication(app).recover() }
@@ -130,7 +132,9 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
         }
         return running
     }
+    private var currentOpening: kotlinx.coroutines.Job? = null
     fun open(track: PlayerViewModel.Track, positionMs: Long = 0) {
+        currentOpening?.cancel()
         if (_selected.value?.uri != track.uri) {
             _sample.value = true; _startText.value = KaraokeInterval.formatStart(positionMs)
         }
@@ -138,15 +142,19 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
         _selected.value = track; _open.value = true; _message.value = null
     }
     fun openCurrent() {
-        _selected.value = _source.value
-        currentInfo()?.let { current ->
-            val data = if (current.state.isFinished) current.outputData else current.progress
-            _sample.value = data.getBoolean("sample", _sample.value)
-            _startText.value = KaraokeInterval.formatStart(data.getLong("startMs", lastStartMs))
+        currentOpening?.cancel()
+        currentOpening = viewModelScope.launch {
+            initialized.await()
+            _selected.value = _source.value
+            currentInfo()?.let { current ->
+                val data = if (current.state.isFinished) current.outputData else current.progress
+                _sample.value = data.getBoolean("sample", _sample.value)
+                _startText.value = KaraokeInterval.formatStart(data.getLong("startMs", lastStartMs))
+            }
+            _open.value = true; _message.value = null
         }
-        _open.value = true; _message.value = null
     }
-    fun close() { _open.value = false }
+    fun close() { currentOpening?.cancel(); _open.value = false }
     fun isPrivatePreview(uri: String?): Boolean = uri?.startsWith(
         android.net.Uri.fromFile(File(getApplication<Application>().noBackupFilesDir, "karaoke-work")).toString().trimEnd('/') + "/") == true
     fun start(onAccepted: () -> Unit = {}) {

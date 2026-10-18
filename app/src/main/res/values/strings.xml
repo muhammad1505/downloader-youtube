@@ -28,7 +28,7 @@
         <item quantity="other">%1$d lagu cocok</item>
     </plurals>
     <string name="player_autoplay_prepare">Menyiapkan musik dari headset…</string>
-    <string name="player_autoplay_retry">Ketuk untuk melanjutkan musik</string>
+    <string name="player_autoplay_retry">Pemutaran belum dilanjutkan. Buka pemutar atau pilih Coba putar.</string>
     <string name="autoplay_bluetooth_title">Auto-play Bluetooth</string>
     <string name="autoplay_bluetooth_description">Izin perangkat terdekat diperlukan untuk menerima sambungan TWS/Bluetooth saat aplikasi tertutup. Headset kabel tidak memerlukan izin ini. TubeFlow tidak memindai lokasi atau perangkat sekitar.</string>
     <string name="autoplay_bluetooth_granted">Izin sambungan Bluetooth tersedia.</string>
@@ -166,4 +166,19 @@
     <string name="page_settings">Pengaturan</string>
     <string name="page_settings_help">Atur pemutaran, penyimpanan, tampilan, dan pemrosesan media.</string>
     <string name="lyrics_http_detail">Respons LRCLIB: HTTP %1$d</string>
+    <string name="cache_clearing_lyrics">Membersihkan cache lirik…</string>
+    <string name="cache_lyrics_cleared">Cache lirik dibersihkan. File LRC dan batas permintaan penyedia tetap dipertahankan.</string>
+    <string name="cache_lyrics_empty">Cache lirik sudah kosong. File LRC tetap tersedia.</string>
+    <string name="cache_clear_failed">Sebagian cache lirik belum dapat dibersihkan. Coba lagi.</string>
+    <string name="notification_retry_play">Coba putar</string>
+    <string name="notification_open_history">Ketuk untuk melihat Riwayat download.</string>
+    <string name="playlist_editing">Ubah nama: %1$s</string>
+    <string name="playlist_cancel_edit">Batal ubah nama</string>
+    <string name="playlist_search">Cari playlist</string>
+    <string name="playlist_clear_search">Bersihkan pencarian playlist</string>
+    <string name="playlist_none">Belum ada playlist pribadi. Buat daftar pertama melalui nama di atas.</string>
+    <string name="playlist_no_results">Tidak ada playlist yang cocok.</string>
+    <plurals name="playlist_count">
+        <item quantity="other">%d playlist pribadi</item>
+    </plurals>
 </resources>

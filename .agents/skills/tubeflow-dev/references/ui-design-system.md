@@ -74,7 +74,7 @@ Verifikasi detail terhadap dokumentasi Android untuk target SDK aktif di Gradle.
 
 ## Player dan karaoke
 
-- Satu player untuk seluruh aplikasi (`PlayerViewModel.obtain()` yang hidup di level proses aplikasi, bukan terikat siklus hidup Activity). Kontrol di layar, notifikasi media (`PlaybackService` dengan ikon monokrom `ic_stat_playback`, sampul 40dp pada isi notifikasi ringkas 48dp, progress bar beraksen, dan durasi/posisi yang di-reset tiap lagu baru), tombol headset, serta auto-play saat perangkat audio tersambung mengarah ke engine yang sama; jangan membuat tampilan player kedua dengan state sendiri.
+- Satu player untuk seluruh aplikasi (`PlayerViewModel.obtain()` yang hidup di level proses aplikasi, bukan terikat siklus hidup Activity). Kontrol di layar, notifikasi media native (`PlaybackService`/MediaStyle dengan ikon monokrom `ic_stat_playback`, artwork dan durasi/posisi dari MediaSession, serta tujuan ketuk full player), tombol headset, serta auto-play saat perangkat audio tersambung mengarah ke engine yang sama; jangan membuat tampilan player kedua dengan state sendiri.
 - Pemutar penuh memakai `HorizontalPager` dua halaman (Sampul ↔ Lirik) tanpa chip pemindah terpisah; geseran manual (swipe) pengguna menang atas auto-switch saat lirik baru tiba.
 - Saat lirik kosong atau belum pas, pemutar penuh menyediakan langsung tombol **Cari lirik** (`LyricsSearchDialog`) dan **Editor lirik** (`LyricTimingDialog`) tanpa memaksa pengguna kembali ke layar Koleksi.
 - Tampilan lirik mengikuti timestamp asli ditambah offset per lagu. Pilihan lirik manual menampilkan pratinjau, atribusi, dan pengakuan bila berbeda dari identitas audio aktual.

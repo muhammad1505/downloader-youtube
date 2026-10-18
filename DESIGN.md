@@ -124,3 +124,18 @@ ke lirik. Tidak menambah kartu promosi, slogan, atau statistik buatan.
 Periksa HP fisik: setiap menu, panel lirik, font 1,3x/2x, terang/gelap, layar sempit,
 status kosong dan galat. Catat cakupan yang benar-benar diuji pada laporan
 perbaikan; jangan menyimpulkan aksesibilitas atau kesiapan rilis dari build saja.
+
+
+## Navigasi dan playlist (1.1.20)
+
+- Notifikasi musik memakai MediaStyle native dan MediaSession, bukan salinan mini
+  player dalam RemoteViews. Ketukan isi membuka full player pada Activity yang sama.
+- Selesai download membuka Riwayat; unduhan aktif/gagal membuka Antrean; karaoke
+  membuka status proses. Aksi stop/cancel/retry tetap terpisah dari tujuan ketuk.
+- Secondary ActionButton selalu memiliki outline, termasuk kondisi disabled.
+  Bersihkan di Riwayat/Antrean putar dan Ubah/Hapus playlist mengikuti komponen ini.
+- Kelola playlist: dialog Material, form tambah/ubah, batal edit, error lokal,
+  pencarian serta daftar lazy. Tombol membungkus sesuai lebar; tidak menggandakan
+  file musik. Nama form dikosongkan setelah operasi database berhasil.
+- Cache lirik menampilkan status berjalan dan hasil sukses/kosong/parsial; LRC dan
+  cooldown penyedia tetap dipertahankan. Bukan tombol untuk melewati batas LRCLIB.

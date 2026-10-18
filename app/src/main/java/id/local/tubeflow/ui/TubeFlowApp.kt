@@ -29,7 +29,7 @@ import id.local.tubeflow.core.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, onNavigationHandled: (String) -> Unit = {}) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var previousTab by rememberSaveable { mutableIntStateOf(1) }
@@ -64,12 +64,30 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
 
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
+            fullPlayer = false
+            karaoke.close()
             if (url != incomingUrl) model.clearPlaylist()
             url = incomingUrl
             tab = 1
             // Inspeksi diserahkan ke efek DownloadScreen (video vs playlist) — memanggil inspect langsung di sini
             // membuat tautan playlist murni memunculkan "tautan tidak valid" sesaat dan video diperiksa dua kali (BUG-022).
         }
+    }
+    LaunchedEffect(navigation?.id) {
+        val request = navigation ?: return@LaunchedEffect
+        fullPlayer = false
+        karaoke.close()
+        library.closeLyrics()
+        tab = request.destination.tab
+        when (request.destination) {
+            AppDestination.PLAYER -> {
+                player.restorePlaybackSession()
+                fullPlayer = player.state.value.track != null
+            }
+            AppDestination.KARAOKE -> karaoke.openCurrent()
+            else -> Unit
+        }
+        onNavigationHandled(request.id)
     }
     // Koleksi harus pulih sendiri setelah data aplikasi dihapus: minta izin baca sekali, lalu pindai
     // otomatis bila koleksi kosong — tanpa pilih folder atau impor file. Izin baca juga membuat file

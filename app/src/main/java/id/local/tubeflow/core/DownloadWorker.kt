@@ -1,12 +1,10 @@
 package id.local.tubeflow.core
 
+import id.local.tubeflow.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.media.MediaMetadataRetriever
@@ -44,7 +42,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
  private fun foreground(progress: Int, text: String): ForegroundInfo {
   val manager = applicationContext.getSystemService(NotificationManager::class.java)
   manager.createNotificationChannel(NotificationChannel("downloads","Unduhan",NotificationManager.IMPORTANCE_LOW))
-  val notification = NotificationCompat.Builder(applicationContext,"downloads").setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("TubeFlow").setContentText(text).setProgress(100,progress.coerceAtLeast(0),progress < 0).setOnlyAlertOnce(true).setOngoing(true).addAction(android.R.drawable.ic_menu_close_clear_cancel,"Batalkan", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)).build()
+  val notification = NotificationCompat.Builder(applicationContext,"downloads").setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("TubeFlow").setContentText(text).setProgress(100,progress.coerceAtLeast(0),progress < 0).setOnlyAlertOnce(true).setOngoing(true).setContentIntent(AppIntents.pending(applicationContext, AppDestination.QUEUE)).addAction(android.R.drawable.ic_menu_close_clear_cancel,"Batalkan", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)).build()
   return ForegroundInfo(id.hashCode().let { if(it == 0) 1 else it },notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
  }
  private suspend fun handleStop(jobId: String, generation: Int) {
@@ -427,23 +425,19 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   val manager = applicationContext.getSystemService(NotificationManager::class.java)
   manager.createNotificationChannel(NotificationChannel("results","Hasil unduhan",NotificationManager.IMPORTANCE_DEFAULT))
   val ok = uri != null
-  val intent = if (ok) {
-   val mime = applicationContext.contentResolver.getType(uri) ?: if (job.mode == MediaMode.AUDIO) "audio/*" else "video/*"
-   Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).apply { clipData = ClipData.newRawUri("Download", uri) }
-  } else applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName) ?: Intent()
-  val pendingIntent = PendingIntent.getActivity(applicationContext, job.id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+  val pendingIntent = AppIntents.pending(applicationContext, AppDestination.downloadResult(ok))
   val notification = NotificationCompat.Builder(applicationContext,"results")
    .setSmallIcon(if (ok) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
    .setContentTitle(if (ok) "Selesai: ${Format.tidyFileName(job.title)}" else "Gagal: ${Format.tidyFileName(job.title)}")
-   .setContentText(if (ok) "Ketuk untuk membuka file." else (error ?: "Unduhan gagal."))
+   .setContentText(if (ok) applicationContext.getString(R.string.notification_open_history) else (error ?: "Unduhan gagal."))
    // Status lirik terpisah: audio sukses tidak dilabeli gagal hanya karena lirik tidak tersedia (BUG-014).
    .setStyle(NotificationCompat.BigTextStyle().bigText(if (ok) buildString {
     append("File tersimpan dan siap diputar.")
     if (lyricStatus.isNotEmpty()) append('\n').append(LyricStatus.label(lyricStatus)).append('.')
    } else (error ?: "Unduhan gagal.")))
    .setContentIntent(pendingIntent).setAutoCancel(true)
-  // Notifikasi hasil hilang sendiri: sukses 10 detik (tetap bisa dibuka dari Riwayat), gagal 30 menit biar sempat dibaca.
-  .setTimeoutAfter(if (ok) 10_000L else 30 * 60 * 1000L)
+  // Keep results available long enough to navigate to their corresponding screen.
+  .setTimeoutAfter(30 * 60 * 1000L)
    .build()
   runCatching { manager.notify(job.id.hashCode().let { if (it == 0) 1 else it }, notification) }
  }

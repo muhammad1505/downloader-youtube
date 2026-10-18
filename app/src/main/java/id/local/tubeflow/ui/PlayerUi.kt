@@ -312,7 +312,7 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                 FilterChip(selected=state.repeat!=PlaybackQueue.Repeat.OFF,onClick=player::cycleRepeat,
                     label={ Text("Ulangi: ${repeatLabel(state.repeat)}") },leadingIcon={
                         Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,null,Modifier.size(18.dp)) })
-                ActionButton("Bersihkan", { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true, enabled = state.queueTracks.size > 1)
+                ActionButton("Bersihkan", { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, destructive = true, enabled = state.queueTracks.size > 1)
             }
             if (positions.isEmpty()) Text(stringResource(id.local.tubeflow.R.string.player_queue_no_results),
                 Modifier.padding(vertical=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)

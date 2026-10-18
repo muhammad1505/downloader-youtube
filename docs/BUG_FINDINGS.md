@@ -29,6 +29,11 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 
 | ID | Prioritas | Temuan | Status |
 | --- | --- | --- | --- |
+| BUG-067 | P2 | Cache lirik diam atau tidak terhapus sesudah startup | Direktori eksplisit, status hasil, lock disk terpisah dan generasi; unit lulus, HP 128 berkas→0, cooldown identik |
+| BUG-068 | P2 | MainActivity menumpuk saat aplikasi dibuka dari beberapa sumber | singleTask dan onNewIntent; HP 2 instance→1 pada release final |
+| BUG-069 | P2 | Tujuan notifikasi berbeda dari konteksnya | AppIntents/AppDestination bersama; musik native→player, sukses→Riwayat, aktif/gagal→Antrean, karaoke→status; pengelola mengonfirmasi sesuai |
+| BUG-070 | P3 | Tombol secondary kehilangan outline dan aksi daftar tidak seragam | Border null diperbaiki; Bersihkan dan Ubah/Hapus playlist mengikuti komponen sekunder/destruktif yang sama |
+| BUG-071 | P2 | Form Kelola playlist cepat hilang dan daftar sulit dikelola | Form direset setelah sukses; error lokal, batal edit, search/empty state dan LazyColumn; buat/ubah/batal/persistensi diuji |
 | BUG-066 | P2 | Pilihan timer terpotong di landscape/font besar | Reproduksi pada HP setelah pemutaran video; dialog diberi scroll; retest release final menjangkau custom/selesai lagu dan timer berhenti sebelum repeat |
 | BUG-064 | P2 | Detail galat inspeksi tertinggal setelah link dikosongkan/diganti | Pemilik sesi inspeksi diikat token; clear membatalkan dan menghapus galat, callback lama ditolak; 3 regresi dan retest HP error/busy lulus |
 | BUG-065 | P3 | Label navigasi terpotong pada font besar | Teramati pada 360dp/font1,35×; ambang ikon bernama disesuaikan; retest lima tujuan pada release final 1,35×/360dp lulus |
@@ -717,3 +722,24 @@ positif sumber Live; jangan reset cooldown, memutar IP atau melonggarkan versi.
 - **Akar:** isi dialog berupa Column yang tidak dapat digulir.
 - **Perbaikan:** viewport dibatasi dan diberi verticalScroll; header dan tombol Tutup tetap pada dialog Material. Logika timer dan volume tidak diubah.
 - **Verifikasi:** countdown satu menit di latar lulus pada kandidat. Release final membuktikan scroll landscape menjangkau input custom dan selesai lagu; opsi selesai lagu menghentikan pemutar sebelum shuffle/repeat. Posisi awal dipulihkan.
+
+
+## BUG-067–071 — Cache, instance, notifikasi, dan playlist 1.1.20
+
+Audit dilakukan pada source terbaru 1.1.19/1d7caf3; upgrade UI 83d4f97 dipertahankan.
+Cache lama hanya membersihkan objek yang sudah diinisialisasi dan menahan lock
+selama HTTP; clear kini bekerja sebelum Engine dan menolak publikasi respons lama.
+MainActivity standard diganti singleTask. Content intent yang generik, membuka
+file eksternal, atau kosong diganti tujuan terpusat pada Activity yang sama.
+MediaStyle native menggantikan RemoteViews, dengan kontrol service tetap sama.
+
+Secondary ActionButton sebelumnya mengirim border=null. Outline dipulihkan;
+Bersihkan di dua daftar dan Ubah/Hapus playlist memakai peran yang sama. Form
+playlist tidak lagi dikosongkan sebelum hasil database; kegagalan tetap terlihat.
+Daftar lazy, pencarian, empty state dan batal edit ditambahkan tanpa tabel baru.
+
+345 Kotlin/93 Python, build debug/release/APK×3/AAB dan audit paket lulus;
+lint0error/2warning lama. HP: cache128→0/cooldown identik, Activity2→1,
+playlist buat/ubah/batal/persistensi, konfirmasi Bersihkan, serta konfirmasi
+pengelola untuk notifikasi. [Akar, file, hash, hasil dan batas](NOTIFICATIONS_PLAYLIST_1_1_20.md).
+Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.

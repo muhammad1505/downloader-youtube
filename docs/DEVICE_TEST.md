@@ -547,3 +547,14 @@ lewat ADB), TalkBack, tablet, dan aksi ikon baru di Koleksi hanya terbukti
 terkompilasi+terpasang, belum tertangkap ulang karena layar HP sedang dipakai
 pengelola (konten pribadi di layar; berkas tangkapan yang memuatnya dihapus).
 Tangkapan bersih ada di `build/reports/ui-1119/` (privat, tidak di-commit).
+
+
+## Cache dan navigasi 1.1.20 — 18 Oktober 2026
+
+Realme RMX1821 Android10/API29/RAM4GB/4KiB. Cache128→0 dan cooldown hash identik pada paket QA; release final menggantikan QA, hash base.apk cocok. Activity2→1, playlist uji bertahan setelah update; buat/ubah/batal/search dan dialog Bersihkan diuji. Notifikasi musik native dan ketuk full player teramati pada QA; pengelola mengonfirmasi notifikasi final sesuai. 345 Kotlin/93 Python, build dan audit paket lulus; lint0error/2warning lama. Raw screenshot/log privat, tidak diikutkan Git.
+[Laporan, checksum dan pengujian](NOTIFICATIONS_PLAYLIST_1_1_20.md).
+
+Penutupan sesi:62path+hash awal identik, hanya video/playlist QA dihapus. Tema
+Ikut sistem dipulihkan, font0,9/density272 tetap. SATRU pengguna paused72960ms
+dan antreannya dipertahankan; helper QA remote dibuang. Tidak ada FATAL/ANR pada
+log PID yang diperiksa. Font besar modal baru tetap belum diuji.

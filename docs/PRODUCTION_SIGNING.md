@@ -259,3 +259,9 @@ refleksiZIP/engine/bootstrap dan AAB jarsigner/native lulus. Bundletool tidak
  diulang, runtime16KB belum diuji; bukan publikasi toko atau klaim produksi penuh.
 Data62file awal identik, QA video dihapus terarah. Room10 membawa playlist/favorit
 melalui migrasi9→10, tanpa dependensi/izin baru. [Hash semua artefak dan pengujian](REPAIR_2026-10-18.md).
+
+
+## Release 1.1.20/code34 — 18 Oktober 2026
+
+Keystore produksi tetap, non-debuggable, Room10 tanpa migrasi/dependensi/izin baru. ARM64 70.870.104byte, SHA256 c82ff6934889a3ae67e693b3ac6e0143f9c378acf52506e635b3ffa023b6e583; update-r dan hash base.apk cocok. Build11m24s,345Kotlin/93Python, lint0error/2warning lama. APK×3 signature/native/zipalign/refleksiZIP/engine dan AAB jarsigner/native lulus; bundletool tidak diulang, runtime16KB belum diuji. Tidak publikasi toko.
+[Laporan, checksum dan pengujian](NOTIFICATIONS_PLAYLIST_1_1_20.md).

@@ -29,15 +29,15 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val playlists = database.personal().observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val favorites = database.personal().references(PersonalLibrary.FAVORITES).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    fun createPlaylist(name: String) = operation {
+    fun createPlaylist(name: String, onResult: (String?) -> Unit = {}) = operation(onResult) {
         require(database.personal().all().count { it.id != PersonalLibrary.FAVORITES } < 200) { "Maksimum 200 playlist." }
         database.personal().insert(PersonalLibrary.create(name)); "Playlist dibuat."
     }
-    fun renamePlaylist(id: String, name: String) = operation {
+    fun renamePlaylist(id: String, name: String, onResult: (String?) -> Unit = {}) = operation(onResult) {
         require(id != PersonalLibrary.FAVORITES)
         database.personal().rename(id, PersonalLibrary.name(name)); "Nama playlist diperbarui."
     }
-    fun deletePlaylist(id: String) = operation {
+    fun deletePlaylist(id: String, onResult: (String?) -> Unit = {}) = operation(onResult) {
         require(id != PersonalLibrary.FAVORITES)
         database.personal().delete(id)
         withContext(Dispatchers.Main) { if (filter.value.playlistId == id) filter.value = Filter(kind = "AUDIO") }
@@ -135,13 +135,20 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun updateDeviceStorage() { viewModelScope.launch(Dispatchers.IO) {
         deviceStorage.value = runCatching { android.os.StatFs(getApplication<Application>().filesDir.path).let { DeviceStorage(it.totalBytes, it.availableBytes) } }.getOrNull()
     } }
-    private fun operation(block: suspend () -> String) {
+    private fun operation(onResult: ((String?) -> Unit)? = null, block: suspend () -> String) {
         if (_busy.value) return
         _busy.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            try { _message.value = block() }
+            try {
+                _message.value = block()
+                withContext(Dispatchers.Main) { onResult?.invoke(null) }
+            }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { _message.value = error.message ?: "Operasi media gagal." }
+            catch (error: Exception) {
+                val message = error.message ?: "Operasi media gagal."
+                _message.value = message
+                withContext(Dispatchers.Main) { onResult?.invoke(message) }
+            }
             finally { _busy.value = false; updateDeviceStorage() }
         }
     }

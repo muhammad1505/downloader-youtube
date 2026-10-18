@@ -11,14 +11,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadata
-import android.view.View
-import android.widget.RemoteViews
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
-import id.local.tubeflow.MainActivity
 import id.local.tubeflow.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -86,7 +83,9 @@ class PlaybackService : Service() {
                 manager.notify(AUTOPLAY_NOTICE_ID, Notification.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_stat_playback)
                     .setContentTitle(context.getString(R.string.player_autoplay_retry))
-                    .setContentIntent(retry).setAutoCancel(true).build())
+                    .setContentIntent(AppIntents.pending(context, AppDestination.PLAYER))
+                    .addAction(android.R.drawable.ic_media_play, context.getString(R.string.notification_retry_play), retry)
+                    .setAutoCancel(true).build())
             }
         }
 
@@ -119,6 +118,7 @@ class PlaybackService : Service() {
                 override fun onStop() { command(ACTION_STOP) }
                 override fun onSeekTo(pos: Long) { PlayerViewModel.active?.seek(pos) }
             })
+            setSessionActivity(AppIntents.pending(this@PlaybackService, AppDestination.PLAYER))
             isActive = true
         }
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TubeFlow:playback").apply {
@@ -135,7 +135,8 @@ class PlaybackService : Service() {
             // Foreground first: no Room query or audio-focus request may precede this point.
             startForeground(NOTIFICATION_ID, if (state?.track != null) build(state) else
                 Notification.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_stat_playback)
-                    .setContentTitle(getString(R.string.player_autoplay_prepare)).setOngoing(true).build())
+                    .setContentTitle(getString(R.string.player_autoplay_prepare))
+                    .setContentIntent(AppIntents.pending(this, AppDestination.PLAYER)).setOngoing(true).build())
             if (autoStart?.isActive != true) autoStart = scope.launch {
                 try {
                     withTimeout(10000) {
@@ -202,6 +203,7 @@ class PlaybackService : Service() {
             .putString(MediaMetadata.METADATA_KEY_TITLE, track?.title ?: "TubeFlow")
             .putString(MediaMetadata.METADATA_KEY_ARTIST, track?.artist?.ifBlank { null } ?: "Artis belum diketahui")
         if (state.durationMs > 0) meta.putLong(MediaMetadata.METADATA_KEY_DURATION, state.durationMs)
+        coverIcon(track?.cover.orEmpty())?.let { meta.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, it) }
         session?.setMetadata(meta.build())
         session?.setPlaybackState(PlaybackState.Builder()
             .setState(if (state.playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, state.positionMs, if (state.playing) state.speed else 0f)
@@ -212,53 +214,27 @@ class PlaybackService : Service() {
 
     private fun build(state: PlayerViewModel.State): Notification {
         val track = state.track
-        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val open = AppIntents.pending(this, AppDestination.PLAYER)
         val cover = track?.cover.orEmpty()
-        val views = playerViews(state)
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_playback)
             .setContentTitle(track?.title ?: "TubeFlow")
             .setContentText(track?.artist?.ifBlank { null } ?: "Artis belum diketahui")
             .setContentIntent(open)
             .setOngoing(state.playing)
-            .setCustomContentView(views)
-            .setCustomBigContentView(views)
+            .setLargeIcon(coverIcon(cover))
+            .setDeleteIntent(actionIntent(ACTION_STOP))
             .setColor(runCatching { id.local.tubeflow.ui.CoverColors.dominant(cover) }.getOrNull() ?: DEFAULT_ACCENT)
-            // Versi ringkas: cukup sebelumnya/putar-berikutnya. Tombol tutup (X) menyatu di kartu,
-            // jadi tidak ada aksi tersembunyi yang perlu dibuka lewat detail notifikasi.
-            .setStyle(Notification.DecoratedMediaCustomViewStyle()
+            .setStyle(Notification.MediaStyle()
                 .setMediaSession(session?.sessionToken).setShowActionsInCompactView(0, 1, 2))
             .addAction(action(ACTION_PREVIOUS, android.R.drawable.ic_media_previous, "Sebelumnya"))
             .addAction(action(ACTION_PLAY_PAUSE, if (state.playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, if (state.playing) "Jeda" else "Putar"))
             .addAction(action(ACTION_NEXT, android.R.drawable.ic_media_next, "Berikutnya"))
+            .addAction(action(ACTION_STOP, R.drawable.ic_notification_close, getString(R.string.player_stop)))
             .build()
     }
 
-    /**
-     * Isi notifikasi dibuat sendiri supaya tingginya ramping tetapi sampul tetap terlihat:
-     * sampul 40dp, judul/artis satu baris, dan garis progres 2dp — sama seperti mini player di
-     * aplikasi. Durasi tak diketahui memakai indikator tak tentu, bukan garis penuh (pesan tetap
-     * jujur: notifikasi tidak berpura-pura tahu progres).
-     */
-    private fun playerViews(state: PlayerViewModel.State): RemoteViews {
-        val track = state.track
-        return RemoteViews(packageName, R.layout.notification_playback).apply {
-            setTextViewText(R.id.playback_title, track?.title ?: "TubeFlow")
-            setTextViewText(R.id.playback_artist, track?.artist?.ifBlank { null } ?: "Artis belum diketahui")
-            val cover = coverIcon(track?.cover.orEmpty())
-            if (cover == null) setViewVisibility(R.id.playback_cover, View.GONE)
-            else {
-                setViewVisibility(R.id.playback_cover, View.VISIBLE)
-                setImageViewBitmap(R.id.playback_cover, cover)
-            }
-            if (state.durationMs > 0) {
-                setProgressBar(R.id.playback_progress, 100, (100.0 * state.positionMs / state.durationMs).toInt().coerceIn(0, 100), false)
-            } else setProgressBar(R.id.playback_progress, 100, 0, true)
-            setOnClickPendingIntent(R.id.playback_close, actionIntent(ACTION_STOP))
-        }
-    }
-
-    /** Sampul kecil (≤96 px) untuk tata letak ramping; di-cache per track agar render berulang murah. */
+    /** Bounded artwork is shared by the native notification and MediaSession. */
     private fun coverIcon(path: String): Bitmap? {
         if (path.isBlank()) return null
         synchronized(coverLock) {
@@ -268,7 +244,7 @@ class PlaybackService : Service() {
                 BitmapFactory.decodeFile(path, bounds)
                 if (bounds.outWidth <= 0) return null
                 var sample = 1
-                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 96) sample *= 2
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 256) sample *= 2
                 BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
             }.getOrNull()
             coverKey = path; coverBitmap = bitmap

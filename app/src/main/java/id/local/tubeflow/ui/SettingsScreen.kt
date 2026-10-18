@@ -21,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,6 +56,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
+    var clearingLyrics by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var lyricsCacheMessage by androidx.compose.runtime.remember { mutableStateOf<Int?>(null) }
     val resumeLabel = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title)
     val partialSuffix = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_partial)
     val unavailableSize = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_unavailable)
@@ -252,16 +255,32 @@ fun SettingsScreen(
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_size_label, sizeLabel(temporaryUsage?.partial)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ActionButton(
-                    androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_clear_lyrics),
+                    androidx.compose.ui.res.stringResource(if (clearingLyrics) id.local.tubeflow.R.string.cache_clearing_lyrics else id.local.tubeflow.R.string.cache_clear_lyrics),
                     {
+                        clearingLyrics = true
+                        lyricsCacheMessage = null
                         smartScope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() }
-                            onRefreshStorage()
+                            try {
+                                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    Lyrics.clearCache(java.io.File(context.cacheDir, "lyrics-responses"))
+                                }
+                                lyricsCacheMessage = when {
+                                    !result.complete -> id.local.tubeflow.R.string.cache_clear_failed
+                                    result.removed == 0 -> id.local.tubeflow.R.string.cache_lyrics_empty
+                                    else -> id.local.tubeflow.R.string.cache_lyrics_cleared
+                                }
+                                onRefreshStorage()
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (_: Exception) { lyricsCacheMessage = id.local.tubeflow.R.string.cache_clear_failed }
+                            finally { clearingLyrics = false }
                         }
                     },
                     icon = Icons.Outlined.CleaningServices,
-                    emphasis = ActionEmphasis.Quiet,
+                    enabled = !clearingLyrics,
                 )
+                lyricsCacheMessage?.let { message -> Text(androidx.compose.ui.res.stringResource(message),
+                    modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 ActionButton(
                     androidx.compose.ui.res.stringResource(if (cleaningPartial) id.local.tubeflow.R.string.partial_clearing else id.local.tubeflow.R.string.partial_clear_title),
                     { confirmPartial = true },

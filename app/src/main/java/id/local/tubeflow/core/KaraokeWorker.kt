@@ -34,6 +34,7 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
             NotificationChannel("karaoke", "Pemrosesan karaoke", NotificationManager.IMPORTANCE_LOW))
         val notification = NotificationCompat.Builder(applicationContext, "karaoke")
             .setSmallIcon(R.drawable.ic_stat_karaoke).setContentTitle("TubeFlow · Karaoke")
+            .setContentIntent(AppIntents.pending(applicationContext, AppDestination.KARAOKE))
             .setContentText(label).setOnlyAlertOnce(true).setOngoing(true).setProgress(100, percent.coerceAtLeast(0), percent < 0)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Batalkan", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)).build()
         return ForegroundInfo(id.hashCode().let { if (it == 0) 1 else it }, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)

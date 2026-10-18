@@ -669,3 +669,9 @@ Bukti: run `39091726565` (commit `c59886f`) dan run `39092901718` (commit
 skip), kedua langkah audit kini dijalankan, dan ringkasan tes 339 unit test
 ditulis ke halaman run. Tidak ada asersi yang dilemahkan dan tidak ada tes yang
 dilewati untuk membuat pipeline hijau.
+
+
+## Cache, notifikasi dan playlist 1.1.20/code34
+
+Baseline 1.1.19/1d7caf3 dipertahankan. Cache lirik bekerja sebelum Engine dengan status hasil; MainActivity singleTask dan tujuan notifikasi bersama, MediaStyle native; tombol outlined serta Kelola playlist diselaraskan. 345 Kotlin/93 Python lulus, signed APK×3/AAB 11m24s, lint0error/2warning lama. Release ARM64 terpasang dan hash cocok. Pengelola mengonfirmasi notifikasi sesuai; rincian tes dan batas pada laporan.
+[Laporan, checksum dan pengujian](NOTIFICATIONS_PLAYLIST_1_1_20.md).
