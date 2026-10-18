@@ -37,6 +37,11 @@ jobs:
           for apk in app/build/outputs/apk/release/*.apk; do
             python3 scripts/audit_release_zip_fields.py "$apk"
           done
+      # Ringkasan angka tes ditulis ke halaman run, jadi hasilnya tetap terbaca
+      # walau unggahan artifact ditolak kuota penyimpanan akun.
+      - name: Publish unit-test summary
+        if: always()
+        run: python3 scripts/ci_summary.py
       # Laporan teks saja (bukan APK debug ~70 MB) agar tidak menghabiskan kuota
       # penyimpanan artifact akun. Kegagalan kuota bukan bagian dari gate
       # kebenaran: tes, lint, dan audit di atas tetap menentukan hasil job.

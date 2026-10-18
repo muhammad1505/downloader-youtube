@@ -655,12 +655,17 @@ Perbaikan di `.github/workflows/android.yml`:
   (bukan di-skip atau diberi pengecualian).
 - Artefak yang diunggah dibatasi ke laporan teks (`app/build/reports/`,
   `app/build/test-results/`) dengan `retention-days: 7`; APK debug tidak lagi
-  diunggah. Kegagalan kuota penyimpanan artifact ditandai `continue-on-error`
-  karena bukan bagian dari gate kebenaran — hasil job tetap ditentukan oleh tes,
-  lint, dan audit.
+  diunggah.
+- Langkah **Publish unit-test summary** menjalankan `scripts/ci_summary.py` yang
+  membaca XML JUnit dan menulis jumlah tes/gagal/dilewati ke halaman run. Ini
+  menjaga laporan tetap terbaca ketika unggahan artifact ditolak kuota, sehingga
+  `continue-on-error` pada unggahan tidak menyembunyikan informasi apa pun.
+  Kuota penyimpanan artifact bersifat akun (repo ini sendiri tidak menyimpan
+  artifact), jadi unggahan masih bisa gagal sampai kuota akun pulih.
 
-Bukti: run `39091726565` untuk commit `c59886f` selesai **success 15m23s** dengan
-semua langkah hijau. Log Python mencatat **`Ran 90 tests ... OK` tanpa skip**
-(sebelumnya 90 tes dengan 1 error dan 6 skip), dan kedua langkah audit kini
-dijalankan. Tidak ada asersi yang dilemahkan dan tidak ada tes yang dilewati untuk
-membuat pipeline hijau.
+Bukti: run `39091726565` (commit `c59886f`) dan run `39092901718` (commit
+`a0f0981`) selesai **success** dengan semua langkah hijau. Log Python mencatat
+**`Ran 90 tests ... OK` tanpa skip** (sebelumnya 90 tes dengan 1 error dan 6
+skip), kedua langkah audit kini dijalankan, dan ringkasan tes 339 unit test
+ditulis ke halaman run. Tidak ada asersi yang dilemahkan dan tidak ada tes yang
+dilewati untuk membuat pipeline hijau.
