@@ -638,3 +638,29 @@ tersebut dihapus dari `build/reports/ui-1119/`, bukan dijadikan bukti publik.
 Versi dinaikkan ke **1.1.19/code33** mengikuti pola setiap checkpoint UI
 sebelumnya. Batas lain: TalkBack/keyboard eksternal, tablet/foldable, dynamic
 color Android 12+, runtime halaman 16KB, dan seluruh kombinasi error belum diuji.
+
+## CI hijau: ffmpeg di runner — 18 Oktober 2026
+
+Gate CI di `main` merah sejak 17 Oktober pada langkah Python, bukan karena kode
+aplikasi: runner `ubuntu-latest` tidak punya binary `ffmpeg`. Akibatnya
+`test_optional_processing…native_opus_packets` gagal dengan
+`FileNotFoundError: 'ffmpeg'`, lima tes kompresi sampul ter-skip, langkah audit
+16KB/refleksi ZIP ikut ter-skip, dan langkah `upload-artifact` gagal karena
+"Aritfact storage quota has been hit" (APK debug ~70 MB per run).
+
+Perbaikan di `.github/workflows/android.yml`:
+
+- Menambah langkah **Install host media tools** (`apt-get install ffmpeg`) sebelum
+  tes Python, sehingga tes yang memang butuh ffmpeg/ffprobe benar-benar berjalan
+  (bukan di-skip atau diberi pengecualian).
+- Artefak yang diunggah dibatasi ke laporan teks (`app/build/reports/`,
+  `app/build/test-results/`) dengan `retention-days: 7`; APK debug tidak lagi
+  diunggah. Kegagalan kuota penyimpanan artifact ditandai `continue-on-error`
+  karena bukan bagian dari gate kebenaran — hasil job tetap ditentukan oleh tes,
+  lint, dan audit.
+
+Bukti: run `39091726565` untuk commit `c59886f` selesai **success 15m23s** dengan
+semua langkah hijau. Log Python mencatat **`Ran 90 tests ... OK` tanpa skip**
+(sebelumnya 90 tes dengan 1 error dan 6 skip), dan kedua langkah audit kini
+dijalankan. Tidak ada asersi yang dilemahkan dan tidak ada tes yang dilewati untuk
+membuat pipeline hijau.
