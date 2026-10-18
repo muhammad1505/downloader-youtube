@@ -35,6 +35,7 @@ fun QueueScreen(
     onResumeAll: () -> Unit,
     onCancelAll: () -> Unit,
     onClearUnsuccessful: () -> Unit,
+    onOpenDownload: () -> Unit = {},
 ) {
     val active = jobs.filter { it.state != JobState.COMPLETED }
     val running = active.count { it.state == JobState.RUNNING }
@@ -46,12 +47,13 @@ fun QueueScreen(
     var confirmCancelAll by remember { mutableStateOf(false) }
 
     if (confirmCancelAll) {
-        AlertDialog(
-            onDismissRequest = { confirmCancelAll = false },
-            title = { Text("Batalkan semua unduhan?") },
-            text = { Text("Semua unduhan yang berjalan dan menunggu ($pausable) beserta yang dijeda ($paused) akan dibatalkan. Unduhan parsial tidak disimpan.") },
-            confirmButton = { TextButton(onClick = { confirmCancelAll = false; onCancelAll() }) { Text("Batalkan semua") } },
-            dismissButton = { TextButton(onClick = { confirmCancelAll = false }) { Text("Kembali") } },
+        ConfirmDialog(
+            title = "Batalkan semua unduhan?",
+            text = "Semua unduhan yang berjalan dan menunggu ($pausable) beserta yang dijeda ($paused) akan dibatalkan. Unduhan parsial tidak disimpan.",
+            confirmLabel = "Batalkan semua",
+            onConfirm = { confirmCancelAll = false; onCancelAll() },
+            onDismiss = { confirmCancelAll = false },
+            destructive = true,
         )
     }
 
@@ -59,7 +61,7 @@ fun QueueScreen(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(UiSpacing.screen),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         item {
             PageHeading(
@@ -70,35 +72,25 @@ fun QueueScreen(
 
         if (active.isNotEmpty()) {
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatPill("Berjalan", running.toString(), Icons.Outlined.Downloading, modifier = Modifier.weight(1f))
-                    StatPill("Menunggu", queued.toString(), Icons.Outlined.Schedule, modifier = Modifier.weight(1f))
-                    StatPill("Gagal", failed.toString(), Icons.Outlined.ErrorOutline, modifier = Modifier.weight(1f), tint = MaterialTheme.colorScheme.error)
-                }
+                StatRow(listOf(
+                    StatSpec("Berjalan", running.toString(), Icons.Outlined.Downloading),
+                    StatSpec("Menunggu", queued.toString(), Icons.Outlined.Schedule),
+                    StatSpec("Gagal", failed.toString(), Icons.Outlined.ErrorOutline, MaterialTheme.colorScheme.error),
+                ))
             }
         }
 
         if (pausable > 0 || paused > 0) {
             item {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
+                ScrollRow {
                     if (pausable > 0) {
-                        OutlinedButton(onClick = onPauseAll, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-                            Icon(Icons.Outlined.Pause, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Jeda semua")
-                        }
+                        ActionButton("Jeda semua", onPauseAll, icon = Icons.Outlined.Pause)
                     }
                     if (paused > 0) {
-                        OutlinedButton(onClick = onResumeAll, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-                            Icon(Icons.Outlined.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Lanjutkan semua")
-                        }
+                        ActionButton("Lanjutkan semua", onResumeAll, icon = Icons.Outlined.PlayArrow)
                     }
                     if (pausable > 0 || paused > 0) {
-                        TextButton(onClick = { confirmCancelAll = true }) {
-                            Text("Batalkan semua", color = MaterialTheme.colorScheme.error)
-                        }
+                        ActionButton("Batalkan semua", { confirmCancelAll = true }, emphasis = ActionEmphasis.Quiet, destructive = true)
                     }
                 }
             }
@@ -107,19 +99,24 @@ fun QueueScreen(
         if (failed > 0 || cancelled > 0) {
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = if (failed > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Warning, null, Modifier.size(20.dp), tint = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            (if (failed > 0) "$failed unduhan gagal" else "") +
-                                (if (failed > 0 && cancelled > 0) " · " else "") +
-                                (if (cancelled > 0) "$cancelled dibatalkan" else ""),
-                            Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (failed > 0) TextButton(onClick = onRetryAll) { Text("Ulangi semua", color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary) }
-                        TextButton(onClick = onClearUnsuccessful) { Text("Bersihkan", color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary) }
+                    Column(Modifier.fillMaxWidth().padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Outlined.Warning, null, Modifier.size(20.dp), tint = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                (if (failed > 0) "$failed unduhan gagal" else "") +
+                                    (if (failed > 0 && cancelled > 0) " · " else "") +
+                                    (if (cancelled > 0) "$cancelled dibatalkan" else ""),
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (failed > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        ScrollRow {
+                            if (failed > 0) {
+                                ActionButton("Ulangi semua", onRetryAll, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+                            }
+                            ActionButton("Bersihkan", onClearUnsuccessful, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true)
+                        }
                     }
                 }
             }
@@ -131,6 +128,8 @@ fun QueueScreen(
                     Icons.Outlined.Queue,
                     "Antrean masih kosong",
                     "Pilih audio atau video di tab Download untuk memulai. Unduhan tetap berjalan walau aplikasi ditutup.",
+                    actionLabel = "Buka Download",
+                    onAction = onOpenDownload,
                 )
             }
         } else {

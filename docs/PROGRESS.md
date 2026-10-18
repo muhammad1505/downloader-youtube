@@ -587,3 +587,54 @@ serta selesai lagu diuji.62file awal identik setelah hanya video QA dibersihkan.
 Room10/enam fitur media dibawa tanpa dependensi baru. Tidak mengklaim audit produksi
 penuh, seluruh lirik sinkron, TalkBack atau runtime16KB sudah lulus.
 [Laporan akhir dan pekerjaan tersisa](REPAIR_2026-10-18.md).
+
+## Penyatuan aksi dan filter 1.1.19/code33 — 18 Oktober 2026
+
+Arahan pengelola: lanjutkan arah pemutar musik (gelap, satu aksen hijau) dan
+samakan seluruh menu, khususnya tombol. Dua permintaan lanjutan: aksi di daftar
+Riwayat cukup ikon (label panjang memakan ruang), deret filter Koleksi
+(Favorit/semua playlist/kelola playlist/terbaru/semua folder) diseragamkan, ikon
+favorit–playlist–antrean dikeluarkan dari menu tiga titik, dan aksi "buka file
+lirik" di Riwayat dihapus karena sudah ada aksi pencarian lirik.
+
+Lapisan interaksi baru di `ui/components.kt` (dipakai 13 layar/dialog):
+
+- `ActionButton` dengan tiga peran (utama 52dp, sekunder, tenang) plus warna
+  galat untuk destruktif, bentuk pil; menggantikan campuran
+  Button/OutlinedButton/FilledTonalButton/TextButton dan CTA gradien di Download.
+- `Panel` (padding 16dp, judul `titleMedium`, deskripsi redup, jarak isi 12dp)
+  menggantikan padding 14/16/18dp yang berbeda per layar.
+- `ToggleRow`/`CheckRow` (satu fokus TalkBack, target 48dp), `ScrollRow` (jarak
+  8dp), `StatRow` (metrik menumpuk saat font >1,3x), `SearchField`,
+  `ConfirmDialog` (aksi berisiko berwarna galat), `IconAction`, `MenuChip`,
+  `ActionChip`.
+- Tipografi tema melengkapi `bodyLarge` dan `headlineMedium` supaya skala tipe
+  tidak jatuh ke nilai bawaan Material.
+
+Keputusan yang perlu dijaga penerus: satu aksi utama per layar; aksi di dalam
+kartu daftar memakai ikon 48dp dengan `contentDescription` (bukan label);
+header, panel, dialog, dan pesan galat tetap memakai teks; deret filter memakai
+satu bentuk chip; kartu media tetap `mediaCardColors` dan aksen sampul tidak
+dipaksa kembali hijau. Lirik di kartu Riwayat hanya menawarkan pencarian lirik;
+lampiran yang tersisa adalah thumbnail dan subtitle video.
+
+Bukti host: `bash scripts/build_release.sh --no-daemon --max-workers=2`
+**BUILD SUCCESSFUL 15m59s**; **339 tes Kotlin lulus** (0 gagal/error); lint debug
+dan release **0 error, 2 warning lama** (`SelectedPhotoAccess`, `GradleDependency`
+ONNX yang dipin). Audit APK rilis arm64: 257 ELF lolos alignment 16KB, 13 kelas
+refleksi ZIP lolos, signature produksi dan zipalign lolos. APK arm64
+SHA256 `5a0fe86f91009b744536d2240f537653ac0dfc18ae6e1713c7e8fe3c076fa2aa`,
+terpasang `adb install -r` tanpa uninstall/reset.
+
+Bukti perangkat: Realme RMX1821 (Android 10/API 29, arm64, 720x1520 @272dpi,
+mode gelap, font 0,9). Tangkapan menu Ringkasan, Download, Antrean, Pengaturan,
+dan Koleksi (chip seragam) pada build yang sama; Riwayat sesudah perubahan
+menampilkan satu baris ikon tanpa tombol lirik. Mode terang, font >1,2x, dan
+lebar 360dp **belum diuji**: ColorOS menolak `cmd uimode night no` (nilai tetap
+"yes") dan `font_scale`/`wm density` lewat ADB. Tangkapan terakhir Koleksi dan
+Riwayat tidak disimpan karena layar HP memuat konten pribadi pengguna — berkas
+tersebut dihapus dari `build/reports/ui-1119/`, bukan dijadikan bukti publik.
+
+Versi dinaikkan ke **1.1.19/code33** mengikuti pola setiap checkpoint UI
+sebelumnya. Batas lain: TalkBack/keyboard eksternal, tablet/foldable, dynamic
+color Android 12+, runtime halaman 16KB, dan seluruh kombinasi error belum diuji.

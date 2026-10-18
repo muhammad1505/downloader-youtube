@@ -57,6 +57,64 @@ aktual; metrik menggunakan data Room, bukan angka contoh. Empty state memberi
 langkah berikutnya tanpa meniru kartu lagu. Dialog memakai tema dan istilah yang
 sama, dengan tindakan berisiko terpisah.
 
+## Sistem aksi dan panel (1.1.19)
+
+Polesan ini tidak menambah warna atau font baru; identitas tetap sampul media +
+satu aksen hijau. Yang disatukan adalah lapisan interaksi yang sebelumnya berbeda
+per layar.
+
+- **Panel.** `Panel` di `ui/components.kt`: padding 16dp, judul `titleMedium`,
+  deskripsi `bodySmall` redup, jarak isi 12dp. Menggantikan padding 14/16/18dp
+  dan judul dengan bobot berbeda di Ringkasan, Download, Antrean, Riwayat,
+  Pengaturan, dan alat media.
+- **Aksi.** Satu `ActionButton` dengan empat peran: utama (filled, tinggi 52dp,
+  satu per layar), sekunder (outlined, 48dp), tenang (text, target 48dp), dan
+  destruktif (warna galat, bukan hijau). Ikon 18dp, jarak 8dp, label
+  `labelLarge`. CTA gradien di Download dihapus.
+- **Kontrol.** `ToggleRow` (baris penuh, `toggleable` + `Role.Switch`), `CheckRow`
+  (`Role.Checkbox`), `ScrollRow` (jarak 8dp), `StatRow` (metrik menumpuk saat
+  font >1,3x), `SearchField`, dan `ConfirmDialog` (aksi berisiko berwarna galat).
+- **Aksi di daftar.** `IconAction` (ikon 48dp, nama dibaca TalkBack) menggantikan
+  tombol berlabel di baris kartu Riwayat/Antrean: label panjang memakan ruang
+  daftar dan membuat kartu tinggi. Teks tetap dipakai untuk aksi di header,
+  panel, dialog, dan tautan dalam pesan galat.
+- **Filter Koleksi.** Satu bentuk chip untuk seluruh deret: `FilterChip` untuk
+  Favorit, `MenuChip` untuk dropdown playlist/urutan/folder/artis/album, dan
+  `ActionChip` untuk "Kelola playlist". Sebelumnya ukuran dan bentuknya campur
+  (chip, tombol outlined, tombol teks).
+- **Aksi lagu di Koleksi.** Favorit, tambah ke playlist, dan tambah ke antrean
+  tampil sebagai ikon di kartu (bukan di menu tiga titik). Menu menyisakan aksi
+  informasi dan berkas: putar sekarang/berikutnya, keluarkan dari playlist,
+  detail, cari lirik, atur waktu lirik, ubah nama, hapus.
+- **Lirik di Riwayat.** Lampiran lirik (.lrc) tidak lagi ditawarkan dari kartu
+  riwayat: satu-satunya aksi lirik di sana adalah pencarian lirik. Lampiran yang
+  tersisa hanya thumbnail dan subtitle video.
+- **Kartu.** Kartu media tetap `mediaCardColors` dengan radius 20dp; chip status
+  memakai bentuk pil agar sejalan dengan `FilterChip`. Baris lagu hanya
+  menampilkan nama file bila tidak mengulang judul.
+
+```text
+Judul halaman
+Keterangan singkat
+[ Tempel link ..........................  📋  ✕ ]
+[ pratinjau / galat + Detail error ]
+Panel: Pilih download
+  ( Video | Audio )        segmented
+  Pilihan cepat: (chip) (chip) (chip)
+  ▸ Pengaturan lanjutan
+[ ringkasan opsi ]
+[  ⬇  Download audio  ]     satu aksi utama, filled
+```
+
+## Kritik
+
+Yang mudah terasa generik dan karena itu diubah: CTA gradien hijau (diganti satu
+tombol filled), tiga tombol outlined sederajat di puncak Ringkasan (diganti chip
+tujuan), setiap aksi tampil sebagai `TextButton` (kini empat peran berbeda), panel
+identik dengan padding acak (kini satu `Panel`), dan dialog hapus yang tombolnya
+sama dengan dialog biasa (kini berwarna galat). Identitas TubeFlow tetap dipegang
+sampul nyata, hierarki judul/artis, status unduhan, dan akses lirik.
+
 ## Kritik dan verifikasi
 
 Gelap dan hijau saja mudah terasa generik. Pertahankan identitas melalui sampul

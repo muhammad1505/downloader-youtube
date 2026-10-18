@@ -32,6 +32,7 @@ fun HistoryScreen(
     onPlay: (List<DownloadJob>, Int) -> Unit = { _, _ -> },
     onClearCompleted: () -> Unit,
     onClearUnsuccessful: () -> Unit,
+    onOpenDownload: () -> Unit = {},
 ) {
     val completed = jobs.filter { it.state == JobState.COMPLETED }
     val unsuccessful = jobs.count { it.state == JobState.FAILED || it.state == JobState.CANCELLED }
@@ -58,32 +59,35 @@ fun HistoryScreen(
     }
 
     if (pendingDelete != null) {
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("Hapus file?") },
-            text = { Text("\"${pendingDelete?.title}\" beserta file pendukungnya (lirik/thumbnail) akan dihapus dari penyimpanan, lalu entri riwayat ikut dihilangkan.") },
-            confirmButton = { TextButton(onClick = { pendingDelete?.let { onDeleteFile(it.id) }; pendingDelete = null }) { Text("Hapus file") } },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Batal") } },
+        ConfirmDialog(
+            title = "Hapus file?",
+            text = "\"${pendingDelete?.title}\" beserta file pendukungnya (lirik/thumbnail) akan dihapus dari penyimpanan, lalu entri riwayat ikut dihilangkan.",
+            confirmLabel = "Hapus file",
+            onConfirm = { pendingDelete?.let { onDeleteFile(it.id) }; pendingDelete = null },
+            onDismiss = { pendingDelete = null },
+            destructive = true,
         )
     }
 
     if (pendingRedownload != null) {
-        AlertDialog(
-            onDismissRequest = { pendingRedownload = null },
-            title = { Text("Unduh lagi?") },
-            text = { Text("File lama \"${pendingRedownload?.title}\" beserta file pendukungnya (lirik/thumbnail) akan dihapus, lalu unduhan yang sama diantrekan ulang sebagai penggantinya.") },
-            confirmButton = { TextButton(onClick = { pendingRedownload?.let { onRetry(it) }; pendingRedownload = null }) { Text("Unduh lagi") } },
-            dismissButton = { TextButton(onClick = { pendingRedownload = null }) { Text("Batal") } },
+        ConfirmDialog(
+            title = "Unduh lagi?",
+            text = "File lama \"${pendingRedownload?.title}\" beserta file pendukungnya (lirik/thumbnail) akan dihapus, lalu unduhan yang sama diantrekan ulang sebagai penggantinya.",
+            confirmLabel = "Unduh lagi",
+            onConfirm = { pendingRedownload?.let { onRetry(it) }; pendingRedownload = null },
+            onDismiss = { pendingRedownload = null },
+            destructive = true,
         )
     }
 
     if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text("Bersihkan riwayat?") },
-            text = { Text("Semua entri yang selesai akan dihapus dari daftar. File hasil download tetap tersimpan di Downloads/${SettingsStore.storageFolder}.") },
-            confirmButton = { TextButton(onClick = { confirmClear = false; onClearCompleted() }) { Text("Bersihkan") } },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Batal") } },
+        ConfirmDialog(
+            title = "Bersihkan riwayat?",
+            text = "Semua entri yang selesai akan dihapus dari daftar. File hasil download tetap tersimpan di Downloads/${SettingsStore.storageFolder}.",
+            confirmLabel = "Bersihkan",
+            onConfirm = { confirmClear = false; onClearCompleted() },
+            onDismiss = { confirmClear = false },
+            destructive = true,
         )
     }
 
@@ -91,34 +95,22 @@ fun HistoryScreen(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(UiSpacing.screen),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         item { PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_history), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_history_help)) }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatPill("Selesai", completed.size.toString(), Icons.Outlined.CheckCircle, modifier = Modifier.weight(1f), tint = MaterialTheme.colorScheme.secondary)
-                StatPill("Video", completed.count { it.mode == MediaMode.VIDEO }.toString(), Icons.Outlined.Videocam, modifier = Modifier.weight(1f))
-                StatPill("Audio", completed.count { it.mode == MediaMode.AUDIO }.toString(), Icons.Outlined.LibraryMusic, modifier = Modifier.weight(1f))
-            }
+            StatRow(listOf(
+                StatSpec("Selesai", completed.size.toString(), Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.secondary),
+                StatSpec("Video", completed.count { it.mode == MediaMode.VIDEO }.toString(), Icons.Outlined.Videocam),
+                StatSpec("Audio", completed.count { it.mode == MediaMode.AUDIO }.toString(), Icons.Outlined.LibraryMusic),
+            ))
         }
 
-        item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Cari judul atau link") },
-                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, "Bersihkan pencarian") }
-                },
-            )
-        }
+        item { SearchField(query, { query = it }, label = "Cari judul atau link") }
 
         item {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ScrollRow {
                 FilterChip(selected = modeFilter == -1, onClick = { modeFilter = -1 }, label = { Text("Semua") })
                 FilterChip(selected = modeFilter == 0, onClick = { modeFilter = 0 }, label = { Text("Video") })
                 FilterChip(selected = modeFilter == 1, onClick = { modeFilter = 1 }, label = { Text("Audio") }) }
@@ -126,7 +118,7 @@ fun HistoryScreen(
 
         if (platforms.size > 1) {
             item {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ScrollRow {
                     FilterChip(selected = platformFilter.isEmpty(), onClick = { platformFilter = "" }, label = { Text("Semua platform") })
                     platforms.forEach { name ->
                         FilterChip(selected = platformFilter == name, onClick = { platformFilter = name }, label = { Text(name) })
@@ -137,11 +129,11 @@ fun HistoryScreen(
 
         if (completed.isNotEmpty() || unsuccessful > 0) {
             item {
-                FlowRow(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("${filtered.size} entri ditampilkan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row {
-                        if (unsuccessful > 0) TextButton(onClick = onClearUnsuccessful) { Text("Hapus gagal ($unsuccessful)") }
-                        if (completed.isNotEmpty()) TextButton(onClick = { confirmClear = true }) { Text("Bersihkan") }
+                    ScrollRow {
+                        if (unsuccessful > 0) ActionButton("Hapus gagal ($unsuccessful)", onClearUnsuccessful, emphasis = ActionEmphasis.Quiet, destructive = true)
+                        if (completed.isNotEmpty()) ActionButton("Bersihkan", { confirmClear = true }, emphasis = ActionEmphasis.Quiet, destructive = true)
                     }
                 }
             }
@@ -153,6 +145,8 @@ fun HistoryScreen(
                     Icons.Outlined.History,
                     "Belum ada download",
                     "Hasil download yang selesai akan muncul di sini beserta detail waktunya.",
+                    actionLabel = "Buka Download",
+                    onAction = onOpenDownload,
                 )
             }
             filtered.isEmpty() -> item {

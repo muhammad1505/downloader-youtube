@@ -62,7 +62,7 @@ fun SettingsScreen(
     if (confirmPartial) AlertDialog(onDismissRequest = { confirmPartial = false },
         title = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title)) },
         text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_warning)) },
-        confirmButton = { TextButton(onClick = { confirmPartial = false; onClearPartial() }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_confirm)) } },
+        confirmButton = { TextButton(onClick = { confirmPartial = false; onClearPartial() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_confirm)) } },
         dismissButton = { TextButton(onClick = { confirmPartial = false }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.action_cancel)) } })
     var confirmClearFiles by rememberSaveable { mutableStateOf(false) }
     val tree = SettingsStore.storageTree
@@ -101,7 +101,7 @@ fun SettingsScreen(
                     clearTreeLauncher.launch(DocumentsContract.buildDocumentUri(
                         "com.android.externalstorage.documents", "primary:Download/$folder"))
                 }
-            }) { Text("Hapus semua", color = MaterialTheme.colorScheme.error) } },
+            }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Hapus semua") } },
             dismissButton = { TextButton(onClick = { confirmClearFiles = false }) { Text("Batal") } },
         )
     }
@@ -126,62 +126,52 @@ fun SettingsScreen(
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(UiSpacing.screen),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
         MediaToolsSettings(karaoke, player)
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title), style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title))
-                        Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_description),
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(SettingsStore.resumeAfterInterruption, onCheckedChange = { SettingsStore.setResumeAfterInterruption(context, it) },
-                        modifier = Modifier.semantics { contentDescription = resumeLabel })
-                }
-            }
+        Panel(title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title)) {
+            ToggleRow(
+                title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title),
+                description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_description),
+                checked = SettingsStore.resumeAfterInterruption,
+                onCheckedChange = { SettingsStore.setResumeAfterInterruption(context, it) },
+                modifier = Modifier.semantics { contentDescription = resumeLabel },
+            )
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Tampilan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Pilih mode tema yang paling nyaman untuk mata kamu.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OptionMenu(
-                    label = "Mode tema",
-                    options = listOf(
-                        SettingsStore.MODE_SYSTEM to "Ikut sistem",
-                        SettingsStore.MODE_LIGHT to "Terang",
-                        SettingsStore.MODE_DARK to "Gelap",
-                    ),
-                    selected = themeMode,
-                    onSelect = onThemeMode,
+        Panel(
+            title = "Tampilan",
+            description = "Pilih mode tema yang paling nyaman untuk mata kamu.",
+        ) {
+            OptionMenu(
+                label = "Mode tema",
+                options = listOf(
+                    SettingsStore.MODE_SYSTEM to "Ikut sistem",
+                    SettingsStore.MODE_LIGHT to "Terang",
+                    SettingsStore.MODE_DARK to "Gelap",
+                ),
+                selected = themeMode,
+                onSelect = onThemeMode,
+            )
+            ToggleRow(
+                title = "Aksen dari sampul",
+                description = "Ikuti sampul lagu yang diputar atau unduhan terbaru.",
+                checked = SettingsStore.artworkAccent,
+                onCheckedChange = { SettingsStore.setArtworkAccent(context, it) },
+            )
+            if (Build.VERSION.SDK_INT >= 31) {
+                ToggleRow(
+                    title = "Warna dinamis",
+                    description = "Ikuti warna wallpaper (Material You).",
+                    checked = dynamicColor,
+                    onCheckedChange = onDynamicColor,
                 )
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Aksen dari sampul",style=MaterialTheme.typography.bodyLarge)
-                        Text("Ikuti sampul lagu yang diputar atau unduhan terbaru.",style=MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(SettingsStore.artworkAccent,onCheckedChange={ SettingsStore.setArtworkAccent(context,it) })
-                }
-                if (Build.VERSION.SDK_INT >= 31) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Warna dinamis", style = MaterialTheme.typography.bodyLarge)
-                            Text("Ikuti warna wallpaper (Material You).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = dynamicColor, onCheckedChange = onDynamicColor)
-                    }
-                }
             }
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Penyimpanan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Panel(title = "Penyimpanan") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
@@ -197,20 +187,24 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    TextButton(onClick = { SettingsStore.setStorageTree(context, null); onRefreshStorage() }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Kembali ke Downloads/${SettingsStore.storageFolder}")
-                    }
-                }
-                OutlinedButton(onClick = {
-                    val initialFolder = tree?.toUri() ?: DocumentsContract.buildDocumentUri(
-                        "com.android.externalstorage.documents", "primary:Download/${SettingsStore.storageFolder}",
+                    ActionButton(
+                        "Kembali ke Downloads/${SettingsStore.storageFolder}",
+                        { SettingsStore.setStorageTree(context, null); onRefreshStorage() },
+                        emphasis = ActionEmphasis.Quiet,
+                        fillWidth = true,
                     )
-                    treeLauncher.launch(initialFolder)
-                }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Outlined.FolderOpen, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (tree == null) "Pilih folder… (bisa buat baru, SD card, dll.)" else "Pilih ulang folder…")
                 }
+                ActionButton(
+                    text = if (tree == null) "Pilih folder… (bisa buat baru, SD card, dll.)" else "Pilih ulang folder…",
+                    onClick = {
+                        val initialFolder = tree?.toUri() ?: DocumentsContract.buildDocumentUri(
+                            "com.android.externalstorage.documents", "primary:Download/${SettingsStore.storageFolder}",
+                        )
+                        treeLauncher.launch(initialFolder)
+                    },
+                    icon = Icons.Outlined.FolderOpen,
+                    fillWidth = true,
+                )
                 if (tree == null) {
                     Text(
                         "Folder di luar Downloads/${SettingsStore.storageFolder} (mis. kartu memori) disimpan lewat pilihan folder sistem dan butuh izin aksesnya — buat folder baru langsung dari pemilih folder. Memilih kembali folder bawaan mengembalikan tujuan ke Downloads/${SettingsStore.storageFolder} tanpa izin.",
@@ -241,7 +235,7 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = onRefreshStorage) { Text("Segarkan") }
+                    ActionButton("Segarkan", onRefreshStorage, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
                 }
                 if (storageCatalogue && storageUnknownSizes > 0) {
                     Text(pluralStringResource(id.local.tubeflow.R.plurals.storage_partial_sizes, storageUnknownSizes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), storageUnknownSizes),
@@ -257,20 +251,32 @@ fun SettingsScreen(
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_size_label, sizeLabel(temporaryUsage?.cache)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_size_label, sizeLabel(temporaryUsage?.partial)), style = MaterialTheme.typography.bodyMedium)
                 Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.temporary_storage_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = {
-                    smartScope.launch {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() }
-                        onRefreshStorage()
-                    }
-                }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_clear_lyrics)) }
-                OutlinedButton(onClick = { confirmPartial = true }, enabled = !cleaningPartial && temporaryUsage != null, modifier = Modifier.fillMaxWidth()) {
-                    Text(androidx.compose.ui.res.stringResource(if (cleaningPartial) id.local.tubeflow.R.string.partial_clearing else id.local.tubeflow.R.string.partial_clear_title))
-                }
-        OutlinedButton(onClick = { confirmClearFiles = true }, enabled = !clearingFiles, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.DeleteSweep, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (clearingFiles) "Menghapus file…" else "Hapus semua file…")
-        }
+                ActionButton(
+                    androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.cache_clear_lyrics),
+                    {
+                        smartScope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Lyrics.clearCache() }
+                            onRefreshStorage()
+                        }
+                    },
+                    icon = Icons.Outlined.CleaningServices,
+                    emphasis = ActionEmphasis.Quiet,
+                )
+                ActionButton(
+                    androidx.compose.ui.res.stringResource(if (cleaningPartial) id.local.tubeflow.R.string.partial_clearing else id.local.tubeflow.R.string.partial_clear_title),
+                    { confirmPartial = true },
+                    enabled = !cleaningPartial && temporaryUsage != null,
+                    destructive = true,
+                    fillWidth = true,
+                )
+                ActionButton(
+                    if (clearingFiles) "Menghapus file…" else "Hapus semua file…",
+                    { confirmClearFiles = true },
+                    icon = Icons.Outlined.DeleteSweep,
+                    enabled = !clearingFiles,
+                    destructive = true,
+                    fillWidth = true,
+                )
                 Text(
                     if (tree == null && storageCatalogue)
                         "Angka dijumlahkan dari file yang sudah terindeks di Koleksi — tidak butuh izin atau pemilihan folder lebih dulu. Untuk ukuran seluruh folder (termasuk file yang belum terindeks), pilih Downloads/${SettingsStore.storageFolder} lewat Pilih folder."
@@ -283,91 +289,79 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Notifikasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Izinkan notifikasi agar progres download tetap terlihat saat aplikasi ditutup.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = {
+        Panel(
+            title = "Notifikasi",
+            description = "Izinkan notifikasi agar progres download tetap terlihat saat aplikasi ditutup.",
+        ) {
+            ActionButton(
+                "Atur notifikasi",
+                {
                     context.startActivity(
                         Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName),
                     )
-                }) { Icon(Icons.Outlined.Notifications, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Atur notifikasi") }
-            }
+                },
+                icon = Icons.Outlined.Notifications,
+            )
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Antrean", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Unduhan yang boleh berjalan bersamaan.", style = MaterialTheme.typography.bodyMedium)
-                OptionMenu(
-                    label = "Unduhan bersamaan",
-                    options = (1..4).map { count -> count to (if (count == 1) "1 · urut" else "$count×") },
-                    selected = SettingsStore.maxConcurrent,
-                    onSelect = { count -> SettingsStore.setMaxConcurrent(context, count) },
-                )
-                Text(
-                    "Urut (1) paling hemat CPU dan kuota. Mode paralel lebih cepat, dengan progres tiap unduhan tetap tampil di notifikasi. Maksimal 4 bersamaan; perubahan berlaku untuk antrean berikutnya, sedangkan unduhan yang sudah berjalan dibiarkan selesai.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Panel(
+            title = "Antrean",
+            description = "Unduhan yang boleh berjalan bersamaan.",
+        ) {
+            OptionMenu(
+                label = "Unduhan bersamaan",
+                options = (1..4).map { count -> count to (if (count == 1) "1 · urut" else "$count×") },
+                selected = SettingsStore.maxConcurrent,
+                onSelect = { count -> SettingsStore.setMaxConcurrent(context, count) },
+            )
+            Text(
+                "Urut (1) paling hemat CPU dan kuota. Mode paralel lebih cepat, dengan progres tiap unduhan tetap tampil di notifikasi. Maksimal 4 bersamaan; perubahan berlaku untuk antrean berikutnya, sedangkan unduhan yang sudah berjalan dibiarkan selesai.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Smart Media", style = MaterialTheme.typography.titleMedium)
-                Text("Berlaku untuk download baru. Lirik dan sampul di panel download tetap dapat dipilih secara eksplisit.", style = MaterialTheme.typography.bodySmall)
-                listOf(
-                    Triple("rename", "Normalisasi nama audio/video", SettingsStore.autoRename),
-                    Triple("tag", "Tag metadata audio", SettingsStore.autoTag),
-                    Triple("artwork", "Sampul audio otomatis", SettingsStore.autoArtwork),
-                    Triple("lyrics", "Lirik audio otomatis", SettingsStore.autoLyrics),
-                    Triple("library", "Tambah audio otomatis ke koleksi", SettingsStore.autoLibrary),
-                ).forEach { (key, label, checked) ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(label, Modifier.weight(1f))
-                        Switch(checked = checked, onCheckedChange = { SettingsStore.setSmart(context, key, it) })
-                    }
-                }
-                Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
+        Panel(
+            title = "Smart Media",
+            description = "Berlaku untuk download baru. Lirik dan sampul di panel download tetap dapat dipilih secara eksplisit.",
+        ) {
+            listOf(
+                Triple("rename", "Normalisasi nama audio/video", SettingsStore.autoRename),
+                Triple("tag", "Tag metadata audio", SettingsStore.autoTag),
+                Triple("artwork", "Sampul audio otomatis", SettingsStore.autoArtwork),
+                Triple("lyrics", "Lirik audio otomatis", SettingsStore.autoLyrics),
+                Triple("library", "Tambah audio otomatis ke koleksi", SettingsStore.autoLibrary),
+            ).forEach { (key, label, checked) ->
+                ToggleRow(label, checked, { SettingsStore.setSmart(context, key, it) })
             }
+            Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Mesin download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("yt-dlp + FFmpeg", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Mesin disertakan dalam aplikasi dan diverifikasi saat pertama kali dijalankan. Pembaruan datang lewat rilis aplikasi — tidak ada executable jaringan yang diunduh.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Panel(title = "Mesin download") {
+            Text("yt-dlp + FFmpeg", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Mesin disertakan dalam aplikasi dan diverifikasi saat pertama kali dijalankan. Pembaruan datang lewat rilis aplikasi — tidak ada executable jaringan yang diunduh.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Privasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Riwayat dan antrean tersimpan di HP kamu. Download menggunakan koneksi perangkat langsung ke penyedia konten, tanpa server perantara.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Panel(title = "Privasi") {
+            Text(
+                "Riwayat dan antrean tersimpan di HP kamu. Download menggunakan koneksi perangkat langsung ke penyedia konten, tanpa server perantara.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
-        SectionCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Tentang TubeFlow", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
-                Text("Simpan momen. Putar kapan saja.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        Panel(title = "Tentang TubeFlow") {
+            Text("Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
+            Text("Simpan momen. Putar kapan saja.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         Text(
@@ -404,23 +398,26 @@ private fun BluetoothAutoPlaySettings() {
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    SectionCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_title),
-                style=MaterialTheme.typography.titleMedium)
-            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_description),
-                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(androidx.compose.ui.res.stringResource(if (granted) id.local.tubeflow.R.string.autoplay_bluetooth_granted else id.local.tubeflow.R.string.autoplay_bluetooth_missing),
-                style=MaterialTheme.typography.bodyMedium)
-            if (!granted) {
-                FilledTonalButton(onClick={ launcher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) }) {
-                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_enable))
-                }
-                TextButton(onClick={ context.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    "package:${context.packageName}".toUri())) }) {
-                    Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_app_settings))
-                }
-            }
+    Panel(
+        title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_title),
+        description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_description),
+    ) {
+        Text(androidx.compose.ui.res.stringResource(if (granted) id.local.tubeflow.R.string.autoplay_bluetooth_granted else id.local.tubeflow.R.string.autoplay_bluetooth_missing),
+            style=MaterialTheme.typography.bodyMedium)
+        if (!granted) {
+            ActionButton(
+                androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_enable),
+                { launcher.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
+                icon = Icons.Outlined.Bluetooth,
+                emphasis = ActionEmphasis.Primary,
+            )
+            ActionButton(
+                androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.autoplay_bluetooth_app_settings),
+                { context.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    "package:${context.packageName}".toUri())) },
+                icon = Icons.Outlined.Settings,
+                emphasis = ActionEmphasis.Quiet,
+            )
         }
     }
 }

@@ -9,10 +9,12 @@ import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.compositeOver
 import id.local.tubeflow.core.songIdentity
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -27,7 +29,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.DownloadPhase
@@ -54,13 +60,298 @@ object UiSpacing {
     val screen = 16.dp
     val panel = 16.dp
     val item = 12.dp
+    val row = 8.dp
     val group = 24.dp
 }
+
+/** Peran aksi: satu utama per layar, sisanya lebih tenang; destruktif tidak pernah hijau. */
+enum class ActionEmphasis { Primary, Secondary, Quiet }
 
 @Composable
 fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = MaterialTheme.shapes.medium, content = content)
+}
+
+/** Panel isi bersama: padding 16dp, judul `titleMedium`, deskripsi `bodySmall` redup. */
+@Composable
+fun Panel(
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    description: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    SectionCard(modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(UiSpacing.panel),
+            verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
+        ) {
+            if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
+            if (description != null) {
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+fun ActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    emphasis: ActionEmphasis = ActionEmphasis.Secondary,
+    destructive: Boolean = false,
+    fillWidth: Boolean = false,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val base = if (fillWidth) modifier.fillMaxWidth() else modifier
+    val content: @Composable RowScope.() -> Unit = {
+        if (icon != null) {
+            Icon(icon, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    when (emphasis) {
+        ActionEmphasis.Primary -> Button(
+            onClick = onClick,
+            modifier = base.heightIn(min = 52.dp),
+            enabled = enabled,
+            shape = CircleShape,
+            colors = if (destructive) ButtonDefaults.buttonColors(containerColor = scheme.errorContainer, contentColor = scheme.onErrorContainer)
+            else ButtonDefaults.buttonColors(),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            content = content,
+        )
+        ActionEmphasis.Secondary -> OutlinedButton(
+            onClick = onClick,
+            modifier = base.heightIn(min = 48.dp),
+            enabled = enabled,
+            shape = CircleShape,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = if (destructive) scheme.error else scheme.primary,
+            ),
+            border = if (destructive) BorderStroke(1.dp, scheme.error.copy(alpha = 0.55f)) else null,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            content = content,
+        )
+        ActionEmphasis.Quiet -> TextButton(
+            onClick = onClick,
+            modifier = base.heightIn(min = 48.dp),
+            enabled = enabled,
+            shape = CircleShape,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = if (destructive) scheme.error else scheme.primary,
+            ),
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            content = content,
+        )
+    }
+}
+
+/** Baris kontrol penuh: satu fokus TalkBack, target 48dp, status tidak hanya warna. */
+@Composable
+fun ToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
+            value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange,
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiSpacing.item),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (description != null) {
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+@Composable
+fun CheckRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
+            value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onCheckedChange,
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiSpacing.row),
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/**
+ * Aksi ikon untuk baris kartu: label panjang memakan ruang daftar, jadi ikon dipakai di sini dan
+ * nama aksinya tetap dibaca TalkBack lewat `contentDescription`.
+ */
+@Composable
+fun IconAction(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+) {
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        destructive -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    IconButton(onClick = onClick, modifier = modifier.size(48.dp), enabled = enabled) {
+        Icon(icon, description, tint = tint)
+    }
+}
+
+/** Chip dropdown: bentuk dan tinggi sama dengan `FilterChip` di deretan filter. */
+@Composable
+fun <T> MenuChip(
+    label: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        AssistChip(
+            onClick = { expanded = true },
+            label = { Text(options.firstOrNull { it.first == selected }?.second ?: label, maxLines = 1) },
+            trailingIcon = { Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp)) },
+        )
+        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
+            options.forEach { (value, text) ->
+                DropdownMenuItem(
+                    text = { Text(text) },
+                    onClick = { onSelect(value); expanded = false },
+                    trailingIcon = { if (value == selected) Icon(Icons.Outlined.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                )
+            }
+        }
+    }
+}
+
+/** Aksi berbentuk chip agar sejajar dengan filter di sekitarnya. */
+@Composable
+fun ActionChip(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+) {
+    AssistChip(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        label = { Text(label, maxLines = 1) },
+        leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
+    )
+}
+
+/** Deretan kontrol yang dapat digulir: satu jarak 8dp untuk chip, filter, dan aksi. */
+@Composable
+fun ScrollRow(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(UiSpacing.row),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+@Composable
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        label = { Text(label) },
+        leadingIcon = { Icon(Icons.Outlined.Search, null) },
+        trailingIcon = {
+            if (value.isNotEmpty()) IconButton(onClick = { onValueChange("") }) { Icon(Icons.Outlined.Close, "Bersihkan pencarian") }
+        },
+    )
+}
+
+/** Konfirmasi bersama; aksi berisiko memakai warna galat pada tombol konfirmasi. */
+@Composable
+fun ConfirmDialog(
+    title: String,
+    text: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = false,
+    confirmEnabled: Boolean = true,
+    dismissLabel: String? = null,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm() },
+                enabled = confirmEnabled,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                ),
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(dismissLabel ?: stringResource(id.local.tubeflow.R.string.action_cancel))
+            }
+        },
+    )
+}
+
+data class StatSpec(val label: String, val value: String, val icon: ImageVector, val tint: Color? = null)
+
+/** Metrik ringkas: tiga kolom pada font normal, menumpuk vertikal agar tidak terpotong pada font besar. */
+@Composable
+fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
+    val stacked = LocalDensity.current.fontScale > 1.3f
+    if (stacked) {
+        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
+            stats.forEach { stat -> StatPill(stat.label, stat.value, stat.icon, Modifier.fillMaxWidth(), stat.tint ?: MaterialTheme.colorScheme.primary) }
+        }
+    } else {
+        Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            stats.forEach { stat -> StatPill(stat.label, stat.value, stat.icon, Modifier.weight(1f), stat.tint ?: MaterialTheme.colorScheme.primary) }
+        }
+    }
 }
 
 @Composable
@@ -72,24 +363,35 @@ fun PageHeading(title: String, subtitle: String) {
 }
 
 @Composable
-fun EmptyState(icon: ImageVector, title: String, description: String) {
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     SectionCard(Modifier.fillMaxWidth()) {
         Column(
-            Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 24.dp),
+            Modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
         ) {
             Box(
                 Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
                 contentAlignment = Alignment.Center,
             ) { Icon(icon, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
             Text(
                 description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.height(4.dp))
+                ActionButton(actionLabel, onAction, emphasis = ActionEmphasis.Primary, icon = Icons.Outlined.ArrowForward)
+            }
         }
     }
 }
@@ -116,7 +418,8 @@ fun StateChip(state: JobState) {
         JobState.FAILED -> Triple("Gagal", scheme.errorContainer, scheme.onErrorContainer)
         JobState.CANCELLED -> Triple("Dibatalkan", scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
-    Surface(color = container, shape = MaterialTheme.shapes.small) {        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = content, fontWeight = FontWeight.SemiBold)
+    Surface(color = container, shape = CircleShape) {
+        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = content, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -280,56 +583,50 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         modifier = Modifier.weight(1f),
                     )
                     if (refetchLyrics != null && LyricStatus.retryable(job.lyricStatus)) {
-                        TextButton(onClick = { refetchLyrics(job.id) }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
-                            Text("Cari ulang", style = MaterialTheme.typography.labelMedium)
-                        }
+                        IconAction(Icons.Outlined.Refresh, "Cari ulang", { refetchLyrics(job.id) })
                     }
                 }
             }
             openError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 when (job.state) {
                     JobState.QUEUED, JobState.RUNNING -> {
-                        pause?.let { onClick -> TextButton(onClick = onClick) { Icon(Icons.Outlined.Pause, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Jeda") } }
-                        TextButton(onClick = cancel) { Text("Batalkan") }
+                        pause?.let { onClick -> IconAction(Icons.Outlined.Pause, "Jeda", onClick) }
+                        IconAction(Icons.Outlined.Close, "Batalkan", cancel, destructive = true)
                     }
                     JobState.PAUSED -> {
-                        resume?.let { onClick -> OutlinedButton(onClick = onClick) { Icon(Icons.Outlined.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Lanjutkan") } }
-                        TextButton(onClick = cancel) { Text("Batalkan") }
+                        resume?.let { onClick -> IconAction(Icons.Outlined.PlayArrow, "Lanjutkan", onClick) }
+                        IconAction(Icons.Outlined.Close, "Batalkan", cancel, destructive = true)
                     }
                     JobState.FAILED, JobState.CANCELLED -> {
-                        OutlinedButton(onClick = retry) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Coba lagi") }
-                        remove?.let { TextButton(onClick = it) { Icon(Icons.Outlined.Delete, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hapus") } }
+                        IconAction(Icons.Outlined.Refresh, "Coba lagi", retry)
+                        remove?.let { IconAction(Icons.Outlined.Delete, "Hapus", it, destructive = true) }
                     }
                     JobState.COMPLETED -> {
-                        if (job.mode == MediaMode.AUDIO && searchLyrics != null) TextButton(onClick={ searchLyrics(job.id) },enabled=job.outputUri != null) { Text("Cari lirik") }
-                        if (job.mode == MediaMode.AUDIO && play != null) OutlinedButton(onClick=play,enabled=job.outputUri != null) { Text("Putar") }
-                        OutlinedButton(onClick = { openError = launchFile(context, job, false) }, enabled = job.outputUri != null) { Text("Buka") }
-                        TextButton(onClick = { openError = launchFile(context, job, true) }, enabled = job.outputUri != null) { Icon(Icons.Outlined.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Bagikan") }
-                        TextButton(onClick = retry) { Icon(Icons.Outlined.Download, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Unduh lagi") }
-                        remove?.let { TextButton(onClick = it) { Icon(Icons.Outlined.Delete, "Hapus file", Modifier.size(16.dp)) } }
+                        if (job.mode == MediaMode.AUDIO && searchLyrics != null) {
+                            IconAction(Icons.Outlined.Lyrics, "Cari lirik", { searchLyrics(job.id) }, enabled = job.outputUri != null)
+                        }
+                        if (job.mode == MediaMode.AUDIO && play != null) {
+                            IconAction(Icons.Outlined.PlayArrow, "Putar", play, enabled = job.outputUri != null)
+                        }
+                        IconAction(Icons.Outlined.OpenInNew, "Buka", { openError = launchFile(context, job, false) }, enabled = job.outputUri != null)
+                        IconAction(Icons.Outlined.Share, "Bagikan", { openError = launchFile(context, job, true) }, enabled = job.outputUri != null)
+                        IconAction(Icons.Outlined.Refresh, "Unduh lagi", retry)
+                        remove?.let { IconAction(Icons.Outlined.Delete, "Hapus file", it, destructive = true) }
                     }
                 }
             }
-            if (job.state == JobState.COMPLETED && !job.sidecarUris.isNullOrBlank()) {
+            // Lampiran hanya untuk thumbnail dan subtitle. Berkas lirik tidak lagi ditawarkan di sini:
+            // pencarian lirik sudah punya aksinya sendiri dan pemutar membaca LRC langsung dari koleksi.
+            if (job.state == JobState.COMPLETED && !job.sidecarUris.isNullOrBlank() && job.mode == MediaMode.VIDEO) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     job.sidecarUris.lines().forEach { line ->
                         val kind = line.substringBefore('|')
                         val uri = line.substringAfter('|', "")
                         if (uri.isBlank()) return@forEach
-                        val label = when {
-                            kind == "thumb" -> "Thumbnail"
-                            job.mode == MediaMode.AUDIO -> "Lirik"
-                            else -> "Subtitle (CC)"
-                        }
-                        val icon = when {
-                            kind == "thumb" -> Icons.Outlined.Image
-                            job.mode == MediaMode.AUDIO -> Icons.Outlined.Lyrics
-                            else -> Icons.Outlined.ClosedCaption
-                        }
-                        OutlinedButton(onClick = { openError = openSidecar(context, uri, kind) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
-                            Icon(icon, null, Modifier.size(15.dp)); Spacer(Modifier.width(6.dp)); Text(label, style = MaterialTheme.typography.labelMedium)
-                        }
+                        val label = if (kind == "thumb") "Thumbnail" else "Subtitle (CC)"
+                        val icon = if (kind == "thumb") Icons.Outlined.Image else Icons.Outlined.ClosedCaption
+                        IconAction(icon, "Buka $label", { openError = openSidecar(context, uri, kind) })
                     }
                 }
             }
@@ -337,16 +634,36 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
     }
 }
 
+/**
+ * Pemilih satu nilai. `showLabel=false` dipakai di deretan filter Koleksi: hanya nilai aktif
+ * yang tampil agar baris chip tetap ringkas dan tidak menumpuk label di setiap tombol.
+ */
 @Composable
-fun <T> OptionMenu(label: String, options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+fun <T> OptionMenu(
+    label: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    showLabel: Boolean = true,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(options.firstOrNull { it.first == selected }?.second.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = if (showLabel) modifier.fillMaxWidth() else modifier.heightIn(min = 48.dp),
+            shape = MaterialTheme.shapes.small,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            if (showLabel) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(options.firstOrNull { it.first == selected }?.second.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                Text(options.firstOrNull { it.first == selected }?.second ?: label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
             }
-            Icon(Icons.Outlined.ExpandMore, null)
+            Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp))
         }
         DropdownMenu(expanded, { expanded = false }) {
             options.forEach { (value, text) ->

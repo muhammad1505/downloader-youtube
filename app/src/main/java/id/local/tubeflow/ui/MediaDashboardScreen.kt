@@ -49,28 +49,26 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
     val cancelled = counts.firstOrNull { it.action == "CANCELLED" }?.count ?: 0
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
         item { PageHeading("Ringkasan media", "Koleksi di perangkat dan aktivitas yang benar-benar tercatat.") }
-        item { FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { collection("AUDIO") }) { Text("Musik") }
-            OutlinedButton(onClick = { collection("VIDEO") }) { Text("Video") }
-            OutlinedButton(onClick = downloads) { Text("Download") }
+        item { ScrollRow {
+            AssistChip(onClick = { collection("AUDIO") }, label = { Text("Musik") }, leadingIcon = { Icon(Icons.Outlined.LibraryMusic, null, Modifier.size(18.dp)) })
+            AssistChip(onClick = { collection("VIDEO") }, label = { Text("Video") }, leadingIcon = { Icon(Icons.Outlined.Videocam, null, Modifier.size(18.dp)) })
+            AssistChip(onClick = downloads, label = { Text("Download") }, leadingIcon = { Icon(Icons.Outlined.Download, null, Modifier.size(18.dp)) })
         } }
         if (totals == null) item { LinearProgressIndicator(Modifier.fillMaxWidth()) } else totals?.let { t ->
-            item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatPill("Audio tersedia", t.audio.toString(), Icons.Outlined.LibraryMusic, Modifier.weight(1f))
-                StatPill("Video tersedia", t.video.toString(), Icons.Outlined.Videocam, Modifier.weight(1f))
-            } }
-            item { DashboardCard("Komposisi koleksi") {
+            item { StatRow(listOf(
+                StatSpec("Audio tersedia", t.audio.toString(), Icons.Outlined.LibraryMusic),
+                StatSpec("Video tersedia", t.video.toString(), Icons.Outlined.Videocam),
+            )) }
+            item { Panel(title = "Komposisi koleksi") {
                 if (t.audio + t.video == 0L) {
                     Text("Koleksi masih kosong",style=MaterialTheme.typography.titleMedium)
-                    Text("Download media baru atau pindai folder yang sudah berisi file.")
-                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Button(onClick=downloads) { Text("Mulai download") }
-                        TextButton(onClick=model::scan,enabled=!busy) { Text("Segarkan katalog") }
-                    }
+                    Text("Download media baru atau pindai folder yang sudah berisi file.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ActionButton("Mulai download", downloads, icon = Icons.Outlined.Download, emphasis = ActionEmphasis.Primary)
+                    ActionButton("Segarkan katalog", model::scan, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet, enabled = !busy)
                 } else CollectionDonut(t.audio, t.video)
                 Text("Hanya media tersedia. ${t.unavailable} file tidak dapat diakses tidak masuk grafik.", style = MaterialTheme.typography.bodySmall)
             } }
-            item { DashboardCard("Koleksi dan penyimpanan") {
+            item { Panel(title = "Koleksi dan penyimpanan") {
                 Metric("Audio", if (t.audio == 0L) "0 B" else t.audioBytes?.let(Format::bytes) ?: "Belum diketahui")
                 Metric("Video", if (t.video == 0L) "0 B" else t.videoBytes?.let(Format::bytes) ?: "Belum diketahui")
                 Metric("Artis / album", "${t.artists} / ${t.albums}")
@@ -83,7 +81,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
                 } ?: Text("Informasi penyimpanan internal belum tersedia.")
                 Text("Ukuran koleksi berdasarkan pemeriksaan terakhir media terindeks, tanpa LRC/cache. Kapasitas internal adalah volume aplikasi, bukan ukuran koleksi atau kartu SD.", style = MaterialTheme.typography.bodySmall)
             } }
-            item { DashboardCard("Kesehatan Smart Audio") {
+            item { Panel(title = "Kesehatan Smart Audio") {
                 Metric("Menunggu indeks media", pending.toString())
                 Metric("Metadata judul + artis", t.tagged.toString()); Metric("Metadata belum lengkap", t.partial.toString())
                 Metric("Metadata belum diperiksa", t.unchecked.toString()); Metric("Artwork tersedia", t.artwork.toString())
@@ -92,37 +90,37 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
                 Metric("Lirik tersimpan", t.lyrics.toString()); Metric("Lirik tidak ditemukan / tidak cocok", t.noLyrics.toString())
                 Text("Album/genre/tahun opsional. Status lirik tersimpan tidak menjamin sinkronisasi. Statistik tidak menjalankan tagging atau pencarian lirik.", style = MaterialTheme.typography.bodySmall)
                 Text(if (lastScan == 0L) "Pemindaian manual belum dijalankan" else "Pindai terakhir: ${date(lastScan)}", style = MaterialTheme.typography.labelSmall)
-                TextButton(onClick = model::scan, enabled = !busy) { Text("Segarkan katalog") }
+                ActionButton("Segarkan katalog", model::scan, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet, enabled = !busy)
             } }
         }
-        item { DashboardCard("Tugas yang masih tercatat") {
+        item { Panel(title = "Tugas yang masih tercatat") {
             Metric("Total tugas", jobs.size.toString())
             Metric("Selesai / gagal / dibatalkan", "${jobCounts[JobState.COMPLETED] ?: 0} / ${jobCounts[JobState.FAILED] ?: 0} / ${jobCounts[JobState.CANCELLED] ?: 0}")
             Metric("Berjalan / antre / jeda", "${jobCounts[JobState.RUNNING] ?: 0} / ${jobCounts[JobState.QUEUED] ?: 0} / ${jobCounts[JobState.PAUSED] ?: 0}")
             Text("Riwayat lama yang telah dibersihkan tidak tersedia. Jumlah tugas berbeda dari jumlah file; retry memakai tugas yang sama.", style = MaterialTheme.typography.bodySmall)
         } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { ScrollRow {
             listOf(7, 30, 90).forEach { days -> FilterChip(period == days, onClick = { period = days }, label = { Text("$days hari") }) }
         } }
-        item { DashboardCard("Aktivitas download sejak upgrade") {
+        item { Panel(title = "Aktivitas download sejak upgrade") {
             Metric("Selesai / gagal / dibatalkan", "$finished / $failed / $cancelled")
             if (finished + failed > 0) Metric("Rasio selesai dari hasil selesai/gagal", "${(100 * finished / (finished + failed))}%")
             Text("Pencatatan dimulai ${date(SettingsStore.analyticsSince)}. Angka adalah transisi hasil aktivitas dalam periode, termasuk retry; tidak merekonstruksi aktivitas sebelum upgrade.", style = MaterialTheme.typography.bodySmall)
             if (finished == 0L) Text("Belum ada download selesai dalam periode tercatat.")
         } }
-        item { DashboardCard("Download selesai per hari") {
+        item { Panel(title = "Download selesai per hari") {
             ActivityChart(points, cumulative = false)
             Text("Batang = jumlah transisi selesai per tanggal; retry bisa tercatat lagi. Hari sebelum pencatatan bukan nol.", style = MaterialTheme.typography.bodySmall)
         } }
-        item { DashboardCard("Tren akumulasi selesai") {
+        item { Panel(title = "Tren akumulasi selesai") {
             ActivityChart(points, cumulative = true)
             Text("Garis = akumulasi aktivitas selesai dalam $period hari, bukan jumlah file atau riwayat ukuran penyimpanan.", style = MaterialTheme.typography.bodySmall)
         } }
-        item { DashboardCard("Sumber download selesai") {
+        item { Panel(title = "Sumber download selesai") {
             if (platforms.isEmpty()) Text("Belum ada sumber tercatat dalam periode ini.")
             platforms.forEach { platform -> Metric(SourcePlatforms.fromId(platform.platformId).label, platform.count.toString()) }
         } }
-        item { DashboardCard("Aktivitas terbaru") {
+        item { Panel(title = "Aktivitas terbaru") {
             if (recent.isEmpty()) Text("Belum ada aktivitas sejak upgrade.")
             recent.forEach { event -> Text("${date(event.at)} · ${eventLabel(event.action)} · ${if (event.kind == "AUDIO") "Audio" else "Video"}", style = MaterialTheme.typography.bodySmall) }
         } }
@@ -216,10 +214,6 @@ private fun ActivityChart(points: List<DashboardCharts.Point>, cumulative: Boole
     if (points.any { it.completed == null }) Text("Titik abu-abu: belum ada pencatatan", style = MaterialTheme.typography.labelSmall)
 }
 
-@Composable
-private fun DashboardCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    SectionCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); content() } }
-}
 @Composable private fun Metric(label: String, value: String) {
     val largeText=androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     if (largeText) Column(Modifier.fillMaxWidth(), verticalArrangement=Arrangement.spacedBy(4.dp)) {

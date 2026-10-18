@@ -8,6 +8,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,7 +79,7 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                     LinearProgressIndicator(progress = { percent.coerceIn(0,100) / 100f }, modifier = Modifier.fillMaxWidth())
                     Text(stringResource(R.string.karaoke_percent, percent.coerceIn(0,100)))
                 } else LinearProgressIndicator(Modifier.fillMaxWidth())
-                OutlinedButton(onClick = { model.cancel(discardPlayback) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_cancel)) }
+                ActionButton(stringResource(R.string.karaoke_cancel), { model.cancel(discardPlayback) }, icon = Icons.Outlined.StopCircle, emphasis = ActionEmphasis.Secondary, destructive = true, enabled = !busy, fillWidth = true)
             } else if (ready) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -91,8 +93,15 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                                 FilterChip(selected = comparing && playingUri == work.outputData.getString("path")?.let { android.net.Uri.fromFile(java.io.File(it)).toString() }, onClick = { model.compare(player, true) }, enabled = actionsEnabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp), label = { Text(stringResource(R.string.karaoke_compare_instrumental)) })
                             }
                             if (comparing) {
-                                Button(onClick = { player.toggle() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(if (comparisonPlayback.second) R.string.karaoke_compare_pause else R.string.karaoke_compare_play)) }
-                                TextButton(onClick = { player.finishComparison() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_compare_done)) }
+                                ActionButton(
+                                    stringResource(if (comparisonPlayback.second) R.string.karaoke_compare_pause else R.string.karaoke_compare_play),
+                                    { player.toggle() },
+                                    icon = if (comparisonPlayback.second) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                                    emphasis = ActionEmphasis.Primary,
+                                    enabled = actionsEnabled,
+                                    fillWidth = true,
+                                )
+                                ActionButton(stringResource(R.string.karaoke_compare_done), { player.finishComparison() }, icon = Icons.Outlined.Check, emphasis = ActionEmphasis.Quiet, enabled = actionsEnabled, fillWidth = true)
                             }
                             if (saved == null) {
                                 KaraokeOutput.entries.forEach { option ->
@@ -104,17 +113,21 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                                 Text(stringResource(R.string.karaoke_output_estimate, if (format == KaraokeOutput.FLAC && work.outputData.getLong("resultBytes", 0) <= 0) stringResource(R.string.size_unavailable) else Format.bytes(format.estimate(length, work.outputData.getLong("resultBytes", 0)))), style = MaterialTheme.typography.bodySmall)
                             }
                             if (resultSample) {
-                                Button(onClick = { model.sample(false); startProcessing() }, enabled = actionsEnabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_make_full)) }
+                                ActionButton(stringResource(R.string.karaoke_make_full), { model.sample(false); startProcessing() }, icon = Icons.Outlined.MusicNote, emphasis = ActionEmphasis.Primary, enabled = actionsEnabled, fillWidth = true)
                                 if (saved == null) Text(stringResource(R.string.karaoke_sample_private), style = MaterialTheme.typography.bodySmall)
                             }
-                            OutlinedButton(onClick = { if (resultSample) confirmSampleSave = true else model.save(work.id, format) }, enabled = actionsEnabled && saved == null, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(if (saved != null) R.string.karaoke_saved else if (resultSample) R.string.karaoke_save_sample else R.string.karaoke_save_full))
-                            }
+                            ActionButton(
+                                stringResource(if (saved != null) R.string.karaoke_saved else if (resultSample) R.string.karaoke_save_sample else R.string.karaoke_save_full),
+                                { if (resultSample) confirmSampleSave = true else model.save(work.id, format) },
+                                icon = Icons.Outlined.Save,
+                                enabled = actionsEnabled && saved == null,
+                                fillWidth = true,
+                            )
                         } else {
                             Text(stringResource(R.string.karaoke_result_mismatch), style = MaterialTheme.typography.bodySmall)
-                            OutlinedButton(onClick = model::openCurrent, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_open_previous)) }
+                            ActionButton(stringResource(R.string.karaoke_open_previous), model::openCurrent, icon = Icons.Outlined.History, enabled = !busy, fillWidth = true)
                         }
-                        TextButton(onClick = { confirmDiscard = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_discard)) }
+                        ActionButton(stringResource(R.string.karaoke_discard), { confirmDiscard = true }, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true, enabled = !busy, fillWidth = true)
                     }
                 }
             } else if (work?.state == WorkInfo.State.FAILED) {
@@ -125,7 +138,7 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                 Text(stringResource(R.string.karaoke_status_missing), style = MaterialTheme.typography.bodySmall)
             }
             if (!active && !stopping && requestId != null && !ready) {
-                TextButton(onClick = { confirmDiscard = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.karaoke_discard)) }
+                ActionButton(stringResource(R.string.karaoke_discard), { confirmDiscard = true }, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true, enabled = !busy, fillWidth = true)
             }
             if (!active && !stopping && track?.uri?.startsWith("content://") == true) {
                 Text(stringResource(R.string.karaoke_limits), style = MaterialTheme.typography.bodySmall)
@@ -140,9 +153,14 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                     isError = position == null, singleLine = true, enabled = actionsEnabled,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done), modifier = Modifier.fillMaxWidth())
                 if (!sample) Text(stringResource(R.string.karaoke_full_warning), style = MaterialTheme.typography.bodySmall)
-                if (!matches) Button(onClick = startProcessing, enabled = actionsEnabled && (!sample || position != null), modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(if (sample) R.string.karaoke_process_sample else R.string.karaoke_make_full))
-                }
+                if (!matches) ActionButton(
+                    stringResource(if (sample) R.string.karaoke_process_sample else R.string.karaoke_make_full),
+                    startProcessing,
+                    icon = Icons.Outlined.Mic,
+                    emphasis = ActionEmphasis.Primary,
+                    enabled = actionsEnabled && (!sample || position != null),
+                    fillWidth = true,
+                )
             }
             if (cleanupPending && !busy) Text(stringResource(R.string.karaoke_cleanup_pending), color = MaterialTheme.colorScheme.error)
             if (busy && !stopping) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -151,13 +169,24 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
         }
     }, confirmButton = { TextButton(onClick = model::close) { Text(stringResource(R.string.karaoke_close)) } })
 
-    if (confirmSampleSave && matches && resultSample) AlertDialog(onDismissRequest = { confirmSampleSave = false },
-        title = { Text(stringResource(R.string.karaoke_save_sample_title)) },
-        text = { Text(stringResource(R.string.karaoke_save_sample_description, KaraokeInterval.formatStart(beginning), KaraokeInterval.formatStart(beginning + length), format.extension.uppercase(java.util.Locale.ROOT))) },
-        confirmButton = { TextButton(onClick = { confirmSampleSave = false; model.save(work.id, format) }, enabled = !busy) { Text(stringResource(R.string.karaoke_save_sample_confirm, format.extension.uppercase(java.util.Locale.ROOT))) } },
-        dismissButton = { TextButton(onClick = { confirmSampleSave = false }) { Text(stringResource(R.string.karaoke_back)) } })
-    if (confirmDiscard) AlertDialog(onDismissRequest = { confirmDiscard = false },
-        title = { Text(stringResource(R.string.karaoke_discard)) }, text = { Text(stringResource(R.string.karaoke_discard_description)) },
-        confirmButton = { TextButton(onClick = { confirmDiscard = false; model.clear(discardPlayback) }, enabled = !busy) { Text(stringResource(R.string.karaoke_discard_confirm)) } },
-        dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.karaoke_back)) } })
+    if (confirmSampleSave && matches && resultSample) ConfirmDialog(
+        title = stringResource(R.string.karaoke_save_sample_title),
+        text = stringResource(R.string.karaoke_save_sample_description, KaraokeInterval.formatStart(beginning), KaraokeInterval.formatStart(beginning + length), format.extension.uppercase(java.util.Locale.ROOT)),
+        confirmLabel = stringResource(R.string.karaoke_save_sample_confirm, format.extension.uppercase(java.util.Locale.ROOT)),
+        onConfirm = { confirmSampleSave = false; model.save(work.id, format) },
+        onDismiss = { confirmSampleSave = false },
+        destructive = false,
+        confirmEnabled = !busy,
+        dismissLabel = stringResource(R.string.karaoke_back),
+    )
+    if (confirmDiscard) ConfirmDialog(
+        title = stringResource(R.string.karaoke_discard),
+        text = stringResource(R.string.karaoke_discard_description),
+        confirmLabel = stringResource(R.string.karaoke_discard_confirm),
+        onConfirm = { confirmDiscard = false; model.clear(discardPlayback) },
+        onDismiss = { confirmDiscard = false },
+        destructive = true,
+        confirmEnabled = !busy,
+        dismissLabel = stringResource(R.string.karaoke_back),
+    )
 }

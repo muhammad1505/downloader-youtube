@@ -141,10 +141,12 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     IconButton(onClick=dismiss) { Icon(Icons.Outlined.ExpandMore,"Kembali ke mini player") }
                     Text(stringResource(id.local.tubeflow.R.string.player_now_playing),Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Box {
-                        Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=0.7f),
-                            border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.6f))) {
-                            TextButton(onClick={ speedOpen=true },modifier=Modifier.semantics { contentDescription="Kecepatan putar ${speedLabel(state.speed)} kali" }) { Text("${speedLabel(state.speed)}×",fontWeight=FontWeight.Bold) }
-                        }
+                        TextButton(
+                            onClick = { speedOpen = true },
+                            modifier = Modifier.semantics { contentDescription = "Kecepatan putar ${speedLabel(state.speed)} kali" },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                        ) { Text("${speedLabel(state.speed)}×", fontWeight = FontWeight.Bold) }
                         DropdownMenu(speedOpen,onDismissRequest={ speedOpen=false }) {
                             listOf(0.5f,0.75f,1f,1.25f,1.5f,2f).forEach { value ->
                                 DropdownMenuItem(text={ Text("${speedLabel(value)}×") },onClick={ speedOpen=false; player.setSpeed(value) })
@@ -165,17 +167,16 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                                     Spacer(Modifier.height(12.dp))
                                     Text(state.lyricError ?: "Lirik tersinkron belum tersedia.",style=MaterialTheme.typography.bodyLarge,textAlign=TextAlign.Center)
                                     Spacer(Modifier.height(16.dp))
-                                    FilledTonalButton(onClick=openSearch) { Icon(Icons.Outlined.Search,null,Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Cari lirik") }
-                                    Spacer(Modifier.height(8.dp))
-                                    OutlinedButton(onClick=openEditor,enabled=track.lyricUri!=null) { Icon(Icons.Outlined.EditNote,null,Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Editor lirik") }
+                                    ActionButton("Cari lirik", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Primary)
+                                    ActionButton("Editor lirik", openEditor, icon = Icons.Outlined.EditNote, enabled = track.lyricUri != null)
                                     if (track.lyricUri==null) Text("Editor waktu lirik tersedia setelah lirik dipilih.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                     lyricToolError?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
                                 }
                             } else {
                                 Column(Modifier.fillMaxSize()) {
                                     Row(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End)) {
-                                        TextButton(onClick=openEditor,enabled=track.lyricUri!=null) { Icon(Icons.Outlined.EditNote,null,Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Atur waktu lirik") }
-                                        TextButton(onClick=openSearch) { Icon(Icons.Outlined.Search,null,Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Cari lirik lain") }
+                                        ActionButton("Atur waktu lirik", openEditor, icon = Icons.Outlined.EditNote, emphasis = ActionEmphasis.Quiet, enabled = track.lyricUri != null)
+                                        ActionButton("Cari lirik lain", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Quiet)
                                     }
                                     lyricToolError?.let { Text(it,Modifier.padding(horizontal=8.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
                                     LazyColumn(state=list,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -311,9 +312,7 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                 FilterChip(selected=state.repeat!=PlaybackQueue.Repeat.OFF,onClick=player::cycleRepeat,
                     label={ Text("Ulangi: ${repeatLabel(state.repeat)}") },leadingIcon={
                         Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,null,Modifier.size(18.dp)) })
-                TextButton(onClick={ confirmClear=true },enabled=state.queueTracks.size>1) {
-                    Icon(Icons.Outlined.DeleteSweep,null,Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Bersihkan")
-                }
+                ActionButton("Bersihkan", { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true, enabled = state.queueTracks.size > 1)
             }
             if (positions.isEmpty()) Text(stringResource(id.local.tubeflow.R.string.player_queue_no_results),
                 Modifier.padding(vertical=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -359,11 +358,14 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
         }
     }
     if (confirmClear) {
-        AlertDialog(onDismissRequest={ confirmClear=false },
-            title={ Text("Bersihkan antrean?") },
-            text={ Text("Antrean disisakan lagu yang sedang diputar (${state.track?.title ?: "-"}). Pemutaran tidak berhenti dan tidak ada lagu yang dihapus dari penyimpanan.") },
-            confirmButton={ TextButton(onClick={ confirmClear=false; player.keepCurrentOnly() }) { Text("Bersihkan") } },
-            dismissButton={ TextButton(onClick={ confirmClear=false }) { Text("Batal") } })
+        ConfirmDialog(
+            title = "Bersihkan antrean?",
+            text = "Antrean disisakan lagu yang sedang diputar (${state.track?.title ?: "-"}). Pemutaran tidak berhenti dan tidak ada lagu yang dihapus dari penyimpanan.",
+            confirmLabel = "Bersihkan",
+            onConfirm = { confirmClear = false; player.keepCurrentOnly() },
+            onDismiss = { confirmClear = false },
+            destructive = true,
+        )
     }
 }
 
@@ -376,12 +378,13 @@ private fun EqualizerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
             if (!snapshot.available) {
                 Text("Equalizer tidak tersedia pada perangkat ini. Pemutaran tetap berjalan tanpa efek.")
             } else {
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text("Aktif",Modifier.weight(1f))
-                    Switch(checked=snapshot.enabled,onCheckedChange={ player.equalizer.setEnabled(it); snapshot=player.equalizer.snapshot() })
-                }
+                ToggleRow(
+                    title = "Aktif",
+                    checked = snapshot.enabled,
+                    onCheckedChange = { player.equalizer.setEnabled(it); snapshot = player.equalizer.snapshot() },
+                )
                 Box {
-                    OutlinedButton(onClick={ presetOpen=true }) { Text("Preset: ${snapshot.preset}") }
+                    ActionButton("Preset: ${snapshot.preset}", { presetOpen = true }, icon = Icons.Outlined.Equalizer)
                     DropdownMenu(presetOpen,onDismissRequest={ presetOpen=false },modifier=Modifier.heightIn(max=320.dp)) {
                         (listOf(AutoEq.AUTO_PRESET,PlayerEqualizer.DEFAULT_PRESET) + snapshot.presets).forEach { name ->
                             DropdownMenuItem(text={ Text(name) },onClick={ presetOpen=false; player.equalizer.usePreset(name); snapshot=player.equalizer.snapshot() })

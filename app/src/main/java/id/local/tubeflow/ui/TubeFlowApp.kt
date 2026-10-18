@@ -232,6 +232,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onResumeAll = { model.resumeAll() },
                     onCancelAll = { model.cancelAll() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
+                    onOpenDownload = { tab = 1 },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 3 }, downloads = { tab = 1 })
                 3 -> MediaLibraryScreen(library, player)
@@ -246,6 +247,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onPlay = { jobs, index -> jobs.getOrNull(index)?.let { player.playJobs(listOf(it), 0) } },
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
+                    onOpenDownload = { tab = 1 },
                 )
                 else -> SettingsScreen(
                     karaoke = karaoke,

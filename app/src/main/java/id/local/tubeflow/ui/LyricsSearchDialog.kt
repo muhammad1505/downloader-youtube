@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +42,7 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
             Text("Sumber: LRCLIB. Parameter pencarian dapat diedit; tag audio tetap sama.",style=MaterialTheme.typography.bodySmall)
             OutlinedTextField(title,{ title=it.take(200) },label={ Text("Judul lagu") },singleLine=true,enabled=!blocked,modifier=Modifier.fillMaxWidth())
             OutlinedTextField(artist,{ artist=it.take(200) },label={ Text("Artis (opsional)") },singleLine=true,enabled=!blocked,modifier=Modifier.fillMaxWidth())
-            OutlinedButton(onClick={ model.searchLyrics(title,artist) },enabled=!blocked && retrySeconds == 0L && title.isNotBlank()) { Text("Cari lirik") }
+            ActionButton("Cari lirik", { model.searchLyrics(title,artist) }, icon = Icons.Outlined.Search, enabled = !blocked && retrySeconds == 0L && title.isNotBlank())
             if (retrySeconds > 0) Text(pluralStringResource(R.plurals.lyrics_retry_after,
                 retrySeconds.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),retrySeconds),style=MaterialTheme.typography.bodySmall)
             if (blocked) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(if (current.saving) "Menyimpan pilihan…" else "Mencari di LRCLIB…") }
@@ -71,16 +73,14 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
                 }
             }
             if (current.canExpand && title.trim() == current.title && artist.trim() == current.artist) {
-                TextButton(onClick={ model.searchLyrics(title,artist,expand=true) },enabled=!blocked && retrySeconds == 0L) {
-                    Text(stringResource(R.string.lyrics_search_more))
-                }
+                ActionButton(stringResource(R.string.lyrics_search_more), { model.searchLyrics(title,artist,expand=true) }, icon = Icons.Outlined.Add, emphasis = ActionEmphasis.Quiet, enabled = !blocked && retrySeconds == 0L)
             }
             selected?.let { choice ->
                 Text("Preview pilihan",style=MaterialTheme.typography.labelMedium)
                 Text(choice.text.orEmpty().lineSequence().take(6).joinToString("\n"),style=MaterialTheme.typography.bodySmall)
                 if (mismatch) {
                     Text("Identitas/versi/durasi berbeda dari audio. Timestamp mungkin tidak sinkron; pilih secara manual hanya jika rekamannya sesuai.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(acknowledge,{ acknowledge=it },enabled=!blocked); Text("Saya tetap memilih versi ini",style=MaterialTheme.typography.bodySmall) }
+                    CheckRow("Saya tetap memilih versi ini", acknowledge, { acknowledge=it }, enabled=!blocked)
                 }
                 if (current.item.lyricUri != null) Text("Lirik lama diganti setelah penyimpanan terverifikasi. Koreksi waktu sebelumnya direset untuk lirik baru.",style=MaterialTheme.typography.bodySmall)
             }

@@ -3,6 +3,8 @@ package id.local.tubeflow.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,14 +28,14 @@ fun SleepTimerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
             if (timer.remainingMs > 0) Text(stringResource(R.string.sleep_remaining, duration(timer.remainingMs)))
             if (timer.afterTrack) Text(stringResource(R.string.sleep_after_track))
             listOf(15, 30, 60).forEach { minutes ->
-                OutlinedButton(onClick = { player.setSleepTimer(minutes); dismiss() }, modifier = Modifier.fillMaxWidth()) { Text(pluralStringResource(R.plurals.sleep_minutes, minutes, minutes)) }
+                ActionButton(pluralStringResource(R.plurals.sleep_minutes, minutes, minutes), { player.setSleepTimer(minutes); dismiss() }, icon = Icons.Outlined.Timer, fillWidth = true)
             }
             OutlinedTextField(custom, { custom = it.take(3) }, label = { Text(stringResource(R.string.sleep_custom)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true,
                 isError = custom.isNotBlank() && minutes == null, modifier = Modifier.fillMaxWidth())
-            TextButton(onClick = { minutes?.let { player.setSleepTimer(it) }; dismiss() }, enabled = minutes != null, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sleep_start)) }
-            OutlinedButton(onClick = { player.setSleepTimer(null, afterTrack = true); dismiss() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sleep_after_track)) }
-            TextButton(onClick = { player.setSleepTimer(null); dismiss() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sleep_cancel)) }
+            ActionButton(stringResource(R.string.sleep_start), { minutes?.let { player.setSleepTimer(it) }; dismiss() }, icon = Icons.Outlined.PlayArrow, emphasis = ActionEmphasis.Primary, enabled = minutes != null, fillWidth = true)
+            ActionButton(stringResource(R.string.sleep_after_track), { player.setSleepTimer(null, afterTrack = true); dismiss() }, icon = Icons.Outlined.SkipNext, fillWidth = true)
+            ActionButton(stringResource(R.string.sleep_cancel), { player.setSleepTimer(null); dismiss() }, icon = Icons.Outlined.TimerOff, emphasis = ActionEmphasis.Quiet, destructive = true, fillWidth = true)
         }
     }, confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.karaoke_close)) } })
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,102 +53,124 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
     fun open(item: MediaItem) { scope.launch {
         openError = withContext(Dispatchers.IO) { launchMedia(context, item.location, item.kind == "AUDIO", false) }
     } }
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
+    ) {
+        item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.") }
+        item { ScrollRow {
             listOf("" to "Semua", "AUDIO" to "Musik", "VIDEO" to "Video").forEach { (kind, name) ->
                 FilterChip(filter.kind == kind, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = kind)) }, label = { Text(name) })
             }
-        }
-        LazyColumn(
-            Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
-        ) {
-            item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.") }
-            val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
-            // Kontrol koleksi berupa tombol ikon: putar, putar acak, dan pencarian yang hanya
-            // membuka kolom teks saat dibutuhkan sehingga daftar tetap menjadi fokus layar.
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { model.playSelection(player, shuffle = false) }, enabled = playable.isNotEmpty()) { Icon(Icons.Outlined.PlayArrow, "Putar semua lagu") }
-                IconButton(onClick = { model.playSelection(player, shuffle = true) }, enabled = playable.size > 1) { Icon(Icons.Outlined.Shuffle, "Putar acak") }
-                IconButton(onClick = { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen }) {
-                    Icon(if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search, if (searchOpen) "Tutup pencarian" else "Cari di koleksi")
-                }
-            } }
-            if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Memeriksa media…") }
-            if (searchOpen) item {
-                OutlinedTextField(filter.query, onValueChange = { model.filter(filter.copy(query = it)) }, label = { Text("Cari judul, artis, nama file") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    trailingIcon = { if (filter.query.isNotEmpty()) IconButton(onClick = { model.filter(filter.copy(query = "")) }) { Icon(Icons.Outlined.Close, "Bersihkan pencarian") } })
-            }
-            item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        } }
+        val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
+        // Aksi koleksi berlabel supaya tujuan setiap tombol jelas tanpa menebak ikon.
+        item { ScrollRow {
+            ActionButton("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
+            ActionButton("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
+            ActionButton(
+                if (searchOpen) "Tutup" else "Cari",
+                { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen },
+                icon = if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search,
+                emphasis = ActionEmphasis.Quiet,
+            )
+        } }
+        if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Memeriksa media…") }
+        if (searchOpen) item {
+            SearchField(filter.query, { model.filter(filter.copy(query = it)) }, label = "Cari judul, artis, nama file")
+        }            // Semua kontrol filter memakai satu bentuk chip: Favorit (aktif/tidak), dropdown playlist,
+            // aksi kelola, dan dropdown urutan/folder/artis/album.
+            item { ScrollRow {
                 FilterChip(filter.playlistId == PersonalLibrary.FAVORITES, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = if (filter.playlistId == PersonalLibrary.FAVORITES) "" else PersonalLibrary.FAVORITES)) }, label = { Text(stringResource(R.string.library_favorites)) })
-                ChoiceMenu(stringResource(R.string.library_playlists), listOf("" to stringResource(R.string.library_all_playlists)) + playlists.filter { it.id != PersonalLibrary.FAVORITES }.map { it.id to it.name }, filter.playlistId) {
-                    model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = it))
-                }
-                TextButton(onClick = { managePlaylists = true }) { Text(stringResource(R.string.library_manage_playlists)) }
+                MenuChip(
+                    label = stringResource(R.string.library_playlists),
+                    options = listOf("" to stringResource(R.string.library_all_playlists)) + playlists.filter { it.id != PersonalLibrary.FAVORITES }.map { it.id to it.name },
+                    selected = filter.playlistId,
+                    onSelect = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = it)) },
+                )
+                ActionChip(stringResource(R.string.library_manage_playlists), { managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd)
             } }
-            item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceMenu("Urut", listOf("recent" to "Terbaru", "name" to "Nama", "size" to "Ukuran", "duration" to "Durasi"), filter.sort) { model.filter(filter.copy(sort = it)) }
-                ChoiceMenu("Folder", listOf("" to "Semua folder") + folders.map { it to it }, filter.folder) { model.filter(filter.copy(folder = it)) }
+            item { ScrollRow {
+                MenuChip("Terbaru", listOf("recent" to "Terbaru", "name" to "Nama", "size" to "Ukuran", "duration" to "Durasi"), filter.sort, { model.filter(filter.copy(sort = it)) })
+                MenuChip("Semua folder", listOf("" to "Semua folder") + folders.map { it to it }, filter.folder, { model.filter(filter.copy(folder = it)) })
                 if (filter.kind == "AUDIO") {
-                    ChoiceMenu("Artis", listOf("" to "Semua artis") + artists.map { it to it }, filter.artist) { model.filter(filter.copy(artist = it)) }
-                    ChoiceMenu("Album", listOf("" to "Semua album") + albums.map { it to it }, filter.album) { model.filter(filter.copy(album = it)) }
+                    MenuChip("Semua artis", listOf("" to "Semua artis") + artists.map { it to it }, filter.artist, { model.filter(filter.copy(artist = it)) })
+                    MenuChip("Semua album", listOf("" to "Semua album") + albums.map { it to it }, filter.album, { model.filter(filter.copy(album = it)) })
                 }
             } }
-            openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
-            if (media.isEmpty() && !busy) item {
-                if (filter.playlistId.isNotBlank()) EmptyState(Icons.Outlined.LibraryMusic, stringResource(if (filter.playlistId == PersonalLibrary.FAVORITES) R.string.library_favorites_empty else R.string.library_playlist_empty), stringResource(R.string.library_playlist_empty_help))
-                else EmptyState(Icons.Outlined.Folder, "Belum ada media yang cocok", "Folder Download/TubeFlow dipindai otomatis saat aplikasi dibuka. File tidak disalin.")
-            }
-            items(media, key = { it.uri }) { item ->
-                val accent=rememberCoverAccent(item.coverPath)
-                var menu by remember(item.uri) { mutableStateOf(false) }
-                Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
-                    // Satu tap = seluruh daftar masuk antrean, mulai dari item ini.
-                    if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item)
-                },colors=mediaCardColors(accent)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                            if (item.displayName.substringBeforeLast('.') != item.title) Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
-                            if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                PlatformIcon(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
-                            }
-                            if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+        openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
+        if (media.isEmpty() && !busy) item {
+            if (filter.playlistId.isNotBlank()) EmptyState(Icons.Outlined.LibraryMusic, stringResource(if (filter.playlistId == PersonalLibrary.FAVORITES) R.string.library_favorites_empty else R.string.library_playlist_empty), stringResource(R.string.library_playlist_empty_help))
+            else EmptyState(
+                Icons.Outlined.Folder,
+                "Belum ada media yang cocok",
+                "Folder Download/TubeFlow dipindai otomatis saat aplikasi dibuka. File tidak disalin.",
+                actionLabel = "Segarkan katalog",
+                onAction = { model.scan() },
+            )
+        }
+        items(media, key = { it.uri }) { item ->
+            val accent=rememberCoverAccent(item.coverPath)
+            var menu by remember(item.uri) { mutableStateOf(false) }
+            Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
+                // Satu tap = seluruh daftar masuk antrean, mulai dari item ini.
+                if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item)
+            },colors=mediaCardColors(accent)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                        // Nama file hanya ditampilkan bila tidak mengulang judul — hierarki seperti daftar lagu.
+                        val fileName = item.displayName.substringBeforeLast('.')
+                        if (item.title.isBlank() || (!fileName.startsWith(item.title, ignoreCase = true) && fileName != item.title)) {
+                            Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
                         }
-                        // Menu tiga titik: aksi sekunder tidak memicu playback saat diketuk.
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Menu ${item.title}") }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text(if (item.kind == "AUDIO") "Putar sekarang" else "Buka di pemutar") },
-                                leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
-                                onClick = { menu = false; if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item) })
-                            if (item.kind == "AUDIO") {
-                                DropdownMenuItem(text = { Text(stringResource(if (item.uri in favorites) R.string.library_unfavorite else R.string.library_favorite)) }, onClick = {
-                                    menu = false
-                                    if (item.uri in favorites) model.removeFromPlaylist(item, PersonalLibrary.FAVORITES) else model.addToPlaylist(item, PersonalLibrary.FAVORITES)
-                                })
-                                DropdownMenuItem(text = { Text(stringResource(R.string.library_add_playlist)) }, onClick = { menu = false; addPlaylist = item })
-                                if (filter.playlistId.isNotBlank()) DropdownMenuItem(text = { Text(stringResource(R.string.library_remove_playlist)) }, onClick = { menu = false; model.removeFromPlaylist(item, filter.playlistId) })
-                                DropdownMenuItem(text = { Text("Putar berikutnya") }, onClick = { menu = false; player.playNext(item) })
-                                DropdownMenuItem(text = { Text("Tambah ke antrean") }, onClick = { menu = false; player.enqueue(item) })
-                            }
-                            DropdownMenuItem(text = { Text("Detail") }, onClick = { menu = false; detail = item })
-                            if (item.kind == "AUDIO") DropdownMenuItem(text = { Text("Cari lirik") }, enabled = !busy,
-                                onClick = { menu = false; model.openLyrics(item) })
-                            if (item.kind == "AUDIO" && item.lyricUri != null) DropdownMenuItem(text = { Text("Atur waktu lirik") }, enabled = !busy,
-                                onClick = { menu = false; timing = item })
-                            DropdownMenuItem(text = { Text("Ubah nama") }, enabled = !busy && item.availability == "AVAILABLE",
-                                onClick = { menu = false; rename = item })
-                            DropdownMenuItem(text = { Text("Hapus file", color = MaterialTheme.colorScheme.error) }, enabled = !busy && item.availability == "AVAILABLE",
-                                onClick = { menu = false; delete = item })
+                        if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            PlatformIcon(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
                         }
+                        if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                    // Menu tiga titik: aksi sekunder tidak memicu playback saat diketuk.
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Menu ${item.title}") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(if (item.kind == "AUDIO") "Putar sekarang" else "Buka di pemutar") },
+                            leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
+                            onClick = { menu = false; if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item) })
+                        if (item.kind == "AUDIO") {
+                            if (filter.playlistId.isNotBlank()) DropdownMenuItem(text = { Text(stringResource(R.string.library_remove_playlist)) }, onClick = { menu = false; model.removeFromPlaylist(item, filter.playlistId) })
+                            DropdownMenuItem(text = { Text("Putar berikutnya") }, onClick = { menu = false; player.playNext(item) })
+                        }
+                        DropdownMenuItem(text = { Text("Detail") }, onClick = { menu = false; detail = item })
+                        if (item.kind == "AUDIO") DropdownMenuItem(text = { Text("Cari lirik") }, enabled = !busy,
+                            onClick = { menu = false; model.openLyrics(item) })
+                        if (item.kind == "AUDIO" && item.lyricUri != null) DropdownMenuItem(text = { Text("Atur waktu lirik") }, enabled = !busy,
+                            onClick = { menu = false; timing = item })
+                        DropdownMenuItem(text = { Text("Ubah nama") }, enabled = !busy && item.availability == "AVAILABLE",
+                            onClick = { menu = false; rename = item })
+                        DropdownMenuItem(text = { Text("Hapus file", color = MaterialTheme.colorScheme.error) }, enabled = !busy && item.availability == "AVAILABLE",
+                            onClick = { menu = false; delete = item })
                     }
                 }
-            } }
-            if (media.size >= filter.limit && filter.limit < 3000) item { TextButton(onClick = model::more) { Text("Muat lebih banyak") } }
+                // Aksi lagu yang sering dipakai tampil sebagai ikon langsung di kartu, bukan tersembunyi
+                // di menu tiga titik; menu menyisakan aksi informasi dan berkas.
+                if (item.kind == "AUDIO") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        val favorite = item.uri in favorites
+                        IconAction(
+                            if (favorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
+                            stringResource(if (favorite) R.string.library_unfavorite else R.string.library_favorite),
+                            { if (favorite) model.removeFromPlaylist(item, PersonalLibrary.FAVORITES) else model.addToPlaylist(item, PersonalLibrary.FAVORITES) },
+                        )
+                        IconAction(Icons.Outlined.PlaylistAdd, stringResource(R.string.library_add_playlist), { addPlaylist = item })
+                        IconAction(Icons.AutoMirrored.Outlined.QueueMusic, "Tambah ke antrean", { player.enqueue(item) })
+                    }
+                }
+            }
+        } }
+        if (media.size >= filter.limit && filter.limit < 3000) item {
+            ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
         }
     }
     if (managePlaylists) PersonalPlaylistDialog(model) { managePlaylists = false }
@@ -156,9 +179,9 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(selected.title)
                 playlists.filter { it.id != PersonalLibrary.FAVORITES }.forEach { entry ->
-                    OutlinedButton(onClick = { model.addToPlaylist(selected, entry.id); addPlaylist = null }, modifier = Modifier.fillMaxWidth()) { Text(entry.name) }
+                    ActionButton(entry.name, { model.addToPlaylist(selected, entry.id); addPlaylist = null }, fillWidth = true)
                 }
-                TextButton(onClick = { addPlaylist = null; managePlaylists = true }) { Text(stringResource(R.string.library_create_playlist)) }
+                ActionButton(stringResource(R.string.library_create_playlist), { addPlaylist = null; managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd, emphasis = ActionEmphasis.Quiet)
             }
         }, confirmButton = { TextButton(onClick = { addPlaylist = null }) { Text(stringResource(R.string.action_cancel)) } }) }
     detail?.let { item -> AlertDialog(onDismissRequest = { detail = null }, title = { Text("Detail media") }, text = {
@@ -184,23 +207,19 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nama file") }, singleLine = true, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false))
                 if (item.kind == "AUDIO") Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(searchAfter,{ searchAfter=it }); Text("Cari lirik dengan nama baru") }
                 Text("Ekstensi tetap sama. File lain tidak akan ditimpa.", style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { name = SmartMedia.fileName(TitleSplit.identify(item.title, metadataArtist = item.artist, metadataTrack = item.title, recognizeCollaboration=item.kind == "AUDIO"), item.title, item.displayName.substringAfterLast('.'), true) }) { Text("Gunakan nama standar") }
+                ActionButton("Gunakan nama standar", { name = SmartMedia.fileName(TitleSplit.identify(item.title, metadataArtist = item.artist, metadataTrack = item.title, recognizeCollaboration=item.kind == "AUDIO"), item.title, item.displayName.substringAfterLast('.'), true) }, icon = Icons.Outlined.AutoFixHigh, emphasis = ActionEmphasis.Quiet)
             }
         }, confirmButton = { TextButton(onClick = { model.rename(item, name, searchAfter); rename = null }) { Text("Simpan") } }, dismissButton = { TextButton(onClick = { rename = null }) { Text("Batal") } })
     }
-    delete?.let { item -> AlertDialog(onDismissRequest = { delete = null }, title = { Text("Hapus file permanen?") }, text = { Text("${item.displayName} dan file pendamping yang tercatat akan dihapus dari penyimpanan.") }, confirmButton = { TextButton(onClick = { model.delete(item); delete = null }) { Text("Hapus file") } }, dismissButton = { TextButton(onClick = { delete = null }) { Text("Batal") } }) }
+    delete?.let { item -> ConfirmDialog(
+        title = "Hapus file permanen?",
+        text = "${item.displayName} dan file pendamping yang tercatat akan dihapus dari penyimpanan.",
+        confirmLabel = "Hapus file",
+        onConfirm = { model.delete(item); delete = null },
+        onDismiss = { delete = null },
+        destructive = true,
+    ) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
-}
-
-@Composable
-private fun ChoiceMenu(label: String, choices: List<Pair<String, String>>, selected: String, choose: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { expanded = true }) { Text(choices.firstOrNull { it.first == selected }?.second ?: label) }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
-            choices.forEach { (id, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { choose(id); expanded = false }) }
-        }
-    }
 }
 
 /** Dialog atur waktu lirik; dipakai Koleksi DAN pemutar penuh supaya tidak bolak-balik. */
@@ -225,11 +244,11 @@ fun LyricTimingDialog(item: MediaItem, model: MediaLibraryViewModel, dismiss: ()
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Sorotan terlambat: majukan lirik. Koreksi hanya lagu ini; perubahan tersimpan pada LRC.")
             OutlinedTextField(seconds, { seconds=it }, label={ Text("Koreksi waktu (detik)") }, supportingText={ Text("Negatif = majukan, positif = mundurkan. Contoh: −2 atau 0,5. Total dari waktu asli.") }, keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text), singleLine=true, isError=offset == null, enabled=preview != null)
-            Column {
-                TextButton(onClick = { seconds = LrcTiming.secondsLabel(((offset ?: 0) - 500).coerceAtLeast(-LrcTiming.LIMIT_MS)) }, enabled = preview != null) { Text("Majukan 0,5 detik") }
-                TextButton(onClick = { seconds = LrcTiming.secondsLabel(((offset ?: 0) + 500).coerceAtMost(LrcTiming.LIMIT_MS)) }, enabled = preview != null) { Text("Mundurkan 0,5 detik") }
+            ScrollRow {
+                ActionButton("Majukan 0,5 detik", { seconds = LrcTiming.secondsLabel(((offset ?: 0) - 500).coerceAtLeast(-LrcTiming.LIMIT_MS)) }, emphasis = ActionEmphasis.Quiet, enabled = preview != null)
+                ActionButton("Mundurkan 0,5 detik", { seconds = LrcTiming.secondsLabel(((offset ?: 0) + 500).coerceAtMost(LrcTiming.LIMIT_MS)) }, emphasis = ActionEmphasis.Quiet, enabled = preview != null)
             }
-            TextButton(onClick = { seconds = "0" }, enabled = preview != null) { Text("Reset ke asli") }
+            ActionButton("Reset ke asli", { seconds = "0" }, icon = Icons.Outlined.RestartAlt, emphasis = ActionEmphasis.Quiet, enabled = preview != null)
             if (preview == null && error == null) CircularProgressIndicator(Modifier.size(24.dp))
             Text(text, style = MaterialTheme.typography.bodySmall)
             Text("Preview timestamp. Buka ulang lirik di pemutar setelah simpan. Selisih yang makin berubah memerlukan rekaman lirik lain.", style = MaterialTheme.typography.bodySmall)

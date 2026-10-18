@@ -151,7 +151,7 @@ fun DownloadScreen(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(UiSpacing.screen),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         item {
             PageHeading(stringResource(id.local.tubeflow.R.string.page_download), stringResource(id.local.tubeflow.R.string.page_download_help))
@@ -196,12 +196,24 @@ fun DownloadScreen(
                 },
             )
             if (hasList && isVideo) {
-                TextButton(onClick = inspectPlaylist, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.AutoMirrored.Outlined.FeaturedPlayList, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Link ini punya playlist — buka sebagai playlist")
-                }
+                ActionButton(
+                    "Link ini punya playlist — buka sebagai playlist",
+                    inspectPlaylist,
+                    icon = Icons.AutoMirrored.Outlined.FeaturedPlayList,
+                    emphasis = ActionEmphasis.Quiet,
+                    enabled = !busy,
+                    fillWidth = true,
+                )
             }
             // Inspeksi gagal untuk URL ini: sediakan coba lagi tanpa perlu mengganti tautan (BUG-006).
-            if (inspectDetails != null && !busy && trimmed.isNotBlank()) TextButton(onClick = { showFailureDetails = true }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.failure_details)) }
+            if (inspectDetails != null && !busy && trimmed.isNotBlank()) {
+                ActionButton(
+                    androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.failure_details),
+                    { showFailureDetails = true },
+                    icon = Icons.Outlined.Info,
+                    emphasis = ActionEmphasis.Quiet,
+                )
+            }
             if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isPlaylistLink)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
@@ -213,11 +225,16 @@ fun DownloadScreen(
                         maxLines = 2,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = {
-                        inspectedUrl = ""
-                        // Retry mengulang jenis inspeksi terakhir — playlist yang gagal tidak diulang sebagai video (BUG-006/R6).
-                        retryInspect()
-                    }) { Text("Coba lagi") }
+                    ActionButton(
+                        "Coba lagi",
+                        {
+                            inspectedUrl = ""
+                            // Retry mengulang jenis inspeksi terakhir — playlist yang gagal tidak diulang sebagai video (BUG-006/R6).
+                            retryInspect()
+                        },
+                        icon = Icons.Outlined.Refresh,
+                        emphasis = ActionEmphasis.Quiet,
+                    )
                 }
             }
         }
@@ -233,7 +250,7 @@ fun DownloadScreen(
         if (shownPlaylist != null) {
             item {
                 SectionCard {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.AutoMirrored.Outlined.FeaturedPlayList, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(8.dp))
@@ -241,9 +258,11 @@ fun DownloadScreen(
                                 Text(shownPlaylist.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
                                 Text(if (Selection.isMix(shownPlaylist.url)) "${entries.size} video dalam antrean awal" else "${entries.size} video · mengikuti isi link (maks 500)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            TextButton(onClick = {
-                                selectedIds = if (allSelected) emptySet() else selectedIds + visibleEntries.map { it.id }
-                            }) { Text(if (allSelected) "Kosongkan" else "Pilih semua") }
+                            ActionButton(
+                                if (allSelected) "Kosongkan" else "Pilih semua",
+                                { selectedIds = if (allSelected) emptySet() else selectedIds + visibleEntries.map { it.id } },
+                                emphasis = ActionEmphasis.Quiet,
+                            )
                         }
                         if (Selection.isMix(shownPlaylist.url)) {
                             Text(
@@ -252,18 +271,7 @@ fun DownloadScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        OutlinedTextField(
-                            value = playlistQuery,
-                            onValueChange = { playlistQuery = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("Cari video dalam playlist") },
-                            placeholder = { Text("Judul video…") },
-                            leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
-                            trailingIcon = {
-                                if (playlistQuery.isNotEmpty()) IconButton(onClick = { playlistQuery = "" }) { Icon(Icons.Outlined.Close, "Bersihkan pencarian", Modifier.size(18.dp)) }
-                            },
-                        )
+                        SearchField(playlistQuery, { playlistQuery = it }, label = "Cari video dalam playlist")
                         if (entries.isEmpty()) {
                             Text("Playlist kosong atau tidak bisa dibaca.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
@@ -308,14 +316,10 @@ fun DownloadScreen(
 
         if (shownVideo != null || shownPlaylist != null) {
         item {
-            SectionCard {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (shownPlaylist != null) Text(
-                        "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
+            Panel(
+                title = if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download",
+                description = if (shownPlaylist != null) "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu." else null,
+            ) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = mode == MediaMode.VIDEO,
@@ -334,7 +338,7 @@ fun DownloadScreen(
                     }
 
                     Text("Pilihan cepat", style = MaterialTheme.typography.labelLarge)
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ScrollRow {
                         presets.forEach { p ->
                             FilterChip(
                                 selected = activePreset?.label == p.label,
@@ -350,11 +354,11 @@ fun DownloadScreen(
                     AnimatedVisibility(advanced, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (mode == MediaMode.VIDEO) {
-                                OptionMenu("Resolusi", listOf(0 to "Auto · terbaik", 4320 to "4320p · 8K", 2160 to "2160p · 4K", 1440 to "1440p", 1080 to "1080p · Full HD", 720 to "720p · HD", 480 to "480p", 360 to "360p"), quality) { quality = it; preset = "" }
-                                OptionMenu("Format video", listOf("auto" to "Auto · format asli", "mp4" to "MP4 · kompatibel", "mkv" to "MKV", "webm" to "WebM", "mov" to "MOV · Apple", "avi" to "AVI · lama"), videoFormat) { videoFormat = it; preset = "" }
+                                OptionMenu("Resolusi", listOf(0 to "Auto · terbaik", 4320 to "4320p · 8K", 2160 to "2160p · 4K", 1440 to "1440p", 1080 to "1080p · Full HD", 720 to "720p · HD", 480 to "480p", 360 to "360p"), quality, onSelect = { quality = it; preset = "" })
+                                OptionMenu("Format video", listOf("auto" to "Auto · format asli", "mp4" to "MP4 · kompatibel", "mkv" to "MKV", "webm" to "WebM", "mov" to "MOV · Apple", "avi" to "AVI · lama"), videoFormat, onSelect = { videoFormat = it; preset = "" })
                             } else {
-                                if (audioFormat !in listOf("flac", "wav", "vorbis")) OptionMenu("Bitrate audio", listOf(0 to "Auto · terbaik", 320 to "320 kbps", 256 to "256 kbps", 192 to "192 kbps", 128 to "128 kbps", 64 to "64 kbps"), bitrate) { bitrate = it; preset = "" }
-                                OptionMenu("Format audio", listOf("auto" to "Auto · format asli", "mp3" to "MP3", "m4a" to "M4A", "aac" to "AAC", "opus" to "Opus", "vorbis" to "OGG Vorbis", "flac" to "FLAC", "wav" to "WAV"), audioFormat) { audioFormat = it; preset = ""; if (it !in Selection.coverFormats) embedThumb = false }
+                                if (audioFormat !in listOf("flac", "wav", "vorbis")) OptionMenu("Bitrate audio", listOf(0 to "Auto · terbaik", 320 to "320 kbps", 256 to "256 kbps", 192 to "192 kbps", 128 to "128 kbps", 64 to "64 kbps"), bitrate, onSelect = { bitrate = it; preset = "" })
+                                OptionMenu("Format audio", listOf("auto" to "Auto · format asli", "mp3" to "MP3", "m4a" to "M4A", "aac" to "AAC", "opus" to "Opus", "vorbis" to "OGG Vorbis", "flac" to "FLAC", "wav" to "WAV"), audioFormat, onSelect = { audioFormat = it; preset = ""; if (it !in Selection.coverFormats) embedThumb = false })
                                 if (audioFormat == "opus" && bitrate > 0) Text("Bitrate Opus adalah target nominal; hasil dapat bervariasi sesuai konten.", style = MaterialTheme.typography.bodySmall)
                                 if (audioFormat == "auto" && bitrate > 0) Text("Bitrate manual dengan format Auto dikonversi ke MP3.", style = MaterialTheme.typography.bodySmall)
                                 if (audioFormat in listOf("flac", "wav")) Text("FLAC/WAV tidak meningkatkan kualitas sumber dan menghasilkan file lebih besar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -362,46 +366,37 @@ fun DownloadScreen(
 
                             HorizontalDivider()
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(if (mode == MediaMode.VIDEO) "Download subtitle" else "Download lirik", style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        if (mode == MediaMode.VIDEO) "Simpan teks subtitle (.srt) di samping file video."
-                                        else "Simpan lirik tersinkron (.lrc) dari penyedia lirik (LRCLIB).",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Switch(
-                                    checked = if (mode == MediaMode.VIDEO) subtitleLang.isNotEmpty() else lyrics,
-                                    onCheckedChange = { enabled ->
-                                        if (mode == MediaMode.VIDEO) {
-                                            subtitleLang = if (enabled) "asli" else ""
-                                            if (!enabled) embedSubs = false
-                                        } else {
-                                            lyrics = enabled
-                                        }
-                                    },
-                                )
-                            }
+                            ToggleRow(
+                                title = if (mode == MediaMode.VIDEO) "Download subtitle" else "Download lirik",
+                                description = if (mode == MediaMode.VIDEO) "Simpan teks subtitle (.srt) di samping file video."
+                                else "Simpan lirik tersinkron (.lrc) dari penyedia lirik (LRCLIB).",
+                                checked = if (mode == MediaMode.VIDEO) subtitleLang.isNotEmpty() else lyrics,
+                                onCheckedChange = { enabled ->
+                                    if (mode == MediaMode.VIDEO) {
+                                        subtitleLang = if (enabled) "asli" else ""
+                                        if (!enabled) embedSubs = false
+                                    } else {
+                                        lyrics = enabled
+                                    }
+                                },
+                            )
                             AnimatedVisibility(if (mode == MediaMode.VIDEO) subtitleLang.isNotEmpty() else lyrics, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     // Bahasa subtitle hanya untuk video — lirik audio selalu dari LRCLIB, tanpa pilihan bahasa (BUG-009).
                                     if (mode == MediaMode.VIDEO) {
-                                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        ScrollRow {
                                             subtitleLabels.drop(1).forEach { (value, label) ->
                                                 FilterChip(selected = subtitleLang == value, onClick = { subtitleLang = value }, label = { Text(label) })
                                             }
                                         }
                                     }
                                     if (mode == MediaMode.VIDEO) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Column(Modifier.weight(1f)) {
-                                                Text("Sematkan ke file video", style = MaterialTheme.typography.bodyMedium)
-                                                Text("Subtitle jadi soft-sub di pemutar (MP4/MKV).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                            Switch(checked = embedSubs, onCheckedChange = { embedSubs = it })
-                                        }
+                                        ToggleRow(
+                                            title = "Sematkan ke file video",
+                                            description = "Subtitle jadi soft-sub di pemutar (MP4/MKV).",
+                                            checked = embedSubs,
+                                            onCheckedChange = { embedSubs = it },
+                                        )
                                     } else {
                                         Text("File lirik (.lrc) disimpan di folder yang sama dengan file audio — nama file sama, langsung terbaca di AIMP/Poweramp. Kalau lagu tidak ada di penyedia lirik, file liriknya tidak ditulis.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -411,13 +406,12 @@ fun DownloadScreen(
                             if (mode == MediaMode.AUDIO) {
                                 HorizontalDivider()
                                 if (Selection.coverSupported(mode, audioFormat)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text("Sampul album (cover)", style = MaterialTheme.typography.bodyMedium)
-                                            Text("Sampul disematkan ke file audio — tidak ada file gambar terpisah.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                        Switch(checked = embedThumb, onCheckedChange = { embedThumb = it })
-                                    }
+                                    ToggleRow(
+                                        title = "Sampul album (cover)",
+                                        description = "Sampul disematkan ke file audio — tidak ada file gambar terpisah.",
+                                        checked = embedThumb,
+                                        onCheckedChange = { embedThumb = it },
+                                    )
                                     if (embedThumb && audioFormat == "auto") Text("Auto mengikuti format asli jika bitrate tidak dipilih. Sampul disematkan bila format dan engine mendukung; preview tetap tersedia.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 } else {
                                     Text("Format ${audioFormat.uppercase()} belum mendukung sampul album — pilih Auto, MP3, atau M4A.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -426,11 +420,12 @@ fun DownloadScreen(
                         }
                     }
 
-                    TextButton(onClick = { advanced = !advanced }, contentPadding = PaddingValues(horizontal = 0.dp)) {
-                        Text(if (advanced) "Tutup pengaturan lanjutan" else "Pengaturan lanjutan")
-                        Icon(if (advanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, Modifier.size(18.dp))
-                    }
-                }
+                    ActionButton(
+                        if (advanced) "Tutup pengaturan lanjutan" else "Pengaturan lanjutan",
+                        { advanced = !advanced },
+                        icon = if (advanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        emphasis = ActionEmphasis.Quiet,
+                    )
             }
         }
         }
@@ -449,7 +444,12 @@ fun DownloadScreen(
 
                 Spacer(Modifier.height(14.dp))
 
-                Button(
+                ActionButton(
+                    text = when {
+                        shownPlaylist != null -> "Antrekan $selectionCount video"
+                        mode == MediaMode.VIDEO -> "Download video"
+                        else -> "Download audio"
+                    },
                     onClick = {
                         if (shownPlaylist != null) {
                             downloadPlaylist(entries.filter { it.id in selectedIds }, buildOptions(shownPlaylist.url))
@@ -457,29 +457,11 @@ fun DownloadScreen(
                             download(buildOptions(trimmed))
                         }
                     },
+                    icon = if (shownPlaylist != null) Icons.Outlined.Queue else Icons.Outlined.Download,
+                    emphasis = ActionEmphasis.Primary,
                     enabled = !busy && if (shownPlaylist != null) selectionCount > 0 && entries.isNotEmpty() else isVideo,
-                    modifier = Modifier.fillMaxWidth().height(54.dp).background(
-                        Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        MaterialTheme.shapes.medium,
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                    ),
-                ) {
-                    Icon(if (shownPlaylist != null) Icons.Outlined.Queue else Icons.Outlined.Download, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        when {
-                            shownPlaylist != null -> "Antrekan $selectionCount video"
-                            mode == MediaMode.VIDEO -> "Download video"
-                            else -> "Download audio"
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                }
+                    fillWidth = true,
+                )
             }
         }
 

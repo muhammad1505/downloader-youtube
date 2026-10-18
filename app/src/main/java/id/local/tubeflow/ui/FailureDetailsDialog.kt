@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -33,7 +35,12 @@ fun FailureDetailsDialog(details: FailureDetails, dismiss: () -> Unit) {
 fun JobFailureDetails(job: DownloadJob, lyrics: Boolean = false) {
     val context = LocalContext.current
     var open by remember(job.id, job.generation) { mutableStateOf(false) }
-    TextButton(onClick = { open = true }) { Text(stringResource(if (lyrics) R.string.failure_lyrics_details else R.string.failure_details)) }
+    ActionButton(
+        stringResource(if (lyrics) R.string.failure_lyrics_details else R.string.failure_details),
+        { open = true },
+        icon = Icons.Outlined.Info,
+        emphasis = ActionEmphasis.Quiet,
+    )
     if (open) {
         val details by produceState<FailureDetails?>(null, job.id, job.generation, job.lyricStatus) {
             value = withContext(Dispatchers.IO) {

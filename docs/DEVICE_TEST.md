@@ -524,3 +524,26 @@ Batas:font2× tidak tersedia dari UI ColorOS (maks1,6), TalkBack/keyboard ekster
 tablet/Android12+ dynamic color, runtime16KB, semua error/storage fault dan alignment
 A/B akhir belum diuji. Tidak mengklaim semua timestamp LRCLIB sinkron.
 [Laporan lengkap, hash semua ABI/AAB dan checkpoint kandidat/final](REPAIR_2026-10-18.md).
+
+
+## Penyatuan aksi/filter 1.1.19/code33 — 18 Oktober 2026
+
+Release ARM64 non-debuggable terpasang update-r di Realme RMX1821 Android10/API29
+ARM64, 720x1520 @272dpi, mode gelap, font0,9. SHA256
+`5a0fe86f91009b744536d2240f537653ac0dfc18ae6e1713c7e8fe3c076fa2aa`; tanpa
+uninstall/reset data. 339 tes Kotlin lulus, lint debug/release 0 error dan 2
+warning lama, audit native16KB/refleksiZIP/signature/zipalign lulus, build15m59s.
+
+Diamati di HP: deret chip Koleksi (Favorit, dropdown playlist, Kelola playlist,
+Terbaru, Semua folder) kini setinggi dan sebentuk sama; kartu Riwayat menampilkan
+satu baris ikon (cari lirik, putar, buka, bagikan, unduh lagi, hapus) tanpa tombol
+teks panjang; kartu Ringkasan/Antrean/Pengaturan memakai panel dan tombol yang
+sama; navigasi lima tab tetap tanpa pil indikator. Satu tangkapan Riwayat sesudah
+perubahan memperlihatkan lampiran lirik sudah hilang dari kartu.
+
+Belum diuji: mode terang (ColorOS menolak `cmd uimode night no`; nilai tetap
+"yes"), font >1,2x dan lebar 360dp (`font_scale`/`wm density` tidak dapat diubah
+lewat ADB), TalkBack, tablet, dan aksi ikon baru di Koleksi hanya terbukti
+terkompilasi+terpasang, belum tertangkap ulang karena layar HP sedang dipakai
+pengelola (konten pribadi di layar; berkas tangkapan yang memuatnya dihapus).
+Tangkapan bersih ada di `build/reports/ui-1119/` (privat, tidak di-commit).
