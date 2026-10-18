@@ -13,6 +13,25 @@ cukup kuat, daftar mudah dipindai, gerak hanya untuk perubahan status.
 
 ## Token
 
+Polesan 1.1.23 mempertahankan ENERGY2/RHYTHM1/MOTION1, palet, tipografi,
+radius kartu20dp dan ritme8/12/16dp. Antrean putar memakai ActionChip seperti
+filter Acak/Ulangi. Aksi kartu audio dan video memakai IconAction48dp agar
+baris tetap ringkas dan target sentuh tidak mengecil. Video mendapat aksi
+yang sesuai berkas video, tanpa menu lirik atau antrean audio.
+
+```text
+Antrean: [Acak] [Ulangi] [Bersihkan]
+Audio:   sampul / judul / artis    [menu]
+         [favorit] [playlist] [antrean] [bagikan]
+Video:   thumbnail / judul / info  [menu]
+         [putar] [bagikan] [detail] [ubah] [hapus]
+```
+
+Kritik: menyamakan semua menu dengan audio akan memberi aksi yang tidak berlaku
+untuk video. Kesamaan diterapkan pada ukuran, posisi dan operasi berkas;
+fitur audio tetap khusus audio. Tombol utama dan konfirmasi tetap memakai
+ActionButton agar hierarki tindakan dan keterbacaan terjaga.
+
 Kontrol Koleksi Putar/Acak/Cari dan Bersihkan di Riwayat memakai `ActionChip`
 yang sama dengan deret filter: tinggi visual mengikuti chip Material, target
 sentuh tetap minimal48dp. Tombol formulir/dialog tetap memakai `ActionButton`.

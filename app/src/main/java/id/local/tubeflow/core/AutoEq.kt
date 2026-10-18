@@ -3,8 +3,8 @@ package id.local.tubeflow.core
 import kotlin.math.ln
 
 /**
- * Kurva equalizer "Otomatis (bass bulat)": bass dinaikkan bulat, mid sedikit ditekan agar vokal
- * jernih, treble naik halus. Murni tanpa Android karena jumlah/lebar band berbeda per perangkat —
+ * Kurva equalizer "Otomatis (bass bulat)": bass dan treble naik seimbang, mid tetap netral.
+ * Murni tanpa Android karena jumlah/lebar band berbeda per perangkat;
  * level dihitung dari frekuensi tengah band, bukan indeks band, sehingga dapat diuji di host.
  */
 object AutoEq {
@@ -12,15 +12,15 @@ object AutoEq {
 
     /** Titik kurva: frekuensi (mHz) → level dB sebelum dibulatkan dan dijepit ke rentang band. */
     private val CURVE = listOf(
-        60_000 to 5.0f,      // bass dalam: punch bulat
-        120_000 to 4.0f,
-        250_000 to 2.5f,
-        500_000 to 1.0f,
-        1_000_000 to -0.5f,  // mid ditekan halus agar vokal tidak tenggelam
-        2_000_000 to -1.0f,
-        4_000_000 to -0.5f,
-        8_000_000 to 1.5f,   // treble naik tipis untuk kilau
-        16_000_000 to 2.5f,
+        60_000 to 3.0f,
+        120_000 to 2.5f,
+        250_000 to 1.0f,
+        500_000 to 0.0f,
+        1_000_000 to 0.0f,
+        2_000_000 to 0.0f,
+        4_000_000 to 0.5f,
+        8_000_000 to 2.0f,
+        16_000_000 to 3.0f,
     )
 
     /** Level dB untuk band berfrekuensi tengah [frequencyMilliHz], dijepit ke [minDb]..[maxDb]. */

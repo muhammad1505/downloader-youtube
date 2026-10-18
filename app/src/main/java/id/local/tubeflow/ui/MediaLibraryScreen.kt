@@ -50,8 +50,8 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var openError by remember { mutableStateOf<String?>(null) }
-    fun open(item: MediaItem) { scope.launch {
-        openError = withContext(Dispatchers.IO) { launchMedia(context, item.location, item.kind == "AUDIO", false) }
+    fun open(item: MediaItem, share: Boolean = false) { scope.launch {
+        openError = withContext(Dispatchers.IO) { launchMedia(context, item.location, item.kind == "AUDIO", share) }
     } }
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
@@ -65,8 +65,10 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
         val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
         // Aksi koleksi berlabel supaya tujuan setiap tombol jelas tanpa menebak ikon.
         item { ScrollRow {
-            ActionChip("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
-            ActionChip("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
+            if (filter.kind != "VIDEO") {
+                ActionChip("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
+                ActionChip("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
+            }
             ActionChip(
                 if (searchOpen) "Tutup" else "Cari",
                 { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen },
@@ -78,7 +80,7 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
             SearchField(filter.query, { model.filter(filter.copy(query = it)) }, label = "Cari judul, artis, nama file")
         }            // Semua kontrol filter memakai satu bentuk chip: Favorit (aktif/tidak), dropdown playlist,
             // aksi kelola, dan dropdown urutan/folder/artis/album.
-            item { ScrollRow {
+            if (filter.kind != "VIDEO") item { ScrollRow {
                 FilterChip(filter.playlistId == PersonalLibrary.FAVORITES, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = if (filter.playlistId == PersonalLibrary.FAVORITES) "" else PersonalLibrary.FAVORITES)) }, label = { Text(stringResource(R.string.library_favorites)) })
                 MenuChip(
                     label = stringResource(R.string.library_playlists),
@@ -142,6 +144,9 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                             DropdownMenuItem(text = { Text("Putar berikutnya") }, onClick = { menu = false; player.playNext(item) })
                         }
                         DropdownMenuItem(text = { Text("Detail") }, onClick = { menu = false; detail = item })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.library_share)) },
+                            leadingIcon = { Icon(Icons.Outlined.Share, null) }, enabled = item.availability == "AVAILABLE",
+                            onClick = { menu = false; open(item, share = true) })
                         if (item.kind == "AUDIO") DropdownMenuItem(text = { Text("Cari lirik") }, enabled = !busy,
                             onClick = { menu = false; model.openLyrics(item) })
                         if (item.kind == "AUDIO" && item.lyricUri != null) DropdownMenuItem(text = { Text("Atur waktu lirik") }, enabled = !busy,
@@ -152,10 +157,8 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                             onClick = { menu = false; delete = item })
                     }
                 }
-                // Aksi lagu yang sering dipakai tampil sebagai ikon langsung di kartu, bukan tersembunyi
-                // di menu tiga titik; menu menyisakan aksi informasi dan berkas.
-                if (item.kind == "AUDIO") {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (item.kind == "AUDIO") {
                         val favorite = item.uri in favorites
                         IconAction(
                             if (favorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
@@ -163,7 +166,15 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                             { if (favorite) model.removeFromPlaylist(item, PersonalLibrary.FAVORITES) else model.addToPlaylist(item, PersonalLibrary.FAVORITES) },
                         )
                         IconAction(Icons.Outlined.PlaylistAdd, stringResource(R.string.library_add_playlist), { addPlaylist = item })
-                        IconAction(Icons.AutoMirrored.Outlined.QueueMusic, "Tambah ke antrean", { player.enqueue(item) })
+                        IconAction(Icons.AutoMirrored.Outlined.QueueMusic, "Tambah ke antrean", { player.enqueue(item) }, enabled = item.availability == "AVAILABLE")
+                    } else {
+                        IconAction(Icons.Outlined.PlayArrow, stringResource(R.string.library_play_video), { open(item) }, enabled = item.availability == "AVAILABLE")
+                    }
+                    IconAction(Icons.Outlined.Share, stringResource(R.string.library_share), { open(item, share = true) }, enabled = item.availability == "AVAILABLE")
+                    if (item.kind == "VIDEO") {
+                        IconAction(Icons.Outlined.Info, stringResource(R.string.library_media_details), { detail = item })
+                        IconAction(Icons.Outlined.Edit, stringResource(R.string.library_rename_file), { rename = item }, enabled = !busy && item.availability == "AVAILABLE")
+                        IconAction(Icons.Outlined.DeleteOutline, stringResource(R.string.library_delete_file), { delete = item }, enabled = !busy && item.availability == "AVAILABLE", destructive = true)
                     }
                 }
             }

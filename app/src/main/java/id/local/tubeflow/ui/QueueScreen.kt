@@ -84,13 +84,13 @@ fun QueueScreen(
             item {
                 ScrollRow {
                     if (pausable > 0) {
-                        ActionButton("Jeda semua", onPauseAll, icon = Icons.Outlined.Pause)
+                        ActionChip("Jeda semua", onPauseAll, icon = Icons.Outlined.Pause)
                     }
                     if (paused > 0) {
-                        ActionButton("Lanjutkan semua", onResumeAll, icon = Icons.Outlined.PlayArrow)
+                        ActionChip("Lanjutkan semua", onResumeAll, icon = Icons.Outlined.PlayArrow)
                     }
                     if (pausable > 0 || paused > 0) {
-                        ActionButton("Batalkan semua", { confirmCancelAll = true }, emphasis = ActionEmphasis.Quiet, destructive = true)
+                        ActionChip("Batalkan semua", { confirmCancelAll = true }, destructive = true)
                     }
                 }
             }
@@ -113,9 +113,9 @@ fun QueueScreen(
                         }
                         ScrollRow {
                             if (failed > 0) {
-                                ActionButton("Ulangi semua", onRetryAll, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+                                ActionChip("Ulangi semua", onRetryAll, icon = Icons.Outlined.Refresh)
                             }
-                            ActionButton("Bersihkan", onClearUnsuccessful, icon = Icons.Outlined.DeleteSweep, emphasis = ActionEmphasis.Quiet, destructive = true)
+                            ActionChip("Bersihkan", onClearUnsuccessful, icon = Icons.Outlined.DeleteSweep, destructive = true)
                         }
                     }
                 }

@@ -1,5 +1,10 @@
 # Pengujian perangkat fisik
 
+Hasil terbaru19Oktober2026: [aksi koleksi, kontrol dan EQ1.1.23](ACTIONS_EQ_1_1_23.md).
+Release ARM64/code37 terpasang dan hash cocok; chip antrean, lima aksi video,
+share audio/video, konfirmasi berkas, playback video dan preset EQ diperiksa.
+Data/sesi tidak direset; karakter suara headset dan Hi-Res belum diverifikasi.
+
 Perangkat: Realme RMX1821, Android 10 (API 29), ARM64, halaman memori 4 KB. Storage /data tersedia sekitar 19 GB pada awal pengujian. Pengguna mengizinkan pengujian dan memberikan link uji. Tidak menggunakan emulator.
 
 APK: release minified ARM64 dengan kunci testing lokal, `app/build/outputs/apk/rc/TubeFlow-arm64-v8a-testing.apk`. Hash artefak berada pada JSON di folder yang sama.

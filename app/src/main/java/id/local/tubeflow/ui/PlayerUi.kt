@@ -312,7 +312,7 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                 FilterChip(selected=state.repeat!=PlaybackQueue.Repeat.OFF,onClick=player::cycleRepeat,
                     label={ Text("Ulangi: ${repeatLabel(state.repeat)}") },leadingIcon={
                         Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,null,Modifier.size(18.dp)) })
-                ActionButton("Bersihkan", { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, destructive = true, enabled = state.queueTracks.size > 1)
+                ActionChip(stringResource(id.local.tubeflow.R.string.action_clear_queue), { confirmClear = true }, icon = Icons.Outlined.DeleteSweep, destructive = true, enabled = state.queueTracks.size > 1)
             }
             if (positions.isEmpty()) Text(stringResource(id.local.tubeflow.R.string.player_queue_no_results),
                 Modifier.padding(vertical=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -374,7 +374,7 @@ private fun EqualizerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
     var snapshot by remember { mutableStateOf(player.equalizer.snapshot()) }
     var presetOpen by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest=dismiss,title={ Text("Equalizer") },text={
-        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if (!snapshot.available) {
                 Text("Equalizer tidak tersedia pada perangkat ini. Pemutaran tetap berjalan tanpa efek.")
             } else {
@@ -384,14 +384,14 @@ private fun EqualizerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
                     onCheckedChange = { player.equalizer.setEnabled(it); snapshot = player.equalizer.snapshot() },
                 )
                 Box {
-                    ActionButton("Preset: ${snapshot.preset}", { presetOpen = true }, icon = Icons.Outlined.Equalizer)
+                    ActionChip("Preset: ${snapshot.preset}", { presetOpen = true }, icon = Icons.Outlined.Equalizer)
                     DropdownMenu(presetOpen,onDismissRequest={ presetOpen=false },modifier=Modifier.heightIn(max=320.dp)) {
                         (listOf(AutoEq.AUTO_PRESET,PlayerEqualizer.DEFAULT_PRESET) + snapshot.presets).forEach { name ->
                             DropdownMenuItem(text={ Text(name) },onClick={ presetOpen=false; player.equalizer.usePreset(name); snapshot=player.equalizer.snapshot() })
                         }
                     }
                 }
-                if (snapshot.preset==AutoEq.AUTO_PRESET) Text("Kurva otomatis: bass bulat, mid jernih, treble halus — diterapkan ke semua lagu.",
+                if (snapshot.preset==AutoEq.AUTO_PRESET) Text(stringResource(id.local.tubeflow.R.string.eq_auto_description),
                     style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 snapshot.bands.forEach { band ->
                     Column {

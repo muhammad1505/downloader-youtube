@@ -185,4 +185,11 @@
     <plurals name="playlist_count">
         <item quantity="other">%d playlist pribadi</item>
     </plurals>
+    <string name="action_clear_queue">Bersihkan</string>
+    <string name="library_share">Bagikan file</string>
+    <string name="library_play_video">Putar video</string>
+    <string name="library_media_details">Detail media</string>
+    <string name="library_rename_file">Ubah nama file</string>
+    <string name="library_delete_file">Hapus file</string>
+    <string name="eq_auto_description">Bass dan treble seimbang dengan dorongan hingga +3 dB, bass tetap bulat, dan mid netral. Hasil mengikuti kemampuan equalizer perangkat.</string>
 </resources>

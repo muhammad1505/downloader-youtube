@@ -684,3 +684,14 @@ sebelum pengukuran folder. Signed APK terpasang di Realme Android10 dan hash coc
 347Kotlin, lint0error/2warning lama, audit ARM64 lulus. Uji HP membuktikan target
 aksi/filter82px, operasi playlist QA, serta respons clear lirik0B sementara
 sampul6,7MB tetap ada. Playlist QA dibersihkan. [Laporan dan batas](CONTROLS_CACHE_1_1_22.md).
+
+## Pembaruan 19 Oktober 2026: aksi koleksi dan EQ 1.1.23
+
+Kontrol antrean putar/download memakai chip, kartu video mempunyai lima aksi
+langsung, audio/video mendukung Bagikan dari Koleksi. Default EQ otomatis
+seimbang hingga+3dB bass/treble dan mid netral tanpa mereset preset manual.
+348 tes Kotlin, lint0error/2warning lama, build debug/release dan audit ARM64
+lulus. Update fisik/code37/hash cocok; tes antrean, share, dialog video,
+playback video dan preset EQ lulus dalam cakupan yang dicatat.
+Hi-Res/ANC masih penilaian kemampuan, bukan fitur baru yang diklaim selesai.
+[Laporan dan batas verifikasi](ACTIONS_EQ_1_1_23.md).

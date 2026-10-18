@@ -1,5 +1,11 @@
 # Signing produksi TubeFlow
 
+Kandidat terbaru yang diuji19Oktober2026: **1.1.23/code37**, ARM64
+70.879.348byte, SHA256 `f0f8439d57bca54b9ffd65305a55308717245de31bebccc8a282468ba85b1b64`.
+Signature produksi, zipalign16KB, audit257ELF/13kelas ZIP lulus; terpasang
+di HP dan hash cocok. Debug/release tiga ABI dibangun; AAB tidak dibangun
+ulang. [Cakupan pengujian dan batas](ACTIONS_EQ_1_1_23.md).
+
 Keystore pertama dibuat atas permintaan pengelola pada 10 Oktober 2026. Tidak ada keystore sebelumnya yang ditimpa. Kunci ini digunakan untuk artefak release lokal, tanpa publikasi ke toko atau server.
 
 ## Berkas privat

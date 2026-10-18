@@ -721,7 +721,10 @@ fun launchMedia(context: Context, raw: String, audio: Boolean, share: Boolean): 
     if (share) context.startActivity(Intent.createChooser(intent, "Bagikan file"))
     else try { context.startActivity(intent) } catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent.createChooser(intent, "Buka dengan")) }
     null
-} catch (_: Exception) { "File tidak dapat dibuka. Pastikan ada aplikasi pemutar yang sesuai." }
+} catch (_: Exception) {
+    if (share) "File tidak dapat dibagikan. Periksa akses file dan aplikasi tujuan."
+    else "File tidak dapat dibuka. Pastikan ada aplikasi pemutar yang sesuai."
+}
 
 fun openSidecar(context: Context, uriString: String, kind: String): String? = try {
     val uri = uriString.toUri()

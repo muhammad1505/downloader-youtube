@@ -37,6 +37,10 @@ bentuk dan padding mengikuti chip Material. Putar/Acak/Cari di Koleksi dan
 Bersihkan di Riwayat memakai pola ini; tombol formulir/dialog tetap memakai
 `ActionButton`. Baris Kelola playlist mengikuti kartu koleksi dengan nama dan
 ikon Ubah/Hapus48dp, beserta deskripsi aksesibilitas yang menyebut playlist.
+Antrean putar dan aksi massal antrean download mengikuti chip yang sama.
+Kartu video memakai baris ikon Putar/Bagikan/Detail/Ubah/Hapus; kartu audio
+menambahkan Bagikan pada aksi musik yang ada. Jangan menyalin aksi khusus
+audio ke video demi menyamakan jumlah tombol.
 
 ## Status antarmuka
 

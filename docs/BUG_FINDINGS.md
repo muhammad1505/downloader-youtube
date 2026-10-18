@@ -767,3 +767,9 @@ Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
 - **Perbaikan 1.1.22:** `PrivateStorage.Usage` memisahkan tiga komponen dengan total turunan; UI menampilkan rincian serta hasil pembersihan yang menjelaskan cakupannya. Ukuran privat diterbitkan sebelum mengukur folder. Tidak menghapus sampul atau metadata untuk memaksa total nol.
 - **Regresi:** `PrivateStorageTest` memeriksa rincian, ukuran setelah clear, metadata/sampul/LRC tetap ada, dan status parsial tanpa mengikuti symlink. [Hasil build/perangkat](CONTROLS_CACHE_1_1_22.md).
 - **HP 1.1.22:** lirik0B, metadata433B, sampul6,7MB; klik bersihkan menampilkan pesan sudah kosong dan mempertahankan cache lain. Penghapusan cache berisi diuji host; 347 tes lulus, lint0error/2warning lama, signed ARM64 terpasang dan hash cocok.
+
+## BUG-075 — P3: Kontrol antrean putar dan aksi video belum konsisten
+
+- **Akar:** Bersihkan antrean putar masih memakai tombol besar di sebelah chip; aksi langsung Koleksi berada seluruhnya dalam cabang audio. Bagikan belum dipaparkan pada kartu Koleksi meskipun helper publikasi intent sudah tersedia.
+- **Perbaikan1.1.23:** Bersihkan serta aksi massal antrean download memakai ActionChip; video mendapat ikon Putar/Bagikan/Detail/Ubah/Hapus, audio mendapat Bagikan. Target sentuh48dp, konfirmasi, MIME aktual dan grant URI tetap dipertahankan; video tidak diberi aksi khusus audio.
+- **Verifikasi:** [laporan aksi dan EQ](ACTIONS_EQ_1_1_23.md) memisahkan hasil host, build dan perangkat yang benar-benar dijalankan.
