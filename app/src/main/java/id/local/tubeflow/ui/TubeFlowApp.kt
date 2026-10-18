@@ -11,6 +11,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -136,6 +138,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     if (!fullPlayer) LyricsSearchDialog(library)
     KaraokeDialog(karaoke, player, requestNotifications)
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
+    val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
+    val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic, Icons.Outlined.History)
+    val showLabels=androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val useRail = maxWidth >= 840.dp
     Scaffold(
         topBar = {
             TopAppBar(
@@ -164,11 +171,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Column {
-            if (playback.track != null) MiniPlayer(playback,player) { fullPlayer=true }
+            if (playback.track != null) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) {
+                Box(Modifier.widthIn(max=840.dp)) { MiniPlayer(playback,player) { fullPlayer=true } }
+            }
+            if (!useRail) {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val showLabels=androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f
-                val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
-                val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic, Icons.Outlined.History)
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
@@ -195,11 +202,34 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 }
             }
             }
+            }
         },
     ) { padding ->
+        Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+        if (useRail) NavigationRail(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()), containerColor=MaterialTheme.colorScheme.surface) {
+            tabs.forEachIndexed { index, title ->
+                NavigationRailItem(
+                    selected=tab==index, onClick={ tab=index },
+                    icon={ if (index==2 && activeCount>0) {
+                        BadgedBox(badge={ Badge { Text(if (activeCount>99) "99+" else "$activeCount") } }) {
+                            Icon(icons[index],if (showLabels) null else title)
+                        }
+                    } else Icon(icons[index],if (showLabels) null else title) },
+                    label=if (showLabels) ({ Text(title) }) else null,
+                    colors=NavigationRailItemDefaults.colors(
+                        selectedIconColor=MaterialTheme.colorScheme.onSurface,
+                        selectedTextColor=MaterialTheme.colorScheme.onSurface,
+                        unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant,
+                        indicatorColor=androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+            }
+        }
+        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment=Alignment.TopCenter) {
         AnimatedContent(
             targetState = tab,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.widthIn(max=840.dp).fillMaxSize(),
             transitionSpec = {
                 (fadeIn(tween(220)) + slideInHorizontally(tween(240)) { it / 8 }) togetherWith
                     (fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { -it / 8 })
@@ -289,6 +319,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             }
             }
         }
+        }
+        }
+    }
     }
     }
 }

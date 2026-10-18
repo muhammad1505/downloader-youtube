@@ -1,5 +1,10 @@
 # Pengujian perangkat fisik
 
+Pembaruan1.1.25/code39: [kontrol adaptif dan ukuran kontekstual](ADAPTIVE_CONTROLS_1_1_25.md).
+Update/hash cocok pada HP Android10; font0,9/1,6, tema terang/gelap,
+portrait/landscape dan rail diuji.10target minimum82px; QA dibersihkan,
+setelan dipulihkan dan daftar65berkas sama. Batas matriks ada pada laporan.
+
 Pembaruan1.1.24/code38: [kontrol ringkas seluruh menu](COMPACT_CONTROLS_1_1_24.md).
 24sampel kontrol82px seperti tab, Pengaturan terang/gelap, playlist QA,
 timer/karaoke idle, lirik serta opsi Download diperiksa pada HP; hash cocok.

@@ -81,8 +81,8 @@ fun PersonalPlaylistDialog(model: MediaLibraryViewModel, dismiss: () -> Unit) {
                 }
                 items(filtered, key = { it.id }) { entry ->
                     Card(Modifier.fillMaxWidth(), colors = mediaCardColors(MaterialTheme.colorScheme.primary)) {
-                        Row(Modifier.fillMaxWidth().padding(UiSpacing.item),
-                            verticalAlignment = Alignment.CenterVertically,
+                        AdaptivePair(Modifier.padding(UiSpacing.item), leading = { available ->
+                        Row(available, verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
                             Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
                                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
@@ -92,14 +92,13 @@ fun PersonalPlaylistDialog(model: MediaLibraryViewModel, dismiss: () -> Unit) {
                             }
                             Text(entry.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Row {
+                        } }, trailing = { Row {
                                 IconAction(Icons.Outlined.Edit, stringResource(R.string.playlist_rename_action, entry.name),
                                     { editing = entry; name = entry.name; formError = null },
                                     enabled = !busy)
                                 IconAction(Icons.Outlined.Delete, stringResource(R.string.playlist_delete_action, entry.name),
                                     { deleting = entry }, destructive = true, enabled = !busy)
-                            }
-                        }
+                        } })
                     }
                 }
             }

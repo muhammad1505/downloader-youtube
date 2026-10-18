@@ -221,7 +221,7 @@ fun SettingsScreen(
                 if (folderAccessError) {
                     Text("Akses folder tidak dapat disimpan. Pilih folder yang bisa dibaca dan ditulis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Storage, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -237,9 +237,9 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(8.dp))
+                } }, trailing = {
                     ActionButton("Segarkan", onRefreshStorage, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
-                }
+                })
                 if (storageCatalogue && storageUnknownSizes > 0) {
                     Text(pluralStringResource(id.local.tubeflow.R.plurals.storage_partial_sizes, storageUnknownSizes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), storageUnknownSizes),
                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

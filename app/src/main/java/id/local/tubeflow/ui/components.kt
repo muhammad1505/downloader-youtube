@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.compositeOver
 import id.local.tubeflow.core.songIdentity
@@ -107,32 +108,56 @@ fun ActionButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val base = if (fillWidth) modifier.fillMaxWidth() else modifier
-    val primary = emphasis == ActionEmphasis.Primary
-    val foreground = when {
-        primary && destructive -> scheme.onErrorContainer
-        primary -> scheme.onPrimary
-        destructive -> scheme.error
-        emphasis == ActionEmphasis.Quiet -> scheme.primary
-        else -> scheme.onSurfaceVariant
+    val content: @Composable RowScope.() -> Unit = {
+        if (icon != null) {
+            Icon(icon, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(text, style = MaterialTheme.typography.labelLarge)
     }
-    AssistChip(
-        onClick = onClick,
-        modifier = base,
-        enabled = enabled,
-        label = { Text(text, style = MaterialTheme.typography.labelLarge) },
-        leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
-        border = if (emphasis == ActionEmphasis.Secondary) AssistChipDefaults.assistChipBorder(enabled) else null,
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = when {
-                primary && destructive -> scheme.errorContainer
-                primary -> scheme.primary
-                else -> Color.Transparent
-            },
-            labelColor = foreground,
-            leadingIconContentColor = foreground,
-            disabledContainerColor = if (primary) scheme.onSurface.copy(alpha = 0.12f) else Color.Transparent,
-        ),
-    )
+    when (emphasis) {
+        ActionEmphasis.Primary -> Button(
+            onClick, base.heightIn(min = 48.dp), enabled = enabled, shape = MaterialTheme.shapes.small,
+            colors = if (destructive) ButtonDefaults.buttonColors(containerColor = scheme.errorContainer, contentColor = scheme.onErrorContainer)
+                else ButtonDefaults.buttonColors(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), content = content,
+        )
+        ActionEmphasis.Secondary -> OutlinedButton(
+            onClick, base.heightIn(min = 40.dp), enabled = enabled, shape = MaterialTheme.shapes.small,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = if (destructive) scheme.error else scheme.onSurfaceVariant),
+            border = BorderStroke(1.dp, if (!enabled) scheme.onSurface.copy(alpha = 0.12f) else scheme.outlineVariant),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), content = content,
+        )
+        ActionEmphasis.Quiet -> TextButton(
+            onClick, base.heightIn(min = 40.dp), enabled = enabled, shape = MaterialTheme.shapes.small,
+            colors = ButtonDefaults.textButtonColors(contentColor = if (destructive) scheme.error else scheme.primary),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), content = content,
+        )
+    }
+}
+
+/** Local width and font determine when content and actions need separate lines. */
+@Composable
+fun AdaptivePair(
+    modifier: Modifier = Modifier,
+    minInlineWidth: androidx.compose.ui.unit.Dp = 320.dp,
+    leading: @Composable (Modifier) -> Unit,
+    trailing: @Composable () -> Unit,
+) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (maxWidth < minInlineWidth || fontScale >= 1.3f) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
+                leading(Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) { trailing() }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(UiSpacing.row), verticalAlignment = Alignment.CenterVertically) {
+                leading(Modifier.weight(1f))
+                trailing()
+            }
+        }
+    }
 }
 
 /** Baris kontrol penuh: satu fokus TalkBack, target 48dp, status tidak hanya warna. */
@@ -243,7 +268,15 @@ fun ActionChip(
     enabled: Boolean = true,
     destructive: Boolean = false,
 ) {
-    ActionButton(label, onClick, modifier, icon, enabled, destructive = destructive)
+    AssistChip(
+        onClick, modifier = modifier, enabled = enabled,
+        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = icon?.let { vector -> { Icon(vector, null, Modifier.size(18.dp)) } },
+        colors = if (destructive) AssistChipDefaults.assistChipColors(
+            labelColor = MaterialTheme.colorScheme.error,
+            leadingIconContentColor = MaterialTheme.colorScheme.error,
+        ) else AssistChipDefaults.assistChipColors(),
+    )
 }
 
 /** Deretan kontrol yang dapat digulir: satu jarak 8dp untuk chip, filter, dan aksi. */

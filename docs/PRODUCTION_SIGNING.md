@@ -1,6 +1,12 @@
 # Signing produksi TubeFlow
 
-Terbaru1.1.24/code38,19Oktober2026: ARM64 **70.876.848byte**,
+Terbaru1.1.25/code39,19Oktober2026: ARM64 **70.894.712byte**,
+SHA256 `697a09c0f07070c0f31662d67b496f58b9440711ffd8e5ec3e60d4de55ef53b5`.
+Signature produksi/zipalign16KB/257ELF/13kelas ZIP lulus; hash APK terpasang
+cocok. Debug/release tiga ABI dibangun; AAB tidak diulang.
+[Cakupan HP, font besar dan batas](ADAPTIVE_CONTROLS_1_1_25.md).
+
+Kandidat1.1.24/code38,19Oktober2026: ARM64 **70.876.848byte**,
 SHA256 `b9639c8be303bad3e0217d7e0ea5c34df158352cce392437fbcde43e7483adf5`.
 Signature produksi/zipalign16KB/257ELF/13kelas ZIP lulus dan hash terpasang
 cocok. Debug/release tiga ABI dibangun; AAB tidak diulang.

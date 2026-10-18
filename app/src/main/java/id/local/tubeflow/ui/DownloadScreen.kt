@@ -215,16 +215,16 @@ fun DownloadScreen(
                 )
             }
             if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isPlaylistLink)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         inspectError,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        maxLines = 2,
                         modifier = Modifier.weight(1f),
                     )
+                } }, trailing = {
                     ActionButton(
                         "Coba lagi",
                         {
@@ -235,7 +235,7 @@ fun DownloadScreen(
                         icon = Icons.Outlined.Refresh,
                         emphasis = ActionEmphasis.Quiet,
                     )
-                }
+                })
             }
         }
 
@@ -251,19 +251,20 @@ fun DownloadScreen(
             item {
                 SectionCard {
                     Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.AutoMirrored.Outlined.FeaturedPlayList, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(shownPlaylist.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
                                 Text(if (Selection.isMix(shownPlaylist.url)) "${entries.size} video dalam antrean awal" else "${entries.size} video · mengikuti isi link (maks 500)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                        } }, trailing = {
                             ActionButton(
                                 if (allSelected) "Kosongkan" else "Pilih semua",
                                 { selectedIds = if (allSelected) emptySet() else selectedIds + visibleEntries.map { it.id } },
                                 emphasis = ActionEmphasis.Quiet,
                             )
-                        }
+                        })
                         if (Selection.isMix(shownPlaylist.url)) {
                             Text(
                                 "Antrean awal Mix dari YouTube (± video terkait yang sedang diputar) — tanpa memuat halaman lanjutan. Daftar dapat berubah dan berbeda dari akun YouTube Anda.",

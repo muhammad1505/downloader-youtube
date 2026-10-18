@@ -779,3 +779,14 @@ Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
 - **Akar:** perubahan sebelumnya mengganti sebagian pemanggil menjadi ActionChip, sedangkan komponen ActionButton bersama tetap48/52dp. OptionMenu memakai tombol dua baris dengan padding besar; timer, karaoke, pengaturan, lirik dan formulir masih mengikuti ukuran lama.
 - **Perbaikan1.1.24:** ActionButton/ActionChip memakai AssistChip bersama dengan peran warna yang tetap berbeda, minimum visual32dp dan target48dp. OptionMenu menjadi chip label:nilai; label panjang membungkus. Kontrol sekunder player memakai tinggi minimum48dp.
 - **Cakupan dan bukti:** [laporan kontrol menyeluruh](COMPACT_CONTROLS_1_1_24.md). EQ tidak diubah; umpan balik suara pengguna dengan QKZ AK6 Pro dicatat terpisah dari pengukuran teknis.
+
+
+## BUG-077 — Ukuran kontrol tidak mengikuti konteks dan ruang lokal (P3)
+
+- **Akar:** penyamaan semua ActionButton menjadi chip pada1.1.24 menghilangkan
+  hierarki formulir; judul dan aksi masih berebut lebar pada beberapa Row.
+  IconButton sekunder player mempunyai ruang isi terbatas untuk label besar.
+- **Perbaikan1.1.25:** ukuran intrinsik berdasarkan peran, AdaptivePair untuk
+  baris sempit/font besar, kontrol player2/4kolom dan rail pada jendela lebar.
+- **Bukti dan batas:** [laporan kontrol adaptif](ADAPTIVE_CONTROLS_1_1_25.md).
+  Tidak menyatakan seluruh matriks perangkat telah diuji.

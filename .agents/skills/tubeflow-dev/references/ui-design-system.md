@@ -35,12 +35,16 @@ Definisikan sekali di tema, pakai di mana-mana. Nilai literal di composable adal
 Untuk deret kontrol di dekat tab/filter, gunakan `ActionChip` agar tinggi visual,
 bentuk dan padding mengikuti chip Material. Putar/Acak/Cari di Koleksi dan
 Bersihkan di Riwayat memakai pola ini; tombol formulir/dialog tetap memakai
-`ActionButton`. Sejak1.1.24 komponen ActionButton sendiri memakai AssistChip
-bersama ActionChip: visual32dp minimum dan target48dp, dengan warna/border
-sesuai peran. Label panjang membungkus. OptionMenu menampilkan label:nilai
-dalam chip yang sama, bukan tombol dua baris berpadding besar. Ini berlaku
-untuk Pengaturan, Download, lirik, timer, karaoke, playlist dan empty state;
-tinggi52/48dp pada catatan desain lama sudah digantikan.
+`ActionButton`. Sejak1.1.25 tombol formulir kembali memakai Button/OutlinedButton/
+TextButton dengan tinggi intrinsik minimum48dp untuk aksi utama dan40dp untuk
+sekunder/tenang; chip32dp tetap untuk aksi dekat tab. Semuanya memiliki target
+sentuh minimum48dp. Label membungkus, bukan diperkecil otomatis. OptionMenu
+menampilkan label:nilai dalam chip yang sama. `AdaptivePair` memisahkan isi
+berbobot dan aksi pada lebar lokal<320dp atau font≥1,3; mini player memakai
+ambang360dp agar judul mendapat ruang. Kontrol sekunder full player memakai
+TextButton intrinsik dan susunan2kolom ketika sempit/font besar. Navigasi rail
+mulai840dp, bisa digulir pada jendela pendek; kolom isi dibatasi840dp.
+Gunakan ukuran area aplikasi dalam dp, bukan resolusi layar fisik atau merek HP.
 Baris Kelola playlist mengikuti kartu koleksi dengan nama dan
 ikon Ubah/Hapus48dp, beserta deskripsi aksesibilitas yang menyebut playlist.
 Antrean putar dan aksi massal antrean download mengikuti chip yang sama.

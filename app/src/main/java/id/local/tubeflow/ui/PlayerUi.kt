@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,8 +63,8 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
     Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)) {
         Card(colors=mediaCardColors(accent)) {
             Column {
-                Row(Modifier.fillMaxWidth().padding(start=10.dp,end=2.dp,top=6.dp,bottom=6.dp), verticalAlignment=Alignment.CenterVertically) {
-                    Row(Modifier.weight(1f).clickable(onClickLabel="Buka pemutar",onClick=expand).padding(end=6.dp), verticalAlignment=Alignment.CenterVertically) {
+                AdaptivePair(Modifier.padding(start=10.dp,end=2.dp,top=6.dp,bottom=6.dp), minInlineWidth=360.dp,
+                    leading = { available -> Row(available.clickable(onClickLabel="Buka pemutar",onClick=expand).padding(end=6.dp), verticalAlignment=Alignment.CenterVertically) {
                         CoverThumb(track.cover,"",MediaMode.AUDIO,Modifier.size(48.dp))
                         Column(Modifier.weight(1f).padding(start=12.dp), verticalArrangement=Arrangement.spacedBy(2.dp)) {
                             Text(track.title,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -72,13 +73,13 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
                                 if (state.speed != 1f) Text("  ·  ${speedLabel(state.speed)}×",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
                             }
                         }
-                    }
+                    } }, trailing = { Row(verticalAlignment=Alignment.CenterVertically) {
                     if (state.loading) CircularProgressIndicator(Modifier.size(22.dp)) else IconButton(onClick=player::toggle) {
                         Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",tint=accent)
                     }
                     IconButton(onClick=player::next,enabled=state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
                     IconButton(onClick=player::stop) { Icon(Icons.Outlined.Close,"Tutup pemutar") }
-                }
+                } })
                 state.error?.let { Text(it,Modifier.padding(horizontal=14.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
                 LinearProgressIndicator(progress={ if (state.durationMs > 0) (state.positionMs.toFloat()/state.durationMs).coerceIn(0f,1f) else 0f },
                     modifier=Modifier.fillMaxWidth().height(3.dp),color=accent,trackColor=accent.copy(alpha=0.18f))
@@ -174,7 +175,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                                 }
                             } else {
                                 Column(Modifier.fillMaxSize()) {
-                                    Row(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End)) {
+                                    FlowRow(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End)) {
                                         ActionButton("Atur waktu lirik", openEditor, icon = Icons.Outlined.EditNote, emphasis = ActionEmphasis.Quiet, enabled = track.lyricUri != null)
                                         ActionButton("Cari lirik lain", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Quiet)
                                     }
@@ -231,36 +232,25 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     IconButton(onClick=player::next,enabled=!state.loading && state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
                     IconButton(onClick={ player.skip(10000) },enabled=!state.loading) { Icon(Icons.Outlined.Forward10,"Maju 10 detik") }
                 }
-                Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                    IconToggleButton(checked=state.shuffle,onCheckedChange={ player.toggleShuffle() },
-                        enabled=state.queueTracks.size>1,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Outlined.Shuffle,null,tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(stringResource(id.local.tubeflow.R.string.player_shuffle),style=MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    IconButton(onClick=player::cycleRepeat,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Icon(if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
-                                "Ulangi: ${repeatLabel(state.repeat)}",tint=if (state.repeat==PlaybackQueue.Repeat.OFF) MaterialTheme.colorScheme.onSurfaceVariant else accent)
-                            Text(stringResource(id.local.tubeflow.R.string.player_repeat),style=MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    IconButton(onClick=karaoke,modifier=Modifier.weight(1f).heightIn(min=48.dp)) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Outlined.MicOff,null)
-                            Text(stringResource(id.local.tubeflow.R.string.player_karaoke),style=MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    IconButton(onClick={ queueOpen=true },modifier=Modifier.weight(1f).heightIn(min=48.dp)
-                        .semantics { contentDescription="Antrean putar, ${state.queueTracks.size} lagu" }) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.AutoMirrored.Outlined.QueueMusic,null,Modifier.size(20.dp))
-                                Text("${state.queueTracks.size}",style=MaterialTheme.typography.labelMedium,maxLines=1)
-                            }
-                            Text(stringResource(id.local.tubeflow.R.string.player_queue),style=MaterialTheme.typography.labelSmall)
-                        }
+                val largeLabels = LocalDensity.current.fontScale >= 1.3f
+                BoxWithConstraints(Modifier.fillMaxWidth().padding(top=8.dp)) {
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),
+                        verticalArrangement=Arrangement.spacedBy(4.dp),
+                        maxItemsInEachRow=if (maxWidth < 320.dp || largeLabels) 2 else 4) {
+                        PlayerAction(stringResource(id.local.tubeflow.R.string.player_shuffle), Icons.Outlined.Shuffle,
+                            onClick=player::toggleShuffle, modifier=Modifier.weight(1f),
+                            enabled=state.queueTracks.size>1, tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                            description="Acak: ${if (state.shuffle) "aktif" else "nonaktif"}")
+                        PlayerAction(stringResource(id.local.tubeflow.R.string.player_repeat),
+                            if (state.repeat==PlaybackQueue.Repeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
+                            onClick=player::cycleRepeat, modifier=Modifier.weight(1f),
+                            tint=if (state.repeat==PlaybackQueue.Repeat.OFF) MaterialTheme.colorScheme.onSurfaceVariant else accent,
+                            description="Ulangi: ${repeatLabel(state.repeat)}")
+                        PlayerAction(stringResource(id.local.tubeflow.R.string.player_karaoke), Icons.Outlined.MicOff,
+                            onClick=karaoke, modifier=Modifier.weight(1f))
+                        PlayerAction(stringResource(id.local.tubeflow.R.string.player_queue), Icons.AutoMirrored.Outlined.QueueMusic,
+                            onClick={ queueOpen=true }, modifier=Modifier.weight(1f), count=state.queueTracks.size,
+                            description="Antrean putar, ${state.queueTracks.size} lagu")
                     }
                 }
             }
@@ -271,6 +261,33 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
             LyricsSearchDialog(library)
             timing?.let { item -> LyricTimingDialog(item,library) { timing=null } }
             }
+        }
+    }
+}
+
+@Composable
+private fun PlayerAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    count: Int? = null,
+    description: String? = null,
+) {
+    TextButton(onClick=onClick, enabled=enabled,
+        modifier=modifier.heightIn(min=48.dp).semantics {
+            if (description != null) contentDescription=description
+        },
+        shape=MaterialTheme.shapes.small, contentPadding=PaddingValues(8.dp),
+        colors=ButtonDefaults.textButtonColors(contentColor=tint)) {
+        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                Icon(icon,null,Modifier.size(20.dp))
+                count?.let { Text("$it",style=MaterialTheme.typography.labelMedium) }
+            }
+            Text(label,style=MaterialTheme.typography.labelSmall,textAlign=TextAlign.Center)
         }
     }
 }

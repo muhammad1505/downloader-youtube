@@ -707,3 +707,15 @@ lama, build debug/release dan audit ARM64 lulus. HP/code38/hash cocok;
 diperiksa. QA playlist dibersihkan dan tema dipulihkan. Pencarian lirik
 mencatat HTTP503 pada salah satu jalur; belum dianggap selesai oleh polesan UI.
 [Hasil dan batas](COMPACT_CONTROLS_1_1_24.md).
+
+
+## Pembaruan 19 Oktober 2026: kontrol adaptif 1.1.25
+
+Ukuran berdasarkan peran dan isi menggantikan penyamaan semua tombol menjadi
+chip. AdaptivePair memisahkan label/aksi saat sempit atau font besar; mini
+player beradaptasi, kontrol sekunder player menjadi2/4kolom, dan navigasi rail
+mulai840dp dengan gulir pada jendela pendek. Room10/engine/EQ tetap.
+348Kotlin, lint0error/2warning lama, debug/release dan audit ARM64 lulus.
+Code39/hash terpasang cocok; HP diuji pada font0,9/1,6, terang/gelap dan
+portrait/landscape. QA playlist dibersihkan, setelan dipulihkan, daftar65file
+sama. [Perubahan, bukti dan batas matriks](ADAPTIVE_CONTROLS_1_1_25.md).

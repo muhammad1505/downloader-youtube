@@ -13,7 +13,35 @@ cukup kuat, daftar mudah dipindai, gerak hanya untuk perubahan status.
 
 ## Token
 
-### Kontrol ringkas menyeluruh (1.1.24)
+### Ukuran kontekstual dan ruang tersedia (1.1.25)
+
+Tombol formulir memakai tinggi minimum40dp (utama48dp), padding16×8dp,
+radius small tema dan labelLarge yang boleh membungkus. ActionChip tetap32dp
+untuk kontrol ringkas di dekat filter. Keduanya mempertahankan target48dp;
+teks tidak dikecilkan otomatis untuk menyembunyikan kekurangan ruang.
+
+AdaptivePair memindahkan aksi ke bawah isi ketika lebar lokal kurang320dp
+atau font minimal1,3×. Mini player memakai ambang360dp karena tiga kontrolnya
+memerlukan144dp. Nama playlist mendapat baris sendiri pada dialog sempit.
+Layar dengan area aplikasi minimal840dp memakai navigasi rail; isi dibatasi
+840dp dan berada di tengah agar formulir tidak merentang tanpa batas.
+
+```text
+lapang:  [sampul / judul playlist ........] [ubah] [hapus]
+sempit:  [sampul / judul playlist ....................]
+                                      [ubah] [hapus]
+form:    [       Simpan       ]    filter: [Semua] [Musik]
+```
+
+ENERGY2/RHYTHM1/MOTION1, palet dan ritme8/12/16dp tetap. Kritik terhadap aturan
+1.1.24: bentuk seragam membuat tombol formulir terlalu menyerupai filter dan
+tidak menyelesaikan baris yang berebut lebar. Aturan baru mempertahankan peran
+kontrol, memakai batas minimum/intrinsik dan perubahan susunan sesuai ruang.
+Ukuran tidak ditentukan dari merek HP atau dikalikan resolusi piksel mentah.
+
+### Kontrol ringkas menyeluruh (1.1.24, historis)
+
+Ukuran formulir bagian ini digantikan aturan kontekstual1.1.25 di atas.
 
 ActionButton dan ActionChip menggunakan komponen chip Material yang sama:
 tinggi visual minimum32dp, ikon18dp, labelLarge, bentuk chip tema dan target
