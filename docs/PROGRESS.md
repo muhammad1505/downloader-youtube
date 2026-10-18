@@ -646,7 +646,7 @@ aplikasi: runner `ubuntu-latest` tidak punya binary `ffmpeg`. Akibatnya
 `test_optional_processing…native_opus_packets` gagal dengan
 `FileNotFoundError: 'ffmpeg'`, lima tes kompresi sampul ter-skip, langkah audit
 16KB/refleksi ZIP ikut ter-skip, dan langkah `upload-artifact` gagal karena
-"Aritfact storage quota has been hit" (APK debug ~70 MB per run).
+"Artifact storage quota has been hit" (APK debug ~70 MB per run).
 
 Perbaikan di `.github/workflows/android.yml`:
 
