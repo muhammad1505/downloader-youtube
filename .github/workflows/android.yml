@@ -22,6 +22,10 @@ jobs:
         run: bash scripts/rebuild_ffmpeg_webp.sh
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease --no-daemon
+      # Tes host memakai binary ffmpeg/ffprobe sungguhan (kompresi sampul dan
+      # pemrosesan opsional). Tanpa ini runner melewati 5 tes dan satu tes gagal.
+      - name: Install host media tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: python3 -m unittest discover -s scripts -p "test_*.py"
       - name: Audit native 16 KB compatibility
         run: |
@@ -33,10 +37,15 @@ jobs:
           for apk in app/build/outputs/apk/release/*.apk; do
             python3 scripts/audit_release_zip_fields.py "$apk"
           done
+      # Laporan teks saja (bukan APK debug ~70 MB) agar tidak menghabiskan kuota
+      # penyimpanan artifact akun. Kegagalan kuota bukan bagian dari gate
+      # kebenaran: tes, lint, dan audit di atas tetap menentukan hasil job.
       - uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: android-reports
+          retention-days: 7
           path: |
             app/build/reports/
-            app/build/outputs/apk/debug/*.apk
+            app/build/test-results/
