@@ -31,33 +31,18 @@ object Engine {
   }
  }
  @Volatile private var assetInstalled = false
+ fun isBusy(): Boolean = activeThreads.values.any { it.thread.isAlive }
+ suspend fun activateStoredEngine(context: Context) = lock.withLock {
+  check(activeThreads.values.none { it.thread.isAlive }) { "Mesin media sedang dipakai." }
+  withContext(Dispatchers.IO) {
+   EngineUpdater.invalidateInstalledCache()
+   installEngineFile(context, force = true)
+  }
+ }
  private fun installBundledEngine(context: Context) {
   if(assetInstalled) return
-  val manifest=JSONObject(context.assets.open("engine.json").bufferedReader().use { it.readText() })
-  val expected=manifest.getString("sha256").lowercase()
-  require(expected.matches(Regex("[a-f0-9]{64}"))) { "Manifest mesin tidak valid." }
-  fun digest(file: File): String {
-   val sha=java.security.MessageDigest.getInstance("SHA-256")
-   file.inputStream().use { input -> val buffer=ByteArray(65536); while(true) { val n=input.read(buffer); if(n<0) break; sha.update(buffer,0,n) } }
-   return sha.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-  }
-  val target=File(context.noBackupFilesDir,"youtubedl-android/yt-dlp/yt-dlp-original")
-  target.parentFile!!.mkdirs()
-  if(!target.isFile || digest(target) != expected) {
-   val temporary=File(target.parentFile,"yt-dlp.tmp")
-   try {
-    context.assets.open("yt-dlp").use { input -> java.io.FileOutputStream(temporary).use { output -> input.copyTo(output); output.fd.sync() } }
-    require(digest(temporary)==expected) { "Verifikasi mesin media gagal." }
-    android.system.Os.rename(temporary.absolutePath,target.absolutePath)
-   } finally { temporary.delete() }
-  }
-  val entry=File(target.parentFile,"yt-dlp")
-  val bootstrap=context.assets.open("engine-bootstrap.py").use { it.readBytes() }
-  if(!entry.isFile || !entry.readBytes().contentEquals(bootstrap)) {
-   val temporary=File(entry.parentFile,"bootstrap.tmp")
-   try { java.io.FileOutputStream(temporary).use { it.write(bootstrap); it.fd.sync() }; android.system.Os.rename(temporary.absolutePath,entry.absolutePath) }
-   finally { temporary.delete() }
-  }
+  installEngineFile(context, force = false)
+  installBootstrap(context)
   extractorCache=File(context.cacheDir, "extractor-cache").apply { mkdirs() }
   processDirectory=File(context.noBackupFilesDir,"engine-processes").apply { mkdirs() }
   processDirectory.listFiles()?.forEach { record ->
@@ -66,6 +51,32 @@ object Engine {
    record.delete()
   }
   assetInstalled=true
+ }
+ private fun engineTarget(context: Context)=File(context.noBackupFilesDir,"youtubedl-android/yt-dlp/yt-dlp-original")
+ private fun installEngineFile(context: Context, force: Boolean) {
+  if(assetInstalled && !force) return
+  val chosen=EngineUpdater.installed(context)
+  val target=engineTarget(context)
+  target.parentFile!!.mkdirs()
+  if(force || !target.isFile || EngineUpdater.sha256(target) != chosen.sha256) {
+   val temporary=File(target.parentFile,"yt-dlp.tmp")
+   try {
+    val source=chosen.file
+    if (source == null) context.assets.open("yt-dlp").use { input -> java.io.FileOutputStream(temporary).use { output -> input.copyTo(output); output.fd.sync() } }
+    else source.inputStream().use { input -> java.io.FileOutputStream(temporary).use { output -> input.copyTo(output); output.fd.sync() } }
+    require(EngineUpdater.sha256(temporary)==chosen.sha256) { "Verifikasi mesin media gagal." }
+    EngineUpdater.atomicReplace(temporary,target)
+   } finally { temporary.delete() }
+  }
+ }
+ private fun installBootstrap(context: Context) {
+  val entry=File(engineTarget(context).parentFile,"yt-dlp")
+  val bootstrap=context.assets.open("engine-bootstrap.py").use { it.readBytes() }
+  if(!entry.isFile || !entry.readBytes().contentEquals(bootstrap)) {
+   val temporary=File(entry.parentFile,"bootstrap.tmp")
+   try { java.io.FileOutputStream(temporary).use { it.write(bootstrap); it.fd.sync() }; android.system.Os.rename(temporary.absolutePath,entry.absolutePath) }
+   finally { temporary.delete() }
+  }
  }
  fun cancel(id: String) {
   activeThreads[id]?.let(::cancelExecution)
@@ -116,8 +127,10 @@ object Engine {
    }
   }
  }
- private suspend fun dumpInfo(context: Context, url: String, id: String): JSONObject {
+ private suspend fun dumpInfo(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): JSONObject {
+  onPhase(InspectionPhase.PREPARING_ENGINE)
   initialize(context)
+  onPhase(InspectionPhase.FETCHING_METADATA)
   val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--socket-timeout", 20)
   return JSONObject(execute(request,id))
  }
@@ -133,18 +146,21 @@ object Engine {
   json.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty().firstOrNull { it != "live_chat" }?.let { return it }
   return json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty().firstOrNull { it.endsWith("-orig") }
  }
- suspend fun inspect(context: Context, url: String, id: String): VideoMetadata {
+ suspend fun inspect(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): VideoMetadata {
   require(Selection.validUrl(url)) { "Gunakan tautan video dari platform yang didukung." }
-  val json = dumpInfo(context, url, id)
+  val json = dumpInfo(context, url, id, onPhase)
   val langs = genuineSubtitleLangs(json).take(8)
   return SourceMetadata.parse(json, url.trim()).copy(subtitleLangs = langs)
  }
- suspend fun inspectPlaylist(context: Context, url: String, id: String): PlaylistMetadata {
+ suspend fun inspectPlaylist(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): PlaylistMetadata {
   require(Selection.validPlaylistUrl(url)) { "Gunakan tautan playlist YouTube yang valid." }
+  onPhase(InspectionPhase.PREPARING_ENGINE)
   initialize(context)
+  onPhase(InspectionPhase.FETCHING_PLAYLIST)
   val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--yes-playlist").addOption("--flat-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--playlist-end", 500).addOption("--socket-timeout", 20)
   if (Selection.isMix(url)) request.addOption("--tubeflow-mix-snapshot")
   val json = JSONObject(execute(request,id))
+  onPhase(InspectionPhase.READING_ENTRIES)
   val array = json.optJSONArray("entries") ?: JSONArray()
   val entryChannels = mutableListOf<String>()
   val entries = (0 until array.length()).mapNotNull { index ->

@@ -301,6 +301,34 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(loading=false,error=failure.message ?: "Pencarian gagal.") }
         }
     }
+    fun saveManualLyrics(raw: String) {
+        val current=_lyrics.value ?: return
+        if (current.loading || current.saving) return
+        val text=try { Lyrics.manualText(raw,current.item.durationMs) }
+        catch (failure: Exception) { _lyrics.value=current.copy(error=failure.message ?: "LRC manual tidak valid."); return }
+        _lyrics.value=current.copy(saving=true,error=null,failureStatus=null,httpCode=null)
+        val session=lyricsSession
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
+                    val item=dao.get(current.item.uri) ?: error("Media telah dihapus.")
+                    require(item.location == current.item.location && item.displayName == current.item.displayName &&
+                        item.lyricUri == current.item.lyricUri && displayName(item.location) == current.item.displayName) { "Media/lirik berubah selama pencarian; buka ulang." }
+                    expectedJob?.let { old -> database.downloads().get(old.id)?.let { job ->
+                        require(job.state == JobState.COMPLETED && job.generation == old.generation &&
+                            job.outputUri == old.outputUri && job.sidecarUris == old.sidecarUris) { "Download berubah; lirik tidak diganti." }
+                    } }
+                    val uri=LyricPublisher(getApplication()).publish(item,text,expectedLyrics)
+                    dao.put(item.copy(lyricUri=uri,lyricStatus=LyricStatus.SAVED))
+                    item.jobId?.let { database.downloads().lyricStatus(it,LyricStatus.SAVED) }
+                    dao.event(MediaEvent(jobId=item.jobId.orEmpty(),action="LYRICS_MANUAL",kind="AUDIO",platformId=item.platformId,at=System.currentTimeMillis()))
+                } }
+                if (session == lyricsSession) { _lyrics.value=null; expectedLyrics=emptyMap(); expectedJob=null }
+                _message.value="Lirik manual disimpan. Cek kecocokan vokal; koreksi waktu bila perlu."
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { if (session == lyricsSession) _lyrics.value=_lyrics.value?.copy(saving=false,error=failure.message ?: "Lirik manual gagal disimpan.") }
+        }
+    }
     fun saveLyrics(choice: Lyrics.Choice, acknowledgedMismatch: Boolean) {
         val current=_lyrics.value ?: return
         if (current.loading || current.saving || !current.choices.contains(choice) || !choice.hasSyncedLyrics) return

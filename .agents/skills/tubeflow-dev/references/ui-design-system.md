@@ -100,7 +100,7 @@ Verifikasi detail terhadap dokumentasi Android untuk target SDK aktif di Gradle.
 - Tampilan lirik mengikuti timestamp asli ditambah offset per lagu. Pilihan lirik manual menampilkan pratinjau, atribusi, dan pengakuan bila berbeda dari identitas audio aktual.
 - Status lirik (tidak ditemukan, instrumental, gagal jaringan, gagal simpan) punya pesan yang berbeda, dan lirik yang gagal tidak membuat unduhan tampak gagal.
 - Warna turunan sampul (`rememberCoverAccent`) boleh mempercantik gradien latar pemutar, panel bawah antrean (kartu lagu aktif berlabel "Sedang diputar" beserta sampul per item), dan aksen notifikasi, tetapi tidak dipakai sebagai informasi platform sumber; ikon/warna platform berasal dari registry platform.
-- Equalizer menyediakan preset bawaan **Otomatis (bass bulat)** (`AutoEq`: kurva frekuensi tengah band +5 dB @60 Hz, −1 dB mid, +2,5 dB treble yang di-clamp ke rentang perangkat) di samping preset perangkat dan pengaturan manual pengguna.
+- Equalizer menyediakan preset bawaan **Otomatis (bass bulat)** (`AutoEq`: kurva frekuensi tengah band +6 dB @30–60 Hz dengan bahu landai sampai 250 Hz, mid netral, +2,5 dB treble yang di-clamp ke rentang perangkat) di samping preset perangkat dan pengaturan manual pengguna.
 - Job karaoke berjalan terpisah dengan progres sendiri; judul dialog mengikuti lagu yang sedang dipilih dan memberi label sumber bila ada proses lama yang masih berjalan. Status batal di UI belum berarti proses native selesai, jadi tombol ulang tidak boleh mengaktifkan job baru sebelum pembersihan job lama berhenti.
 
 ## Aksesibilitas

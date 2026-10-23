@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.sourcePlatform
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.JobState
+import id.local.tubeflow.core.LyricStatus
 import id.local.tubeflow.core.MediaMode
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
@@ -33,6 +34,9 @@ fun HistoryScreen(
     onClearCompleted: () -> Unit,
     onClearUnsuccessful: () -> Unit,
     onOpenDownload: () -> Unit = {},
+    onEnqueue: (DownloadJob) -> Unit = {},
+    onPlayNext: (DownloadJob) -> Unit = {},
+    onEditLyricTiming: (String) -> Unit = {},
 ) {
     val completed = jobs.filter { it.state == JobState.COMPLETED }
     val unsuccessful = jobs.count { it.state == JobState.FAILED || it.state == JobState.CANCELLED }
@@ -166,6 +170,11 @@ fun HistoryScreen(
                     refetchLyrics = onRefetchLyrics,
                     searchLyrics = onSearchLyrics,
                     play = { onPlay(filtered, filtered.indexOf(job)) },
+                    enqueue = { onEnqueue(job) },
+                    playNext = { onPlayNext(job) },
+                    editLyricTiming = if (job.mode == MediaMode.AUDIO && job.lyricStatus == LyricStatus.SAVED) {
+                        { onEditLyricTiming(job.id) }
+                    } else null,
                 )
             }
         }

@@ -88,7 +88,7 @@ class FailureDetailsStore(private val context: Context) {
         return AtomicFile(File(directory, "$id-$generation.json"))
     }
     private fun engineVersion(): String = runCatching {
-        context.assets.open("engine.json").bufferedReader().use { JSONObject(it.readText()).getString("version") }
+        EngineUpdater.installed(context).version
     }.getOrDefault("Tidak terbaca")
     fun capture(error: Exception, phase: String): FailureDetails = FailureDetails.capture(
         "${error.javaClass.simpleName}: ${error.message.orEmpty()}", phase,

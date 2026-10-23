@@ -204,6 +204,14 @@ object Lyrics {
         return tagged
     }
 
+    fun manualText(raw: String, durationMs: Long?): String {
+        val text=raw.trimStart('\uFEFF').trim()
+        require(text.isNotBlank()) { "Lirik manual masih kosong." }
+        require(text.toByteArray().size <= 512*1024) { "LRC terlalu besar." }
+        LrcTiming.shift(text,0,durationMs)
+        return "[re:TubeFlow / manual]\n$text\n"
+    }
+
 
     /**
      * Cari lirik untuk nama konsisten "Judul - Artis" (judul dulu — urutan yang dipakai nama file)

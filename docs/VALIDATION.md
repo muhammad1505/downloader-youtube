@@ -1,6 +1,38 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 13 Oktober 2026
+## Status terbaru — 23 Oktober 2026
+
+Baseline **1.1.30/code44**: yt-dlp bawaan 2026.10.21
+(`b7af77f686e95f7845ce8d09d21957718febb8b48b30555adb9dd2292ad7bf14`),
+inspeksi bertahap + cache metadata 30 menit/200 entri, LRC manual, recovery
+exception-safe, dan guard checksum engine di CI. **402 tes Kotlin** (0
+gagal/error/skip, dibaca dari `test-results/testDebugUnitTest`), **98 tes Python**
+`OK` (24,075 detik), lint debug/release **0 error/3 warning** lama
+(SelectedPhotoAccess, Gradle 9.8.2 tersedia, pin onnxruntime 1.23.2 yang disengaja karena 1.31.0 gagal JNI di perangkat target).
+`scripts/build_release.sh` lulus (16m03s).
+
+Signed APK ARM64 70.948.952 byte, SHA256
+`6bf4957d6d16d4bfe22589fa7818b1d531211204ea4c43e223fa14918cefe7c5`;
+AAB 256.040.881 byte, SHA256
+`b686b07ceb7cd5596ff40320f61ffd4e9b3bdb1a9d5f5f91348f363aafd53eee`.
+Audit APK: 257/257/259 ELF dan 13 kelas refleksi ZIP 0 gagal, `zipalign -c -P 16 4`
+OK, `apksigner` v2 sertifikat `ebe3b40e…`; AAB 1.038 ELF 0 gagal 16 KB dan
+`jarsigner` jar verified. Engine/bootstrap dalam APK cocok dengan aset.
+
+Perangkat Realme RMX1821 Android 10: 1.1.30 terpasang sebagai update; hash `base.apk` identik dengan artefak. Fase
+inspeksi (`Mengambil detail video… · 13 dtk`), tombol cancel, cache yang tetap
+hit setelah force-stop, simpan LRC manual (sidecar 49 byte, status **Lirik
+tersimpan**), dan unduhan BUG-054 MP3 128 (4.023.060 byte/247,824 dtk) lulus.
+Lirik otomatis gagal karena LRCLIB. Riwayat 0 di awal sesi berasal dari setelan
+pengguna **Hapus otomatis 7 hari**, bukan database reset. [Ringkasan dan
+batas](PROGRESS.md).
+
+**Belum diuji:** TWS/Android 12+, runtime halaman 16 KB, ABI lain, Android
+selain 10, fault injection provider SAF/process death, gangguan
+jaringan/checksum nyata, matriks font besar/landscape, bundletool, dan
+publikasi toko. Audit host tidak membuktikan jalur gagal Android aman.
+
+## Status sebelumnya — 13 Oktober 2026
 
 Baseline produksi aktual **1.1.1/code15/Room9**: 145 tes Kotlin (dibaca ulang dari `test-results/testDebugUnitTest`), **76 tes Python dijalankan ulang → `OK` (23,173 detik)**, lint debug/release “No issues found”, signed APK×3/AAB dengan `sha256sum -c SHA256SUMS` semua OK. Audit dijalankan ulang sesi dokumentasi pada artefak distribusi (source tidak berubah sesudah build): native 255/255/257 ELF + AAB 1.024 ELF 0 gagal 16 KB, ZIP reflektif 13 kelas 0 gagal, `zipalign -c -P 16 4` OK, `apksigner` v2 verified sertifikat `ebe3b40e…`, AAB `jarsigner` jar verified. ARM64 SHA256 `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0` cocok APK terpasang di Realme Android 10. [Laporan 1.1.1 dan cakupan](DASHBOARD_LYRICS_2026-10-13.md), [signing](PRODUCTION_SIGNING.md), [uji perangkat](DEVICE_TEST.md).
 

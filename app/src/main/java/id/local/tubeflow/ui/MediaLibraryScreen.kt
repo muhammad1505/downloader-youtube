@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +29,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
+fun MediaLibraryScreen(
+    model: MediaLibraryViewModel,
+    player: PlayerViewModel,
+    jobs: List<DownloadJob> = emptyList(),
+    onRedownload: (DownloadJob) -> Unit = {},
+) {
     LaunchedEffect(Unit) { model.validateAvailability() }
     val media by model.items.collectAsStateWithLifecycle()
     val playlists by model.playlists.collectAsStateWithLifecycle()
@@ -42,16 +46,23 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
     val artists by model.artists.collectAsStateWithLifecycle()
     val albums by model.albums.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
+    // Peta sekali per perubahan daftar job; jangan memindai seluruh riwayat untuk tiap kartu.
+    val completedJobs = remember(jobs) { jobs.filter { it.state == JobState.COMPLETED }.associateBy { it.id } }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var detail by remember { mutableStateOf<MediaItem?>(null) }
     var rename by remember { mutableStateOf<MediaItem?>(null) }
     var delete by remember { mutableStateOf<MediaItem?>(null) }
     var timing by remember { mutableStateOf<MediaItem?>(null) }
+    // "Unduh lagi" mengganti file yang ada; pasangkan job sumber dengan item yang dikonfirmasi.
+    var redownload by remember { mutableStateOf<Pair<DownloadJob, MediaItem>?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var openError by remember { mutableStateOf<String?>(null) }
     fun open(item: MediaItem, share: Boolean = false) { scope.launch {
-        openError = withContext(Dispatchers.IO) { launchMedia(context, item.location, item.kind == "AUDIO", share) }
+        // Judul menjadi caption cadangan bila provider tidak menyediakan nama file.
+        openError = withContext(Dispatchers.IO) {
+            launchMedia(context, item.location, item.kind == "AUDIO", share, item.title.ifBlank { item.displayName })
+        }
     } }
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
@@ -111,7 +122,6 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
         }
         items(media, key = { it.uri }) { item ->
             val accent=rememberCoverAccent(item.coverPath)
-            var menu by remember(item.uri) { mutableStateOf(false) }
             Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
                 // Satu tap = seluruh daftar masuk antrean, mulai dari item ini.
                 if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item)
@@ -133,50 +143,51 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
                         }
                         if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                     }
-                    // Menu tiga titik: aksi sekunder tidak memicu playback saat diketuk.
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Menu ${item.title}") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text(if (item.kind == "AUDIO") "Putar sekarang" else "Buka di pemutar") },
-                            leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
-                            onClick = { menu = false; if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item) })
-                        if (item.kind == "AUDIO") {
-                            if (filter.playlistId.isNotBlank()) DropdownMenuItem(text = { Text(stringResource(R.string.library_remove_playlist)) }, onClick = { menu = false; model.removeFromPlaylist(item, filter.playlistId) })
-                            DropdownMenuItem(text = { Text("Putar berikutnya") }, onClick = { menu = false; player.playNext(item) })
+                }
+                // Aksi kartu memakai rencana bersama dengan Riwayat; semua aksi tampil langsung.
+                val sourceJob = completedJobs[item.jobId]
+                MediaActionBar(
+                    audio = item.kind == "AUDIO",
+                    specs = MediaCardPlan.library(
+                        audio = item.kind == "AUDIO",
+                        favorite = item.uri in favorites,
+                        inPlaylist = filter.playlistId.isNotBlank(),
+                        hasLyrics = item.lyricUri != null,
+                        canRedownload = sourceJob != null,
+                    ),
+                    enabled = { kind ->
+                        val available = item.availability == "AVAILABLE"
+                        when (kind) {
+                            MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
+                            MediaActionKind.ENQUEUE, MediaActionKind.PLAY_NEXT -> available
+                            MediaActionKind.FIND_LYRICS -> !busy
+                            MediaActionKind.REDOWNLOAD -> !busy
+                            MediaActionKind.EDIT_LYRIC_TIMING, MediaActionKind.RENAME,
+                            MediaActionKind.DELETE -> !busy && available
+                            else -> true
                         }
-                        DropdownMenuItem(text = { Text("Detail") }, onClick = { menu = false; detail = item })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.library_share)) },
-                            leadingIcon = { Icon(Icons.Outlined.Share, null) }, enabled = item.availability == "AVAILABLE",
-                            onClick = { menu = false; open(item, share = true) })
-                        if (item.kind == "AUDIO") DropdownMenuItem(text = { Text("Cari lirik") }, enabled = !busy,
-                            onClick = { menu = false; model.openLyrics(item) })
-                        if (item.kind == "AUDIO" && item.lyricUri != null) DropdownMenuItem(text = { Text("Atur waktu lirik") }, enabled = !busy,
-                            onClick = { menu = false; timing = item })
-                        DropdownMenuItem(text = { Text("Ubah nama") }, enabled = !busy && item.availability == "AVAILABLE",
-                            onClick = { menu = false; rename = item })
-                        DropdownMenuItem(text = { Text("Hapus file", color = MaterialTheme.colorScheme.error) }, enabled = !busy && item.availability == "AVAILABLE",
-                            onClick = { menu = false; delete = item })
-                    }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (item.kind == "AUDIO") {
-                        val favorite = item.uri in favorites
-                        IconAction(
-                            if (favorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
-                            stringResource(if (favorite) R.string.library_unfavorite else R.string.library_favorite),
-                            { if (favorite) model.removeFromPlaylist(item, PersonalLibrary.FAVORITES) else model.addToPlaylist(item, PersonalLibrary.FAVORITES) },
-                        )
-                        IconAction(Icons.Outlined.PlaylistAdd, stringResource(R.string.library_add_playlist), { addPlaylist = item })
-                        IconAction(Icons.AutoMirrored.Outlined.QueueMusic, "Tambah ke antrean", { player.enqueue(item) }, enabled = item.availability == "AVAILABLE")
-                    } else {
-                        IconAction(Icons.Outlined.PlayArrow, stringResource(R.string.library_play_video), { open(item) }, enabled = item.availability == "AVAILABLE")
-                    }
-                    IconAction(Icons.Outlined.Share, stringResource(R.string.library_share), { open(item, share = true) }, enabled = item.availability == "AVAILABLE")
-                    if (item.kind == "VIDEO") {
-                        IconAction(Icons.Outlined.Info, stringResource(R.string.library_media_details), { detail = item })
-                        IconAction(Icons.Outlined.Edit, stringResource(R.string.library_rename_file), { rename = item }, enabled = !busy && item.availability == "AVAILABLE")
-                        IconAction(Icons.Outlined.DeleteOutline, stringResource(R.string.library_delete_file), { delete = item }, enabled = !busy && item.availability == "AVAILABLE", destructive = true)
-                    }
-                }
+                    },
+                    onClick = { kind ->
+                        when (kind) {
+                            MediaActionKind.PLAY -> model.playSelection(player, item.uri)
+                            MediaActionKind.OPEN -> open(item)
+                            MediaActionKind.SHARE -> open(item, share = true)
+                            MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
+                            MediaActionKind.FAVORITE_REMOVE -> model.removeFromPlaylist(item, PersonalLibrary.FAVORITES)
+                            MediaActionKind.ENQUEUE -> player.enqueue(item)
+                            MediaActionKind.PLAY_NEXT -> player.playNext(item)
+                            MediaActionKind.ADD_PLAYLIST -> addPlaylist = item
+                            MediaActionKind.REMOVE_PLAYLIST -> model.removeFromPlaylist(item, filter.playlistId)
+                            MediaActionKind.FIND_LYRICS -> model.openLyrics(item)
+                            MediaActionKind.EDIT_LYRIC_TIMING -> timing = item
+                            MediaActionKind.DETAIL -> detail = item
+                            MediaActionKind.RENAME -> rename = item
+                            MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
+                            MediaActionKind.DELETE -> delete = item
+                            else -> Unit
+                        }
+                    },
+                )
             }
         } }
         if (media.size >= filter.limit && filter.limit < 3000) item {
@@ -227,6 +238,14 @@ fun MediaLibraryScreen(model: MediaLibraryViewModel, player: PlayerViewModel) {
         confirmLabel = "Hapus file",
         onConfirm = { model.delete(item); delete = null },
         onDismiss = { delete = null },
+        destructive = true,
+    ) }
+    redownload?.let { (job, item) -> ConfirmDialog(
+        title = "Unduh lagi?",
+        text = "\"${item.displayName}\" akan dihapus dari penyimpanan, lalu unduhan yang sama diantrekan ulang. Lirik dan lampiran lama ikut diganti.",
+        confirmLabel = "Unduh lagi",
+        onConfirm = { onRedownload(job); redownload = null },
+        onDismiss = { redownload = null },
         destructive = true,
     ) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }

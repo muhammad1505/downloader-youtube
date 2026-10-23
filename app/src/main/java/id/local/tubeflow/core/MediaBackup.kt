@@ -81,6 +81,7 @@ class MediaBackup(private val context: Context) {
         put("resume_interruption", SettingsStore.resumeAfterInterruption); put("concurrent", SettingsStore.maxConcurrent)
         put("rename", SettingsStore.autoRename); put("tag", SettingsStore.autoTag); put("artwork", SettingsStore.autoArtwork)
         put("lyrics", SettingsStore.autoLyrics); put("library", SettingsStore.autoLibrary)
+        put("history_auto_days", SettingsStore.historyAutoDays)
     }
     suspend fun export(): Export = withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
         recoverLocked()
@@ -200,5 +201,7 @@ class MediaBackup(private val context: Context) {
         if (data.opt("artwork_accent") is Boolean) SettingsStore.setArtworkAccent(context, data.getBoolean("artwork_accent"))
         if (data.opt("resume_interruption") is Boolean) SettingsStore.setResumeAfterInterruption(context, data.getBoolean("resume_interruption"))
         data.optInt("concurrent").takeIf { it in 1..4 }?.let { SettingsStore.setMaxConcurrent(context, it) }
+        // Cadangan lama tidak punya kunci ini; 0 berarti biarkan nonaktif.
+        if (data.has("history_auto_days")) SettingsStore.setHistoryAutoDays(context, data.optInt("history_auto_days", 0))
     }
 }

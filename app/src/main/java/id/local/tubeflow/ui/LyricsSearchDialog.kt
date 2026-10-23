@@ -30,6 +30,8 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
     var artist by remember(current.item.uri) { mutableStateOf(current.artist) }
     var selected by remember(current.choices) { mutableStateOf<Lyrics.Choice?>(null) }
     var acknowledge by remember(selected) { mutableStateOf(false) }
+    var manualOpen by remember(current.item.uri) { mutableStateOf(false) }
+    var manualText by remember(current.item.uri) { mutableStateOf("") }
     val mismatch=selected?.automaticMatch(current.query) == false
     val blocked=current.loading || current.saving
     var retrySeconds by remember(current.failureStatus) { mutableLongStateOf(Lyrics.retryAfterSeconds()) }
@@ -83,6 +85,30 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
                     CheckRow("Saya tetap memilih versi ini", acknowledge, { acknowledge=it }, enabled=!blocked)
                 }
                 if (current.item.lyricUri != null) Text("Lirik lama diganti setelah penyimpanan terverifikasi. Koreksi waktu sebelumnya direset untuk lirik baru.",style=MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick={ manualOpen=!manualOpen }, enabled=!blocked) {
+                Icon(Icons.Outlined.ContentPaste,null,Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (manualOpen) "Tutup lirik manual" else "Tempel LRC manual")
+            }
+            if (manualOpen) {
+                Text("Format LRC dengan timestamp, mis. [00:12.00]Baris lirik. Lirik tanpa timestamp ditolak.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value=manualText,
+                    onValueChange={ manualText=it.take(512*1024) },
+                    label={ Text("LRC manual") },
+                    placeholder={ Text("[00:00.00]…") },
+                    minLines=5,
+                    maxLines=10,
+                    enabled=!blocked,
+                    modifier=Modifier.fillMaxWidth(),
+                )
+                ActionButton(
+                    "Simpan lirik manual",
+                    { model.saveManualLyrics(manualText) },
+                    icon=Icons.Outlined.Save,
+                    enabled=!blocked && manualText.isNotBlank(),
+                )
             }
         }
     },confirmButton={ TextButton(onClick={ selected?.let { model.saveLyrics(it,acknowledge) } },enabled=!blocked && selected != null && (!mismatch || acknowledge)) { Text("Simpan pilihan") } },

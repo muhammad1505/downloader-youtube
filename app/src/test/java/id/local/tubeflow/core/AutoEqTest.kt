@@ -8,9 +8,10 @@ class AutoEqTest {
     private val min = -15f
     private val max = 15f
 
-    @Test fun bassBandsGetRoundBoost() {
-        assertEquals(3f, AutoEq.levelDb(60_000, min, max), 0.05f)
-        assertEquals(2.5f, AutoEq.levelDb(120_000, min, max), 0.05f)
+    @Test fun bassBandsGetFullRoundBoost() {
+        assertEquals(6f, AutoEq.levelDb(60_000, min, max), 0.05f)
+        assertEquals(4.5f, AutoEq.levelDb(120_000, min, max), 0.05f)
+        assertEquals(2f, AutoEq.levelDb(250_000, min, max), 0.05f)
     }
 
     @Test fun midsStayClearAndTrebleGetsSubtleShine() {
@@ -20,11 +21,21 @@ class AutoEqTest {
         assertTrue(AutoEq.levelDb(8_000_000, min, max) <= 3f)
     }
 
-    @Test fun bassAndTrebleHaveEqualPeakWithModestBoostAcrossDeviceBands() {
-        assertEquals(AutoEq.levelDb(60_000, min, max), AutoEq.levelDb(16_000_000, min, max), 0.05f)
+    @Test fun fullBassLeadsWhileTrebleStaysRounded() {
+        val bass = AutoEq.levelDb(60_000, min, max)
+        val treble = AutoEq.levelDb(16_000_000, min, max)
+        assertTrue("Bass harus penuh", bass >= 5.5f)
+        assertTrue("Treble hanya kilau, bukan menyaingi bass", treble in 1f..3f)
         for (hz in listOf(20, 60, 120, 230, 250, 500, 910, 1000, 2000, 3600, 4000, 8000, 14000, 16000, 20000)) {
-            assertTrue("$hz Hz", AutoEq.levelDb(hz * 1000, min, max) in 0f..3f)
+            assertTrue("$hz Hz", AutoEq.levelDb(hz * 1000, min, max) in 0f..6f)
         }
+    }
+
+    @Test fun bassShoulderIsBroadInsteadOfASpike() {
+        // 30–60 Hz sama penuh, lalu turun bertahap sampai mid; bukan lonjakan satu band.
+        assertEquals(AutoEq.levelDb(60_000, min, max), AutoEq.levelDb(30_000, min, max), 0.05f)
+        assertTrue(AutoEq.levelDb(120_000, min, max) > 3f)
+        assertTrue(AutoEq.levelDb(250_000, min, max) > 0f)
     }
 
     @Test fun curveDecreasesTowardMidsThenRisesAgain() {

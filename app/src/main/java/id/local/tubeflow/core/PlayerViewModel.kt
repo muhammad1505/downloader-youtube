@@ -372,6 +372,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Sisipkan setelah lagu aktif. Tanpa antrean aktif lagu langsung diputar agar tidak ada antrean tersembunyi. */
     fun playNext(item: MediaItem) { trackOf(item)?.let { addToQueue(it, next = true) } }
     fun enqueue(item: MediaItem) { trackOf(item)?.let { addToQueue(it, next = false) } }
+    /** Varian dari Riwayat: job selesai sudah membawa URI, sampul, dan identitas lagu. */
+    fun playNext(job: DownloadJob) { trackOf(job)?.let { addToQueue(it, next = true) } }
+    fun enqueue(job: DownloadJob) { trackOf(job)?.let { addToQueue(it, next = false) } }
     private fun addToQueue(track: Track, next: Boolean) = handler.post {
         val current = queue
         if (current == null || _state.value.track == null) { load(PlaybackQueue(listOf(track))); return@post }

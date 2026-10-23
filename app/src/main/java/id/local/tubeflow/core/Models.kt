@@ -162,6 +162,8 @@ class Converters {
  /** Versi milik worker: hanya mengenai baris dengan generasi eksekusi ini — worker lama tak bisa menimpa job yang dilanjutkan. */
  @Query("UPDATE downloads SET state = 'FAILED', error = :message, pendingUri = NULL WHERE id = :id AND generation = :gen AND state IN ('RUNNING','QUEUED')") suspend fun failOwned(id: String, gen: Int, message: String): Int
  @Query("UPDATE downloads SET pendingUri = NULL WHERE id = :id") suspend fun clearPending(id: String)
+ /** Pertahankan jurnal saat penghapusan pending ditolak provider; recovery berikutnya mencoba lagi. */
+ @Query("UPDATE downloads SET pendingUri = :uri WHERE id = :id AND generation = :gen AND state IN ('FAILED','CANCELLED')") suspend fun retainPending(id: String, gen: Int, uri: String): Int
  /** Versi milik worker untuk cleanup akhir: worker lama tak boleh menghapus jejak pending milik generasi baru (BUG-002/R1). */
  @Query("UPDATE downloads SET pendingUri = NULL WHERE id = :id AND generation = :gen") suspend fun clearPendingOwned(id: String, gen: Int): Int
  @Query("UPDATE downloads SET pendingUri = :uri WHERE id = :id AND generation = :gen AND state = 'RUNNING'") suspend fun pending(id: String, gen: Int, uri: String?): Int
@@ -182,6 +184,8 @@ class Converters {
  @Query("UPDATE downloads SET state = 'CANCELLED' WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING','PAUSED')") suspend fun cancelOwned(id: String, gen: Int): Int
  @Query("DELETE FROM downloads WHERE id = :id AND state IN ('COMPLETED','FAILED','CANCELLED')") suspend fun remove(id: String): Int
  @Query("DELETE FROM downloads WHERE state = 'COMPLETED'") suspend fun clearCompleted(): Int
+ /** Retensi riwayat: baris lama memakai createdAt bila completedAt masih 0 (BUG-023). */
+ @Query("DELETE FROM downloads WHERE state = 'COMPLETED' AND COALESCE(NULLIF(completedAt, 0), createdAt) < :cutoff") suspend fun clearCompletedBefore(cutoff: Long): Int
  @Query("DELETE FROM downloads WHERE state IN ('FAILED','CANCELLED')") suspend fun clearUnsuccessful(): Int
  @Query("UPDATE downloads SET state = 'QUEUED', speed = '', eta = '', error = NULL, outputUri = NULL, pendingUri = NULL, sidecarUris = NULL, lyricStatus = '', generation = generation + 1, title = :title, artist = :artist, mode = :mode, format = :format, quality = :quality, bitrate = :bitrate, subtitles = :subtitles, embedSubs = :embedSubs, thumbnail = :thumbnail, embedThumb = :embedThumb, createdAt = :now WHERE id = :id AND state IN ('FAILED','CANCELLED')") suspend fun revive(id: String, title: String, artist: String, mode: MediaMode, format: String, quality: Int, bitrate: Int, subtitles: String, embedSubs: Boolean, thumbnail: Boolean, embedThumb: Boolean, now: Long): Int
  @Query("UPDATE downloads SET sidecarUris = :uris WHERE id = :id") suspend fun sidecars(id: String, uris: String?)

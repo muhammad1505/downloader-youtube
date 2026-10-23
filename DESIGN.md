@@ -66,20 +66,55 @@ Polesan 1.1.23 mempertahankan ENERGY2/RHYTHM1/MOTION1, palet, tipografi,
 radius kartu20dp dan ritme8/12/16dp. Antrean putar memakai ActionChip seperti
 filter Acak/Ulangi. Aksi kartu audio dan video memakai IconAction48dp agar
 baris tetap ringkas dan target sentuh tidak mengecil. Video mendapat aksi
-yang sesuai berkas video, tanpa menu lirik atau antrean audio.
+yang sesuai berkas video, tanpa menu lirik atau antrean audio. Sejak 1.1.26
+seluruh aksi kartu ditampilkan langsung; titik tiga di bawah adalah keadaan
+1.1.23 yang sudah digantikan.
 
 ```text
 Antrean: [Acak] [Ulangi] [Bersihkan]
-Audio:   sampul / judul / artis    [menu]
-         [favorit] [playlist] [antrean] [bagikan]
-Video:   thumbnail / judul / info  [menu]
-         [putar] [bagikan] [detail] [ubah] [hapus]
+Audio:   sampul / judul / artis
+         [putar] [favorit] [bagikan] [antrean] [lirik] [berkas]
+Video:   thumbnail / judul / info
+         [buka] [bagikan] [detail] [berkas]
 ```
 
-Kritik: menyamakan semua menu dengan audio akan memberi aksi yang tidak berlaku
+Kritik: menyamakan semua aksi dengan audio akan memberi aksi yang tidak berlaku
 untuk video. Kesamaan diterapkan pada ukuran, posisi dan operasi berkas;
 fitur audio tetap khusus audio. Tombol utama dan konfirmasi tetap memakai
-ActionButton agar hierarki tindakan dan keterbacaan terjaga.
+ActionButton agar hierarki tindakan dan keterbacaan terjaga. Rincian pembagian
+aksi ada pada bagian "Aksi kartu media" di bawah.
+
+## Aksi kartu media (20 Oktober 2026)
+
+Koleksi dan Riwayat menampilkan file yang sama, jadi aksinya tidak boleh berbeda
+pola. `ui/MediaCardActions.kt` menjadi satu sumber kebenaran: `MediaCardPlan.card`
+menentukan aksi mana yang ada dan slotnya; `MediaActionBar` menggambar **enam aksi
+harian langsung di kartu** sebagai ikon 48dp dalam `FlowRow` yang membungkus, lalu
+satu tombol ⋮ untuk sisanya. Kedua layar hanya mengisi `enabled` dan `onClick`,
+sehingga satu aksi memiliki satu nama dan satu ikon di mana pun.
+
+- **Ikon langsung (maksimal enam):** Putar/Buka → Favorit (audio) → Bagikan →
+  Ubah nama (Koleksi) → Cari lirik (audio) → Hapus file.
+- **Menu ⋮ (berkelompok):** *Antrean & playlist* (Tambah ke antrean, Putar
+  berikutnya, Tambah/Hapus dari playlist), *Lirik* (Atur waktu lirik bila LRC
+  tersimpan), *Lampiran* (thumbnail, subtitle video), *Berkas* (Detail, Buka
+  dengan aplikasi lain, Unduh lagi bila item masih tertaut ke unduhan selesai).
+- **Video:** Buka, Bagikan, Ubah nama, Hapus file langsung; Detail dan lampiran
+  di menu. Tidak ada aksi lirik atau antrean audio.
+- **Perbedaan yang sah:** Koleksi memiliki aksi pustaka (favorit, playlist,
+  ubah nama) karena katalog adalah sumbernya; Riwayat memiliki lampiran unduhan.
+  Pola, penamaan, dan urutan tetap sama.
+- **Aksi berisiko:** Hapus file dan Unduh lagi tetap meminta konfirmasi; ikon
+  Hapus di kartu dan item Hapus di menu memakai warna galat.
+- **Berbagi:** `ACTION_SEND` menyertakan caption `EXTRA_TEXT` berisi nama file
+  tanpa ekstensi, agar aplikasi tujuan membuka pesan yang sudah terisi. Buka
+  dengan aplikasi lain tidak menambahkan caption.
+
+```text
+Kartu audio (Koleksi):  [▷] [♡] [↗] [✎] [♪] [🗑] [⋮]
+Kartu audio (Riwayat):  [▷] [↗] [♪] [🗑] [⋮]
+Menu ⋮:                 Antrean & playlist / Lirik / Lampiran / Berkas
+```
 
 Kontrol Koleksi Putar/Acak/Cari dan Bersihkan di Riwayat memakai `ActionChip`
 yang sama dengan deret filter: tinggi visual mengikuti chip Material, target
@@ -97,6 +132,9 @@ Kelola playlist
 
 Pengaturan memisahkan total cache menjadi lirik, metadata, dan sampul. Hasil
 bersihkan lirik tidak menyiratkan cache sampul atau file LRC juga dihapus.
+Panel **Riwayat unduhan** menyediakan satu pilihan **Hapus otomatis**
+(Nonaktif/7/30/90 hari) dengan keterangan bahwa hanya catatan riwayat yang
+dihapus — file media tetap ada.
 
 | Peran | Gelap | Terang |
 |---|---|---|
@@ -167,10 +205,14 @@ per layar.
   Favorit, `MenuChip` untuk dropdown playlist/urutan/folder/artis/album, dan
   `ActionChip` untuk "Kelola playlist". Sebelumnya ukuran dan bentuknya campur
   (chip, tombol outlined, tombol teks).
-- **Aksi lagu di Koleksi.** Favorit, tambah ke playlist, dan tambah ke antrean
-  tampil sebagai ikon di kartu (bukan di menu tiga titik). Menu menyisakan aksi
-  informasi dan berkas: putar sekarang/berikutnya, keluarkan dari playlist,
-  detail, cari lirik, atur waktu lirik, ubah nama, hapus.
+- **Aksi kartu media.** Koleksi dan Riwayat memakai satu `MediaCardPlan.card`
+  dan `MediaActionBar`: **enam aksi harian tampil langsung di kartu** (Putar/Buka,
+  Favorit, Bagikan, Ubah nama, Cari lirik, Hapus) dan sisanya di menu ⋮ yang
+  berkelompok. Urutan dan pembagian slot sama di kedua daftar. Sejak 1.1.27
+  **Unduh lagi** (Koleksi, bila item masih tertaut ke unduhan selesai, dengan
+  konfirmasi karena file lama diganti), **Atur waktu lirik**, antrean, detail,
+  dan lampiran berada di menu agar baris kartu tetap ringkas. Hapus file tetap
+  berkonfirmasi walau tampil sebagai ikon.
 - **Lirik di Riwayat.** Lampiran lirik (.lrc) tidak lagi ditawarkan dari kartu
   riwayat: satu-satunya aksi lirik di sana adalah pencarian lirik. Lampiran yang
   tersisa hanya thumbnail dan subtitle video.

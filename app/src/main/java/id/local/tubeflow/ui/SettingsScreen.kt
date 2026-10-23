@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.Format
@@ -53,6 +52,7 @@ fun SettingsScreen(
     onClearPartial: () -> Unit = {},
     clearingFiles: Boolean = false,
     onClearStorage: () -> Unit = {},
+    engineUpdateBlockedReason: String? = null,
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -133,6 +133,28 @@ fun SettingsScreen(
     ) {
         PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
         MediaToolsSettings(karaoke, player)
+
+        Panel(
+            title = "Riwayat unduhan",
+            description = "Bersihkan catatan riwayat lama tanpa menghapus file media.",
+        ) {
+            OptionMenu(
+                label = "Hapus otomatis",
+                options = listOf(
+                    0 to "Nonaktif",
+                    7 to "Setelah 7 hari",
+                    30 to "Setelah 30 hari",
+                    90 to "Setelah 90 hari",
+                ),
+                selected = SettingsStore.historyAutoDays,
+                onSelect = { SettingsStore.setHistoryAutoDays(context, it) },
+            )
+            Text(
+                "Hanya entri riwayat selesai yang lebih lama dari batas ini yang dihapus. File hasil download tetap tersimpan di perangkat.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         Panel(title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title)) {
             ToggleRow(
@@ -364,14 +386,7 @@ fun SettingsScreen(
             Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
         }
 
-        Panel(title = "Mesin download") {
-            Text("yt-dlp + FFmpeg", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            Text(
-                "Mesin disertakan dalam aplikasi dan diverifikasi saat pertama kali dijalankan. Pembaruan datang lewat rilis aplikasi — tidak ada executable jaringan yang diunduh.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        EngineUpdatePanel(engineUpdateBlockedReason)
 
         if (Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
 

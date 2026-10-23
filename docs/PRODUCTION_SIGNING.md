@@ -1,6 +1,39 @@
 # Signing produksi TubeFlow
 
-Terbaru1.1.25/code39,19Oktober2026: ARM64 **70.894.712byte**,
+Terbaru1.1.30/code44,23Oktober2026: ARM64 **70.948.952byte**, SHA256
+`6bf4957d6d16d4bfe22589fa7818b1d531211204ea4c43e223fa14918cefe7c5`;
+AAB **256.040.881byte**, SHA256
+`b686b07ceb7cd5596ff40320f61ffd4e9b3bdb1a9d5f5f91348f363aafd53eee`.
+APK×3/AAB bertanda tangan; signature v2/zipalign16KB, APK 257/257/259
+ELF/13kelas ZIP, dan AAB1.038ELF/jarsigner lulus. Terpasang sebagai update di RealmeAndroid10. Inspeksi
+bertahap/cancel/cache, LRC manual, dan unduhan BUG-054 diuji. TWS/Android12+,
+fault injection provider/process death, runtime16KB, dan ABI/Android lain belum
+diuji. Bundletool/publikasi toko tidak dijalankan. [Ringkasan](PROGRESS.md).
+
+Sebelumnya1.1.29/code43,23Oktober2026: ARM64 **70.935.808byte**, SHA256
+`e3893e1183ef28539ecb5f09343e2abd18407cb24eac4dd92d00274d3dc390c2`.
+APK×3/AAB bertanda tangan; signature v2/zipalign16KB/257ELF/13kelas ZIP/AAB
+jarsigner+1.038ELF lulus. Terpasang sebagai update di RealmeAndroid10, hash
+identik, data/riwayat utuh. Engine bawaan2026.10.21; cek pembaruan, blokir saat
+unduhan aktif, rollback di1.1.28 dan unduhan akhir diuji. [Laporan dan
+batas](ENGINE_UPDATE_1_1_29.md).
+
+Kandidat1.1.28/code42,23Oktober2026: ARM64 signed, SHA256
+`8d00a3f92396d2bd660ee189758436887259334028cb9a951fc846519cb4d081`.
+Dipakai khusus menguji cek/pasang/rollback updater dengan engine bawaan
+2026.08.19; terpasang di HP. Bukan kandidat distribusi final.
+
+1.1.27/code41,20Oktober2026: ARM64 **70.898.404byte**, SHA256
+`f70b34ef4900d650de4110b6193929f0c8952bbed2362fc3cd6143874ce17c70`;
+signature/zipalign16KB/257ELF/13kelas ZIP lulus, terpasang dan hash cocok.
+[Hasil dan batas](CARD_ACTIONS_1_1_27.md).
+
+1.1.26/code40,20Oktober2026: ARM64 **70.893.564byte**, SHA256
+`e4fbef60be742935ec90e823d870e8481a351ca71c605a51fb81f5f8f12c1374`;
+signature/zipalign16KB/257ELF/13kelas ZIP lulus, terpasang dan hash cocok.
+[Hasil dan batas](CARDS_EQ_1_1_26.md).
+
+1.1.25/code39,19Oktober2026: ARM64 **70.894.712byte**,
 SHA256 `697a09c0f07070c0f31662d67b496f58b9440711ffd8e5ec3e60d4de55ef53b5`.
 Signature produksi/zipalign16KB/257ELF/13kelas ZIP lulus; hash APK terpasang
 cocok. Debug/release tiga ABI dibangun; AAB tidak diulang.

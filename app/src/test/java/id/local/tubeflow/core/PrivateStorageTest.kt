@@ -22,6 +22,17 @@ class PrivateStorageTest {
         assertEquals(70,size.artwork.bytes)
         assertTrue(size.cache.complete); assertTrue(size.partial.complete)
     }
+    @Test fun inspectionCacheCountsAsMetadataWithoutTouchingLyricsOrArtwork() {
+        val cache = temp.newFolder("cache"); val data = temp.newFolder("private")
+        File(cache,"extractor-cache/video.json").apply { requireNotNull(parentFile).mkdirs(); writeText("extract") }
+        File(cache,"inspection-cache/video.json").apply { requireNotNull(parentFile).mkdirs(); writeText("inspect") }
+
+        val usage = PrivateStorage.summary(cache,data)
+
+        assertEquals(("extract".length + "inspect".length).toLong(),usage.metadata.bytes)
+        assertTrue(usage.metadata.complete); assertTrue(usage.cache.complete)
+    }
+
     @Test fun clearingLyricsUpdatesOnlyItsSizeAndPreservesOtherCachesAndMedia() {
         val cache = temp.newFolder("cache"); val data = temp.newFolder("private")
         val lyrics = File(cache,"lyrics-responses").apply { mkdirs() }

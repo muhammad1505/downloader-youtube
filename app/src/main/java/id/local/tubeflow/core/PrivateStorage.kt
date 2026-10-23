@@ -58,9 +58,10 @@ object PrivateStorage {
 
     fun summary(cacheRoot: File, privateRoot: File): Usage {
         val covers = listOf(File(privateRoot,"covers"),File(privateRoot,"library-covers")).map { measure(it) }
+        val metadata = listOf(File(cacheRoot,"extractor-cache"),File(cacheRoot,"inspection-cache")).map { measure(it) }
         return Usage(
             lyrics = measure(File(cacheRoot,"lyrics-responses")),
-            metadata = measure(File(cacheRoot,"extractor-cache")),
+            metadata = Size(metadata.sumOf { it.bytes },metadata.all { it.complete }),
             artwork = Size(covers.sumOf { it.bytes },covers.all { it.complete }),
             partial = measure(File(privateRoot,"downloads")),
         )

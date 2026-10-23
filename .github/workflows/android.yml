@@ -20,6 +20,8 @@ jobs:
         run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
       - name: Rebuild compatible FFmpeg payload
         run: bash scripts/rebuild_ffmpeg_webp.sh
+      - name: Verify bundled engine manifest and checksum
+        run: python3 scripts/verify_engine_asset.py
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease --no-daemon
       # Tes host memakai binary ffmpeg/ffprobe sungguhan (kompresi sampul dan
@@ -29,7 +31,7 @@ jobs:
       - run: python3 -m unittest discover -s scripts -p "test_*.py"
       - name: Audit native 16 KB compatibility
         run: |
-          for apk in app/build/outputs/apk/debug/*.apk; do
+          for apk in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
             python3 scripts/audit_native.py "$apk"
           done
       - name: Audit optimized reflective ZIP constructors

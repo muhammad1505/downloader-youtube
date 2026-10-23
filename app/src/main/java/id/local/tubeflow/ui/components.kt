@@ -1,11 +1,15 @@
 package id.local.tubeflow.ui
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.compositeOver
@@ -17,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +37,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -368,7 +375,7 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
 @Composable
 fun PageHeading(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.semantics { heading() })
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -401,7 +408,7 @@ fun EmptyState(
             )
             if (actionLabel != null && onAction != null) {
                 Spacer(Modifier.height(4.dp))
-                ActionButton(actionLabel, onAction, emphasis = ActionEmphasis.Primary, icon = Icons.Outlined.ArrowForward)
+                ActionButton(actionLabel, onAction, emphasis = ActionEmphasis.Primary, icon = Icons.AutoMirrored.Outlined.ArrowForward)
             }
         }
     }
@@ -489,7 +496,7 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
     val accent=rememberCoverAccent(job.coverPath)
@@ -570,7 +577,6 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 Text(job.resumeNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             // Status lirik terpisah dari status audio: audio sukses tetap "Selesai" walau lirik tidak ada (BUG-014).
             if (job.processingNotice.isNotBlank()) Text(job.processingNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-            if (job.state == JobState.COMPLETED && id.local.tubeflow.core.FailureDetails.isLyricFailure(job.lyricStatus)) JobFailureDetails(job, lyrics = true)
             if (job.state == JobState.COMPLETED && job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty() && job.lyricStatus.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                     Icon(
@@ -593,6 +599,9 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         },
                         modifier = Modifier.weight(1f),
                     )
+                    if (id.local.tubeflow.core.FailureDetails.isLyricFailure(job.lyricStatus)) {
+                        JobFailureDetails(job, lyrics = true, compact = true)
+                    }
                     if (refetchLyrics != null && LyricStatus.retryable(job.lyricStatus)) {
                         IconAction(Icons.Outlined.Refresh, "Cari ulang", { refetchLyrics(job.id) })
                     }
@@ -614,30 +623,55 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         remove?.let { IconAction(Icons.Outlined.Delete, "Hapus", it, destructive = true) }
                     }
                     JobState.COMPLETED -> {
-                        if (job.mode == MediaMode.AUDIO && searchLyrics != null) {
-                            IconAction(Icons.Outlined.Lyrics, "Cari lirik", { searchLyrics(job.id) }, enabled = job.outputUri != null)
-                        }
-                        if (job.mode == MediaMode.AUDIO && play != null) {
-                            IconAction(Icons.Outlined.PlayArrow, "Putar", play, enabled = job.outputUri != null)
-                        }
-                        IconAction(Icons.Outlined.OpenInNew, "Buka", { openError = launchFile(context, job, false) }, enabled = job.outputUri != null)
-                        IconAction(Icons.Outlined.Share, "Bagikan", { openError = launchFile(context, job, true) }, enabled = job.outputUri != null)
-                        IconAction(Icons.Outlined.Refresh, "Unduh lagi", retry)
-                        remove?.let { IconAction(Icons.Outlined.Delete, "Hapus file", it, destructive = true) }
-                    }
-                }
-            }
-            // Lampiran hanya untuk thumbnail dan subtitle. Berkas lirik tidak lagi ditawarkan di sini:
-            // pencarian lirik sudah punya aksinya sendiri dan pemutar membaca LRC langsung dari koleksi.
-            if (job.state == JobState.COMPLETED && !job.sidecarUris.isNullOrBlank() && job.mode == MediaMode.VIDEO) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    job.sidecarUris.lines().forEach { line ->
-                        val kind = line.substringBefore('|')
-                        val uri = line.substringAfter('|', "")
-                        if (uri.isBlank()) return@forEach
-                        val label = if (kind == "thumb") "Thumbnail" else "Subtitle (CC)"
-                        val icon = if (kind == "thumb") Icons.Outlined.Image else Icons.Outlined.ClosedCaption
-                        IconAction(icon, "Buka $label", { openError = openSidecar(context, uri, kind) })
+                        val attachments = attachmentUris(job.sidecarUris)
+                        val audio = job.mode == MediaMode.AUDIO
+                        MediaActionBar(
+                            audio = audio,
+                            specs = MediaCardPlan.history(
+                                audio = audio,
+                                hasThumbnail = attachments.containsKey(ATTACHMENT_THUMBNAIL),
+                                hasSubtitle = hasSubtitleAttachment(audio, job.sidecarUris),
+                                hasLyrics = job.lyricStatus == LyricStatus.SAVED,
+                            ).filter { spec ->
+                                // Aksi hanya muncul bila pemanggil menyediakan jalurnya.
+                                when (spec.kind) {
+                                    MediaActionKind.PLAY -> play != null
+                                    MediaActionKind.FIND_LYRICS -> searchLyrics != null
+                                    MediaActionKind.ENQUEUE -> enqueue != null
+                                    MediaActionKind.PLAY_NEXT -> playNext != null
+                                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming != null
+                                    MediaActionKind.DELETE -> remove != null
+                                    else -> true
+                                }
+                            },
+                            enabled = { kind ->
+                                when (kind) {
+                                    MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
+                                    MediaActionKind.FIND_LYRICS -> job.outputUri != null
+                                    else -> true
+                                }
+                            },
+                            onClick = { kind ->
+                                when (kind) {
+                                    MediaActionKind.PLAY -> play?.invoke()
+                                    MediaActionKind.ENQUEUE -> enqueue?.invoke()
+                                    MediaActionKind.PLAY_NEXT -> playNext?.invoke()
+                                    MediaActionKind.OPEN -> openError = launchFile(context, job, false)
+                                    MediaActionKind.SHARE -> openError = launchFile(context, job, true)
+                                    MediaActionKind.FIND_LYRICS -> searchLyrics?.invoke(job.id)
+                                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming?.invoke()
+                                    MediaActionKind.REDOWNLOAD -> retry()
+                                    MediaActionKind.DELETE -> remove?.invoke()
+                                    MediaActionKind.OPEN_THUMBNAIL -> attachments[ATTACHMENT_THUMBNAIL]?.let {
+                                        openError = openSidecar(context, it, ATTACHMENT_THUMBNAIL)
+                                    }
+                                    MediaActionKind.OPEN_SUBTITLE -> attachments.entries
+                                        .firstOrNull { it.key != ATTACHMENT_THUMBNAIL }
+                                        ?.let { (sidecarKind, uri) -> openError = openSidecar(context, uri, sidecarKind) }
+                                    else -> Unit
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -687,12 +721,8 @@ fun <T> OptionMenu(
  * "jangan tanya lagi", karena pilihan default tersimpan per tipe mime yang spesifik.
  */
 fun concreteMime(context: Context, uri: Uri, fallback: String): String {
-    val displayName = runCatching {
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
-    }.getOrNull()
-    val extension = displayName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.length in 2..5 }
+    val fileName = displayName(context, uri)
+    val extension = fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.length in 2..5 }
     val byExtension = extension?.let { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it) }
     val current = runCatching { context.contentResolver.getType(uri) }.getOrNull()
     val mime = byExtension ?: current
@@ -700,17 +730,61 @@ fun concreteMime(context: Context, uri: Uri, fallback: String): String {
 }
 
 fun launchFile(context: Context, job: DownloadJob, share: Boolean): String? =
-    launchFile(job, share) { raw, audio, sharing -> launchMedia(context, raw, audio, sharing) }
+    launchFile(job, share) { raw, audio, sharing -> launchMedia(context, raw, audio, sharing, job.title) }
 
 internal fun launchFile(job: DownloadJob, share: Boolean, launch: (String, Boolean, Boolean) -> String?): String? {
     val uri = job.outputUri?.takeIf { it.isNotBlank() } ?: return "File tidak tersedia."
     return launch(uri, job.mode == MediaMode.AUDIO, share)
 }
 
-fun launchMedia(context: Context, raw: String, audio: Boolean, share: Boolean): String? = try {
+/**
+ * Caption berbagi dari nama file. Ekstensi dibuang karena aplikasi tujuan sudah menampilkan
+ * jenis berkasnya, sehingga caption berisi judul yang rapi (mis. "Ipank - Mutiara").
+ */
+internal fun shareCaptionFrom(displayName: String?): String? =
+    displayName?.substringBeforeLast('.')?.trim()?.takeIf { it.isNotBlank() }
+
+/**
+ * Caption berbagi: nama file tanpa ekstensi, atau judul lagu bila provider tidak memberi nama
+ * (mis. URI SAF tanpa `DISPLAY_NAME`). Judul dipakai apa adanya karena titik di judul bukan ekstensi.
+ */
+internal fun shareCaption(fileName: String?, title: String?): String? =
+    shareCaptionFrom(fileName) ?: title?.trim()?.takeIf { it.isNotBlank() }
+
+/** Nama tampilan berkas dari MediaStore/SAF, dipakai untuk caption berbagi. */
+internal fun displayName(context: Context, uri: Uri): String? = runCatching {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0) else null
+    }
+}.getOrNull()
+
+fun launchMedia(
+    context: Context,
+    raw: String,
+    audio: Boolean,
+    share: Boolean,
+    fallbackCaption: String? = null,
+): String? = try {
     val uri = raw.toUri()
     val mime = concreteMime(context, uri, if (audio) "audio/mpeg" else "video/mp4")
-    val intent = if (share) Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri) else Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+    val intent = if (share) {
+        val caption = shareCaption(displayName(context, uri), fallbackCaption)
+        Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).apply {
+            // Aplikasi yang mendukung caption memakai EXTRA_TEXT sebagai pesan bawaan.
+            if (caption != null) putExtra(Intent.EXTRA_TEXT, caption)
+        }.also {
+            // WhatsApp tidak menyediakan kolom caption untuk audio, jadi teksnya disiapkan
+            // di clipboard agar bisa ditempel; toast menjelaskan kenapa clipboard berubah.
+            // Toast wajib dari main thread: pemanggil Koleksi berjalan di Dispatchers.IO.
+            if (caption != null && audio) {
+                context.getSystemService(ClipboardManager::class.java)
+                    ?.setPrimaryClip(ClipData.newPlainText("Caption", caption))
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Caption disalin: $caption", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    } else Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     intent.clipData = ClipData.newRawUri("Download", uri)
     if (share) context.startActivity(Intent.createChooser(intent, "Bagikan file"))

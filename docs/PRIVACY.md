@@ -1,6 +1,6 @@
 # Privasi TubeFlow
 
-TubeFlow tidak membutuhkan akun atau server aplikasi. URL dikirim dari perangkat langsung ke penyedia konten untuk memperoleh metadata dan media. Penyedia konten dapat melihat alamat IP serta permintaan jaringan seperti pada akses internet lainnya. Runtime yt-dlp dapat mengakses endpoint lain yang diperlukan oleh extractor.
+TubeFlow tidak membutuhkan akun atau server aplikasi. URL dikirim dari perangkat langsung ke penyedia konten untuk memperoleh metadata dan media. Penyedia konten dapat melihat alamat IP serta permintaan jaringan seperti pada akses internet lainnya. Runtime yt-dlp dapat mengakses endpoint lain yang diperlukan oleh extractor. Saat pengguna menekan **Periksa pembaruan** di Pengaturan → Mesin media, aplikasi menghubungi API resmi GitHub dan mengunduh metadata/rilis yt-dlp; URL unduhan, riwayat, dan data media tidak dikirim. Pemeriksaan tidak berjalan otomatis.
 
 URL, pilihan kualitas, status, dan riwayat disimpan secara lokal dalam database aplikasi. Hasil disimpan di folder Downloads/ yang namanya bisa diubah di Pengaturan (default Downloads/TubeFlow). Menghapus aplikasi menghapus database lokal, tetapi file publik Downloads dapat tetap tersimpan. Backup aplikasi dinonaktifkan.
 
@@ -15,7 +15,7 @@ Buka/bagikan file memberikan izin baca sementara untuk URI file kepada aplikasi 
 
 Katalog media dan event aktivitas berada pada database Room yang sama di perangkat. Impor hanya menyimpan URI/grant dan metadata, tanpa menyalin file atau meminta akses semua penyimpanan. Event tidak menggandakan URL/token sumber. Pemindaian manual dibatasi folder yang diizinkan; statistik memakai indeks aktual dan bisa parsial ketika izin/provider berubah.
 
-Cache respons LRCLIB dibatasi10MiB/200entry, cover32MiB dan frame/artwork katalog24MiB. Koreksi LRC menyimpan baseline/jurnal privat (batas32MiB) untuk reset/rollback; audio dan timestamp rekaman lain tidak diubah. Playback audio dapat menggunakan pemutar lokal TubeFlow atau aplikasi pemutar perangkat. Video tetap memakai pemutar perangkat.
+Cache respons LRCLIB dibatasi10MiB/200entry, cover32MiB dan frame/artwork katalog24MiB. Metadata hasil inspeksi (URL, judul, durasi, format/subtitle) disimpan privat maksimal30menit/200entri dan dihitung sebagai metadata; cache tidak diunggah dan dipangkas otomatis. Impor **LRC manual** menyimpan teks yang ditempel pengguna sebagai sidecar di samping audio, menggantikan pilihan lirik sebelumnya hanya setelah validasi berhasil. Koreksi LRC menyimpan baseline/jurnal privat (batas32MiB) untuk reset/rollback; audio dan timestamp rekaman lain tidak diubah. Playback audio dapat menggunakan pemutar lokal TubeFlow atau aplikasi pemutar perangkat. Video tetap memakai pemutar perangkat.
 
 ## Pemutaran dan interupsi audio
 

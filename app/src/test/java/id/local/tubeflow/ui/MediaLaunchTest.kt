@@ -35,6 +35,25 @@ class MediaLaunchTest {
         }
     }
 
+    @Test fun shareCaptionUsesFileNameWithoutExtension() {
+        assertEquals("Ipank - Mutiara", shareCaptionFrom("Ipank - Mutiara.mp3"))
+        assertEquals("Artist - Song (Live) [320]", shareCaptionFrom("Artist - Song (Live) [320].mp3"))
+        assertEquals("Rekaman", shareCaptionFrom("Rekaman"))
+    }
+
+    @Test fun shareCaptionIgnoresMissingOrBlankNames() {
+        for (name in listOf(null, "", "   ", ".nomedia")) {
+            assertNull("Nama tanpa judul tidak boleh jadi caption", shareCaptionFrom(name))
+        }
+    }
+
+    @Test fun shareCaptionFallsBackToTitleWhenProviderHasNoName() {
+        assertEquals("Ipank - Mutiara", shareCaption("Ipank - Mutiara.mp3", "Judul lain"))
+        assertEquals("Mr. Brightside", shareCaption(null, "Mr. Brightside"))
+        assertEquals("Mr. Brightside", shareCaption("", "Mr. Brightside"))
+        assertNull("Tidak ada caption tanpa nama dan judul", shareCaption(null, "  "))
+    }
+
     @Test fun actualLaunchFailureIsPreserved() {
         assertEquals("Pemutar tidak tersedia", launchFile(job(MediaMode.VIDEO, "content://media/42"), false) { _, _, _ ->
             "Pemutar tidak tersedia"

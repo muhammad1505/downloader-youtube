@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="storage_clear_description">Seluruh file dan subfolder di %1$s akan dihapus permanen. Folder utama dan riwayat unduhan tetap tersimpan. Selesaikan atau batalkan unduhan yang berjalan/dijeda terlebih dahulu. Izin yang sudah tersedia digunakan langsung; pemilih folder hanya dibuka jika akses hapus belum tersedia.</string>
     <string name="app_name">TubeFlow</string>
     <plurals name="lyrics_retry_after">
@@ -101,10 +101,7 @@
     <string name="library_playlists">Playlist</string>
     <string name="library_all_playlists">Semua playlist</string>
     <string name="library_manage_playlists">Kelola playlist</string>
-    <string name="library_favorite">Tambah ke Favorit</string>
-    <string name="library_unfavorite">Hapus dari Favorit</string>
     <string name="library_add_playlist">Tambah ke playlist</string>
-    <string name="library_remove_playlist">Keluarkan dari playlist</string>
     <string name="library_create_playlist">Buat playlist</string>
     <string name="library_delete_playlist">Hapus playlist</string>
     <string name="library_playlist_name">Nama playlist</string>
@@ -186,10 +183,29 @@
         <item quantity="other">%d playlist pribadi</item>
     </plurals>
     <string name="action_clear_queue">Bersihkan</string>
-    <string name="library_share">Bagikan file</string>
-    <string name="library_play_video">Putar video</string>
-    <string name="library_media_details">Detail media</string>
-    <string name="library_rename_file">Ubah nama file</string>
-    <string name="library_delete_file">Hapus file</string>
-    <string name="eq_auto_description">Bass dan treble seimbang dengan dorongan hingga +3 dB, bass tetap bulat, dan mid netral. Hasil mengikuti kemampuan equalizer perangkat.</string>
+    <string name="eq_auto_description">Bass penuh dan bulat hingga +6 dB dengan bahu landai, mid netral, treble +2,5 dB. Hasil mengikuti kemampuan equalizer perangkat.</string>
+    <string name="engine_media_title">Mesin media</string>
+    <string name="engine_installed_bundled">yt-dlp %1$s · bawaan aplikasi</string>
+    <string name="engine_installed_updated">yt-dlp %1$s · pembaruan terverifikasi</string>
+    <string name="engine_bundled_description">Engine bawaan dipakai untuk unduhan. FFmpeg tetap berasal dari paket aplikasi dan tidak ikut diperbarui.</string>
+    <string name="engine_updated_description">Pembaruan resmi aktif untuk unduhan berikutnya. Kamu dapat kembali ke engine bawaan kapan saja.</string>
+    <string name="engine_check">Periksa pembaruan</string>
+    <string name="engine_checking">Memeriksa rilis resmi…</string>
+    <string name="engine_up_to_date">yt-dlp %1$s adalah versi terbaru yang tersedia.</string>
+    <string name="engine_available">Rilis resmi yt-dlp %1$s tersedia (%2$s).</string>
+    <string name="engine_download">Unduh &amp; pasang %1$s</string>
+    <string name="engine_downloading">Mengunduh engine… %1$d%%</string>
+    <string name="engine_verifying">Memeriksa SHA-256 dan isi paket…</string>
+    <string name="engine_installing">Memasang engine…</string>
+    <string name="engine_updated">yt-dlp %1$s aktif dan terverifikasi.</string>
+    <string name="engine_rolled_back">Engine bawaan yt-dlp %1$s aktif kembali.</string>
+    <string name="engine_rollback">Kembali ke engine bawaan</string>
+    <string name="engine_update_title">Perbarui mesin media?</string>
+    <string name="engine_update_warning" tools:ignore="TypographyDashes">TubeFlow akan mengunduh rilis resmi yt-dlp %1$s dari GitHub, mencocokkan SHA-256 dengan metadata rilis dan SHA2-256SUMS, lalu memasangnya hanya untuk aplikasi ini. Engine tetap berupa executable pihak ketiga; jika verifikasi atau pemasangan gagal, engine lama dipertahankan.</string>
+    <string name="engine_update_confirm">Unduh &amp; pasang</string>
+    <string name="engine_rollback_title">Kembali ke engine bawaan?</string>
+    <string name="engine_rollback_warning">Pembaruan yt-dlp yang terpasang akan dihapus dan aplikasi memakai engine dari paket aplikasi. Unduhan yang sedang berjalan tidak terpengaruh.</string>
+    <string name="engine_rollback_confirm">Kembalikan</string>
+    <string name="engine_security_note">Pembaruan tidak otomatis. Hanya rilis stabil resmi dari host GitHub yang diterima; batas ukuran, versi di dalam zipapp, dan checksum diperiksa sebelum dipasang.</string>
+    <string name="engine_cancel">Batalkan unduhan</string>
 </resources>

@@ -34,6 +34,19 @@ class InspectionStateTest {
         assertFalse(state.state.value.busy)
     }
 
+    @Test fun phaseUpdatesOnlyBelongToCurrentInspectionAndClearOnFinish() {
+        val state=InspectionState()
+        state.begin("old", InspectionPhase.PREPARING_ENGINE, 100L)
+        assertEquals(InspectionPhase.PREPARING_ENGINE,state.state.value.phase)
+        assertEquals(100L,state.state.value.startedAt)
+        state.begin("new", InspectionPhase.FETCHING_METADATA, 200L)
+        assertFalse(state.phase("old", InspectionPhase.READING_ENTRIES))
+        assertTrue(state.phase("new", InspectionPhase.READING_ENTRIES))
+        assertEquals(InspectionPhase.READING_ENTRIES,state.state.value.phase)
+        state.finish("new")
+        assertNull(state.state.value.phase)
+    }
+
     @Test fun clearingAfterEnqueueRetainsCompletedVideoCacheButNewInspectionResetsIt() {
         val state=InspectionState()
         state.begin("a");state.video("a",video);state.finish("a")

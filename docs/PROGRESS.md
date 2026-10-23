@@ -719,3 +719,115 @@ mulai840dp dengan gulir pada jendela pendek. Room10/engine/EQ tetap.
 Code39/hash terpasang cocok; HP diuji pada font0,9/1,6, terang/gelap dan
 portrait/landscape. QA playlist dibersihkan, setelan dipulihkan, daftar65file
 sama. [Perubahan, bukti dan batas matriks](ADAPTIVE_CONTROLS_1_1_25.md).
+
+## Pembaruan 20 Oktober 2026: aksi kartu seragam dan EQ bass penuh 1.1.26
+
+Satu `MediaCardPlan.card` menjadi sumber urutan, grup, dan slot ikon untuk
+Koleksi dan Riwayat. Koleksi mendapat **Unduh lagi** (hanya bila item masih
+tertaut ke job selesai; konfirmasi karena file lama diganti), sedangkan
+Riwayat mendapat **Tambah ke antrean**, **Putar berikutnya**, dan **Atur waktu
+lirik** untuk LRC tersimpan. Semua aksi tampil langsung di kartu (tanpa menu
+titik tiga), sehingga Unduh lagi + Cari lirik selalu terlihat di baris yang sama
+di kedua daftar; aksi yang tidak dimiliki layar (playlist/favorit/ubah nama di
+Riwayat) tetap tidak dipalsukan.
+
+EQ **Otomatis (bass bulat)** berubah dari kurva seimbang +3 dB menjadi bass
+penuh: +6 dB pada 30–60 Hz, +4,5 dB 120 Hz, +2 dB 250 Hz, netral 500 Hz–2 kHz,
++2,5 dB treble. Interpolasi logaritmik dan clamp rentang band dipertahankan;
+preset/level manual dan pilihan nonaktif pengguna tidak direset. Tidak ada
+perubahan Room, engine, izin, atau dependensi.
+
+362 tes Kotlin 0 gagal (termasuk tes baru urutan Unduh lagi/Cari lirik,
+kurva bass landai, dan LRC audio yang tidak boleh tampil sebagai subtitle),
+lint 0 error/2 warning lama, debug dan release bertanda tangan lulus.
+[Rincian dan batas](CARDS_EQ_1_1_26.md).
+
+## Pembaruan 20 Oktober 2026: enam aksi di kartu 1.1.27
+
+Kartu Koleksi dan Riwayat kembali diringkas: hanya **Putar/Buka, Favorit,
+Bagikan, Ubah nama, Cari lirik, dan Hapus** yang tampil langsung. Antrean,
+playlist, atur waktu lirik, lampiran, detail, buka dengan aplikasi lain, dan
+unduh lagi pindah ke menu ⋮ yang berkelompok (*Antrean & playlist*, *Lirik*,
+*Lampiran*, *Berkas*). `MediaCardPlan` menandai slot tiap aksi dan
+`MediaActionBar` menggambar ikon langsung plus tombol ⋮; Hapus tetap
+berkonfirmasi.
+
+Berbagi mengisi `EXTRA_TEXT` dengan nama file tanpa ekstensi (cadangan: judul
+media), sehingga aplikasi yang mendukung caption membuka pesan siap kirim.
+WhatsApp Android tidak punya kolom caption untuk audio, jadi saat audio dibagikan
+caption juga disalin ke clipboard dengan toast penjelas; untuk gambar/video dan
+aplikasi seperti Telegram/email teks tetap terisi otomatis. Share dari Koleksi
+sempat gagal karena toast dibuat di thread IO (exception tertangkap sebagai
+"file tidak dapat dibagikan"); toast kini diposting ke main thread dan share
+dari Koleksi sudah dicoba lagi di HP berhasil.
+
+Pengaturan **Riwayat unduhan → Hapus otomatis** (Nonaktif/7/30/90 hari) menghapus
+catatan riwayat selesai yang lama saat aplikasi dibuka atau pilihan diubah.
+File media, LRC, sampul, dan playlist tidak disentuh. 370 tes Kotlin 0 gagal,
+lint 0 error/2 warning lama, release bertanda tangan lulus; kartu dan menu
+diperiksa di Realme Android 10. [Rincian dan batas](CARD_ACTIONS_1_1_27.md).
+
+## Pembaruan 23 Oktober 2026: pembaruan engine 1.1.28
+
+Pengaturan **Mesin media** dapat memeriksa rilis stabil resmi GitHub, memverifikasi
+SHA-256 dari API dan `SHA2-256SUMS`, memvalidasi zipapp/versi, memasang override
+secara atomik, dan kembali ke engine bawaan. Hanya host GitHub yang diizinkan,
+ukuran dibatasi 20 MB, dan pembaruan ditolak saat inspeksi/unduhan aktif. Tidak
+ada pembaruan otomatis; FFmpeg tidak ikut diperbarui. 1.1.28 sengaja membawa
+engine bawaan 2026.08.19 agar jalur nyata diuji di HP: cek menemukan 2026.10.21,
+pasang berhasil, lalu rollback kembali ke 2026.08.19. 378 tes Kotlin dan 93 tes
+Python lulus; lint 0 error/3 warning. [Rincian dan batas](ENGINE_UPDATE_1_1_29.md).
+
+## Pembaruan 23 Oktober 2026: engine bawaan 2026.10.21 dan recovery 1.1.29
+
+Engine bawaan diganti ke yt-dlp 2026.10.21. Recovery kini memakai
+`DownloadRecovery` untuk mempertahankan `pendingUri`/`sidecarPending`/sidecar
+yatim yang ditolak dihapus provider; update DAO memakai generation agar recovery
+tidak menimpa job yang dilanjutkan. Enam regresi baru mengunci perilaku ini.
+384 tes Kotlin 0 gagal, 93 tes Python OK, lint 0 error/3 warning, signed APK×3/AAB
+dan audit ARM64/AAB lulus. 1.1.29 terpasang sebagai update (hash base.apk identik,
+riwayat 212 entri utuh); cek "versi terbaru", blokir saat unduhan aktif, unduhan
+320 kbps, dan BUG-054 MP3 128 (4.023.060 byte, decode penuh, sampul tertanam)
+berhasil. Lirik gagal karena LRCLIB. [Laporan dan batas](ENGINE_UPDATE_1_1_29.md).
+
+## Pembaruan 23 Oktober 2026: inspeksi bertahap, cache, dan lirik manual 1.1.30
+
+Inspeksi link kini melaporkan fase kerja (`Menyiapkan mesin`, `Mengambil detail
+video`, `Membaca playlist`, `Memilih format`) dan elapsed setelah 3 detik.
+Tombol **Batalkan pemeriksaan** menghentikan engine tanpa menghapus URL. Metadata
+hasil inspeksi disimpan di cache privat selama 30 menit (maksimal 200 entri,
+nama berkas SHA-256) dan dipanaskan 800 ms setelah aplikasi dibuka; cache tetap
+tersedia setelah force-stop. Cache ini dihitung sebagai metadata pada ukuran
+penyimpanan.
+
+Dialog **Cari dan pilih lirik** mendapat **Tempel LRC manual**. Teks divalidasi
+(timestamp wajib, batas ukuran/durasi), lalu dipublikasikan ke sidecar audio
+dengan header `[re:TubeFlow / manual]`; kegagalan tidak menimpa lirik lama.
+Detail kegagalan lirik di kartu dipadatkan menjadi satu ikon, dan `PageHeading`
+memakai semantics heading.
+
+Recovery menangkap exception provider saat menghapus berkas dan mempertahankan
+jurnal, bukan menganggapnya sukses. CI menjalankan
+`scripts/verify_engine_asset.py` (versi/checksum/sumber/bootstrap) dan audit
+native untuk APK debug serta release.
+
+**402 tes Kotlin** 0 gagal, **98 tes Python** OK, lint 0 error/3 warning lama,
+signed APK×3/AAB lulus. ARM64 **70.948.952 byte**, SHA256
+`6bf4957d6d16d4bfe22589fa7818b1d531211204ea4c43e223fa14918cefe7c5`;
+AAB **256.040.881 byte**, SHA256
+`b686b07ceb7cd5596ff40320f61ffd4e9b3bdb1a9d5f5f91348f363aafd53eee`.
+Audit APK 257/257/259 ELF/13 kelas ZIP dan AAB 1.038 ELF 0 gagal 16 KB,
+zipalign 16 KB dan signature v2 lulus. 1.1.30 terpasang sebagai update di Realme RMX1821 Android 10; hash `base.apk` identik dengan artefak.
+
+Di HP: fase inspeksi terlihat (`Mengambil detail video… · 13 dtk`), cancel
+mengembalikan layar ke input tanpa hasil, URL yang sama setelah force-stop
+langsung memakai cache, LRC manual tersimpan (sidecar 49 byte) dan status
+berubah menjadi **Lirik tersimpan**, lalu entri uji dihapus kembali. Unduhan
+BUG-054 MP3 128 selesai 4.023.060 byte/247,824 detik; lirik otomatis gagal
+karena LRCLIB, bukan 403. Riwayat kosong pada awal sesi karena setelan pengguna
+**Hapus otomatis: Setelah 7 hari**, bukan reset database; file media tetap ada.
+
+**Batas:** TWS/Android 12+ belum diuji ulang, fault injection provider/process
+death, runtime 16 KB, ABI/Android lain, dan matriks font besar/landscape belum
+dijalankan pada 1.1.30. Cache inspeksi tidak menggantikan validasi media hasil
+unduhan.

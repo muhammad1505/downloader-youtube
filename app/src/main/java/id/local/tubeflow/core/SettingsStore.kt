@@ -48,6 +48,17 @@ object SettingsStore {
     var maxConcurrent by mutableIntStateOf(1)
         private set
 
+    /** Hapus catatan riwayat selesai yang lebih lama dari N hari; 0 = nonaktif. File media tidak disentuh. */
+    var historyAutoDays by mutableIntStateOf(0)
+        private set
+
+    fun setHistoryAutoDays(context: Context, days: Int) {
+        val value = days.coerceIn(0, 365)
+        historyAutoDays = value
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putInt("history_auto_days", value) }
+    }
+
     var autoRename by mutableStateOf(true); private set
     var autoTag by mutableStateOf(true); private set
     var autoArtwork by mutableStateOf(true); private set
@@ -84,6 +95,7 @@ object SettingsStore {
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER
         storageTree = prefs.getString("tree", "")?.takeIf { it.isNotBlank() }
         maxConcurrent = prefs.getInt("concurrent", 1).coerceIn(1, 4)
+        historyAutoDays = prefs.getInt("history_auto_days", 0).coerceIn(0, 365)
     }
 
     /** Picks (or clears with null) the storage directory via a persisted SAF tree URI. */

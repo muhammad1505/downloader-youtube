@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import id.local.tubeflow.core.DownloadOptions
 import id.local.tubeflow.core.Format
+import id.local.tubeflow.core.InspectionPhase
 import id.local.tubeflow.core.MediaMode
 import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
@@ -69,6 +70,8 @@ fun DownloadScreen(
     metadata: VideoMetadata?,
     playlist: PlaylistMetadata?,
     busy: Boolean,
+    inspectPhase: String?,
+    inspectStartedAt: Long,
     inspectError: String?,
     inspectDetails: id.local.tubeflow.core.FailureDetails? = null,
     listState: LazyListState,
@@ -76,6 +79,7 @@ fun DownloadScreen(
     inspectPlaylist: () -> Unit,
     retryInspect: () -> Unit,
     clearPlaylist: () -> Unit,
+    cancelInspect: () -> Unit,
     download: (DownloadOptions) -> Unit,
     downloadPlaylist: (List<PlaylistEntry>, DownloadOptions) -> Unit,
 ) {
@@ -107,6 +111,17 @@ fun DownloadScreen(
     val hasList = Selection.hasListParam(trimmed)
     val shownPlaylist = playlist?.takeIf { it.url == trimmed }
     val shownVideo = metadata?.takeIf { it.url == trimmed && (shownPlaylist == null) }
+    var inspectElapsed by remember(busy, inspectStartedAt) { mutableLongStateOf(0L) }
+    LaunchedEffect(busy, inspectStartedAt) {
+        if (!busy) { inspectElapsed = 0L; return@LaunchedEffect }
+        while (true) {
+            inspectElapsed = inspectStartedAt.takeIf { it > 0 }
+                ?.let { ((System.currentTimeMillis() - it) / 1000).coerceAtLeast(0) } ?: 0L
+            delay(1000)
+        }
+    }
+    val inspectProgressText = (inspectPhase?.let(InspectionPhase::label) ?: "Membaca detail link…") +
+        if (inspectElapsed >= 3) " · ${inspectElapsed} dtk" else ""
 
     // Auto-baca detail: jeda singkat lalu inspect tanpa tombol "Cek link".
     LaunchedEffect(trimmed) {
@@ -168,7 +183,7 @@ fun DownloadScreen(
                 isError = url.isNotBlank() && !isVideo && !isPlaylistLink,
                 supportingText = {
                     when {
-                        busy -> Text("Membaca detail link…")
+                        busy -> Text(inspectProgressText)
                         url.isNotBlank() && !isVideo && !isPlaylistLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
                         hasList -> Text("Link ini bagian dari sebuah playlist.")
@@ -195,6 +210,13 @@ fun DownloadScreen(
                     }
                 },
             )
+            if (busy) {
+                TextButton(onClick = cancelInspect, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                    Icon(Icons.Outlined.Close, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Batalkan pemeriksaan")
+                }
+            }
             if (hasList && isVideo) {
                 ActionButton(
                     "Link ini punya playlist — buka sebagai playlist",

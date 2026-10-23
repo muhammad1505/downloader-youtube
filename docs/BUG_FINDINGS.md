@@ -12,6 +12,8 @@ Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPME
 
 **Pembaruan 1.1.2/code16:** kredit Title/Voc dan folder per artis/remixer diperbaiki (BUG-038/039);149 Kotlin/76 Python, lint0, audit paket/bundletool lulus. APK final terpasang,57file lama utuh; seed Mix terbit di folder remixer. [Laporan sumber dan pengujian](SOURCE_REVIEW_2026-10-13.md).
 
+**Pembaruan 1.1.30/code44 (23 Oktober 2026):** inspeksi link kini menampilkan fase/elapsed, dapat dibatalkan, dan memakai cache metadata privat 30 menit/200 entri; dialog lirik menerima impor LRC manual; recovery menahan jurnal saat delete provider melempar exception; CI memeriksa checksum engine dan audit native release. 402 tes Kotlin/98 Python, lint0error/3warning, signed APK×3/AAB dan audit lulus. Fase/cancel/cache, simpan LRC manual, dan unduhan BUG-054 diuji di Realme Android10. BUG-048 tetap: speaker Bluetooth terverifikasi pengguna, TWS/Android12+ belum. **Batas:** fault injection provider/process death, TWS/Android12+, runtime16KB, ABI/Android lain, dan matriks font/landscape belum diuji pada build ini. [Ringkasan](PROGRESS.md).
+
 ### Rekonsiliasi kode dan bukti terbaru — 13 Oktober 2026
 
 Tidak ada klaim seluruh37bug tertutup. Perbaikan host, uji normal perangkat, dan fault injection adalah bukti berbeda. [Roadmap aktual](DEVELOPMENT_ROADMAP.md#status-aktual-hasil-rekonsiliasi--13-oktober-2026-110code14) dan [checkpoint backlog](PROGRESS.md#rekonsiliasi-backlog-bug-roadmap-dan-release--13-oktober-2026) memisahkan pekerjaan belum diimplementasikan dari cakupan belum diuji.
@@ -43,12 +45,12 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-063 | P3 | Detail galat lirik tidak menyimpan respons HTTP sebenarnya | Kode HTTP diteruskan dari pencarian/cache ke dialog dan laporan worker/refetch; cooldown lokal tetap tanpa HTTP rekaan; fixture lulus |
 | BUG-001 | P1 | URI induk SAF untuk pembuatan dokumen | Perbaikan tersedia; audio + LRC Despacito pernah diuji SAF; video/subtitle/provider lain masih perlu uji |
 | BUG-002 | P2 | Worker lama membatalkan unduhan yang dilanjutkan | Sebagian: mutasi utama bergaris generasi, engine ownership dan resume normal teruji; sidecar/status lirik + race cleanup/lanjut cepat belum aman terbukti |
-| BUG-003 | P2 | Penghapusan dokumen SAF salah jalur | Helper tersedia; recovery masih dapat melepas jejak meskipun delete gagal; provider menolak/izin dicabut belum diuji penuh |
+| BUG-003 | P2 | Penghapusan dokumen SAF salah jalur | Host 23 Okt: recovery memakai `DownloadRecovery` dan hanya melepas jurnal bila delete terbukti; provider menolak/izin dicabut belum diuji perangkat |
 | BUG-004 | P2 | Berkas parsial job yang dijeda tidak dibersihkan | Sebagian: retensi/retry normal teruji; cleanup cancel/remove/clear/restart lintas owner perlu perbaikan/audit dan uji terkontrol |
 | BUG-005 | P2 | Deteksi duplikat mengabaikan opsi keluaran | Diperbaiki; teruji host |
 | BUG-006 | P2 | Inspeksi gagal tidak bisa diulang untuk URL yang sama | Diperbaiki kode 10 Okt (R6: retry memakai jenis inspeksi terakhir); uji perangkat ditunda terakhir atas permintaan pengguna |
 | BUG-007 | P2 | Tautan pendek/Shorts gagal dibuka sebagai playlist | Diperbaiki; teruji host + terverifikasi di perangkat (watch+list → kartu playlist 31 video) |
-| BUG-008 | P2 | File pendukung parsial tertinggal saat publikasi gagal | Sebagian: commit atomik tersedia; pelepasan jurnal recovery saat delete gagal, create→journal dan guard generasi masih perlu diperkuat |
+| BUG-008 | P2 | File pendukung parsial tertinggal saat publikasi gagal | Sebagian: commit atomik + jurnal recovery generasi 23 Okt; create→journal dan fault injection provider/proses mati belum ditutup |
 | BUG-009 | P2 | Pilihan bahasa lirik tidak diterapkan | Diperbaiki; terverifikasi di perangkat (toggle lirik audio, ringkasan tanpa bahasa) |
 | BUG-010 | P2 | Nama lirik tidak mengikuti nama audio aktual | Diperbaiki; terverifikasi sebagian (Despacito `.lrc` ikut nama audio; kasus tabrakan `Judul (1)` belum diuji) |
 | BUG-011 | P3 | Subfolder SAF tidak dihitung dalam ukuran penyimpanan | Diperbaiki; menunggu verifikasi runtime |
@@ -83,13 +85,13 @@ Hasil audit ini tidak mengubah kode/media atau menjalankan fault injection. Jang
 | BUG-045 | P2 | Angka penyimpanan tertinggal dari Koleksi setelah scan/impor/hapus/karaoke | Pengamatan agregat Room dan label ukuran parsial diterapkan; verifikasi checkpoint pada laporan player |
 | BUG-046 | P2 | Posisi notifikasi tertinggal setelah seek saat jeda dan progres berjalan | Sinkronisasi dibatasi per detik, seek saat jeda dan kecepatan disinkronkan langsung; regresi host lulus, verifikasi APK akhir pada laporan player |
 | BUG-047 | P2 | Slider full player terlalu besar dan badge antrean terpotong | Diperbaiki; layar penuh/track tipis/jumlah51 terbaca di HP Android10; matriks font besar belum diuji |
-| BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent terverifikasi langsung putar di HP/pengelola; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
+| BUG-048 | P1 | Auto-play perlu membuka UI setelah headset/TWS tersambung | Kabel setelah sapu Recent dan speaker Bluetooth terverifikasi pengguna langsung putar; bootstrap/pemulihan diperbaiki, TWS/Android12+ belum diuji |
 | BUG-049 | P2 | Antrean putar tidak menyediakan pencarian | Diterapkan; lima regresi lulus, cari/pilih/clear/tanpa hasil teruji HP dengan antrean51 |
 | BUG-050 | P2 | Hapus semua meminta SAF walau Android10 sudah memiliki izin hapus | Diperbaiki1.1.11; 240Kotlin/83Python lulus, pengelola+HP membuktikan langsung bersih tanpa SAF, root tetap/0entri |
 | BUG-051 | P1 | Nama/tag artis tidak konsisten saat sumber dan ekstraksi berbeda |1.1.15: audit51MP3 dan M4A SATRU2Live baru membuktikan format/tag;24artis lama kosong tanpa bukti tidak ditebak. Bukan klaim semua sumber/metadata lengkap |
-| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.15: search-first bersama sebelum exact get, cache manual dipakai otomatis;296Kotlin/84Python. HP membedakan status pembatasan dari sukses audio; keberhasilan lirik Live/auditori terbaru belum terbukti |
+| BUG-052 | P1 | Lookup lirik otomatis/manual berbeda dan provider429 disebut jaringan |1.1.15: search-first bersama sebelum exact get, cache manual dipakai otomatis;296Kotlin/84Python. 1.1.30 menambah impor LRC manual sebagai fallback eksplisit; HP membedakan status pembatasan dari sukses audio; keberhasilan lirik Live/auditori terbaru belum terbukti |
 | BUG-053 | P2 | Koleksi mempertahankan file yang sudah dihapus |1.1.15: dua file QA di HP hilang otomatis2→1→0 setelah MediaStore delete, tanpa scan/row unavailable; event validasi digabung (BUG-057). DENIED/UNKNOWN tetap dipertahankan |
-| BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | Teramati pada1.1.11 dengan3J1Opi7MVHw; host berhasil10KB, bukan galat LRCLIB; belum terselesaikan |
+| BUG-054 | P2 | Sumber YouTube tertentu gagal403 di HP | URL laporan selesai 23 Okt dengan engine2026.10.21 (MP3128 4.023.060byte, decode penuh, sampul); lirik terpisah gagal LRCLIB; sumber DJ lain/akar403 lama belum diisolasi |
 | BUG-055 | P2 | Musik tidak lanjut setelah video aplikasi lain dijeda | 1.1.14 terpasang;279Kotlin/84Python dan6 skenario fokus di HP lulus; pemulihan native diperbaiki setelah kandidat pertama gagal; pengelola mengonfirmasi Facebook asli otomatis lanjut |
 | BUG-056 | P2 | Antrean/seek hilang setelah proses pemutar mati | Snapshot privat atomik ber-revisi1.1.15;51lagu/acak/ulangi/31589ms pulih jeda setelah force-stop/manualopen; finalupgradejeda44817ms. OEM/low-memory belum diuji |
 | BUG-057 | P2 | Perubahan koleksi saat validasi berjalan terlewat | Permintaan digabung sampai selesai; checkedAt batch memajukan jendela pemeriksaan;2QAfile terhapus otomatis di HP. Koleksi>4000/provider lambat belum diuji |
@@ -130,9 +132,10 @@ Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut a
 **Lokasi:** [DownloadViewModel.kt](../app/src/main/java/id/local/tubeflow/core/DownloadViewModel.kt), `recovery` (66–75), `removeFile`/`deleteStoredUri` (241–260); [DownloadWorker.kt](../app/src/main/java/id/local/tubeflow/core/DownloadWorker.kt), `isSafDocument`/`deleteUri` (261–272).
 
 - **Pemicu/dampak:** Hapus hasil dari folder SAF atau lakukan recovery atas `pendingUri` SAF. Pemeriksaan lama `scheme == "document"` tidak cocok dengan URI `content://`; penghapusan gagal sementara riwayat dan pesan UI menganggap berhasil.
-- **Kode saat ini:** Helper worker dan `deleteStoredUri` sudah memakai pemeriksaan path dan `deleteDocument`. Namun recovery masih memanggil `contentResolver.delete` langsung; kegagalan helper masih ditelan oleh `runCatching`.
+- **Kode saat ini:** Worker, riwayat, dan recovery memakai `StorageUris.delete` yang memilih `deleteDocument` untuk URI dokumen. Sejak 23 Oktober, recovery tidak lagi melepas jurnal bila delete gagal/berkas masih ada.
 - **Arah perbaikan:** Satukan helper penghapusan untuk worker, riwayat, dan recovery; gunakan `DocumentsContract.isDocumentUri(context, uri)` untuk memilih `deleteDocument`. Bedakan file sudah hilang dari kegagalan izin/provider; jangan mengumumkan keberhasilan penghapusan file jika gagal.
 - [ ] **Kriteria selesai:** Media dan sidecar SAF benar-benar terhapus; pending SAF dibersihkan saat recovery. Uji izin dicabut/provider menolak, serta jalur MediaStore. UI dan riwayat mencerminkan hasil sebenarnya.
+- [x] **Perbaikan kode 23 Oktober 2026 (host):** `DownloadRecovery` hanya melepas `pendingUri` bila `StorageUris.delete` mengembalikan true; job aktif yang berakhir memakai `retainPending` bergenerasi agar jurnal tidak hilang setelah `fail`/`cancel`; regresi `DownloadRecoveryTest` (6 tes) lulus. **Sisa:** provider menolak/izin dicabut dan MediaStore belum diuji perangkat.
 
 ## BUG-004 — P2: Berkas parsial tertinggal setelah pembatalan
 
@@ -173,13 +176,14 @@ Urutan batch perbaikan sebelumnya (riwayat pengerjaan; masih ada celah menurut a
 
 ## BUG-008 — P2: Cleanup file pendukung ketika copy gagal
 
-**Lokasi:** [DownloadWorker.kt](../app/src/main/java/id/local/tubeflow/core/DownloadWorker.kt), `publishSidecars` (227–250), pemanggilan `dao.sidecars` (169).
+**Lokasi:** [DownloadWorker.kt](../app/src/main/java/id/local/tubeflow/core/DownloadWorker.kt), `publishSidecars` (227–250), pemanggilan `dao.sidecars` (169); [DownloadRecovery.kt](../app/src/main/java/id/local/tubeflow/core/DownloadRecovery.kt), [DownloadViewModel.kt](../app/src/main/java/id/local/tubeflow/core/DownloadViewModel.kt) `recovery`.
 
 - **Reproduksi:** Simulasikan stream null, write gagal/storage penuh, atau publikasi MediaStore gagal setelah URI sidecar dibuat.
 - **Penyebab/dampak:** `runCatching` menelan error dan `return@runCatching` keluar tanpa menghapus URI. URI belum tercatat di database, sehingga dokumen parsial/pending row tertinggal meskipun job selesai.
 - **Arah perbaikan:** Simpan URI yang sedang dibuat; hapus pada setiap jalur kegagalan. Wajibkan keberhasilan publikasi sebelum menambahkan ke `recorded`. Pastikan URI yang sudah dibuat bisa ditemukan recovery jika proses mati, misalnya lewat pencatatan pending sidecar. Gunakan helper penghapusan BUG-003.
 - [x] **Perbaikan kode 10 Oktober 2026 (R2, host):** DAO `commitSidecar` mencatat baris terbit + melepas jurnal dalam SATU UPDATE atomik (per sidecar); jalur gagal hanya melepas jurnal bila `StorageUris.delete` terbukti berhasil; `writeLyricBesideAudio` (cari ulang) menjurnal URI sebelum menulis, memperbarui jurnal setelah rename (ID dokumen bisa berubah), dan melepasnya setelah tercatat; baris sidecar yatim (`outputUri` null) dibersihkan di awal run worker dan di recovery. Regresi host: `test_sidecar_commit_is_atomic_with_journal_release`.
 - [ ] **Kriteria selesai:** Tes kegagalan open/write/publish tidak menyisakan dokumen atau pending row pada SAF maupun MediaStore. Hanya sidecar berhasil yang dicatat; uji proses mati saat copy untuk memeriksa recovery.
+- [x] **Perbaikan kode 23 Oktober 2026 (host):** `sidecarPending` dan baris sidecar yatim kini mempertahankan hanya entri yang gagal dihapus (`kind|uri` utuh), memakai DAO bergenerasi; jurnal tidak lagi dikosongkan buta saat recovery. Regresi `DownloadRecoveryTest` lulus. **Sisa:** simulasi open/write/publish dan proses mati nyata belum dijalankan.
 
 ## BUG-009 — P2: Pilihan bahasa lirik tidak berpengaruh
 
@@ -566,7 +570,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 - **Perbaikan:** receiver hanya mendengarkan tiga action koneksi sistem terproteksi dan diekspor; PlaybackService tetap privat. Pemicu memulai foreground service dahulu, lalu membaca Room dan melanjutkan engine yang sama. Sesi aktif memakai `START_STICKY` dan penanda preferensi; X menghapus penanda. Pemulihan tanpa headset menyiapkan lagu dalam keadaan jeda. Setelan kecepatan tidak menerapkan PlaybackParams ke MediaPlayer yang dijeda; diterapkan setelah fokus audio didapat saat mulai putar.
 - **Jalur gagal:** pekerjaan bootstrap dibatasi10detik, dibatalkan bersama service, empty/error dihentikan; penolakan start di latar menawarkan notifikasi ketuk-untuk-putar jika izin notifikasi tersedia.
 - **Batas:** sticky bukan jaminan terhadap force-stop/ColorOS yang melarang restart. Tidak ada service pengawas permanen. Pemulihan proses mati membangun antrean lagi; posisi seek sesi mati belum dipersist. TWS tidak tersedia pada sesi tes ini.
-- **Bukti:** empat regresi host memeriksa receiver exported/action terproteksi, service privat serta izin Bluetooth sesuai versi tanpa discovery; tes kabel sesudah sapu Recent berhasil (konfirmasi pengelola “Langsung berjalan”), Launcher foreground/PLAYING1.095→3.108ms. TWS/Android12+ belum diuji; [laporan](PLAYER_AUTOPLAY_1_1_10.md).
+- **Bukti:** empat regresi host memeriksa receiver exported/action terproteksi, service privat serta izin Bluetooth sesuai versi tanpa discovery; tes kabel sesudah sapu Recent berhasil (konfirmasi pengelola “Langsung berjalan”), dan speaker portable Bluetooth terverifikasi pengguna langsung auto-play pada 23 Okt 2026. Launcher foreground/PLAYING1.095→3.108ms. TWS/Android12+ belum diuji; [laporan](PLAYER_AUTOPLAY_1_1_10.md).
 
 ## BUG-049 — P2: Pencarian belum tersedia di antrean putar
 
@@ -608,7 +612,7 @@ Pembaruan BUG-033: setelah restart Poweramp pada −1s, pengguna masih mendengar
 ## BUG-054 — P2: Download sumber DJ memberi403 di HP
 
 - **Reproduksi:**1.1.11, MP3128/lirik/sampul, `https://youtu.be/3J1Opi7MVHw` → HTTP403 pada transfer media sebelum hasil dipublikasikan. Host dengan engine yang sama berhasil mengambil10KB format251.
-- **Status:** terbuka; belum membuktikan akar perbedaan IP/format/cache/provider. Jangan menyamakan dengan429LRCLIB atau menyebut download link ini lulus hanya karena inspect metadata berhasil.
+- **Status 23 Oktober 2026:** unduhan MP3 128 pada HP dengan engine 2026.10.21 selesai: 4.023.060 byte, durasi 247,824 detik (sama dengan metadata 4:08), decode penuh, sampul mJPG tertanam. Riwayat menampilkan Selesai; lirik gagal karena LRCLIB, bukan 403. Unduhan MP3 320 pada 1.1.29 juga selesai (9.971.412 byte, 321.886 bps) sebagai uji build final. **Batas:** hanya URL laporan; akar 403 lama (engine vs jaringan/IP) tidak diisolasi dan sumber DJ lain belum diuji.
 
 ## BUG-055 — P2: Musik tidak lanjut setelah video aplikasi lain dijeda
 

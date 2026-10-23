@@ -17,9 +17,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private val work = WorkManager.getInstance(application)
  val jobs = dao.observe().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
  private val inspectionState=InspectionState()
+ private val inspectionCache by lazy { InspectionCache(java.io.File(getApplication<Application>().cacheDir,"inspection-cache")) }
  val metadata = inspectionState.state.map { it.metadata }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
  val playlist = inspectionState.state.map { it.playlist }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
  val busy = inspectionState.state.map { it.busy }.stateIn(viewModelScope,SharingStarted.Eagerly,false)
+ val inspectPhase = inspectionState.state.map { it.phase }.stateIn(viewModelScope,SharingStarted.Eagerly,null)
+ val inspectStartedAt = inspectionState.state.map { it.startedAt }.stateIn(viewModelScope,SharingStarted.Eagerly,0L)
  private val _error=MutableStateFlow<String?>(null)
  val error: StateFlow<String?> = _error.asStateFlow()
  /** Alasan inspeksi terakhir gagal — menyalakan tombol "Coba lagi" untuk URL yang sama (BUG-006). */
@@ -80,8 +83,13 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  }
  private var storageRefresh: Job? = null
  init {
-  refreshStorage()
-  // Angka penyimpanan ikut naik/turun begitu ada unduhan selesai (atau file dihapus) tanpa perlu tombol Segarkan.
+   refreshStorage()
+   // Panaskan engine saat aplikasi dibuka supaya inspeksi pertama tidak menanggung seluruh biaya init.
+   viewModelScope.launch {
+    delay(800)
+    withContext(Dispatchers.IO) { runCatching { Engine.initialize(getApplication()) } }
+   }
+   // Angka penyimpanan ikut naik/turun begitu ada unduhan selesai (atau file dihapus) tanpa perlu tombol Segarkan.
   viewModelScope.launch { jobs.map { list -> list.count { it.state == JobState.COMPLETED } }.distinctUntilChanged().collect { refreshStorage() } }
   // Pemindaian, impor, hapus, dan hasil karaoke mengubah katalog tanpa mengubah riwayat download.
   viewModelScope.launch {
@@ -194,21 +202,20 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    }.forEach { job ->
     val infos=work.getWorkInfosByTag(job.id).get()
     if(infos.isEmpty() || infos.all { it.state.isFinished }) {
-     // URI pending/sidecar memakai helper bersama (BUG-003); sidecarPending membersihkan sisa publikasi (BUG-008).
-     job.pendingUri?.let { raw -> StorageUris.delete(application, raw) }
-     job.sidecarPending?.lines()?.filter { it.isNotBlank() }?.forEach { raw -> StorageUris.delete(application, raw) }
-     if(job.sidecarPending != null) dao.sidecarPending(job.id, null)
+     // URI pending/sidecar memakai helper bersama (BUG-003); jurnal hanya dilepas bila provider
+     // membuktikan berkas hilang, supaya referensi ke file yang menolak dihapus tidak hilang (BUG-008).
+     val pendingGone=DownloadRecovery.clearPendingAfterDelete(job) { raw -> StorageUris.delete(application, raw) }
+     if(job.sidecarPending != null) dao.sidecarPendingOwned(job.id, job.generation, DownloadRecovery.retainedSidecarPending(job) { raw -> StorageUris.delete(application, raw) })
      // Sidecar yatim: media tak pernah terbit (outputUri null) tapi berkas pendamping sudah tercatat —
      // finalisasi terputus; buang bersama jejaknya supaya tak menumpuk tanpa pasangan (BUG-008/R2).
-     if(job.outputUri == null && job.sidecarUris != null) {
-      job.sidecarUris.lines().mapNotNull { line -> line.substringAfter('|',"").takeIf { it.isNotBlank() } }.forEach { raw -> StorageUris.delete(application, raw) }
-      dao.sidecars(job.id, null)
-     }
+     if(job.outputUri == null && job.sidecarUris != null) dao.sidecarsOwned(job.id, job.generation, DownloadRecovery.retainedOrphanSidecars(job) { raw -> StorageUris.delete(application, raw) })
      // Jeda/Gagal menyimpan berkas parsial — jangan dihapus supaya "Lanjutkan"/"Coba lagi" bisa
      // lanjut dari progres terakhir (BUG-004/P1 resume). Hanya batal yang dibersihkan.
      if(job.state == JobState.CANCELLED) deleteJobDir(job.id)
-     if(job.state in setOf(JobState.RUNNING, JobState.QUEUED)) { if(infos.any { it.state == WorkInfo.State.CANCELLED }) dao.cancel(job.id) else dao.fail(job.id,"Unduhan terhenti. Ketuk Coba lagi untuk melanjutkan dari progres terakhir.") }
-     dao.clearPending(job.id)
+     if(job.state in setOf(JobState.RUNNING, JobState.QUEUED)) {
+      if(infos.any { it.state == WorkInfo.State.CANCELLED }) dao.cancel(job.id) else dao.fail(job.id,"Unduhan terhenti. Ketuk Coba lagi untuk melanjutkan dari progres terakhir.")
+      if(!pendingGone && job.pendingUri != null) dao.retainPending(job.id, job.generation, job.pendingUri)
+     } else if(pendingGone) dao.clearPendingOwned(job.id, job.generation)
     }
    }
  }
@@ -222,21 +229,30 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private fun hasActiveWork(id: String): Boolean = runCatching { work.getWorkInfosByTag(id).get().any { !it.state.isFinished } }.getOrDefault(false)
  fun clearError() { _error.value=null }
  fun clearNotice() { _notice.value=null }
- fun inspect(url: String) {
-  inspectionId?.let(Engine::cancel); inspection?.cancel()
-  lastInspectPlaylist=false
-  val id=UUID.randomUUID().toString(); inspectionState.begin(id); _error.value=null
-  inspection=viewModelScope.launch {
-   try { inspectionState.video(id,Engine.inspect(getApplication(),url,id)) }
-   catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) {
-    val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
-    val message=inspectErrorMessage(url,details)
-    if (inspectionState.fail(id,message,details)) _error.value=message
+  fun inspect(url: String) {
+   inspectionId?.let(Engine::cancel); inspection?.cancel()
+   lastInspectPlaylist=false
+   val id=UUID.randomUUID().toString(); inspectionState.begin(id); _error.value=null
+   inspection=viewModelScope.launch {
+    try {
+     val cached=withContext(Dispatchers.IO) { runCatching { inspectionCache.read(url) }.getOrNull() }
+     if(cached != null) {
+      inspectionState.video(id,cached)
+      return@launch
+     }
+     val result=Engine.inspect(getApplication(),url,id) { phase -> inspectionState.phase(id,phase) }
+     withContext(Dispatchers.IO) { runCatching { inspectionCache.write(url,result) } }
+     inspectionState.video(id,result)
+    }
+    catch(cancelled: CancellationException) { throw cancelled }
+    catch(error: Exception) {
+     val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
+     val message=inspectErrorMessage(url,details)
+     if (inspectionState.fail(id,message,details)) _error.value=message
+    }
+    finally { inspectionState.finish(id) }
    }
-   finally { inspectionState.finish(id) }
   }
- }
  fun inspectPlaylist(url: String) {
   inspectionId?.let(Engine::cancel); inspection?.cancel()
   lastInspectPlaylist=true
@@ -249,7 +265,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   inspectionState.begin(id); _error.value=null
   inspection=viewModelScope.launch {
    try {
-    val result=Engine.inspectPlaylist(getApplication(),canonical,id).copy(url=original)
+    val result=Engine.inspectPlaylist(getApplication(),canonical,id) { phase -> inspectionState.phase(id,phase) }.copy(url=original)
     val seed=if (Selection.isMix(original)) cachedSeed ?: try {
      Engine.inspect(getApplication(), "https://www.youtube.com/watch?v=${Selection.videoId(canonical)}", id)
     } catch(cancelled: CancellationException) { throw cancelled }
@@ -265,10 +281,14 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    finally { inspectionState.finish(id) }
   }
  }
- fun clearPlaylist() {
-  inspectionState.clear()?.let(Engine::cancel)
-  inspection?.cancel(); inspection=null; _error.value=null
- }
+  fun clearPlaylist() {
+   inspectionState.clear()?.let(Engine::cancel)
+   inspection?.cancel(); inspection=null; _error.value=null
+  }
+  fun cancelInspection() {
+   inspectionState.clear()?.let(Engine::cancel)
+   inspection?.cancel(); inspection=null; _error.value=null
+  }
  /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
  private fun inspectErrorMessage(url: String, details: FailureDetails): String {
   if(Selection.platform(url) != "Facebook") return details.userMessage
@@ -646,6 +666,22 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private suspend fun writeLyricBesideAudio(job: DownloadJob, text: String, expected: Map<String, ByteArray>): Boolean =
   LyricPublisher(getApplication()).publish(job, text, expected)
 
+ /**
+  * Retensi riwayat: hapus catatan selesai yang lebih lama dari [days]. File media TIDAK dihapus —
+  * hanya baris riwayat dan notifikasi hasilnya. 0 berarti nonaktif.
+  */
+ fun pruneHistory(days: Int) {
+  val cutoff = historyCutoff(days, System.currentTimeMillis()) ?: return
+  viewModelScope.launch {
+   val ids = dao.observe().first()
+    .filter { it.state == JobState.COMPLETED && historyTimestamp(it.completedAt, it.createdAt) < cutoff }
+    .map { it.id }
+   if (ids.isEmpty()) return@launch
+   val removed = dao.clearCompletedBefore(cutoff)
+   if (removed > 0) ids.forEach(::cancelResultNotification)
+  }
+ }
+
  fun clearCompleted() { viewModelScope.launch {
   val ids=dao.observe().first().filter { it.state == JobState.COMPLETED }.map { it.id }
   val n=MediaFileOperations.mutex.withLock { dao.clearCompleted() }; ids.forEach(::cancelResultNotification)
@@ -659,3 +695,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  } }
  override fun onCleared() { inspectionId?.let(Engine::cancel) }
 }
+
+/** Batas waktu retensi riwayat; null berarti retensi nonaktif. */
+internal fun historyCutoff(days: Int, now: Long): Long? =
+    if (days <= 0) null else now - days.coerceIn(0, 365) * 86_400_000L
+
+/** Waktu selesai efektif; baris lama tanpa completedAt memakai createdAt (BUG-023). */
+internal fun historyTimestamp(completedAt: Long, createdAt: Long): Long =
+    if (completedAt > 0) completedAt else createdAt

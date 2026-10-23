@@ -1,5 +1,36 @@
 # Pengujian perangkat fisik
 
+Pembaruan1.1.30/code44: update-r sukses pada Realme RMX1821 Android10; hash `base.apk` identik dengan artefak.
+Fase inspeksi terlihat (`Mengambil detail video… · 13dtk`), cancel kembali ke
+input tanpa hasil, dan URL yang sama langsung hit cache setelah force-stop.
+LRC manual tersimpan sebagai sidecar49byte dan kartu berubah menjadi **Lirik
+tersimpan**; entri uji dihapus kembali. Unduhan BUG-054 MP3128 selesai
+4.023.060byte/247,824dtk; lirik otomatis gagal karena LRCLIB. Riwayat kosong
+karena setelan pengguna **Hapus otomatis 7hari**, bukan reset. Cache metadata
+30menit/200entri dihitung sebagai metadata. TWS/Android12+, fault injection
+provider/process death, runtime16KB, ABI/Android lain, dan matriks
+font/landscape belum diuji pada build ini. [Ringkasan](PROGRESS.md).
+
+Pembaruan1.1.29/code43: [updater engine dan BUG-054](ENGINE_UPDATE_1_1_29.md).
+Update-r sukses, base.apk hash identik, riwayat212entri utuh. Engine bawaan
+2026.10.21, cek terbaru, blokir saat unduhan aktif, unduhan320kbps selesai
+(9.971.412byte/247,824dtk), dan BUG-054 MP3128 selesai (4.023.060byte, decode
+penuh, sampul tertanam); lirik gagal karena LRCLIB. Rollback diuji pada1.1.28.
+Runtime16KB/ABI lain/Android lain dan fault injection provider belum diuji.
+
+Pembaruan1.1.28/code42: updater engine diuji nyata dari bawaan2026.08.19 ke
+2026.10.21, lalu rollback kembali ke2026.08.19. APK signed hash
+`8d00a3f9…` terpasang; 1.1.29 kemudian menjadi kandidat final.
+[Laporan](ENGINE_UPDATE_1_1_29.md).
+
+Pembaruan1.1.27/code41: [enam aksi kartu, menu ⋮, dan caption berbagi](CARD_ACTIONS_1_1_27.md).
+Pembaruan1.1.26/code40: [aksi kartu langsung dan EQ bass penuh](CARDS_EQ_1_1_26.md).
+APK ARM64 update-r/hash cocok; kartu Koleksi dan Riwayat menampilkan semua aksi
+tanpa menu titik tiga, dialog Unduh lagi dibatalkan tanpa menghapus file,
+Atur waktu lirik dari Riwayat memuat LRC, dan EQ Otomatis menunjukkan60Hz
++6dB. Riwayat saat uji hanya berisi satu audio; kartu video dan audisi suara
+belum diuji. Screenshot/log privat.
+
 Pembaruan1.1.25/code39: [kontrol adaptif dan ukuran kontekstual](ADAPTIVE_CONTROLS_1_1_25.md).
 Update/hash cocok pada HP Android10; font0,9/1,6, tema terang/gelap,
 portrait/landscape dan rail diuji.10target minimum82px; QA dibersihkan,

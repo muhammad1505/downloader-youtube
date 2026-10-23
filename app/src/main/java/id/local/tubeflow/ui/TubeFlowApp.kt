@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.core.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +40,14 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val metadata by model.metadata.collectAsStateWithLifecycle()
     val playlist by model.playlist.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
+    val inspectPhase by model.inspectPhase.collectAsStateWithLifecycle()
+    val inspectStartedAt by model.inspectStartedAt.collectAsStateWithLifecycle()
+    val engineUpdateBlockedReason = when {
+        busy -> "Tunggu pemeriksaan tautan selesai dulu."
+        jobs.any { it.state == JobState.QUEUED || it.state == JobState.RUNNING || it.state == JobState.PAUSED } ->
+            "Selesaikan atau hentikan unduhan aktif dulu."
+        else -> null
+    }
     val inspectError by model.inspectError.collectAsStateWithLifecycle()
     val inspectDetails by model.inspectDetails.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
@@ -63,6 +72,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val downloadList = rememberLazyListState()
     val queueList = rememberLazyListState()
     val historyList = rememberLazyListState()
+    // Dialog waktu lirik dari Riwayat dihost di sini karena butuh item katalog yang tertaut.
+    var lyricTiming by remember { mutableStateOf<MediaItem?>(null) }
+    val appScope = rememberCoroutineScope()
 
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
@@ -120,6 +132,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(Unit) {
         if (library.hasReadPermission() || library.hasFolderAccess()) library.scanIfEmpty() else requestRead.launch(readPermissions)
     }
+    // Retensi riwayat: dijalankan saat aplikasi dibuka dan setiap pilihan di Pengaturan berubah.
+    LaunchedEffect(SettingsStore.historyAutoDays) { model.pruneHistory(SettingsStore.historyAutoDays) }
     LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it); model.clearError() } }
     // Info "Terpakai …" di Pengaturan ikut terbaru tiap tab dibuka, bukan cuma pas aplikasi start.
     LaunchedEffect(tab) { if (tab == settingsTab) model.refreshStorage(); if (tab == 0) library.updateDeviceStorage() }
@@ -136,6 +150,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     AccentTheme(accentCover, SettingsStore.artworkAccent) {
     // Saat pemutar penuh terbuka, dialog lirik dihost di dalam jendela pemutar (z-order dialog).
     if (!fullPlayer) LyricsSearchDialog(library)
+    lyricTiming?.let { LyricTimingDialog(it, library) { lyricTiming = null } }
     KaraokeDialog(karaoke, player, requestNotifications)
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
     val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
@@ -244,6 +259,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     metadata = metadata,
                     playlist = playlist,
                     busy = busy,
+                    inspectPhase = inspectPhase,
+                    inspectStartedAt = inspectStartedAt,
                     inspectError = inspectError,
                     inspectDetails = inspectDetails,
                     listState = downloadList,
@@ -251,6 +268,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     inspectPlaylist = { model.inspectPlaylist(url.trim()) },
                     retryInspect = { model.retryInspect(url.trim()) },
                     clearPlaylist = { model.clearPlaylist() },
+                    cancelInspect = { model.cancelInspection() },
                     download = { opts ->
                         requestNotifications()
                         model.enqueue(opts.copy(url = url.trim()))
@@ -283,7 +301,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onOpenDownload = { tab = 1 },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 3 }, downloads = { tab = 1 })
-                3 -> MediaLibraryScreen(library, player)
+                3 -> MediaLibraryScreen(
+                    library, player, jobs = jobs,
+                    // Konfirmasi sudah dilakukan di kartu: Unduh lagi mengganti file lama (BUG-026).
+                    onRedownload = { model.retry(it) },
+                )
                 4 -> HistoryScreen(
                     jobs = jobs,
                     listState = historyList,
@@ -296,6 +318,16 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onClearCompleted = { model.clearCompleted() },
                     onClearUnsuccessful = { model.clearUnsuccessful() },
                     onOpenDownload = { tab = 1 },
+                    onEnqueue = { player.enqueue(it) },
+                    onPlayNext = { player.playNext(it) },
+                    onEditLyricTiming = { jobId ->
+                        appScope.launch {
+                            val uri = jobs.firstOrNull { it.id == jobId }?.outputUri
+                            val item = uri?.let { library.itemFor(it) }
+                            if (item == null) snackbar.showSnackbar("Lirik belum ada di katalog Koleksi. Segarkan katalog lalu coba lagi.")
+                            else lyricTiming = item
+                        }
+                    },
                 )
                 else -> SettingsScreen(
                     karaoke = karaoke,
@@ -315,6 +347,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onClearPartial = model::clearPartialFiles,
                     clearingFiles = clearingFiles,
                     onClearStorage = { model.clearStorageFolder() },
+                    engineUpdateBlockedReason = engineUpdateBlockedReason,
                 )
             }
             }

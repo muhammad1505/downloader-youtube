@@ -9,6 +9,8 @@ internal class InspectionState {
         val metadata: VideoMetadata? = null,
         val playlist: PlaylistMetadata? = null,
         val busy: Boolean = false,
+        val phase: String? = null,
+        val startedAt: Long = 0L,
         val error: String? = null,
         val details: FailureDetails? = null,
     )
@@ -18,17 +20,18 @@ internal class InspectionState {
     var token: String? = null
         private set
 
-    fun begin(id: String) {
+    fun begin(id: String, phase: String = InspectionPhase.PREPARING_ENGINE, startedAt: Long = System.currentTimeMillis()) {
         token = id
-        current.value = Snapshot(busy = true)
+        current.value = Snapshot(busy = true, phase = phase, startedAt = startedAt)
     }
 
+    fun phase(id: String, phase: String): Boolean = commit(id) { it.copy(phase = phase) }
     fun video(id: String, metadata: VideoMetadata): Boolean = commit(id) { it.copy(metadata = metadata) }
     fun playlist(id: String, playlist: PlaylistMetadata): Boolean = commit(id) { it.copy(playlist = playlist) }
     fun fail(id: String, message: String, details: FailureDetails): Boolean = commit(id) {
         it.copy(error = message, details = details)
     }
-    fun finish(id: String) { commit(id) { it.copy(busy = false) } }
+    fun finish(id: String) { commit(id) { it.copy(busy = false, phase = null) } }
 
     fun clear(): String? {
         val previous = token

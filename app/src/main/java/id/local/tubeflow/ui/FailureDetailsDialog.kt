@@ -32,15 +32,12 @@ fun FailureDetailsDialog(details: FailureDetails, dismiss: () -> Unit) {
 }
 
 @Composable
-fun JobFailureDetails(job: DownloadJob, lyrics: Boolean = false) {
+fun JobFailureDetails(job: DownloadJob, lyrics: Boolean = false, compact: Boolean = false) {
     val context = LocalContext.current
     var open by remember(job.id, job.generation) { mutableStateOf(false) }
-    ActionButton(
-        stringResource(if (lyrics) R.string.failure_lyrics_details else R.string.failure_details),
-        { open = true },
-        icon = Icons.Outlined.Info,
-        emphasis = ActionEmphasis.Quiet,
-    )
+    val label = stringResource(if (lyrics) R.string.failure_lyrics_details else R.string.failure_details)
+    if (compact) IconAction(Icons.Outlined.Info, label, { open = true })
+    else ActionButton(label, { open = true }, icon = Icons.Outlined.Info, emphasis = ActionEmphasis.Quiet)
     if (open) {
         val details by produceState<FailureDetails?>(null, job.id, job.generation, job.lyricStatus) {
             value = withContext(Dispatchers.IO) {
