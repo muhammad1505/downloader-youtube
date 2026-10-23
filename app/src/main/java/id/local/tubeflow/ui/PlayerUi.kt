@@ -136,7 +136,8 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     LaunchedEffect(dragged) { if (dragged) userChoseView=true }
     LaunchedEffect(track.uri) { pager.scrollToPage(if (state.lines.isNotEmpty()) 1 else 0) }
     LaunchedEffect(state.lines) { if (!userChoseView && state.lines.isNotEmpty() && pager.settledPage==0) pager.animateScrollToPage(1) }
-    LaunchedEffect(active,pager.settledPage,track.uri) { if (pager.settledPage==1 && active>=0 && !list.isScrollInProgress) list.animateScrollToItem(active) }
+    // Lirik mengikuti baris aktif juga saat landscape tidak memakai pager.
+    LaunchedEffect(active,pager.settledPage,track.uri) { if (active>=0 && !list.isScrollInProgress) list.animateScrollToItem(active) }
     Dialog(onDismissRequest=dismiss,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         val view=LocalView.current
         val darkBars=MaterialTheme.colorScheme.background.luminance()<0.5f
@@ -150,13 +151,15 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
         }
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-            // Layar pendek/landscape dan font besar butuh ruang lebih sedikit untuk sampul agar
-            // kontrol bawah tetap terjangkau; angka tetap lama mendorong kontrol keluar layar.
+            val landscape=maxWidth>maxHeight && maxWidth>=560.dp
             val compactHeight=maxHeight<600.dp || LocalDensity.current.fontScale>=1.3f
             val pageHeight=if(compactHeight) (maxHeight-280.dp).coerceIn(140.dp,400.dp)
                 else (maxHeight-370.dp).coerceIn(220.dp,400.dp)
-            Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),MaterialTheme.colorScheme.background))).verticalScroll(rememberScrollState()).padding(20.dp)) {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            val background=Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),MaterialTheme.colorScheme.background))
+            val coverDescription=stringResource(id.local.tubeflow.R.string.player_page_show_cover)
+            val lyricsDescription=stringResource(id.local.tubeflow.R.string.player_page_show_lyrics)
+            val header: @Composable (Modifier) -> Unit = { headerModifier ->
+                Row(headerModifier,verticalAlignment=Alignment.CenterVertically) {
                     IconButton(onClick=dismiss) { Icon(Icons.Outlined.ExpandMore,"Kembali ke mini player") }
                     Text(stringResource(id.local.tubeflow.R.string.player_now_playing),Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Box {
@@ -191,67 +194,102 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     IconButton(onClick={ sleepOpen=true }) { Icon(Icons.Outlined.Bedtime, stringResource(id.local.tubeflow.R.string.sleep_title), Modifier.size(24.dp)) }
                     IconButton(onClick={ equalizerOpen=true }) { Icon(Icons.Outlined.Tune,"Equalizer", Modifier.size(24.dp)) }
                 }
-                // Halaman utama dapat digeser: sampul ↔ lirik, tanpa harus mencari tombol.
-                Box(Modifier.fillMaxWidth().height(pageHeight)) {
-                HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),pageSpacing=12.dp) { page ->
-                    if (page==1) {
-                        LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor)
-                    } else {
-                        PlayerCoverPage(track)
-                    }
-                }
+            }
+            val pageIndicator: @Composable (Modifier) -> Unit = { indicatorModifier ->
                 PlayerPageIndicator(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                    modifier = indicatorModifier,
                     selectedPage = pager.currentPage,
-                    coverDescription = stringResource(id.local.tubeflow.R.string.player_page_show_cover),
-                    lyricsDescription = stringResource(id.local.tubeflow.R.string.player_page_show_lyrics),
+                    coverDescription = coverDescription,
+                    lyricsDescription = lyricsDescription,
                     accent = coverAccent,
-                    onSelect = { page ->
-                        userChoseView = true
-                        scope.launch { pager.animateScrollToPage(page) }
-                    },
+                    onSelect = { page -> userChoseView = true; scope.launch { pager.animateScrollToPage(page) } },
                 )
-                }
-                if (pager.settledPage==0) Text(stringResource(id.local.tubeflow.R.string.player_swipe_hint),
-                    modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,
-                    style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(10.dp))
-                Text(track.title,style=MaterialTheme.typography.headlineSmall,maxLines=2,overflow=TextOverflow.Ellipsis)
-                Text(track.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                if (state.queueTracks.size>1) Text(
-                    "Lagu ${state.queueIndex+1} dari ${state.queueTracks.size}" + (if (state.shuffle) " · acak" else "") + (if (state.repeat!=PlaybackQueue.Repeat.OFF) " · ulangi ${repeatLabel(state.repeat)}" else ""),
-                    style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                if (timer.remainingMs > 0 || timer.afterTrack) Text(
-                    if (timer.afterTrack) stringResource(id.local.tubeflow.R.string.sleep_after_track) else stringResource(id.local.tubeflow.R.string.sleep_remaining, duration(timer.remainingMs)),
-                    modifier = Modifier.clickable { sleepOpen = true }.padding(vertical = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-                // Bilah progres putih tipis di atas latar gelap — aksen hijau disimpan untuk tombol putar.
-                val seekTint=MaterialTheme.colorScheme.onBackground
-                val seekColors=SliderDefaults.colors(thumbColor=seekTint,activeTrackColor=seekTint,inactiveTrackColor=seekTint.copy(alpha=0.22f))
-                Slider(value=dragging ?: state.positionMs.toFloat().coerceIn(0f,state.durationMs.coerceAtLeast(1).toFloat()),
-                    onValueChange={ dragging=it }, onValueChangeFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
-                    modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),
-                    valueRange=0f..state.durationMs.coerceAtLeast(1).toFloat(),enabled=!state.loading && state.durationMs>0,
-                    colors=seekColors,
-                    thumb={ Box(Modifier.size(12.dp).background(seekTint,CircleShape)) },
-                    track={ sliderState -> SliderDefaults.Track(sliderState,modifier=Modifier.height(4.dp),
-                        colors=seekColors,thumbTrackGapSize=0.dp,drawStopIndicator=null) })
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium); Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium) }
-                Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
-                    IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }
-                    IconButton(onClick=player::previous,enabled=!state.loading) { Icon(Icons.Outlined.SkipPrevious,"Lagu sebelumnya") }
-                    FilledIconButton(onClick=player::toggle,modifier=Modifier.size(72.dp),enabled=!state.loading,
-                        colors=IconButtonDefaults.filledIconButtonColors(containerColor=accent,contentColor=AccentContrast.ink(accent))) {
-                        Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",Modifier.size(34.dp))
+            }
+            val pagerPane: @Composable (Modifier) -> Unit = { paneModifier ->
+                Box(paneModifier) {
+                    HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),pageSpacing=12.dp) { page ->
+                        if (page==1) {
+                            LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor)
+                        } else {
+                            PlayerCoverPage(track)
+                        }
                     }
-                    IconButton(onClick=player::next,enabled=!state.loading && state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
-                    IconButton(onClick={ player.skip(10000) },enabled=!state.loading) { Icon(Icons.Outlined.Forward10,"Maju 10 detik") }
+                    // Di landscape tidak ada pager; indikator hanya dipakai pada tampilan portrait.
+                    if (!landscape) pageIndicator(Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp))
                 }
+            }
+            val controls: @Composable (Modifier) -> Unit = { controlsModifier ->
+                Column(controlsModifier) {
+                    val largeText=LocalDensity.current.fontScale>=1.3f
+                    Spacer(Modifier.height(if(landscape) 4.dp else 10.dp))
+                    Text(track.title,style=if(landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                        maxLines=if(landscape && largeText) 1 else 2,overflow=TextOverflow.Ellipsis)
+                    val queueInfo=if (state.queueTracks.size>1)
+                        "Lagu ${state.queueIndex+1} dari ${state.queueTracks.size}" + (if (state.shuffle) " · acak" else "") + (if (state.repeat!=PlaybackQueue.Repeat.OFF) " · ulangi ${repeatLabel(state.repeat)}" else "")
+                    else ""
+                    if (landscape) {
+                        // Satu baris di layar lebar: posisi antrean ringkas, status acak/ulangi terbaca dari warna aksi.
+                        val queueShort=if (state.queueTracks.size>1) "Lagu ${state.queueIndex+1}/${state.queueTracks.size}" else ""
+                        Text(listOf(track.artist.ifBlank { "Artis belum diketahui" }, queueShort).filter { it.isNotBlank() }.joinToString(" · "),
+                            style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    } else {
+                        Text(track.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (queueInfo.isNotBlank()) Text(queueInfo,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (landscape) {
+                        // Kolom kiri khusus lirik; sampul pindah ke sini, di antara identitas dan kontrol.
+                        Spacer(Modifier.height(6.dp))
+                        CoverThumb(track.cover,"",MediaMode.AUDIO,
+                            Modifier.size(if (largeText) 48.dp else 104.dp).align(Alignment.CenterHorizontally),
+                            shape=MaterialTheme.shapes.medium)
+                    }
+                    if (timer.remainingMs > 0 || timer.afterTrack) Text(
+                        if (timer.afterTrack) stringResource(id.local.tubeflow.R.string.sleep_after_track) else stringResource(id.local.tubeflow.R.string.sleep_remaining, duration(timer.remainingMs)),
+                        modifier = Modifier.clickable { sleepOpen = true }.padding(vertical = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+                    // Bilah progres putih tipis di atas latar gelap — aksen hijau disimpan untuk tombol putar.
+                    val seekTint=MaterialTheme.colorScheme.onBackground
+                    val seekColors=SliderDefaults.colors(thumbColor=seekTint,activeTrackColor=seekTint,inactiveTrackColor=seekTint.copy(alpha=0.22f))
+                    val seekSlider: @Composable (Modifier) -> Unit = { sliderModifier ->
+                        Slider(value=dragging ?: state.positionMs.toFloat().coerceIn(0f,state.durationMs.coerceAtLeast(1).toFloat()),
+                            onValueChange={ dragging=it }, onValueChangeFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
+                            modifier=sliderModifier.heightIn(min=48.dp),
+                            valueRange=0f..state.durationMs.coerceAtLeast(1).toFloat(),enabled=!state.loading && state.durationMs>0,
+                            colors=seekColors,
+                            thumb={ Box(Modifier.size(12.dp).background(seekTint,CircleShape)) },
+                            track={ sliderState -> SliderDefaults.Track(sliderState,modifier=Modifier.height(4.dp),
+                                colors=seekColors,thumbTrackGapSize=0.dp,drawStopIndicator=null) })
+                    }
+                    if (landscape) {
+                        // Waktu mengapit slider agar satu baris lebih pendek — semua kontrol muat tanpa gulir.
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                            Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium,modifier=Modifier.widthIn(min=44.dp))
+                            seekSlider(Modifier.weight(1f))
+                            Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium,modifier=Modifier.widthIn(min=44.dp),textAlign=TextAlign.End)
+                        }
+                    } else {
+                        seekSlider(Modifier.fillMaxWidth())
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium); Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium) }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(vertical=if(landscape) 2.dp else 8.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
+                        IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }
+                        IconButton(onClick=player::previous,enabled=!state.loading) { Icon(Icons.Outlined.SkipPrevious,"Lagu sebelumnya") }
+                        FilledIconButton(onClick=player::toggle,modifier=Modifier.size(if(landscape) 64.dp else 72.dp),enabled=!state.loading,
+                            colors=IconButtonDefaults.filledIconButtonColors(containerColor=accent,contentColor=AccentContrast.ink(accent))) {
+                            Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",Modifier.size(34.dp))
+                        }
+                        IconButton(onClick=player::next,enabled=!state.loading && state.queueHasNext) { Icon(Icons.Outlined.SkipNext,"Lagu berikutnya") }
+                        IconButton(onClick={ player.skip(10000) },enabled=!state.loading) { Icon(Icons.Outlined.Forward10,"Maju 10 detik") }
+                    }
+                }
+            }
+            // Aksi sekunder terpisah agar di landscape dapat menetap di bawah kolom kontrol.
+            val playerActions: @Composable (Modifier) -> Unit = { actionsModifier ->
                 val largeLabels = LocalDensity.current.fontScale >= 1.3f
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(top=8.dp)) {
+                BoxWithConstraints(actionsModifier) {
                     FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),
                         verticalArrangement=Arrangement.spacedBy(4.dp),
-                        maxItemsInEachRow=if (maxWidth < 320.dp || largeLabels) 2 else 4) {
+                        maxItemsInEachRow=if (landscape) 4 else if (maxWidth < 320.dp || largeLabels) 2 else 4) {
                         PlayerAction(stringResource(id.local.tubeflow.R.string.player_shuffle), Icons.Outlined.Shuffle,
                             onClick=player::toggleShuffle, modifier=Modifier.weight(1f),
                             enabled=state.queueTracks.size>1, tint=if (state.shuffle) accent else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -269,6 +307,34 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     }
                 }
             }
+            if (landscape) {
+                // Layar lebar: lirik di kiri; identitas, sampul, dan kontrol di kanan tanpa gulir.
+                Column(Modifier.fillMaxSize().background(background)) {
+                    header(Modifier.fillMaxWidth().padding(horizontal=12.dp))
+                    Row(Modifier.fillMaxWidth().weight(1f).padding(start=12.dp,end=12.dp,bottom=8.dp)) {
+                        // Kiri hanya lirik — tanpa pager sampul/indikator — agar bersih.
+                        LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor,
+                            Modifier.weight(1.15f).fillMaxHeight())
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                                controls(Modifier.fillMaxWidth().padding(end=4.dp))
+                            }
+                            playerActions(Modifier.fillMaxWidth().padding(top=2.dp,end=4.dp))
+                        }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize().background(background).verticalScroll(rememberScrollState()).padding(20.dp)) {
+                    header(Modifier.fillMaxWidth())
+                    pagerPane(Modifier.fillMaxWidth().height(pageHeight))
+                    if (pager.settledPage==0) Text(stringResource(id.local.tubeflow.R.string.player_swipe_hint),
+                        modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,
+                        style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    controls(Modifier.fillMaxWidth())
+                    playerActions(Modifier.fillMaxWidth().padding(top=8.dp))
+                }
+            }
             if (sleepOpen) SleepTimerDialog(player) { sleepOpen=false }
             if (queueOpen) QueueDialog(state,player) { queueOpen=false }
             if (equalizerOpen) EqualizerDialog(player) { equalizerOpen=false }
@@ -283,9 +349,11 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
 /** Halaman sampul; hanya bergantung pada track agar tick posisi tidak menyusun ulang halaman. */
 @Composable
 private fun PlayerCoverPage(track: PlayerViewModel.Track) {
-    Box(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
+    // Sisi sampul dibatasi tinggi pager juga, agar di landscape tidak meluber menutupi header.
+    BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
+        val side=minOf(maxWidth,maxHeight,380.dp)
         CoverThumb(track.cover,"",MediaMode.AUDIO,
-            Modifier.widthIn(max=380.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
+            Modifier.size(side),shape=MaterialTheme.shapes.large)
     }
 }
 
@@ -305,8 +373,9 @@ private fun LyricsPage(
     onSeek: (Long) -> Unit,
     onSearch: () -> Unit,
     onEdit: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(accent.copy(alpha=0.28f),accent.copy(alpha=0.10f),Color.Transparent)))) {
+    Box(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(accent.copy(alpha=0.28f),accent.copy(alpha=0.10f),Color.Transparent)))) {
         if (lines.isEmpty()) {
             // Lirik kosong: langsung tawarkan alat lirik yang sama dengan Koleksi.
             Column(Modifier.fillMaxSize().padding(start=24.dp,end=24.dp,top=24.dp,bottom=56.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
@@ -417,7 +486,7 @@ private fun PlayerAction(
                 Icon(icon,null,Modifier.size(20.dp))
                 count?.let { Text("$it",style=MaterialTheme.typography.labelMedium) }
             }
-            Text(label,style=MaterialTheme.typography.labelSmall,textAlign=TextAlign.Center)
+            Text(label,style=MaterialTheme.typography.labelSmall,textAlign=TextAlign.Center,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
     }
 }

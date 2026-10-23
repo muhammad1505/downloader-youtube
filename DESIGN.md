@@ -253,6 +253,17 @@ status kosong dan galat. Catat cakupan yang benar-benar diuji pada laporan
 perbaikan; jangan menyimpulkan aksesibilitas atau kesiapan rilis dari build saja.
 
 
+## Pemutar dua kolom (1.1.31)
+
+Layar landscape lebar (lebar > tinggi dan minimal 560dp) membagi pemutar penuh
+menjadi dua kolom: kolom kiri hanya lirik, tanpa pager sampul atau pil
+indikator; kolom kanan berisi judul, artis/posisi antrean, sampul, slider
+dengan waktu di kiri/kanan, dan transport. Sampul 104dp pada font normal dan
+48dp pada font minimal 1,3× (judul lalu dibatasi satu baris).
+Acak/Ulangi/Karaoke/Antrean menetap di dasar kolom kanan dalam satu baris empat
+slot agar tidak perlu digulir. Portrait tetap satu kolom bergulir dengan pager
+sampul/lirik dan indikator mengambang.
+
 ## Navigasi dan playlist (1.1.20)
 
 - Notifikasi musik memakai MediaStyle native dan MediaSession, bukan salinan mini

@@ -893,8 +893,8 @@ entri yang dihapus lewat notice, tanpa menyentuh file media.
 
 **Verifikasi host:** 405 tes Kotlin 0 gagal/error/skip; lint debug **0 error, 3 warning
 lama** (ulang setelah perubahan terakhir); `assembleDebug` dan `assembleRelease` signed
-ARM64 70.956.060 byte, SHA256
-`df5813886bbd92987f315f41e42e965ef1ed8197c6f69a5404a61e6884716922` sukses. Audit APK
+ARM64 70.962.676 byte, SHA256
+`15d9c83a324ffe4187c3e8bdf25ba51e66454a7b23bad1e2fc40368663e0950d` sukses. Audit APK
 rilis: 257 ELF 0 gagal 16 KB, 13 kelas refleksi ZIP 0 gagal. **Di HP** (Realme RMX1821
 Android 10): rilis dipasang sebagai update (versionCode 45, hash `base.apk` identik
 dengan artefak, aplikasi berjalan tanpa FATAL/ANR). Titik halaman berpindah
@@ -904,8 +904,16 @@ perbaikan tembus pandang. **Uji pembatalan nyata:** unduhan Big Buck Bunny 4K
 dibuat lewat share intent, direktori `no_backup/downloads/200a94bd-…` terlihat
 saat job berjalan, lalu dibatalkan dari kartu; setelah 3 detik direktori itu
 hilang (tersisa `.` dan `..`), status menjadi **Dibatalkan**, dan entri uji
-dihapus dari riwayat. **Belum:** landscape/font besar (shell tidak punya
-WRITE_SETTINGS di ColorOS), TalkBack aktif, notice retensi dengan baris
+dihapus dari riwayat. **Matriks tata letak:** portrait pada font **0,9×**
+menampilkan empat aksi sekunder dalam satu baris; font **1,6×** (maksimum
+ColorOS) memindahkannya ke dua kolom, teks membungkus tanpa tombol terpotong.
+Landscape memakai **dua kolom** — kolom kiri hanya lirik, tanpa pager sampul
+atau pil indikator; kolom kanan memuat judul, artis/posisi antrean, sampul,
+slider dengan waktu di kiri/kanan, transport, dan aksi
+Acak/Ulangi/Karaoke/Antrean yang menetap di dasar. Pada font besar judul
+dibatasi satu baris dan sampul diperkecil agar kolom tetap ringkas. Pada build
+rilis final (font 0,9×) keempat aksi terlihat tanpa menggulir. Rotasi otomatis,
+font 0,9×, dan status ulangi semula dipulihkan setelah uji. **Belum:** TalkBack aktif, notice retensi dengan baris
 kedaluwarsa, pengukuran
 recomposition/perfetto, dan celah `createDocument` → `dao.pending` (BUG-008) masih
 terbuka — jurnal-intent sebelum create belum dirancang.
