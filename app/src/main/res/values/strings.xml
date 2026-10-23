@@ -14,6 +14,9 @@
     <string name="player_queue_next">Putar setelah lagu ini</string>
     <string name="player_queue_close">Tutup antrean</string>
     <string name="player_swipe_hint">Geser sampul untuk melihat lirik</string>
+    <string name="player_page_show_cover">Tampilkan sampul</string>
+    <string name="player_page_show_lyrics">Tampilkan lirik</string>
+    <string name="player_speed_description">Kecepatan putar %1$s kali</string>
     <string name="player_stop">Tutup pemutar</string>
     <string name="player_now_playing">Sedang diputar</string>
     <string name="player_shuffle">Acak</string>

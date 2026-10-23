@@ -1,5 +1,7 @@
 package id.local.tubeflow.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,8 +38,13 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -96,6 +104,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     val accent=MaterialTheme.colorScheme.primary
     // Aksen diambil dari sampul lagu: latar pemutar dan lirik ikut bernuansa sampul, bukan hitam polos.
     val coverAccent=rememberCoverAccent(track.cover)
+    val speedDescription=stringResource(id.local.tubeflow.R.string.player_speed_description, speedLabel(state.speed))
     val list=rememberLazyListState()
     val active=LrcLines.activeIndex(state.lines,state.positionMs)
     var userChoseView by remember(track.uri) { mutableStateOf(false) }
@@ -144,26 +153,41 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     Box {
                         TextButton(
                             onClick = { speedOpen = true },
-                            modifier = Modifier.semantics { contentDescription = "Kecepatan putar ${speedLabel(state.speed)} kali" },
+                            modifier = Modifier.heightIn(min=48.dp).clearAndSetSemantics {
+                                role = Role.Button
+                                contentDescription = speedDescription
+                                onClick(label = speedDescription) { speedOpen = true; true }
+                            },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                        ) { Text("${speedLabel(state.speed)}×", fontWeight = FontWeight.Bold) }
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                        ) {
+                            Icon(Icons.Outlined.Speed,null,Modifier.size(24.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${speedLabel(state.speed)}×", fontWeight = FontWeight.Bold)
+                        }
                         DropdownMenu(speedOpen,onDismissRequest={ speedOpen=false }) {
                             listOf(0.5f,0.75f,1f,1.25f,1.5f,2f).forEach { value ->
-                                DropdownMenuItem(text={ Text("${speedLabel(value)}×") },onClick={ speedOpen=false; player.setSpeed(value) })
+                                DropdownMenuItem(
+                                    text={ Text("${speedLabel(value)}×") },
+                                    onClick={ speedOpen=false; player.setSpeed(value) },
+                                    trailingIcon = if (state.speed == value) {
+                                        { Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)) }
+                                    } else null,
+                                )
                             }
                         }
                     }
-                    IconButton(onClick={ sleepOpen=true }) { Icon(Icons.Outlined.Bedtime, stringResource(id.local.tubeflow.R.string.sleep_title)) }
-                    IconButton(onClick={ equalizerOpen=true }) { Icon(Icons.Outlined.Tune,"Equalizer") }
+                    IconButton(onClick={ sleepOpen=true }) { Icon(Icons.Outlined.Bedtime, stringResource(id.local.tubeflow.R.string.sleep_title), Modifier.size(24.dp)) }
+                    IconButton(onClick={ equalizerOpen=true }) { Icon(Icons.Outlined.Tune,"Equalizer", Modifier.size(24.dp)) }
                 }
                 // Halaman utama dapat digeser: sampul ↔ lirik, tanpa harus mencari tombol.
-                HorizontalPager(state=pager,modifier=Modifier.height(pageHeight).fillMaxWidth(),pageSpacing=12.dp) { page ->
+                Box(Modifier.fillMaxWidth().height(pageHeight)) {
+                HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),pageSpacing=12.dp) { page ->
                     if (page==1) {
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.28f),coverAccent.copy(alpha=0.10f),Color.Transparent)))) {
                             if (state.lines.isEmpty()) {
                                 // Lirik kosong: langsung tawarkan alat lirik yang sama dengan Koleksi.
-                                Column(Modifier.fillMaxSize().padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                                Column(Modifier.fillMaxSize().padding(start=24.dp,end=24.dp,top=24.dp,bottom=56.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
                                     Icon(Icons.Outlined.Lyrics,null,Modifier.size(44.dp),tint=coverAccent)
                                     Spacer(Modifier.height(12.dp))
                                     Text(state.lyricError ?: "Lirik tersinkron belum tersedia.",style=MaterialTheme.typography.bodyLarge,textAlign=TextAlign.Center)
@@ -180,7 +204,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                                         ActionButton("Cari lirik lain", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Quiet)
                                     }
                                     lyricToolError?.let { Text(it,Modifier.padding(horizontal=8.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
-                                    LazyColumn(state=list,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                                    LazyColumn(state=list,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(top=16.dp,bottom=64.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                         itemsIndexed(state.lines) { index,line ->
                                             Text(line.text.ifBlank { "♪" },Modifier.fillMaxWidth().clickable(onClickLabel="Putar dari baris lirik") { player.seek(line.atMs) }.padding(vertical=14.dp,horizontal=8.dp),
                                                 style=MaterialTheme.typography.titleLarge,fontWeight=if (index==active) FontWeight.ExtraBold else FontWeight.Medium,
@@ -196,6 +220,18 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                                 Modifier.widthIn(max=380.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
                         }
                     }
+                }
+                PlayerPageIndicator(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                    selectedPage = pager.currentPage,
+                    coverDescription = stringResource(id.local.tubeflow.R.string.player_page_show_cover),
+                    lyricsDescription = stringResource(id.local.tubeflow.R.string.player_page_show_lyrics),
+                    accent = coverAccent,
+                    onSelect = { page ->
+                        userChoseView = true
+                        scope.launch { pager.animateScrollToPage(page) }
+                    },
+                )
                 }
                 if (pager.settledPage==0) Text(stringResource(id.local.tubeflow.R.string.player_swipe_hint),
                     modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,
@@ -262,6 +298,62 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
             timing?.let { item -> LyricTimingDialog(item,library) { timing=null } }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerPageIndicator(
+    modifier: Modifier = Modifier,
+    selectedPage: Int,
+    coverDescription: String,
+    lyricsDescription: String,
+    accent: Color,
+    onSelect: (Int) -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+    ) {
+        Row(
+            Modifier.selectableGroup().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PlayerPageDot(selectedPage == 0, coverDescription, accent) { onSelect(0) }
+            Spacer(Modifier.width(4.dp))
+            PlayerPageDot(selectedPage == 1, lyricsDescription, accent) { onSelect(1) }
+        }
+    }
+}
+
+@Composable
+private fun PlayerPageDot(
+    selected: Boolean,
+    description: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    val width by animateDpAsState(if (selected) 22.dp else 8.dp, label = "player-page-dot-width")
+    val color by animateColorAsState(
+        if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+        label = "player-page-dot-color",
+    )
+    Box(
+        Modifier
+            .size(48.dp)
+            .clickable(onClick = onClick)
+            .clearAndSetSemantics {
+                this.selected = selected
+                role = Role.Tab
+                contentDescription = description
+                onClick(label = description) { onClick(); true }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(width).height(8.dp).background(color, CircleShape))
     }
 }
 
