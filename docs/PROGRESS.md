@@ -900,8 +900,12 @@ Android 10): rilis dipasang sebagai update (versionCode 45, hash `base.apk` iden
 dengan artefak, aplikasi berjalan tanpa FATAL/ANR). Titik halaman berpindah
 sampul↔lirik lewat ketukan, tombol kecepatan membuka menu dengan centang pada 1×,
 memilih 1,25× langsung mengubah label header, dan pil indikator opak setelah
-perbaikan tembus pandang. **Belum:** landscape/font besar (shell tidak punya
-WRITE_SETTINGS di ColorOS), TalkBack aktif, pembatalan unduhan nyata untuk
-cleanup berlease, notice retensi dengan baris kedaluwarsa, pengukuran
+perbaikan tembus pandang. **Uji pembatalan nyata:** unduhan Big Buck Bunny 4K
+dibuat lewat share intent, direktori `no_backup/downloads/200a94bd-…` terlihat
+saat job berjalan, lalu dibatalkan dari kartu; setelah 3 detik direktori itu
+hilang (tersisa `.` dan `..`), status menjadi **Dibatalkan**, dan entri uji
+dihapus dari riwayat. **Belum:** landscape/font besar (shell tidak punya
+WRITE_SETTINGS di ColorOS), TalkBack aktif, notice retensi dengan baris
+kedaluwarsa, pengukuran
 recomposition/perfetto, dan celah `createDocument` → `dao.pending` (BUG-008) masih
 terbuka — jurnal-intent sebelum create belum dirancang.
