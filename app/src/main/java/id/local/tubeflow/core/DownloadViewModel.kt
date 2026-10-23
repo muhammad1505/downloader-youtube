@@ -219,11 +219,22 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     }
    }
  }
- /** Berkas parsial sementara sebuah job di noBackupFilesDir (BUG-004). */
- private fun deleteJobDir(id: String) {
-  val app=getApplication<Application>()
-  java.io.File(app.noBackupFilesDir, "downloads/$id").deleteRecursively()
-  java.io.File(app.noBackupFilesDir, "covers").listFiles()?.filter { it.name == "$id.jpg" || it.name.startsWith("$id-") }?.forEach { it.delete() }
+ /**
+  * Berkas sementara sebuah job di noBackupFilesDir (BUG-004). Lease eksekusi menentukan pemilik:
+  * worker yang sedang berjalan (termasuk saat baru dibatalkan) memegang lease dan membersihkan
+  * direktorinya sendiri di finally, jadi penghapusan dari sini dilewati. WorkManager berstatus
+  * ENQUEUED belum tentu berjalan, sehingga status WorkInfo bukan penentu — lease dan engine yang dipakai.
+  */
+ private suspend fun deleteJobDir(id: String): Boolean {
+  val lease = DownloadFileAccess.lock(id)
+  if (!lease.tryLock()) return false
+  try {
+   if (Engine.isRunning(id)) return false
+   val app=getApplication<Application>()
+   java.io.File(app.noBackupFilesDir, "downloads/$id").deleteRecursively()
+   java.io.File(app.noBackupFilesDir, "covers").listFiles()?.filter { it.name == "$id.jpg" || it.name.startsWith("$id-") }?.forEach { it.delete() }
+   return true
+  } finally { lease.unlock() }
  }
  /** Masih ada pekerjaan WorkManager aktif untuk job ini? */
  private fun hasActiveWork(id: String): Boolean = runCatching { work.getWorkInfosByTag(id).get().any { !it.state.isFinished } }.getOrDefault(false)
@@ -397,9 +408,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   cancelResultNotification(id)
   val cancelled=dao.cancel(id)
   Engine.cancel(id); work.cancelAllWorkByTag(id)
-  // Job tanpa pekerjaan (mis. dijeda) tak punya yang membersihkan berkas parsialnya; job berjalan dibersihkan
-  // oleh finally milik worker setelah engine berhenti (BUG-004).
-  if(cancelled > 0 && !hasActiveWork(id)) deleteJobDir(id)
+  // Job tanpa pekerjaan (mis. dijeda/diantre) tak punya yang membersihkan berkas parsialnya; job berjalan
+  // dibersihkan oleh finally milik worker setelah engine berhenti (BUG-004). Lease di deleteJobDir mencegah
+  // penghapusan direktori milik worker yang masih berjalan, termasuk saat pekerjaan baru dibatalkan.
+  if(cancelled > 0) deleteJobDir(id)
  }
  fun cancelAll() { viewModelScope.launch {
   val ids=dao.observe().first().filter { it.state in setOf(JobState.QUEUED,JobState.RUNNING,JobState.PAUSED) }.map { it.id }
@@ -682,7 +694,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     .map { it.id }
    if (ids.isEmpty()) return@launch
    val removed = dao.clearCompletedBefore(cutoff)
-   if (removed > 0) ids.forEach(::cancelResultNotification)
+   if (removed > 0) {
+    ids.forEach(::cancelResultNotification)
+    // Retensi berjalan diam-diam saat aplikasi dibuka; beri tahu hasilnya agar tidak terasa seperti kehilangan data.
+    _notice.value = "$removed entri riwayat lama dihapus otomatis. File media tetap tersimpan."
+   }
   }
  }
 

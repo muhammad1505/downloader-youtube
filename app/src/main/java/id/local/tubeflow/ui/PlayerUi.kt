@@ -13,6 +13,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -118,15 +119,19 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     val pager=rememberPagerState(pageCount={ 2 })
     val scope=rememberCoroutineScope()
     val dragged by pager.interactionSource.collectIsDraggedAsState()
-    val openSearch: () -> Unit = { lyricToolError=null; library.openLyricsForTrack(track.uri) }
-    val openEditor: () -> Unit = {
-        lyricToolError=null
-        scope.launch {
-            val item=library.itemFor(track.uri)
-            if (item?.lyricUri == null) lyricToolError="Lirik tersinkron belum tersedia untuk lagu ini."
-            else timing=item
+    // Callback diingat agar halaman pager tidak dianggap berubah setiap tick posisi (lihat LyricsPage).
+    val openSearch: () -> Unit = remember(track.uri,library) { { lyricToolError=null; library.openLyricsForTrack(track.uri) } }
+    val openEditor: () -> Unit = remember(track.uri,library) {
+        {
+            lyricToolError=null
+            scope.launch {
+                val item=library.itemFor(track.uri)
+                if (item?.lyricUri == null) lyricToolError="Lirik tersinkron belum tersedia untuk lagu ini."
+                else timing=item
+            }
         }
     }
+    val seekLine: (Long) -> Unit = remember(player) { { player.seek(it) } }
     // Swipe pengguna menang atas pemilihan otomatis; lagu baru kembali memakai aturan otomatis.
     LaunchedEffect(dragged) { if (dragged) userChoseView=true }
     LaunchedEffect(track.uri) { pager.scrollToPage(if (state.lines.isNotEmpty()) 1 else 0) }
@@ -145,7 +150,11 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
         }
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-            val pageHeight=(maxHeight-370.dp).coerceIn(220.dp,400.dp)
+            // Layar pendek/landscape dan font besar butuh ruang lebih sedikit untuk sampul agar
+            // kontrol bawah tetap terjangkau; angka tetap lama mendorong kontrol keluar layar.
+            val compactHeight=maxHeight<600.dp || LocalDensity.current.fontScale>=1.3f
+            val pageHeight=if(compactHeight) (maxHeight-280.dp).coerceIn(140.dp,400.dp)
+                else (maxHeight-370.dp).coerceIn(220.dp,400.dp)
             Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),MaterialTheme.colorScheme.background))).verticalScroll(rememberScrollState()).padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                     IconButton(onClick=dismiss) { Icon(Icons.Outlined.ExpandMore,"Kembali ke mini player") }
@@ -170,6 +179,8 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                                 DropdownMenuItem(
                                     text={ Text("${speedLabel(value)}×") },
                                     onClick={ speedOpen=false; player.setSpeed(value) },
+                                    // Centang saja tidak terbaca TalkBack — item aktif diumumkan "dipilih".
+                                    modifier = Modifier.semantics { if (state.speed == value) selected = true },
                                     trailingIcon = if (state.speed == value) {
                                         { Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)) }
                                     } else null,
@@ -184,41 +195,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                 Box(Modifier.fillMaxWidth().height(pageHeight)) {
                 HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),pageSpacing=12.dp) { page ->
                     if (page==1) {
-                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.28f),coverAccent.copy(alpha=0.10f),Color.Transparent)))) {
-                            if (state.lines.isEmpty()) {
-                                // Lirik kosong: langsung tawarkan alat lirik yang sama dengan Koleksi.
-                                Column(Modifier.fillMaxSize().padding(start=24.dp,end=24.dp,top=24.dp,bottom=56.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-                                    Icon(Icons.Outlined.Lyrics,null,Modifier.size(44.dp),tint=coverAccent)
-                                    Spacer(Modifier.height(12.dp))
-                                    Text(state.lyricError ?: "Lirik tersinkron belum tersedia.",style=MaterialTheme.typography.bodyLarge,textAlign=TextAlign.Center)
-                                    Spacer(Modifier.height(16.dp))
-                                    ActionButton("Cari lirik", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Primary)
-                                    ActionButton("Editor lirik", openEditor, icon = Icons.Outlined.EditNote, enabled = track.lyricUri != null)
-                                    if (track.lyricUri==null) Text("Editor waktu lirik tersedia setelah lirik dipilih.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    lyricToolError?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
-                                }
-                            } else {
-                                Column(Modifier.fillMaxSize()) {
-                                    FlowRow(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End)) {
-                                        ActionButton("Atur waktu lirik", openEditor, icon = Icons.Outlined.EditNote, emphasis = ActionEmphasis.Quiet, enabled = track.lyricUri != null)
-                                        ActionButton("Cari lirik lain", openSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Quiet)
-                                    }
-                                    lyricToolError?.let { Text(it,Modifier.padding(horizontal=8.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
-                                    LazyColumn(state=list,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(top=16.dp,bottom=64.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                                        itemsIndexed(state.lines) { index,line ->
-                                            Text(line.text.ifBlank { "♪" },Modifier.fillMaxWidth().clickable(onClickLabel="Putar dari baris lirik") { player.seek(line.atMs) }.padding(vertical=14.dp,horizontal=8.dp),
-                                                style=MaterialTheme.typography.titleLarge,fontWeight=if (index==active) FontWeight.ExtraBold else FontWeight.Medium,
-                                                color=if (index==active) coverAccent else MaterialTheme.colorScheme.onSurfaceVariant, textAlign=TextAlign.Center)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor)
                     } else {
-                        Box(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
-                            CoverThumb(track.cover,"",MediaMode.AUDIO,
-                                Modifier.widthIn(max=380.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
-                        }
+                        PlayerCoverPage(track)
                     }
                 }
                 PlayerPageIndicator(
@@ -301,6 +280,64 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     }
 }
 
+/** Halaman sampul; hanya bergantung pada track agar tick posisi tidak menyusun ulang halaman. */
+@Composable
+private fun PlayerCoverPage(track: PlayerViewModel.Track) {
+    Box(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
+        CoverThumb(track.cover,"",MediaMode.AUDIO,
+            Modifier.widthIn(max=380.dp).fillMaxWidth().aspectRatio(1f),shape=MaterialTheme.shapes.large)
+    }
+}
+
+/**
+ * Halaman lirik dipisah dari FullPlayer: parameter yang berubah tiap tick hanyalah [activeIndex],
+ * sehingga daftar lirik dan tombol alat tidak ikut direkomposisi saat posisi audio bergerak.
+ */
+@Composable
+private fun LyricsPage(
+    track: PlayerViewModel.Track,
+    lines: List<LrcLines.Line>,
+    activeIndex: Int,
+    accent: Color,
+    lyricError: String?,
+    toolError: String?,
+    list: LazyListState,
+    onSeek: (Long) -> Unit,
+    onSearch: () -> Unit,
+    onEdit: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(accent.copy(alpha=0.28f),accent.copy(alpha=0.10f),Color.Transparent)))) {
+        if (lines.isEmpty()) {
+            // Lirik kosong: langsung tawarkan alat lirik yang sama dengan Koleksi.
+            Column(Modifier.fillMaxSize().padding(start=24.dp,end=24.dp,top=24.dp,bottom=56.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                Icon(Icons.Outlined.Lyrics,null,Modifier.size(44.dp),tint=accent)
+                Spacer(Modifier.height(12.dp))
+                Text(lyricError ?: "Lirik tersinkron belum tersedia.",style=MaterialTheme.typography.bodyLarge,textAlign=TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                ActionButton("Cari lirik", onSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Primary)
+                ActionButton("Editor lirik", onEdit, icon = Icons.Outlined.EditNote, enabled = track.lyricUri != null)
+                if (track.lyricUri==null) Text("Editor waktu lirik tersedia setelah lirik dipilih.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                toolError?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                FlowRow(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp,Alignment.End)) {
+                    ActionButton("Atur waktu lirik", onEdit, icon = Icons.Outlined.EditNote, emphasis = ActionEmphasis.Quiet, enabled = track.lyricUri != null)
+                    ActionButton("Cari lirik lain", onSearch, icon = Icons.Outlined.Search, emphasis = ActionEmphasis.Quiet)
+                }
+                toolError?.let { Text(it,Modifier.padding(horizontal=8.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+                LazyColumn(state=list,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(top=16.dp,bottom=64.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    itemsIndexed(lines) { index,line ->
+                        Text(line.text.ifBlank { "♪" },Modifier.fillMaxWidth().clickable(onClickLabel="Putar dari baris lirik") { onSeek(line.atMs) }.padding(vertical=14.dp,horizontal=8.dp),
+                            style=MaterialTheme.typography.titleLarge,fontWeight=if (index==activeIndex) FontWeight.ExtraBold else FontWeight.Medium,
+                            color=if (index==activeIndex) accent else MaterialTheme.colorScheme.onSurfaceVariant, textAlign=TextAlign.Center)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PlayerPageIndicator(
     modifier: Modifier = Modifier,
@@ -313,7 +350,8 @@ private fun PlayerPageIndicator(
     Surface(
         modifier = modifier,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        // Opak: indikator mengambang di atas lirik, jadi teks yang lewat di belakangnya tidak boleh tembus.
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         shadowElevation = 2.dp,
     ) {

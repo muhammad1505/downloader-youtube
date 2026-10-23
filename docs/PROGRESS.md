@@ -875,3 +875,33 @@ debug bertanda tangan kunci yang sama); pencarian/filter Riwayat dengan >3 entri
 TWS/Android 12+, fault injection provider/process death, runtime 16 KB,
 ABI/Android lain, serta matriks font/landscape belum diuji. Audit host tidak
 membuktikan seluruh jalur gagal Android aman.
+
+## Pembaruan 23 Oktober 2026: pemolesan pemutar, cleanup berlease, retensi terlihat
+
+Pemutar penuh memisahkan halaman **Sampul** dan **Lirik** menjadi composable sendiri
+(`PlayerCoverPage`, `LyricsPage`) dengan callback yang diingat, sehingga pembaruan posisi
+tiap 200 ms hanya mengubah `activeIndex`, bukan menyusun ulang daftar lirik dan tombol
+alat. Tinggi halaman memakai ambang ringkas (tinggi < 600dp atau font ≥ 1,3×) agar
+kontrol bawah tetap terjangkau di layar pendek/landscape. Menu kecepatan mengumumkan
+baris aktif sebagai "dipilih" untuk TalkBack, bukan hanya ikon centang.
+
+Pembersihan direktori sementara job (`deleteJobDir`) kini memegang lease
+`DownloadFileAccess` dan menolak hapus saat `Engine.isRunning`; pembatalan job yang
+masih ENQUEUED tidak lagi menunggu worker yang tak akan berjalan, sedangkan worker aktif
+membersihkan sendiri di `finally` (BUG-004). Retensi riwayat otomatis memberi tahu jumlah
+entri yang dihapus lewat notice, tanpa menyentuh file media.
+
+**Verifikasi host:** 405 tes Kotlin 0 gagal/error/skip; lint debug **0 error, 3 warning
+lama** (ulang setelah perubahan terakhir); `assembleDebug` dan `assembleRelease` signed
+ARM64 70.956.060 byte, SHA256
+`df5813886bbd92987f315f41e42e965ef1ed8197c6f69a5404a61e6884716922` sukses. Audit APK
+rilis: 257 ELF 0 gagal 16 KB, 13 kelas refleksi ZIP 0 gagal. **Di HP** (Realme RMX1821
+Android 10): rilis dipasang sebagai update (versionCode 45, hash `base.apk` identik
+dengan artefak, aplikasi berjalan tanpa FATAL/ANR). Titik halaman berpindah
+sampul↔lirik lewat ketukan, tombol kecepatan membuka menu dengan centang pada 1×,
+memilih 1,25× langsung mengubah label header, dan pil indikator opak setelah
+perbaikan tembus pandang. **Belum:** landscape/font besar (shell tidak punya
+WRITE_SETTINGS di ColorOS), TalkBack aktif, pembatalan unduhan nyata untuk
+cleanup berlease, notice retensi dengan baris kedaluwarsa, pengukuran
+recomposition/perfetto, dan celah `createDocument` → `dao.pending` (BUG-008) masih
+terbuka — jurnal-intent sebelum create belum dirancang.
