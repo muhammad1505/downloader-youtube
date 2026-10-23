@@ -29,6 +29,7 @@ class MediaCardPlanTest {
         assertTrue(plan.menu().contains(MediaActionKind.ENQUEUE))
         assertTrue(plan.menu().contains(MediaActionKind.DETAIL))
         assertTrue(plan.menu().contains(MediaActionKind.OPEN))
+        assertFalse("Audio tidak punya pemotong Status video", plan.menu().contains(MediaActionKind.CLIP_STATUS))
     }
 
     @Test
@@ -41,7 +42,9 @@ class MediaCardPlanTest {
         )
         assertFalse("Video tidak punya aksi lirik", plan.inline().contains(MediaActionKind.FIND_LYRICS))
         assertFalse("Video tidak punya aksi lirik", plan.menu().contains(MediaActionKind.FIND_LYRICS))
+        assertEquals(MediaCardPlan.GROUP_FILE, plan.first { it.kind == MediaActionKind.CLIP_STATUS }.group)
         assertFalse("Video tidak punya antrean audio", plan.menu().contains(MediaActionKind.ENQUEUE))
+        assertTrue("Video punya pemotong Status", plan.menu().contains(MediaActionKind.CLIP_STATUS))
         // Buka sudah menjadi aksi utama, jangan diulang di menu.
         assertFalse(plan.menu().contains(MediaActionKind.OPEN))
     }

@@ -53,6 +53,7 @@ fun MediaLibraryScreen(
     var rename by remember { mutableStateOf<MediaItem?>(null) }
     var delete by remember { mutableStateOf<MediaItem?>(null) }
     var timing by remember { mutableStateOf<MediaItem?>(null) }
+    var clipStatus by remember { mutableStateOf<MediaItem?>(null) }
     // "Unduh lagi" mengganti file yang ada; pasangkan job sumber dengan item yang dikonfirmasi.
     var redownload by remember { mutableStateOf<Pair<DownloadJob, MediaItem>?>(null) }
     val context = LocalContext.current
@@ -164,6 +165,7 @@ fun MediaLibraryScreen(
                             MediaActionKind.REDOWNLOAD -> !busy
                             MediaActionKind.EDIT_LYRIC_TIMING, MediaActionKind.RENAME,
                             MediaActionKind.DELETE -> !busy && available
+                            MediaActionKind.CLIP_STATUS -> !busy && available
                             else -> true
                         }
                     },
@@ -183,6 +185,7 @@ fun MediaLibraryScreen(
                             MediaActionKind.DETAIL -> detail = item
                             MediaActionKind.RENAME -> rename = item
                             MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
+                            MediaActionKind.CLIP_STATUS -> clipStatus = item
                             MediaActionKind.DELETE -> delete = item
                             else -> Unit
                         }
@@ -249,6 +252,7 @@ fun MediaLibraryScreen(
         destructive = true,
     ) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
+    clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
 }
 
 /** Dialog atur waktu lirik; dipakai Koleksi DAN pemutar penuh supaya tidak bolak-balik. */

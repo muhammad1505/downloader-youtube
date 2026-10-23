@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.ClosedCaption
+import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Favorite
@@ -68,6 +69,7 @@ enum class MediaActionKind {
     DETAIL,
     RENAME,
     REDOWNLOAD,
+    CLIP_STATUS,
     OPEN_THUMBNAIL,
     OPEN_SUBTITLE,
     DELETE,
@@ -109,6 +111,7 @@ object MediaCardPlan {
         playlist: Boolean = false,
         detail: Boolean = false,
         rename: Boolean = false,
+        clipStatus: Boolean = false,
         canRedownload: Boolean = false,
     ): List<MediaActionSpec> = buildList {
         // Enam aksi yang selalu terlihat, urut sesuai kebiasaan memakai kartu.
@@ -138,6 +141,7 @@ object MediaCardPlan {
         if (hasThumbnail) add(menu(MediaActionKind.OPEN_THUMBNAIL, GROUP_ATTACHMENT))
         if (hasSubtitle) add(menu(MediaActionKind.OPEN_SUBTITLE, GROUP_ATTACHMENT))
         if (detail) add(menu(MediaActionKind.DETAIL, GROUP_FILE))
+        if (!audio && clipStatus) add(menu(MediaActionKind.CLIP_STATUS, GROUP_FILE))
         // Audio juga bisa dibuka di pemutar lain; video sudah memakai Buka sebagai aksi utama.
         if (audio) add(menu(MediaActionKind.OPEN, GROUP_FILE))
         if (canRedownload) add(menu(MediaActionKind.REDOWNLOAD, GROUP_FILE))
@@ -162,6 +166,7 @@ object MediaCardPlan {
         playlist = true,
         detail = true,
         rename = true,
+        clipStatus = !audio,
         canRedownload = canRedownload,
     )
 
@@ -199,6 +204,7 @@ object MediaCardPlan {
         MediaActionKind.DETAIL -> "Detail"
         MediaActionKind.RENAME -> "Ubah nama"
         MediaActionKind.REDOWNLOAD -> "Unduh lagi"
+        MediaActionKind.CLIP_STATUS -> "Potong Status (30 dtk)"
         MediaActionKind.OPEN_THUMBNAIL -> "Buka thumbnail"
         MediaActionKind.OPEN_SUBTITLE -> "Buka subtitle (CC)"
         MediaActionKind.DELETE -> "Hapus file"
@@ -219,6 +225,7 @@ object MediaCardPlan {
         MediaActionKind.DETAIL -> Icons.Outlined.Info
         MediaActionKind.RENAME -> Icons.Outlined.Edit
         MediaActionKind.REDOWNLOAD -> Icons.Outlined.Refresh
+        MediaActionKind.CLIP_STATUS -> Icons.Outlined.ContentCut
         MediaActionKind.OPEN_THUMBNAIL -> Icons.Outlined.Image
         MediaActionKind.OPEN_SUBTITLE -> Icons.Outlined.ClosedCaption
         MediaActionKind.DELETE -> Icons.Outlined.DeleteOutline
