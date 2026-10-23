@@ -1,14 +1,23 @@
 # Signing produksi TubeFlow
 
-Terbaru1.1.30/code44,23Oktober2026: ARM64 **70.948.952byte**, SHA256
+Terbaru1.1.31/code45,23Oktober2026: ARM64 **70.946.520byte**, SHA256
+`cd265cee31516c9a5f4a0e3a70388fbc704617ebde190ad50cb29bef9978c18f`;
+AAB **256.041.323byte**, SHA256
+`7341a6adf0fc3ffc4bb62df941828682cc9f05390ba5ba4a18b528028a8c3e80`.
+APK×3/AAB bertanda tangan; signature v2/zipalign16KB, APK 257/257/259
+ELF/13kelas ZIP, dan AAB1.038ELF/jarsigner lulus. Terpasang sebagai update di
+RealmeAndroid10, `base.apk` identik; daftar Antrean/Riwayat terpadu dan riwayat
+setelah force-stop diuji. TWS/Android12+, fault injection provider/process death,
+runtime16KB, dan ABI/Android lain belum diuji. Bundletool/publikasi toko tidak
+dijalankan. [Ringkasan](PROGRESS.md).
+
+Sebelumnya1.1.30/code44,23Oktober2026: ARM64 **70.948.952byte**, SHA256
 `6bf4957d6d16d4bfe22589fa7818b1d531211204ea4c43e223fa14918cefe7c5`;
 AAB **256.040.881byte**, SHA256
 `b686b07ceb7cd5596ff40320f61ffd4e9b3bdb1a9d5f5f91348f363aafd53eee`.
 APK×3/AAB bertanda tangan; signature v2/zipalign16KB, APK 257/257/259
 ELF/13kelas ZIP, dan AAB1.038ELF/jarsigner lulus. Terpasang sebagai update di RealmeAndroid10. Inspeksi
-bertahap/cancel/cache, LRC manual, dan unduhan BUG-054 diuji. TWS/Android12+,
-fault injection provider/process death, runtime16KB, dan ABI/Android lain belum
-diuji. Bundletool/publikasi toko tidak dijalankan. [Ringkasan](PROGRESS.md).
+bertahap/cancel/cache, LRC manual, dan unduhan BUG-054 diuji. [Ringkasan](PROGRESS.md).
 
 Sebelumnya1.1.29/code43,23Oktober2026: ARM64 **70.935.808byte**, SHA256
 `e3893e1183ef28539ecb5f09343e2abd18407cb24eac4dd92d00274d3dc390c2`.

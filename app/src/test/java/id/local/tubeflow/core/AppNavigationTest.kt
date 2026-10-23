@@ -14,10 +14,15 @@ class AppNavigationTest {
         assertNull(AppDestination.fromAction("unknown"))
     }
     @Test fun successfulDownloadsOpenHistoryWhileFailuresAndTransfersOpenTheQueue() {
-        assertEquals(4, AppDestination.downloadResult(true).tab)
+        assertEquals(1, AppDestination.downloadResult(true).tab)
         assertEquals(AppDestination.HISTORY, AppDestination.downloadResult(true))
         assertEquals(AppDestination.QUEUE, AppDestination.downloadResult(false))
-        assertEquals(2, AppDestination.QUEUE.tab)
+        assertEquals(1, AppDestination.QUEUE.tab)
+    }
+    @Test fun downloadTabOwnsBothQueueAndHistoryWhilePlayerUsesCollection() {
+        assertEquals(1, AppDestination.DOWNLOAD.tab)
+        assertEquals(2, AppDestination.PLAYER.tab)
+        assertEquals(2, AppDestination.KARAOKE.tab)
     }
     @Test fun repeatedTapsOnTheSameNotificationRemainSeparateNavigationEvents() {
         val first = AppNavigationRequest(AppDestination.PLAYER)

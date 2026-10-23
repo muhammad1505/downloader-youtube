@@ -8,10 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,7 +37,6 @@ import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
-import id.local.tubeflow.core.TitleSplit
 import id.local.tubeflow.core.VideoMetadata
 import kotlinx.coroutines.delay
 
@@ -64,7 +60,7 @@ private val subtitleLabels = listOf("" to "Tanpa subtitle", "asli" to "Bahasa as
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadScreen(
+internal fun DownloadComposer(
     url: String,
     onUrl: (String) -> Unit,
     metadata: VideoMetadata?,
@@ -74,7 +70,6 @@ fun DownloadScreen(
     inspectStartedAt: Long,
     inspectError: String?,
     inspectDetails: id.local.tubeflow.core.FailureDetails? = null,
-    listState: LazyListState,
     inspect: () -> Unit,
     inspectPlaylist: () -> Unit,
     retryInspect: () -> Unit,
@@ -162,17 +157,11 @@ fun DownloadScreen(
 
     LaunchedEffect(shownPlaylist?.url) { selectedIds = shownPlaylist?.entries?.map { it.id }?.toSet().orEmpty(); playlistQuery = "" }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(UiSpacing.screen),
+    Column(
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
-        item {
-            PageHeading(stringResource(id.local.tubeflow.R.string.page_download), stringResource(id.local.tubeflow.R.string.page_download_help))
-        }
-
-        item {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedTextField(
                 value = url,
                 onValueChange = { onUrl(it); if (shownPlaylist != null) clearPlaylist() },
@@ -262,16 +251,13 @@ fun DownloadScreen(
         }
 
         if (shownVideo != null) {
-            item {
-                AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                    VideoPreviewCard(shownVideo, if (mode == MediaMode.VIDEO) subtitleLang else "")
-                }
+            AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                VideoPreviewCard(shownVideo, if (mode == MediaMode.VIDEO) subtitleLang else "")
             }
         }
 
         if (shownPlaylist != null) {
-            item {
-                SectionCard {
+            SectionCard {
                     Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
                         AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.AutoMirrored.Outlined.FeaturedPlayList, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -334,11 +320,9 @@ fun DownloadScreen(
                         }
                     }
                 }
-            }
         }
 
         if (shownVideo != null || shownPlaylist != null) {
-        item {
             Panel(
                 title = if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download",
                 description = if (shownPlaylist != null) "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu." else null,
@@ -451,10 +435,9 @@ fun DownloadScreen(
                     )
             }
         }
-        }
 
         if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty())) {
-            item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 val summary = buildSummary(mode, videoFormat, audioFormat, quality, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
                 Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -464,8 +447,6 @@ fun DownloadScreen(
                         if (shownPlaylist != null) Text("$selectionCount video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }
-
-                Spacer(Modifier.height(14.dp))
 
                 ActionButton(
                     text = when {
@@ -488,15 +469,13 @@ fun DownloadScreen(
             }
         }
 
-        item {
-            Text(
-                "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        item { Spacer(Modifier.height(4.dp)) }
+        Text(
+            "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
     }
 }
 

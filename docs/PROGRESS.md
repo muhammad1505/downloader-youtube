@@ -831,3 +831,47 @@ karena LRCLIB, bukan 403. Riwayat kosong pada awal sesi karena setelan pengguna
 death, runtime 16 KB, ABI/Android lain, dan matriks font besar/landscape belum
 dijalankan pada 1.1.30. Cache inspeksi tidak menggantikan validasi media hasil
 unduhan.
+
+## Pembaruan 23 Oktober 2026: Antrean dan Riwayat dalam satu daftar 1.1.31
+
+Tab segmented **Antrean/Riwayat** dihapus. Tab Download kini menampilkan satu
+daftar vertikal: composer URL selalu terlihat, lalu Antrean bila ada job aktif,
+pemisah tipis bila keduanya ada, lalu Riwayat. Saat tidak ada job, halaman tetap
+bersih tanpa kartu kosong. `DownloadSection` dan state `downloadSection` dihapus;
+`AppDestination.HISTORY`/`QUEUE` sama-sama membuka tab Download, dan deep link
+lama tidak lagi menggulir ke section tertentu.
+
+Ringkasan Antrean memakai `"Antrean · …"`; aksi massal (jeda/lanjut/batal semua)
+hanya muncul bila ada lebih dari satu job, sehingga satu job tidak menampilkan
+kontrol ganda di header dan kartu. Ringkasan Riwayat memakai `"Riwayat · …"`.
+Pencarian dan filter Riwayat disembunyikan sampai ada lebih dari tiga entri
+selesai atau pengguna sedang memakai query/filter; empty state Riwayat dihapus
+karena section hanya dirender saat ada entri.
+
+**405 tes Kotlin** 0 gagal, **98 tes Python** OK, lint 0 error/3 warning lama,
+debug arm64 bertanda tangan release key terpasang sebagai update di Realme
+RMX1821 Android 10. Sertifikat tetap `ebe3b40e…`; kandidat debug
+`/tmp/opencode/tubeflow-1.1.31-unified-debug-releasekey-g.apk` SHA256
+`ef70dd62ef56291b1487ca3e9af29e90d975601c4d971d225d1081ab2bd7896d`.
+
+Release **1.1.31/code45** dibangun (16m01s): ARM64 **70.946.520 byte**, SHA256
+`cd265cee31516c9a5f4a0e3a70388fbc704617ebde190ad50cb29bef9978c18f`;
+AAB **256.041.323 byte**, SHA256
+`7341a6adf0fc3ffc4bb62df941828682cc9f05390ba5ba4a18b528028a8c3e80`.
+APK×3/AAB bertanda tangan; audit APK 257/257/259 ELF dan 13 kelas ZIP lulus,
+`zipalign -c -P 16 4` dan signature v2 sertifikat `ebe3b40e…` lulus; AAB 1.038
+ELF dan `jarsigner` jar verified. Release terpasang sebagai update di Realme
+RMX1821 Android 10, `base.apk` identik dengan artefak, riwayat uji tetap ada.
+
+Di HP: keadaan kosong bersih; job aktif + riwayat tampil berurutan dengan
+pemisah; job dijeda, dilanjutkan, dibatalkan, lalu entri batal dihapus tanpa
+menghapus riwayat; riwayat satu entri tetap tampil setelah force-stop; dialog
+**Bersihkan riwayat?** dibuka lalu dibatalkan; deep link `OPEN_HISTORY` membuka
+tab Download. Riwayat uji `"Me at the zoo"` dibuat ulang dan bertahan. Tidak
+melakukan uninstall, clear data, atau reset database.
+
+**Batas:** state Antrean aktif pada build release belum diulang (diverifikasi pada
+debug bertanda tangan kunci yang sama); pencarian/filter Riwayat dengan >3 entri,
+TWS/Android 12+, fault injection provider/process death, runtime 16 KB,
+ABI/Android lain, serta matriks font/landscape belum diuji. Audit host tidak
+membuktikan seluruh jalur gagal Android aman.

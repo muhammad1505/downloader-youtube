@@ -297,17 +297,20 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang
   * playlist, bukan inspeksi video (BUG-006/R6). */
  fun retryInspect(url: String) { if(lastInspectPlaylist) inspectPlaylist(url) else inspect(url) }
- /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions) { if(submitting) return; submitting=true; viewModelScope.launch {
+ /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
   try {
    val folder = Selection.safeFolder(playlist.folderName) ?: Selection.collectionFolder(playlist)
    val credits=CollectionCredit.learn(playlist)
    var queued=0; var skipped=0
+   var firstQueued: String? = null
    entries.forEach { entry ->
     try {
      val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
        artist = entry.artist, track = entry.track, creator = entry.uploader,
        platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
-     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=if (options.mode == MediaMode.AUDIO) credits.apply(meta) else meta, autoFolder="collection")
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=if (options.mode == MediaMode.AUDIO) credits.apply(meta) else meta, autoFolder="collection", onQueued = { id ->
+      if (firstQueued == null) { firstQueued = id; onQueued?.invoke(id) }
+     })
      queued++
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { skipped++ }
@@ -318,8 +321,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    finally { submitting=false }
  } }
  @Volatile private var submitting=false
- fun enqueue(options: DownloadOptions) { if(submitting) return; submitting=true; viewModelScope.launch {
-   try { submit(options) }
+ fun enqueue(options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
+   try { submit(options, onQueued = onQueued) }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
@@ -345,7 +348,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }
  } }
- private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null, entryMetadata: VideoMetadata? = null, autoFolder: String = "") {
+ private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null, entryMetadata: VideoMetadata? = null, autoFolder: String = "", onQueued: ((String) -> Unit)? = null) {
    recovery.join()
    check(!_clearing.value) { "Tunggu pembersihan folder selesai sebelum mengunduh." }
    Selection.validate(options)
@@ -375,6 +378,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     CoverCache.fetch(getApplication(), current)?.let { if (dao.coverPath(id, current.generation, it) == 0) CoverCache.deleteIfUnused(getApplication(), id, it) }
    }
    enqueueWork(id)
+   onQueued?.invoke(id)
  }
  /** Menaruh pekerjaan WorkManager untuk sebuah job (dipakai submit baru maupun melanjutkan yang dijeda). */
  private suspend fun enqueueWork(id: String, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP, failMessage: String = "Tidak dapat memasukkan unduhan ke antrean.") {

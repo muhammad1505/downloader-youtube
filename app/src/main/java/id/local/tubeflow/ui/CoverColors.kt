@@ -61,6 +61,6 @@ fun AccentTheme(coverPath: String, enabled: Boolean = true, content: @Composable
     val primary by animateColorAsState(if (enabled) target else base.primary, tween(600), label="cover-accent")
     val container=Color(ColorUtils.blendARGB(base.surface.toArgb(), primary.toArgb(), 0.20f))
     fun ink(color: Color) = AccentContrast.ink(color)
-    MaterialTheme(colorScheme=base.copy(primary=primary,onPrimary=ink(primary),primaryContainer=container,onPrimaryContainer=ink(container)),
+    MaterialTheme(colorScheme=base.copy(primary=primary,onPrimary=ink(primary),primaryContainer=container,onPrimaryContainer=ink(container),secondaryContainer=container,onSecondaryContainer=ink(container)),
         typography=MaterialTheme.typography,shapes=MaterialTheme.shapes,content=content)
 }

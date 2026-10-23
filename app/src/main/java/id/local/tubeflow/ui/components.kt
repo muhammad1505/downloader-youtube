@@ -496,12 +496,16 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
     val accent=rememberCoverAccent(job.coverPath)
     val song=job.songIdentity()
-    Card(modifier.fillMaxWidth(), colors=mediaCardColors(accent)) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = mediaCardColors(accent),
+        border = if (highlighted) BorderStroke(2.dp, accent) else null,
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(56.dp))
@@ -528,10 +532,10 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     if (job.progress >= 0f) {
                         LinearProgressIndicator(
                             progress = { (job.progress / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent,
+                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent, trackColor=MaterialTheme.colorScheme.surfaceContainerHighest,
                         )
                     } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp),color=accent)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp),color=accent,trackColor=MaterialTheme.colorScheme.surfaceContainerHighest)
                     }
                     val transferring = DownloadPhase.isTransfer(job.phase)
                     val speed = if (transferring) Format.speedLabel(job.speed) else null
@@ -565,7 +569,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     if (job.progress >= 0f) {
                         LinearProgressIndicator(
                             progress = { (job.progress / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent,
+                            modifier = Modifier.fillMaxWidth().height(6.dp), color=accent, trackColor=MaterialTheme.colorScheme.surfaceContainerHighest,
                         )
                     }
                     val position = if (job.progress >= 0f) " · ${job.progress.toInt()}%" else ""

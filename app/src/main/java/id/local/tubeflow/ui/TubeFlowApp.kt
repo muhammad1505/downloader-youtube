@@ -13,7 +13,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.core.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,20 +61,24 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val temporaryUsage by model.temporaryUsage.collectAsStateWithLifecycle()
     val cleaningPartial by model.cleaningPartial.collectAsStateWithLifecycle()
     val libraryMessage by library.message.collectAsStateWithLifecycle()
-    // Riwayat adalah tujuan navigasi sendiri (tab 4), bukan chip di dalam Koleksi; Pengaturan
-    // tetap di luar bilah bawah lewat ikon di app bar sehingga punya indeks terpisah.
-    val settingsTab = 5
+    // Antrean dan riwayat kini satu tab Download; Pengaturan tetap di luar bilah bawah.
+    val settingsTab = 3
     var tab by rememberSaveable { mutableIntStateOf(1) }
+    var highlightedJobId by rememberSaveable { mutableStateOf<String?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     val screenState = rememberSaveableStateHolder()
-    val downloadList = rememberLazyListState()
-    val queueList = rememberLazyListState()
-    val historyList = rememberLazyListState()
     // Dialog waktu lirik dari Riwayat dihost di sini karena butuh item katalog yang tertaut.
     var lyricTiming by remember { mutableStateOf<MediaItem?>(null) }
     val appScope = rememberCoroutineScope()
+
+    LaunchedEffect(highlightedJobId) {
+        if (highlightedJobId != null) {
+            delay(3_000)
+            highlightedJobId = null
+        }
+    }
 
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
@@ -141,7 +145,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); model.clearNotice() } }
 
     val karaokeRequest by karaoke.requestId.collectAsStateWithLifecycle()
-    val activeCount = jobs.count { it.state == JobState.RUNNING || it.state == JobState.QUEUED }
+    val activeCount = DownloadSections.running(jobs)
 
     BackHandler(enabled=tab == settingsTab && !fullPlayer) { tab=previousTab }
     LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false else requestNotifications() }
@@ -153,8 +157,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     lyricTiming?.let { LyricTimingDialog(it, library) { lyricTiming = null } }
     KaraokeDialog(karaoke, player, requestNotifications)
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
-    val tabs = listOf("Ringkasan", "Download", "Antrean", "Koleksi", "Riwayat")
-    val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.Queue, Icons.Outlined.LibraryMusic, Icons.Outlined.History)
+    val tabs = listOf("Ringkasan", "Download", "Koleksi")
+    val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.LibraryMusic)
     val showLabels=androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val useRail = maxWidth >= 840.dp
@@ -196,7 +200,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         selected = tab == index,
                         onClick = { tab = index },
                         icon = {
-                            if (index == 2 && activeCount > 0) {
+                            if (index == 1 && activeCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (activeCount > 99) "99+" else "$activeCount") } }) {
                                     Icon(icons[index], contentDescription = if (showLabels) null else title)
                                 }
@@ -225,7 +229,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             tabs.forEachIndexed { index, title ->
                 NavigationRailItem(
                     selected=tab==index, onClick={ tab=index },
-                    icon={ if (index==2 && activeCount>0) {
+                    icon={ if (index==1 && activeCount>0) {
                         BadgedBox(badge={ Badge { Text(if (activeCount>99) "99+" else "$activeCount") } }) {
                             Icon(icons[index],if (showLabels) null else title)
                         }
@@ -254,6 +258,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             screenState.SaveableStateProvider("screen-$current") {
             when (current) {
                 1 -> DownloadScreen(
+                    jobs = jobs,
+                    highlightedJobId = highlightedJobId,
                     url = url,
                     onUrl = { if (url != it) model.clearPlaylist(); url = it },
                     metadata = metadata,
@@ -263,7 +269,6 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     inspectStartedAt = inspectStartedAt,
                     inspectError = inspectError,
                     inspectDetails = inspectDetails,
-                    listState = downloadList,
                     inspect = { model.inspect(url.trim()) },
                     inspectPlaylist = { model.inspectPlaylist(url.trim()) },
                     retryInspect = { model.retryInspect(url.trim()) },
@@ -271,63 +276,56 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     cancelInspect = { model.cancelInspection() },
                     download = { opts ->
                         requestNotifications()
-                        model.enqueue(opts.copy(url = url.trim()))
+                        model.enqueue(opts.copy(url = url.trim()), onQueued = { id -> highlightedJobId = id })
                         url = ""
                         model.clearPlaylist()
-                        tab = 2
+                        tab = 1
                     },
                     downloadPlaylist = { entries, opts ->
                         requestNotifications()
-                        // Judul playlist ikut diambil SEBELUM panel dibersihkan — jadi nama subfolder otomatis.
-                        playlist?.let { model.queuePlaylist(it, entries, opts) }
+                        // Judul playlist diambil SEBELUM panel dibersihkan agar subfolder tetap benar.
+                        val target = playlist
+                        if (target != null) model.queuePlaylist(target, entries, opts, onQueued = { id -> highlightedJobId = id })
                         url = ""
                         model.clearPlaylist()
-                        tab = 2
+                        tab = 1
                     },
+                    queueActions = QueueActions(
+                        cancel = { model.cancel(it) },
+                        retry = { model.retry(it) },
+                        retryAll = { model.retryFailed() },
+                        remove = { model.remove(it) },
+                        pause = { model.pause(it) },
+                        resume = { model.resume(it) },
+                        pauseAll = { model.pauseAll() },
+                        resumeAll = { model.resumeAll() },
+                        cancelAll = { model.cancelAll() },
+                        clearUnsuccessful = { model.clearUnsuccessful() },
+                    ),
+                    historyActions = HistoryActions(
+                        redownload = { model.retry(it) },
+                        deleteFile = { model.removeFile(it) },
+                        refetchLyrics = { model.refetchLyrics(it) },
+                        searchLyrics = { library.openLyrics(it) },
+                        play = { list, index -> list.getOrNull(index)?.let { player.playJobs(listOf(it), 0) } },
+                        clearCompleted = { model.clearCompleted() },
+                        enqueue = { player.enqueue(it) },
+                        playNext = { player.playNext(it) },
+                        editLyricTiming = { jobId ->
+                            appScope.launch {
+                                val uri = jobs.firstOrNull { it.id == jobId }?.outputUri
+                                val item = uri?.let { library.itemFor(it) }
+                                if (item == null) snackbar.showSnackbar("Lirik belum ada di katalog Koleksi. Segarkan katalog lalu coba lagi.")
+                                else lyricTiming = item
+                            }
+                        },
+                    ),
                 )
-                2 -> QueueScreen(
-                    jobs = jobs,
-                    listState = queueList,
-                    onCancel = { model.cancel(it) },
-                    onRetry = { model.retry(it) },
-                    onRetryAll = { model.retryFailed() },
-                    onRemove = { model.remove(it) },
-                    onPause = { model.pause(it) },
-                    onResume = { model.resume(it) },
-                    onPauseAll = { model.pauseAll() },
-                    onResumeAll = { model.resumeAll() },
-                    onCancelAll = { model.cancelAll() },
-                    onClearUnsuccessful = { model.clearUnsuccessful() },
-                    onOpenDownload = { tab = 1 },
-                )
-                0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 3 }, downloads = { tab = 1 })
-                3 -> MediaLibraryScreen(
+                0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 2 }, downloads = { tab = 1 })
+                2 -> MediaLibraryScreen(
                     library, player, jobs = jobs,
                     // Konfirmasi sudah dilakukan di kartu: Unduh lagi mengganti file lama (BUG-026).
                     onRedownload = { model.retry(it) },
-                )
-                4 -> HistoryScreen(
-                    jobs = jobs,
-                    listState = historyList,
-                    onRetry = { model.retry(it) },
-                    onDeleteFile = { model.removeFile(it) },
-                    onRefetchLyrics = { model.refetchLyrics(it) },
-                    onSearchLyrics = { library.openLyrics(it) },
-                    // Riwayat hanya memutar lagu yang diketuk; daftar riwayat tidak boleh membanjiri antrean.
-                    onPlay = { jobs, index -> jobs.getOrNull(index)?.let { player.playJobs(listOf(it), 0) } },
-                    onClearCompleted = { model.clearCompleted() },
-                    onClearUnsuccessful = { model.clearUnsuccessful() },
-                    onOpenDownload = { tab = 1 },
-                    onEnqueue = { player.enqueue(it) },
-                    onPlayNext = { player.playNext(it) },
-                    onEditLyricTiming = { jobId ->
-                        appScope.launch {
-                            val uri = jobs.firstOrNull { it.id == jobId }?.outputUri
-                            val item = uri?.let { library.itemFor(it) }
-                            if (item == null) snackbar.showSnackbar("Lirik belum ada di katalog Koleksi. Segarkan katalog lalu coba lagi.")
-                            else lyricTiming = item
-                        }
-                    },
                 )
                 else -> SettingsScreen(
                     karaoke = karaoke,

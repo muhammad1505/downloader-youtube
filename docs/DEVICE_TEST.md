@@ -627,3 +627,28 @@ pesan sudah kosong dan cache lain tetap sama. Kasus nonempty diuji host saja.
 Gulir ADB sempat gagal255; setelah pembacaan layar baru, uji cache selesai.
 Tidak ada FATAL pada AndroidRuntime PID yang diperiksa. Screenshot/log privat;
 tema/font/density pengguna tidak diubah. [Laporan dan batas](CONTROLS_CACHE_1_1_22.md).
+
+## Daftar Antrean/Riwayat terpadu 1.1.31/code45 — 23 Oktober 2026
+
+Release arm64 1.1.31/code45 terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256
+`cd265cee31516c9a5f4a0e3a70388fbc704617ebde190ad50cb29bef9978c18f`, `base.apk`
+identik. Tidak uninstall, clear data, atau reset database. State Antrean aktif
+diverifikasi pada debug bertanda tangan kunci yang sama (SHA256
+`ef70dd62ef56291b1487ca3e9af29e90d975601c4d971d225d1081ab2bd7896d`).
+
+Di HP: (1) keadaan kosong hanya menampilkan composer, tanpa tab atau kartu kosong;
+(2) satu job aktif + satu riwayat tampil dalam satu daftar, Antrean di atas,
+pemisah, Riwayat di bawah; (3) job dijeda lalu dilanjutkan; (4) aksi massal tidak
+muncul saat hanya satu job, aksi per kartu tetap bekerja; (5) batalkan semua,
+hapus entri batal, riwayat tetap utuh; (6) riwayat satu entri tetap ada setelah
+force-stop; (7) dialog **Bersihkan riwayat?** dibuka dan dibatalkan; (8) deep
+link `id.local.tubeflow.action.OPEN_HISTORY` membuka tab Download. Riwayat uji
+`"Me at the zoo"` dibuat ulang. Pencarian/filter Riwayat belum diuji dengan >3
+entri pada build ini.
+
+405 tes Kotlin/98 Python, lint 0 error/3 warning. Audit APK 257/257/259 ELF,
+13 kelas ZIP, zipalign 16 KB, signature v2; AAB 1.038 ELF dan jarsigner lulus.
+State Antrean aktif pada build release, pencarian/filter Riwayat >3 entri,
+TWS/Android 12+, fault injection provider/process death, runtime 16 KB,
+ABI/Android lain, dan matriks font/landscape belum diuji.
