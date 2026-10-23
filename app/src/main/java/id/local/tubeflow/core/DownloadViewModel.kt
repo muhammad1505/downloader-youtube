@@ -302,7 +302,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   }
  /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
  private fun inspectErrorMessage(url: String, details: FailureDetails): String {
-  if(Selection.platform(url) != "Facebook") return details.userMessage
+  // Jangan tuduh tautan privat saat masalahnya DNS/jaringan/penyimpanan — pakai pesan kategori itu.
+  if(Selection.platform(url) != "Facebook" || details.category in setOf("dns","network","rate_limit","storage","permission")) return details.userMessage
   return "Tautan Facebook tidak dapat dibaca — video mungkin privat, butuh login, atau tautannya sudah kedaluwarsa. Coba salin tautan video publik langsung dari aplikasi Facebook."
  }
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang

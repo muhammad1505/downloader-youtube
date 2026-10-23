@@ -14,6 +14,13 @@ class FailureDetailsTest {
         assertEquals("permission",report("SecurityException: no grant").category)
         assertNull(report("video id: 403").http)
     }
+    @Test fun dnsResolutionFailureIsNotReportedAsConnectionLoss() {
+        val dns = report("YoutubeDLException: [Errno 7] No address associated with hostname")
+        assertEquals("dns", dns.category)
+        assertTrue(dns.userMessage.contains("DNS"))
+        assertEquals("dns", report("Name or service not known").category)
+        assertEquals("network", report("connection reset by peer").category)
+    }
     @Test fun tokensHeadersUrlsAndPrivatePathsAreRedacted() {
         val raw = "HTTP Error 403 https://user:PASS@example.com/file?secret_token=SECRET\n"+
             "Authorization: Bearer TOPSECRET\nCookie: sid=COOKIE\n"+

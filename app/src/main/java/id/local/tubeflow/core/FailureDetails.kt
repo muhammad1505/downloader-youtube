@@ -23,6 +23,7 @@ data class FailureDetails(val category: String, val phase: String, val message: 
         "access" -> "Sumber menolak akses. Coba lagi nanti atau periksa apakah konten masih dapat diakses."
         "storage" -> "Ruang penyimpanan tidak cukup. Kosongkan ruang lalu coba lagi."
         "permission" -> "Akses penyimpanan ditolak. Periksa izin atau pilih ulang folder."
+        "dns" -> "Nama domain tidak dapat diterjemahkan. Periksa koneksi atau pengaturan DNS lalu coba lagi."
         "network" -> "Koneksi ke penyedia terputus. Coba lagi setelah koneksi pulih."
         "provider" -> "Penyedia sedang bermasalah. Coba lagi nanti."
         else -> "Proses gagal. Coba lagi; buka Detail error untuk pemeriksaan lebih lanjut."
@@ -67,7 +68,8 @@ data class FailureDetails(val category: String, val phase: String, val message: 
                 http != null && http >= 500 -> "provider"
                 listOf("enospc", "no space left", "penyimpanan tidak cukup").any { it in lower } -> "storage"
                 listOf("securityexception", "permission denied", "access denied", "akses folder", "izin akses").any { it in lower } -> "permission"
-                listOf("timeout", "timed out", "unknownhost", "unable to resolve", "connection", "network is unreachable").any { it in lower } -> "network"
+                listOf("unknownhost", "unable to resolve", "no address associated with hostname", "name or service not known").any { it in lower } -> "dns"
+                listOf("timeout", "timed out", "connection", "network is unreachable").any { it in lower } -> "network"
                 else -> "unknown"
             }
             return FailureDetails(category, safe(phase), safe(raw), app, engine, at, http)
