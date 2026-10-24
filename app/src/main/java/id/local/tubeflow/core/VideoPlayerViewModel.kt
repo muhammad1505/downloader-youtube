@@ -15,6 +15,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -58,6 +59,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val audioTracks: List<VideoTrack> = emptyList(),
         val textTracks: List<VideoTrack> = emptyList(),
         val subtitlesDisabled: Boolean = true,
+        val subtitleSize: VideoSubtitleSize = VideoSubtitleSize.NORMAL,
+        val subtitleStyle: VideoSubtitleStyle = VideoSubtitleStyle.OUTLINE,
+        val subtitlePosition: VideoSubtitlePosition = VideoSubtitlePosition.BOTTOM,
+        val subtitleBackground: VideoSubtitleBackground = VideoSubtitleBackground.TRANSPARENT,
+        val subtitleDelayMs: Int = 0,
         val videoWidth: Int = 0,
         val videoHeight: Int = 0,
     ) {
@@ -176,6 +182,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
     fun open(entries: List<VideoEntry>, startIndex: Int = 0) {
         if (entries.isEmpty()) return
         closeInternal(savePosition = true)
@@ -195,7 +202,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         lastPositionMs = startPosition
         lastDurationMs = 0
         try {
-            val exo = ExoPlayer.Builder(getApplication()).build().apply {
+            // Fallback ke decoder lain saat decoder utama perangkat menolak format (mis. codec
+            // MP4 yang hanya punya decoder software, atau profil H.264 yang tidak didukung GPU).
+            val renderers = VideoRenderersFactory(getApplication()) {
+                _state.value.subtitleDelayMs * 1000L
+            }.setEnableDecoderFallback(true)
+            val exo = ExoPlayer.Builder(getApplication(), renderers).build().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA)
@@ -301,6 +313,40 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun cycleRepeat() = setRepeat(_state.value.repeat.next())
+
+    fun setSubtitleSize(value: VideoSubtitleSize) {
+        preferences.edit { putString(KEY_SUBTITLE_SIZE, value.name) }
+        _state.value = _state.value.copy(subtitleSize = value)
+    }
+
+    fun setSubtitleStyle(value: VideoSubtitleStyle) {
+        preferences.edit { putString(KEY_SUBTITLE_STYLE, value.name) }
+        _state.value = _state.value.copy(subtitleStyle = value)
+    }
+
+    fun setSubtitlePosition(value: VideoSubtitlePosition) {
+        preferences.edit { putString(KEY_SUBTITLE_POSITION, value.name) }
+        _state.value = _state.value.copy(subtitlePosition = value)
+    }
+
+    fun setSubtitleBackground(value: VideoSubtitleBackground) {
+        preferences.edit { putString(KEY_SUBTITLE_BACKGROUND, value.name) }
+        _state.value = _state.value.copy(subtitleBackground = value)
+    }
+
+    /** Menggeser sampel subtitle memerlukan flush decoder; seek ke posisi yang sama memicunya. */
+    fun setSubtitleDelay(valueMs: Int) {
+        val value = VideoPlayback.adjustSubtitleDelay(valueMs, 0)
+        preferences.edit { putInt(KEY_SUBTITLE_DELAY, value) }
+        val position = player?.currentPosition ?: _state.value.positionMs
+        _state.value = _state.value.copy(subtitleDelayMs = value)
+        player?.seekTo(position)
+    }
+
+    fun adjustSubtitleDelay(deltaMs: Int) =
+        setSubtitleDelay(VideoPlayback.adjustSubtitleDelay(_state.value.subtitleDelayMs, deltaMs))
+
+    fun resetSubtitleDelay() = setSubtitleDelay(0)
 
     fun selectAudio(track: VideoTrack) = selectTrack(track)
 
@@ -465,7 +511,37 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         repeat = runCatching {
             VideoRepeat.valueOf(preferences.getString(KEY_REPEAT, VideoRepeat.OFF.name) ?: VideoRepeat.OFF.name)
         }.getOrDefault(VideoRepeat.OFF),
+        subtitleSize = runCatching {
+            VideoSubtitleSize.valueOf(
+                preferences.getString(KEY_SUBTITLE_SIZE, VideoSubtitleSize.NORMAL.name)
+                    ?: VideoSubtitleSize.NORMAL.name,
+            )
+        }.getOrDefault(VideoSubtitleSize.NORMAL),
+        subtitleStyle = storedSubtitleStyle(),
+        subtitlePosition = runCatching {
+            VideoSubtitlePosition.valueOf(
+                preferences.getString(KEY_SUBTITLE_POSITION, VideoSubtitlePosition.BOTTOM.name)
+                    ?: VideoSubtitlePosition.BOTTOM.name,
+            )
+        }.getOrDefault(VideoSubtitlePosition.BOTTOM),
+        subtitleBackground = runCatching {
+            VideoSubtitleBackground.valueOf(
+                preferences.getString(KEY_SUBTITLE_BACKGROUND, VideoSubtitleBackground.TRANSPARENT.name)
+                    ?: VideoSubtitleBackground.TRANSPARENT.name,
+            )
+        }.getOrDefault(VideoSubtitleBackground.TRANSPARENT),
+        subtitleDelayMs = VideoPlayback.adjustSubtitleDelay(
+            preferences.getInt(KEY_SUBTITLE_DELAY, 0),
+            0,
+        ),
     )
+
+    /** Build pengembangan sempat menyimpan BOX; petakan ke gaya tebal yang setara. */
+    private fun storedSubtitleStyle(): VideoSubtitleStyle {
+        val raw = preferences.getString(KEY_SUBTITLE_STYLE, null) ?: return VideoSubtitleStyle.OUTLINE
+        if (raw == "BOX") return VideoSubtitleStyle.BOLD
+        return runCatching { VideoSubtitleStyle.valueOf(raw) }.getOrDefault(VideoSubtitleStyle.OUTLINE)
+    }
 
     private fun VideoRepeat.media3Value(): Int = when (this) {
         VideoRepeat.OFF -> Player.REPEAT_MODE_OFF
@@ -481,5 +557,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         const val KEY_SPEED = "speed"
         const val KEY_ASPECT = "aspect"
         const val KEY_REPEAT = "repeat"
+        const val KEY_SUBTITLE_SIZE = "subtitle_size"
+        const val KEY_SUBTITLE_STYLE = "subtitle_style"
+        const val KEY_SUBTITLE_POSITION = "subtitle_position"
+        const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
+        const val KEY_SUBTITLE_DELAY = "subtitle_delay_ms"
     }
 }

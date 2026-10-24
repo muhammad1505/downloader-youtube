@@ -21,6 +21,49 @@ enum class VideoRepeat(val label: String) {
     fun next(): VideoRepeat = entries[(ordinal + 1) % entries.size]
 }
 
+/**
+ * Orientasi layar pemutar. Otomatis mengikuti sensor perangkat (termasuk saat kunci rotasi
+ * sistem aktif), sedangkan dua mode lain mengunci ke satu arah untuk menonton sambil berbaring.
+ */
+enum class VideoOrientation(val label: String) {
+    AUTO("Otomatis"),
+    LANDSCAPE("Lanskap"),
+    PORTRAIT("Potret");
+
+    fun next(): VideoOrientation = entries[(ordinal + 1) % entries.size]
+}
+
+/** Skala teks subtitle relatif terhadap ukuran bawaan SubtitleView Media3. */
+enum class VideoSubtitleSize(val label: String, val scale: Float) {
+    SMALL("Kecil", 0.8f),
+    NORMAL("Normal", 1f),
+    LARGE("Besar", 1.25f),
+    HUGE("Sangat besar", 1.5f),
+}
+
+/** Gaya teks subtitle; warna dan garis tepi dipetakan ke CaptionStyleCompat di layar. */
+enum class VideoSubtitleStyle(val label: String) {
+    OUTLINE("Garis tepi"),
+    BOLD("Tebal"),
+    YELLOW("Kuning"),
+}
+
+/** Jarak subtitle dari tepi bawah; makin tinggi makin jauh dari kontrol pemutar. */
+enum class VideoSubtitlePosition(val label: String, val bottomPaddingFraction: Float) {
+    BOTTOM("Bawah", 0.08f),
+    RAISED("Agak naik", 0.14f),
+    HIGH("Naik", 0.22f),
+    TOP("Tinggi", 0.30f),
+}
+
+/** Opasitas kotak latar subtitle. Nol berarti teks hanya memakai garis tepi. */
+enum class VideoSubtitleBackground(val label: String, val alphaPercent: Int) {
+    TRANSPARENT("Transparan", 0),
+    LIGHT("Samar", 30),
+    MEDIUM("Sedang", 60),
+    DARK("Gelap", 85),
+}
+
 /** Berkas subtitle sampingan yang ditemukan dari catatan unduhan (`sub|…`). */
 data class VideoSubtitle(val uri: String, val mime: String, val language: String, val label: String)
 
@@ -42,6 +85,8 @@ object VideoPlayback {
     const val SEEK_STEP_MS = 10_000L
     const val RESUME_MIN_MS = 10_000L
     const val RESUME_TAIL_MS = 5_000L
+    const val SUBTITLE_DELAY_STEP_MS = 250
+    const val SUBTITLE_DELAY_LIMIT_MS = 10_000
 
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
@@ -92,6 +137,17 @@ object VideoPlayback {
         val moved = positionMs.coerceAtLeast(0) + deltaMs
         val capped = if (durationMs > 0) moved.coerceAtMost(durationMs) else moved
         return capped.coerceAtLeast(0)
+    }
+
+    /** Delay subtitle positif menampilkan teks lebih lambat; batasnya menjaga hasil tetap masuk akal. */
+    fun adjustSubtitleDelay(currentMs: Int, deltaMs: Int): Int =
+        (currentMs + deltaMs).coerceIn(-SUBTITLE_DELAY_LIMIT_MS, SUBTITLE_DELAY_LIMIT_MS)
+
+    fun subtitleDelayLabel(delayMs: Int): String {
+        if (delayMs == 0) return "0,00 dtk"
+        val magnitude = if (delayMs < 0) -delayMs else delayMs
+        val seconds = String.format(Locale.ROOT, "%.2f", magnitude / 1000.0).replace('.', ',')
+        return "${if (delayMs > 0) "+" else "−"}$seconds dtk"
     }
 
     /** Posisi lama hanya dipakai bila sudah cukup jauh dan bukan bagian akhir video. */

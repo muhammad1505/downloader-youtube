@@ -233,4 +233,41 @@ class VideoPlaybackTest {
         assertEquals(VideoRepeat.ONE, VideoRepeat.ALL.next())
         assertEquals(VideoRepeat.OFF, VideoRepeat.ONE.next())
     }
+
+    @Test
+    fun orientationCyclesAutoLandscapePortrait() {
+        assertEquals(VideoOrientation.LANDSCAPE, VideoOrientation.AUTO.next())
+        assertEquals(VideoOrientation.PORTRAIT, VideoOrientation.LANDSCAPE.next())
+        assertEquals(VideoOrientation.AUTO, VideoOrientation.PORTRAIT.next())
+        assertEquals("Otomatis", VideoOrientation.AUTO.label)
+    }
+
+    @Test
+    fun subtitleDelayIsClampedAndLabeledWithSign() {
+        assertEquals(250, VideoPlayback.adjustSubtitleDelay(0, 250))
+        assertEquals(10_000, VideoPlayback.adjustSubtitleDelay(9_900, 500))
+        assertEquals(-10_000, VideoPlayback.adjustSubtitleDelay(-9_900, -500))
+        assertEquals("0,00 dtk", VideoPlayback.subtitleDelayLabel(0))
+        assertEquals("+0,25 dtk", VideoPlayback.subtitleDelayLabel(250))
+        assertEquals("−1,50 dtk", VideoPlayback.subtitleDelayLabel(-1_500))
+    }
+
+    @Test
+    fun subtitleSizesGrowFromSmallToHuge() {
+        assertTrue(VideoSubtitleSize.SMALL.scale < VideoSubtitleSize.NORMAL.scale)
+        assertTrue(VideoSubtitleSize.NORMAL.scale < VideoSubtitleSize.LARGE.scale)
+        assertTrue(VideoSubtitleSize.LARGE.scale < VideoSubtitleSize.HUGE.scale)
+    }
+
+    @Test
+    fun subtitlePositionAndBackgroundIncreaseSafely() {
+        assertTrue(VideoSubtitlePosition.BOTTOM.bottomPaddingFraction < VideoSubtitlePosition.RAISED.bottomPaddingFraction)
+        assertTrue(VideoSubtitlePosition.RAISED.bottomPaddingFraction < VideoSubtitlePosition.HIGH.bottomPaddingFraction)
+        assertTrue(VideoSubtitlePosition.HIGH.bottomPaddingFraction < VideoSubtitlePosition.TOP.bottomPaddingFraction)
+        assertTrue(VideoSubtitlePosition.TOP.bottomPaddingFraction < 0.5f)
+        assertEquals(0, VideoSubtitleBackground.TRANSPARENT.alphaPercent)
+        assertTrue(VideoSubtitleBackground.LIGHT.alphaPercent < VideoSubtitleBackground.MEDIUM.alphaPercent)
+        assertTrue(VideoSubtitleBackground.MEDIUM.alphaPercent < VideoSubtitleBackground.DARK.alphaPercent)
+        assertTrue(VideoSubtitleBackground.DARK.alphaPercent <= 100)
+    }
 }
