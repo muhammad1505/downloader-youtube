@@ -33,11 +33,11 @@ class MediaCardPlanTest {
     }
 
     @Test
-    fun libraryVideoOpensInsteadOfPlayingInApp() {
+    fun libraryVideoPlaysInAppAndKeepsExternalOpenInMenu() {
         val plan = MediaCardPlan.library(audio = false, favorite = false, inPlaylist = false, hasLyrics = false)
 
         assertEquals(
-            listOf(MediaActionKind.OPEN, MediaActionKind.SHARE, MediaActionKind.RENAME, MediaActionKind.DELETE),
+            listOf(MediaActionKind.PLAY, MediaActionKind.SHARE, MediaActionKind.RENAME, MediaActionKind.DELETE),
             plan.inline(),
         )
         assertFalse("Video tidak punya aksi lirik", plan.inline().contains(MediaActionKind.FIND_LYRICS))
@@ -45,8 +45,8 @@ class MediaCardPlanTest {
         assertEquals(MediaCardPlan.GROUP_FILE, plan.first { it.kind == MediaActionKind.CLIP_STATUS }.group)
         assertFalse("Video tidak punya antrean audio", plan.menu().contains(MediaActionKind.ENQUEUE))
         assertTrue("Video punya pemotong Status", plan.menu().contains(MediaActionKind.CLIP_STATUS))
-        // Buka sudah menjadi aksi utama, jangan diulang di menu.
-        assertFalse(plan.menu().contains(MediaActionKind.OPEN))
+        assertTrue("Buka di aplikasi lain tetap tersedia", plan.menu().contains(MediaActionKind.OPEN))
+        assertEquals(MediaCardPlan.GROUP_FILE, plan.first { it.kind == MediaActionKind.OPEN }.group)
     }
 
     @Test
@@ -136,7 +136,8 @@ class MediaCardPlanTest {
         assertFalse(without.menu().contains(MediaActionKind.OPEN_SUBTITLE))
         assertTrue(with.menu().contains(MediaActionKind.OPEN_THUMBNAIL))
         assertTrue(with.menu().contains(MediaActionKind.OPEN_SUBTITLE))
-        assertFalse("Video tidak butuh aksi buka ganda", with.menu().contains(MediaActionKind.OPEN))
+        assertTrue("Video diputar di TubeFlow, buka eksternal ada di menu", with.menu().contains(MediaActionKind.OPEN))
+        assertTrue(with.inline().contains(MediaActionKind.PLAY))
     }
 
     @Test

@@ -6,6 +6,8 @@
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+ <!-- Gesturvolume sisi kanan pemutar video mengubah volume musik sistem. -->
+ <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
  <!-- Baca koleksi: file yang dibuat versi/SAF lama tidak terlihat MediaStore tanpa izin baca,
@@ -18,7 +20,8 @@
       scoped-storage untuk targetSdk 30+ ada di platform Android 11+). Di API 29 tanpa mode ini,
       baris MediaStore milik versi/SAF lama (owner kosong) tidak terbaca meski izin diberikan. -->
  <application android:icon="@drawable/ic_launcher_foreground" android:label="@string/app_name" android:theme="@style/Theme.TubeFlow" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true" android:requestLegacyExternalStorage="true">
-  <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:theme="@style/Theme.TubeFlow.Splash">
+  <!-- configChanges mencegah Activity dibangun ulang saat rotasi/PiP; ExoPlayer tetap di ViewModel. -->
+  <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" android:theme="@style/Theme.TubeFlow.Splash">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
    <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>
   </activity>
@@ -28,6 +31,8 @@
   </provider>
   <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" android:exported="false" xmlns:tools="http://schemas.android.com/tools" tools:node="merge"/>
   <service android:name=".core.PlaybackService" android:foregroundServiceType="mediaPlayback" android:exported="false"/>
+  <!-- Aksi play/pause di jendela Picture-in-Picture video; hanya PendingIntent aplikasi ini. -->
+  <receiver android:name=".core.VideoPipReceiver" android:exported="false"/>
   <receiver android:name=".core.HeadsetAutoPlayReceiver" android:exported="true">
    <intent-filter>
     <action android:name="android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"/>

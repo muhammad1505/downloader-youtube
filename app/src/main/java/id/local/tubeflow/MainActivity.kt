@@ -16,6 +16,8 @@ import androidx.compose.runtime.mutableStateOf
 import id.local.tubeflow.core.DownloadViewModel
 import id.local.tubeflow.core.SettingsStore
 import id.local.tubeflow.core.PlayerViewModel
+import id.local.tubeflow.core.VideoPip
+import id.local.tubeflow.core.VideoPlayerViewModel
 import id.local.tubeflow.core.AppDestination
 import id.local.tubeflow.core.AppNavigationRequest
 import id.local.tubeflow.ui.TubeFlowApp
@@ -23,6 +25,7 @@ import id.local.tubeflow.ui.theme.TubeFlowTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var player: PlayerViewModel
+    private lateinit var video: VideoPlayerViewModel
     private val incomingUrl = mutableStateOf("")
     private val navigation = mutableStateOf<AppNavigationRequest?>(null)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -38,13 +41,14 @@ class MainActivity : ComponentActivity() {
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
         player = PlayerViewModel.obtain(application)
+        video = ViewModelProvider(this)[VideoPlayerViewModel::class.java]
         val karaoke = ViewModelProvider(this)[id.local.tubeflow.core.KaraokeViewModel::class.java]
         setContent {
             TubeFlowTheme(
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
             ) {
-                TubeFlowApp(model, library, player, karaoke, incomingUrl.value, ::requestDownloadNotifications,
+                TubeFlowApp(model, library, player, karaoke, video, incomingUrl.value, ::requestDownloadNotifications,
                     navigation = navigation.value,
                     onNavigationHandled = { id -> if (navigation.value?.id == id) navigation.value = null })
             }
@@ -63,6 +67,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         readLaunchIntent(intent)
+    }
+    /** Android 10–11 belum punya setAutoEnterEnabled; Home saat video diputar masuk PiP dari sini. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (::video.isInitialized) VideoPip.enterOnLeave(this, video.state.value)
     }
     override fun onSaveInstanceState(outState: Bundle) {
         navigation.value?.let { outState.putString("pending_destination", it.destination.action) }

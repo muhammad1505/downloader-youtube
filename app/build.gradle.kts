@@ -30,6 +30,9 @@ dependencies {
  implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
  implementation(files("libs/ffmpeg-0.18.1-webp16k.aar"))
  implementation("io.coil-kt:coil-compose:2.7.0")
+ // Pemutar video dalam aplikasi; pemutar audio tetap memakai MediaPlayer (PlayerViewModel).
+ implementation("androidx.media3:media3-exoplayer:1.11.1")
+ implementation("androidx.media3:media3-ui:1.11.1")
  // Pinned after target-device JNI startup failed with 1.31.0; audit a replacement on Android 10 first.
  //noinspection NewerVersionAvailable
  implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")

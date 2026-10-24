@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, onNavigationHandled: (String) -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, video: VideoPlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, onNavigationHandled: (String) -> Unit = {}) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var previousTab by rememberSaveable { mutableIntStateOf(1) }
@@ -75,6 +75,16 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     var lyricTiming by remember { mutableStateOf<MediaItem?>(null) }
     val appScope = rememberCoroutineScope()
 
+    // Audio dijeda (bukan dihentikan) agar antrean lagu tetap utuh saat video dibuka.
+    fun playVideo(entries: List<VideoEntry>, index: Int) {
+        if (entries.isEmpty()) {
+            appScope.launch { snackbar.showSnackbar("Berkas video tidak tersedia.") }
+            return
+        }
+        player.pause()
+        video.open(entries, index)
+    }
+
     LaunchedEffect(highlightedJobId) {
         if (highlightedJobId != null) {
             delay(3_000)
@@ -85,6 +95,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
             fullPlayer = false
+            video.close()
             karaoke.close()
             if (url != incomingUrl) model.clearPlaylist()
             url = incomingUrl
@@ -96,6 +107,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(navigation?.id) {
         val request = navigation ?: return@LaunchedEffect
         fullPlayer = false
+        video.close()
         karaoke.close()
         library.closeLyrics()
         tab = request.destination.tab
@@ -339,7 +351,15 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         deleteFile = { model.removeFile(it) },
                         refetchLyrics = { model.refetchLyrics(it) },
                         searchLyrics = { library.openLyrics(it) },
-                        play = { list, index -> list.getOrNull(index)?.let { player.playJobs(listOf(it), 0) } },
+                        play = { list, index ->
+                            val job = list.getOrNull(index)
+                            if (job?.mode == MediaMode.VIDEO) {
+                                val (entries, start) = VideoPlayback.videoEntries(list, job.id)
+                                playVideo(entries, start)
+                            } else {
+                                job?.let { player.playJobs(listOf(it), 0) }
+                            }
+                        },
                         clearCompleted = { model.clearCompleted() },
                         enqueue = { player.enqueue(it) },
                         playNext = { player.playNext(it) },
@@ -356,6 +376,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 2 }, downloads = { tab = 1 })
                 2 -> MediaLibraryScreen(
                     library, player, jobs = jobs,
+                    onPlayVideo = { entries, index -> playVideo(entries, index) },
                     // Konfirmasi sudah dilakukan di kartu: Unduh lagi mengganti file lama (BUG-026).
                     onRedownload = { model.retry(it) },
                 )
@@ -386,5 +407,6 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         }
     }
     }
+    VideoPlayerScreen(video)
     }
 }

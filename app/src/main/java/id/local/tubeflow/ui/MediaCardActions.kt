@@ -115,12 +115,9 @@ object MediaCardPlan {
         canRedownload: Boolean = false,
     ): List<MediaActionSpec> = buildList {
         // Enam aksi yang selalu terlihat, urut sesuai kebiasaan memakai kartu.
-        if (audio) {
-            add(inline(MediaActionKind.PLAY))
-            if (favorite != null) add(inline(if (favorite) MediaActionKind.FAVORITE_REMOVE else MediaActionKind.FAVORITE_ADD))
-        } else {
-            add(inline(MediaActionKind.OPEN))
-        }
+        // Video juga diputar di dalam TubeFlow; membuka di aplikasi lain tetap tersedia di menu.
+        add(inline(MediaActionKind.PLAY))
+        if (audio && favorite != null) add(inline(if (favorite) MediaActionKind.FAVORITE_REMOVE else MediaActionKind.FAVORITE_ADD))
         add(inline(MediaActionKind.SHARE))
         if (rename) add(inline(MediaActionKind.RENAME))
         if (audio) add(inline(MediaActionKind.FIND_LYRICS))
@@ -142,8 +139,8 @@ object MediaCardPlan {
         if (hasSubtitle) add(menu(MediaActionKind.OPEN_SUBTITLE, GROUP_ATTACHMENT))
         if (detail) add(menu(MediaActionKind.DETAIL, GROUP_FILE))
         if (!audio && clipStatus) add(menu(MediaActionKind.CLIP_STATUS, GROUP_FILE))
-        // Audio juga bisa dibuka di pemutar lain; video sudah memakai Buka sebagai aksi utama.
-        if (audio) add(menu(MediaActionKind.OPEN, GROUP_FILE))
+        // Kedua jenis bisa dibuka di aplikasi lain; aksi utama selalu memutar di TubeFlow.
+        add(menu(MediaActionKind.OPEN, GROUP_FILE))
         if (canRedownload) add(menu(MediaActionKind.REDOWNLOAD, GROUP_FILE))
     }
 
@@ -191,7 +188,7 @@ object MediaCardPlan {
     /** Satu nama untuk satu aksi di seluruh aplikasi; hanya beda bila maknanya memang beda. */
     fun label(kind: MediaActionKind, audio: Boolean): String = when (kind) {
         MediaActionKind.PLAY -> "Putar"
-        MediaActionKind.OPEN -> if (audio) "Buka dengan aplikasi lain" else "Buka"
+        MediaActionKind.OPEN -> "Buka dengan aplikasi lain"
         MediaActionKind.SHARE -> "Bagikan"
         MediaActionKind.FAVORITE_ADD -> "Tambah ke favorit"
         MediaActionKind.FAVORITE_REMOVE -> "Hapus dari favorit"

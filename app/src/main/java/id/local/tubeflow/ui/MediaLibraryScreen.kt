@@ -33,6 +33,7 @@ fun MediaLibraryScreen(
     model: MediaLibraryViewModel,
     player: PlayerViewModel,
     jobs: List<DownloadJob> = emptyList(),
+    onPlayVideo: (List<VideoEntry>, Int) -> Unit = { _, _ -> },
     onRedownload: (DownloadJob) -> Unit = {},
 ) {
     LaunchedEffect(Unit) { model.validateAvailability() }
@@ -65,6 +66,13 @@ fun MediaLibraryScreen(
             launchMedia(context, item.location, item.kind == "AUDIO", share, item.title.ifBlank { item.displayName })
         }
     } }
+    // Video diputar di pemutar Media3 dalam aplikasi; audio tetap memakai PlayerViewModel.
+    fun playVideo(item: MediaItem) {
+        val (entries, index) = VideoPlayback.videoEntries(media, item.uri) { entry ->
+            entry.jobId?.let { completedJobs[it]?.sidecarUris }
+        }
+        if (entries.isEmpty()) open(item) else onPlayVideo(entries, index)
+    }
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
@@ -124,8 +132,8 @@ fun MediaLibraryScreen(
         items(media, key = { it.uri }) { item ->
             val accent=rememberCoverAccent(item.coverPath)
             Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
-                // Satu tap = seluruh daftar masuk antrean, mulai dari item ini.
-                if (item.kind == "AUDIO") model.playSelection(player, item.uri) else open(item)
+                // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
+                if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
             },colors=mediaCardColors(accent)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -171,7 +179,7 @@ fun MediaLibraryScreen(
                     },
                     onClick = { kind ->
                         when (kind) {
-                            MediaActionKind.PLAY -> model.playSelection(player, item.uri)
+                            MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
                             MediaActionKind.OPEN -> open(item)
                             MediaActionKind.SHARE -> open(item, share = true)
                             MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
