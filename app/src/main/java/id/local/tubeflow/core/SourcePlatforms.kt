@@ -24,6 +24,9 @@ object SourcePlatforms {
         SourcePlatform("bilibili", "Bilibili", setOf("bilibili.com", "b23.tv"), "video"),
         SourcePlatform("likee", "Likee", setOf("likee.video")),
         SourcePlatform("snapchat", "Snapchat", setOf("snapchat.com")),
+        // Spotify hanya sumber metadata: audio tetap diambil dari video YouTube hasil pencocokan.
+        // Domains sengaja kosong supaya tautannya tidak pernah lolos allowlist engine (yt-dlp tanpa extractor Spotify).
+        SourcePlatform(Spotify.PLATFORM_ID, "Spotify", emptySet(), "music"),
     )
     private val unknown = SourcePlatform("unknown", "Sumber tidak diketahui", emptySet())
     fun fromId(id: String) = known.firstOrNull { it.id == id } ?: unknown

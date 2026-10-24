@@ -24,6 +24,10 @@ import id.local.tubeflow.core.JobState
 import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.SpotifyCandidate
+import id.local.tubeflow.core.SpotifyCollectionPreview
+import id.local.tubeflow.core.SpotifyPreview
+import id.local.tubeflow.core.SpotifyTrack
 import id.local.tubeflow.core.VideoMetadata
 
 data class QueueActions(
@@ -71,6 +75,16 @@ fun DownloadScreen(
     cancelInspect: () -> Unit,
     download: (DownloadOptions) -> Unit,
     downloadPlaylist: (List<PlaylistEntry>, DownloadOptions) -> Unit,
+    spotify: SpotifyPreview = SpotifyPreview(),
+    inspectSpotify: () -> Unit = {},
+    clearSpotify: () -> Unit = {},
+    downloadSpotify: (DownloadOptions, SpotifyCandidate) -> Unit = { _, _ -> },
+    spotifyCollection: SpotifyCollectionPreview = SpotifyCollectionPreview(),
+    inspectSpotifyCollection: () -> Unit = {},
+    clearSpotifyCollection: () -> Unit = {},
+    matchSpotifyTracks: (List<SpotifyTrack>) -> Unit = {},
+    cancelSpotifyMatch: () -> Unit = {},
+    downloadSpotifyCollection: (DownloadOptions, List<SpotifyTrack>) -> Unit = { _, _ -> },
     queueActions: QueueActions,
     historyActions: HistoryActions,
 ) {
@@ -163,6 +177,16 @@ fun DownloadScreen(
                 cancelInspect = cancelInspect,
                 download = download,
                 downloadPlaylist = downloadPlaylist,
+                spotify = spotify,
+                inspectSpotify = inspectSpotify,
+                clearSpotify = clearSpotify,
+                downloadSpotify = downloadSpotify,
+                spotifyCollection = spotifyCollection,
+                inspectSpotifyCollection = inspectSpotifyCollection,
+                clearSpotifyCollection = clearSpotifyCollection,
+                matchSpotifyTracks = matchSpotifyTracks,
+                cancelSpotifyMatch = cancelSpotifyMatch,
+                downloadSpotifyCollection = downloadSpotifyCollection,
             )
         }
 

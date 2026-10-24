@@ -178,6 +178,25 @@ object Engine {
   )
   return PlaylistMetadata(json.optString("title", "Playlist").ifBlank { "Playlist" }, url.trim(), entries, channel)
  }
+ /**
+  * Pencarian YouTube untuk pencocokan track Spotify (atau sumber lain tanpa tautan video).
+  * Hanya metadata ringkas (`--flat-playlist`): unduhan tetap memakai URL video yang dipilih pengguna.
+  */
+ suspend fun search(context: Context, query: String, id: String, limit: Int = 5, onPhase: (String) -> Unit = {}): List<VideoMetadata> {
+  val trimmed = query.replace(Regex("\\s+"), " ").trim().take(200)
+  require(trimmed.isNotEmpty()) { "Kata kunci pencarian kosong." }
+  onPhase(InspectionPhase.PREPARING_ENGINE)
+  initialize(context)
+  onPhase(InspectionPhase.SEARCHING)
+  val request = YoutubeDLRequest("ytsearch$limit:$trimmed").addOption("--ignore-config").addOption("--no-colors")
+   .addOption("--flat-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--socket-timeout", 20)
+  val entries = JSONObject(execute(request,id)).optJSONArray("entries") ?: return emptyList()
+  return (0 until entries.length()).mapNotNull { index ->
+   val entry = entries.optJSONObject(index) ?: return@mapNotNull null
+   val videoId = entry.optString("id").takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) } ?: return@mapNotNull null
+   SourceMetadata.parse(entry, "https://www.youtube.com/watch?v=$videoId")
+  }
+ }
  suspend fun download(context: Context, job: DownloadJob, directory: File, skipSubtitles: Boolean = false, callback: (DownloadProgress)->Unit, resumeNotice: (String)->Unit = {}, processingNotice: (String)->Unit = {}): File {
   initialize(context)
   val options = DownloadOptions(job.url,job.mode,job.format,job.quality,job.bitrate,job.subtitles,job.embedSubs,job.thumbnail,job.embedThumb)

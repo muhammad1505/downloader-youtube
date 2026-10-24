@@ -48,6 +48,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             "Selesaikan atau hentikan unduhan aktif dulu."
         else -> null
     }
+    val spotifyPreview by model.spotify.collectAsStateWithLifecycle()
+    val spotifyCollectionPreview by model.spotifyCollection.collectAsStateWithLifecycle()
     val inspectError by model.inspectError.collectAsStateWithLifecycle()
     val inspectDetails by model.inspectDetails.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
@@ -287,6 +289,36 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         val target = playlist
                         if (target != null) model.queuePlaylist(target, entries, opts, onQueued = { id -> highlightedJobId = id })
                         url = ""
+                        model.clearPlaylist()
+                        tab = 1
+                    },
+                    spotify = spotifyPreview,
+                    inspectSpotify = { model.inspectSpotify(url.trim()) },
+                    clearSpotify = { model.clearSpotify() },
+                    downloadSpotify = { opts, candidate ->
+                        requestNotifications()
+                        // Track diambil SEBELUM state dibersihkan; URL job memakai video YouTube pilihan.
+                        spotifyPreview.track?.let { track ->
+                            model.enqueueSpotify(opts, track, candidate, onQueued = { id -> highlightedJobId = id })
+                        }
+                        url = ""
+                        model.clearSpotify()
+                        model.clearPlaylist()
+                        tab = 1
+                    },
+                    spotifyCollection = spotifyCollectionPreview,
+                    inspectSpotifyCollection = { model.inspectSpotifyCollection(url.trim()) },
+                    clearSpotifyCollection = { model.clearSpotifyCollection() },
+                    matchSpotifyTracks = { tracks -> model.matchSpotifyTracks(tracks) },
+                    cancelSpotifyMatch = { model.cancelSpotifyMatch() },
+                    downloadSpotifyCollection = { opts, tracks ->
+                        requestNotifications()
+                        // Koleksi diambil SEBELUM state dibersihkan; tiap lagu memakai video YouTube hasil pencocokan.
+                        spotifyCollectionPreview.collection?.let { collection ->
+                            model.enqueueSpotifyCollection(opts, collection, tracks, onQueued = { id -> highlightedJobId = id })
+                        }
+                        url = ""
+                        model.clearSpotifyCollection()
                         model.clearPlaylist()
                         tab = 1
                     },

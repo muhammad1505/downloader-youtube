@@ -127,17 +127,27 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    // Refresh source metadata on every attempt: playlist entries and expired URLs need the same identity path.
    try {
     var metadata = Engine.inspect(applicationContext, job.url, job.id)
-    sourceTrackAvailable = metadata.track.isNotBlank()
-    if (job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) {
-     val initial = TitleSplit.identify(metadata.title, metadata.uploader, metadata.artist, metadata.track, metadata.creator)
-     val resolved = runInterruptible(Dispatchers.IO) { Lyrics.resolveIdentity(initial, metadata.durationSeconds) }
-     if (resolved.evidence == "provider_identity") metadata = metadata.copy(artist=resolved.artist.orEmpty(), track=resolved.title, artistEvidence=resolved.evidence)
+    val spotifyIdentity = job.platformId == Spotify.PLATFORM_ID
+    sourceTrackAvailable = spotifyIdentity || metadata.track.isNotBlank()
+    if (spotifyIdentity) {
+     // Identitas judul/artis/sampul berasal dari Spotify; judul video YouTube ("(Official Video)" dsb.)
+     // tidak boleh menimpanya. Durasi sumber hanya dipakai bila job belum punya durasi.
+     if (job.durationSeconds <= 0 && metadata.durationSeconds > 0) {
+      if (dao.duration(jobId, generation, metadata.durationSeconds) == 0) throw CancellationException()
+      job = job.copy(durationSeconds = metadata.durationSeconds)
+     }
+    } else {
+     if (job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) {
+      val initial = TitleSplit.identify(metadata.title, metadata.uploader, metadata.artist, metadata.track, metadata.creator)
+      val resolved = runInterruptible(Dispatchers.IO) { Lyrics.resolveIdentity(initial, metadata.durationSeconds) }
+      if (resolved.evidence == "provider_identity") metadata = metadata.copy(artist=resolved.artist.orEmpty(), track=resolved.title, artistEvidence=resolved.evidence)
+     }
+     val updated = job.withMetadata(metadata)
+     if (dao.metadata(jobId, generation, updated.rawTitle, updated.trackTitle, updated.title, updated.artist,
+       updated.creator, updated.remixer, updated.versionTag, updated.artistEvidence, updated.platformId,
+       updated.thumbnailUrl, updated.sourceId, updated.extractor, updated.subfolder, updated.durationSeconds) == 0) throw CancellationException()
+     job = updated
     }
-    val updated = job.withMetadata(metadata)
-    if (dao.metadata(jobId, generation, updated.rawTitle, updated.trackTitle, updated.title, updated.artist,
-      updated.creator, updated.remixer, updated.versionTag, updated.artistEvidence, updated.platformId,
-      updated.thumbnailUrl, updated.sourceId, updated.extractor, updated.subfolder, updated.durationSeconds) == 0) throw CancellationException()
-    job = updated
    } catch (cancelled: CancellationException) { throw cancelled }
    catch (_: Exception) { /* Extracting metadata may fail while the engine can still download. Keep the stored identity. */ }
    CoverCache.fetch(applicationContext, job)?.let { path ->

@@ -190,6 +190,190 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    }
   }
  }
+ /**
+  * Pratinjau link Spotify: metadata track + kandidat video YouTube. State terpisah dari inspeksi
+  * engine karena link Spotify tidak pernah masuk ke yt-dlp; sumber audionya selalu YouTube.
+  */
+ private val _spotify=MutableStateFlow(SpotifyPreview())
+ val spotify: StateFlow<SpotifyPreview> = _spotify.asStateFlow()
+ private var spotifyInspection: Job?=null
+ private var spotifyToken: String?=null
+ fun inspectSpotify(url: String) {
+  val trimmed=url.trim()
+  if (!Spotify.isTrackLink(trimmed)) return
+  spotifyToken?.let(Engine::cancel); spotifyInspection?.cancel()
+  val id=UUID.randomUUID().toString()
+  spotifyToken=id
+  _spotify.value=SpotifyPreview(url=trimmed,busy=true,phase=InspectionPhase.PREPARING_ENGINE)
+  spotifyInspection=viewModelScope.launch {
+   try {
+    val track=Spotify.fetchTrack(getApplication(),trimmed)
+    if (_spotify.value.url != trimmed) return@launch
+    _spotify.value=_spotify.value.copy(track=track,phase=InspectionPhase.SEARCHING)
+    val videos=Engine.search(getApplication(),Spotify.searchQuery(track),id) { phase ->
+     if (_spotify.value.url == trimmed) _spotify.value=_spotify.value.copy(phase=phase)
+    }
+    if (_spotify.value.url != trimmed) return@launch
+    _spotify.value=SpotifyPreview(url=trimmed,track=track,candidates=SpotifyMatch.rank(track,videos))
+   } catch(cancelled: CancellationException) { throw cancelled }
+   catch(error: Exception) {
+    val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error,"SPOTIFY_INSPECTION") }
+    val message=error.message?.takeIf { it.isNotBlank() } ?: details.userMessage
+    // Pratinjau yang sudah dibersihkan/diganti tidak boleh memunculkan error tertinggal.
+    if (_spotify.value.url == trimmed) {
+     _spotify.value=_spotify.value.copy(error=message)
+     _error.value=message
+    }
+   }
+   finally {
+    // Inspeksi yang sudah digantikan tidak boleh mematikan indikator milik inspeksi baru.
+    if (spotifyToken == id) {
+     spotifyToken=null
+     if (_spotify.value.url == trimmed) _spotify.value=_spotify.value.copy(busy=false,phase=null)
+    }
+   }
+  }
+ }
+ fun clearSpotify() {
+  spotifyToken?.let(Engine::cancel)
+  spotifyToken=null
+  spotifyInspection?.cancel(); spotifyInspection=null
+  if (_spotify.value != SpotifyPreview()) _spotify.value=SpotifyPreview()
+ }
+ /** Album/playlist Spotify: metadata dulu, pencocokan YouTube per track dijalankan terpisah. */
+ private val _spotifyCollection=MutableStateFlow(SpotifyCollectionPreview())
+ val spotifyCollection: StateFlow<SpotifyCollectionPreview> = _spotifyCollection.asStateFlow()
+ private var collectionInspection: Job?=null
+ private var collectionToken: String?=null
+ private var collectionMatch: Job?=null
+ private var collectionMatchToken: String?=null
+ fun inspectSpotifyCollection(url: String) {
+  val trimmed=url.trim()
+  if (!Spotify.isCollectionLink(trimmed)) return
+  cancelSpotifyMatch()
+  collectionInspection?.cancel()
+  val id=UUID.randomUUID().toString()
+  collectionToken=id
+  _spotifyCollection.value=SpotifyCollectionPreview(url=trimmed,busy=true,phase=InspectionPhase.PREPARING_ENGINE)
+  collectionInspection=viewModelScope.launch {
+   try {
+    _spotifyCollection.value=_spotifyCollection.value.copy(phase=InspectionPhase.FETCHING_COLLECTION)
+    val collection=Spotify.fetchCollection(getApplication(),trimmed)
+    if (_spotifyCollection.value.url != trimmed) return@launch
+    _spotifyCollection.value=SpotifyCollectionPreview(url=trimmed,collection=collection)
+   } catch(cancelled: CancellationException) { throw cancelled }
+   catch(error: Exception) {
+    val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error,"SPOTIFY_COLLECTION") }
+    val message=error.message?.takeIf { it.isNotBlank() } ?: details.userMessage
+    if (_spotifyCollection.value.url == trimmed) {
+     _spotifyCollection.value=_spotifyCollection.value.copy(error=message)
+     _error.value=message
+    }
+   }
+   finally {
+    if (collectionToken == id) {
+     collectionToken=null
+     if (_spotifyCollection.value.url == trimmed) _spotifyCollection.value=_spotifyCollection.value.copy(busy=false,phase=null)
+    }
+   }
+  }
+ }
+ fun clearSpotifyCollection() {
+  collectionToken=null
+  collectionInspection?.cancel(); collectionInspection=null
+  cancelSpotifyMatch()
+  if (_spotifyCollection.value != SpotifyCollectionPreview()) _spotifyCollection.value=SpotifyCollectionPreview()
+ }
+ /**
+  * Cocokkan track terpilih satu per satu (sekuensial — satu proses yt-dlp pada satu waktu) dan
+  * simpan kandidat terbaik per track. Track yang sudah punya kandidat tidak dicari ulang.
+  */
+ fun matchSpotifyTracks(tracks: List<SpotifyTrack>) {
+  val state=_spotifyCollection.value
+  val collection=state.collection ?: return
+  if (state.matching) return
+  val wanted=tracks.filter { it.playable && !state.matches.containsKey(it.id) }
+  if (wanted.isEmpty()) return
+  val token=UUID.randomUUID().toString().replace("-","")
+  collectionMatchToken=token
+  _spotifyCollection.value=state.copy(matching=true,done=0,total=wanted.size)
+  collectionMatch=viewModelScope.launch {
+   val matched=state.matches.toMutableMap()
+   val failures=state.failures.toMutableMap()
+   var done=0
+   try {
+    wanted.forEach { track ->
+     ensureActive()
+     if (_spotifyCollection.value.collection?.id != collection.id) return@launch
+     try {
+      val videos=Engine.search(getApplication(),Spotify.searchQuery(track),token,limit=3)
+      val best=SpotifyMatch.rank(track,videos).firstOrNull()
+      if (best == null) failures[track.id]="Tidak ada kandidat YouTube." else { matched[track.id]=best; failures.remove(track.id) }
+     } catch(cancelled: CancellationException) { throw cancelled }
+     catch(error: Exception) { failures[track.id]=error.message?.takeIf { it.isNotBlank() } ?: "Pencarian gagal." }
+     done++
+     // State bisa dibersihkan/diganti saat pencarian terakhir berjalan — jangan tulis ke pratinjau lain.
+     val current=_spotifyCollection.value
+     if (current.collection?.id == collection.id) _spotifyCollection.value=current.copy(done=done,matches=matched.toMap(),failures=failures.toMap())
+    }
+   } catch(cancelled: CancellationException) { throw cancelled }
+   catch(error: Exception) { _error.value=error.message }
+   finally {
+    if (collectionMatchToken == token) {
+     collectionMatchToken=null
+     if (_spotifyCollection.value.collection?.id == collection.id) _spotifyCollection.value=_spotifyCollection.value.copy(matching=false)
+    }
+   }
+  }
+ }
+ fun cancelSpotifyMatch() {
+  collectionMatchToken?.let(Engine::cancel)
+  collectionMatchToken=null
+  collectionMatch?.cancel(); collectionMatch=null
+  if (_spotifyCollection.value.matching) _spotifyCollection.value=_spotifyCollection.value.copy(matching=false)
+ }
+ /** Antrekan track terpilih yang sudah punya kandidat; satu job per lagu, satu folder koleksi. */
+ fun enqueueSpotifyCollection(options: DownloadOptions, collection: SpotifyCollection, tracks: List<SpotifyTrack>, onQueued: ((String) -> Unit)? = null) {
+  if(submitting) return; submitting=true
+  // Ditangkap SEBELUM state dibersihkan pemanggil; coroutine belum tentu berjalan saat itu.
+  val matches=_spotifyCollection.value.matches
+  viewModelScope.launch {
+   try {
+    // Album memakai artis (mis. ed-sheeran); playlist memakai judulnya (mis. today-s-top-hits).
+    val folder=(if (collection.kind == SpotifyKind.ALBUM) Selection.artistFolder(collection.owner) else Selection.artistFolder(collection.title)).orEmpty()
+    var queued=0; var skipped=0
+    var firstQueued: String? = null
+    tracks.filter { it.playable }.forEach { track ->
+     val candidate=matches[track.id] ?: run { skipped++; return@forEach }
+     try {
+      submit(options.copy(url=candidate.video.url), durationSeconds=candidate.video.durationSeconds.takeIf { it > 0 },
+        subfolder=folder, entryMetadata=Spotify.toMetadata(track,candidate.video), autoFolder="collection", onQueued = { id ->
+         if (firstQueued == null) { firstQueued = id; onQueued?.invoke(id) }
+        })
+      queued++
+     } catch(cancelled: CancellationException) { throw cancelled }
+     catch(_: Exception) { skipped++ }
+    }
+    _notice.value="${collection.title}: $queued lagu diantrekan" + (if (folder.isNotBlank()) " ke folder $folder" else "") + (if(skipped > 0) "; $skipped dilewati." else ".")
+    if (queued == 0) _error.value="Tidak ada lagu yang bisa diantrekan dari ${collection.title}."
+   } catch(cancelled: CancellationException) { throw cancelled }
+   catch(error: Exception) { _error.value=error.message }
+   finally { submitting=false }
+  }
+ }
+ /** Satu track Spotify diantrekan memakai video YouTube pilihan pengguna, dengan tag metadata Spotify. */
+ fun enqueueSpotify(options: DownloadOptions, track: SpotifyTrack, candidate: SpotifyCandidate, onQueued: ((String) -> Unit)? = null) {
+  if(submitting) return; submitting=true; viewModelScope.launch {
+   try {
+    require(Selection.videoId(candidate.video.url) != null) { "Video YouTube hasil pencocokan tidak valid." }
+    submit(options.copy(url=candidate.video.url), durationSeconds=candidate.video.durationSeconds.takeIf { it > 0 },
+      entryMetadata=Spotify.toMetadata(track,candidate.video), onQueued=onQueued)
+   }
+   catch(cancelled: CancellationException) { throw cancelled }
+   catch(error: Exception) { _error.value=error.message }
+   finally { submitting=false }
+  }
+ }
  private var inspection: Job?=null
  private val inspectionId: String? get()=inspectionState.token
  /** Jenis inspeksi terakhir — retry harus mengulang operasi yang sama, bukan yang lain (BUG-006/R6). */

@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +38,13 @@ import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.Spotify
+import id.local.tubeflow.core.SpotifyCandidate
+import id.local.tubeflow.core.SpotifyCollection
+import id.local.tubeflow.core.SpotifyCollectionPreview
+import id.local.tubeflow.core.SpotifyKind
+import id.local.tubeflow.core.SpotifyPreview
+import id.local.tubeflow.core.SpotifyTrack
 import id.local.tubeflow.core.VideoMetadata
 import kotlinx.coroutines.delay
 
@@ -77,6 +85,16 @@ internal fun DownloadComposer(
     cancelInspect: () -> Unit,
     download: (DownloadOptions) -> Unit,
     downloadPlaylist: (List<PlaylistEntry>, DownloadOptions) -> Unit,
+    spotify: SpotifyPreview = SpotifyPreview(),
+    inspectSpotify: () -> Unit = {},
+    clearSpotify: () -> Unit = {},
+    downloadSpotify: (DownloadOptions, SpotifyCandidate) -> Unit = { _, _ -> },
+    spotifyCollection: SpotifyCollectionPreview = SpotifyCollectionPreview(),
+    inspectSpotifyCollection: () -> Unit = {},
+    clearSpotifyCollection: () -> Unit = {},
+    matchSpotifyTracks: (List<SpotifyTrack>) -> Unit = {},
+    cancelSpotifyMatch: () -> Unit = {},
+    downloadSpotifyCollection: (DownloadOptions, List<SpotifyTrack>) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     var mode by rememberSaveable { mutableStateOf(MediaMode.VIDEO) }
@@ -91,6 +109,9 @@ internal fun DownloadComposer(
     var showFailureDetails by remember(url.trim()) { mutableStateOf(false) }
     if (showFailureDetails && inspectDetails != null) FailureDetailsDialog(inspectDetails) { showFailureDetails = false }
     var inspectedUrl by rememberSaveable { mutableStateOf("") }
+    var spotifyCandidateUrl by rememberSaveable { mutableStateOf("") }
+    var selectedSpotifyIds by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var spotifyCollectionQuery by rememberSaveable { mutableStateOf("") }
 
     var subtitleLang by rememberSaveable { mutableStateOf("") }
     // Lirik audio hanya on/off dari penyedia lirik — pilihan bahasa berlaku untuk subtitle video (BUG-009).
@@ -106,6 +127,36 @@ internal fun DownloadComposer(
     val hasList = Selection.hasListParam(trimmed)
     val shownPlaylist = playlist?.takeIf { it.url == trimmed }
     val shownVideo = metadata?.takeIf { it.url == trimmed && (shownPlaylist == null) }
+    val isSpotifyTrackLink = Spotify.isTrackLink(trimmed)
+    val isSpotifyCollectionLink = Spotify.isCollectionLink(trimmed)
+    val isSpotifyLink = isSpotifyTrackLink || isSpotifyCollectionLink
+    val spotifyTrack = spotify.track?.takeIf { spotify.url == trimmed }
+    val spotifyCollectionData = spotifyCollection.collection?.takeIf { spotifyCollection.url == trimmed }
+    val spotifyBusy = if (isSpotifyCollectionLink) spotifyCollection.busy else spotify.busy
+    val selectedSpotify = spotify.candidates.firstOrNull { it.video.url == spotifyCandidateUrl } ?: spotify.candidates.firstOrNull()
+    val spotifyTracks = spotifyCollectionData?.tracks.orEmpty()
+    val visibleSpotifyTracks = if (spotifyCollectionQuery.isBlank()) spotifyTracks
+        else spotifyTracks.filter {
+            it.title.contains(spotifyCollectionQuery.trim(), ignoreCase = true) ||
+                it.artists.contains(spotifyCollectionQuery.trim(), ignoreCase = true)
+        }
+    val spotifyVisibleSelectable = visibleSpotifyTracks.filter { it.playable }
+    val spotifyAllVisibleSelected = spotifyVisibleSelectable.isNotEmpty() && spotifyVisibleSelectable.all { it.id in selectedSpotifyIds }
+    val spotifySelectedTracks = spotifyTracks.filter { it.id in selectedSpotifyIds }
+    val spotifyUnmatchedTracks = spotifySelectedTracks.filter { !spotifyCollection.matches.containsKey(it.id) }
+    val spotifyMatchedSelected = spotifySelectedTracks.count { spotifyCollection.matches.containsKey(it.id) }
+    // Track Spotify selalu audio — tidak ada video yang bisa diunduh dari tautannya.
+    LaunchedEffect(isSpotifyLink) { if (isSpotifyLink) { mode = MediaMode.AUDIO; preset = "" } }
+    LaunchedEffect(spotify.url, spotify.candidates) {
+        if (spotify.candidates.none { it.video.url == spotifyCandidateUrl }) {
+            spotifyCandidateUrl = spotify.candidates.firstOrNull()?.video?.url.orEmpty()
+        }
+    }
+    // Pilihan awal koleksi: semua track yang tersedia di Spotify.
+    LaunchedEffect(spotifyCollectionData?.url) {
+        selectedSpotifyIds = spotifyCollectionData?.tracks?.filter { it.playable }?.map { it.id }?.toSet().orEmpty()
+        spotifyCollectionQuery = ""
+    }
     var inspectElapsed by remember(busy, inspectStartedAt) { mutableLongStateOf(0L) }
     LaunchedEffect(busy, inspectStartedAt) {
         if (!busy) { inspectElapsed = 0L; return@LaunchedEffect }
@@ -120,6 +171,20 @@ internal fun DownloadComposer(
 
     // Auto-baca detail: jeda singkat lalu inspect tanpa tombol "Cek link".
     LaunchedEffect(trimmed) {
+        if (isSpotifyLink) {
+            inspectedUrl = ""
+            // Pratinjau jenis lain (track ↔ album/playlist) tidak boleh tertinggal di memori.
+            if (!isSpotifyTrackLink && spotify.url.isNotEmpty()) clearSpotify()
+            if (!isSpotifyCollectionLink && spotifyCollection.url.isNotEmpty()) clearSpotifyCollection()
+            if (isSpotifyTrackLink) {
+                if (spotify.url != trimmed) { delay(400); inspectSpotify() }
+            } else if (spotifyCollection.url != trimmed) {
+                delay(400); inspectSpotifyCollection()
+            }
+            return@LaunchedEffect
+        }
+        if (spotify.url.isNotEmpty()) clearSpotify()
+        if (spotifyCollection.url.isNotEmpty()) clearSpotifyCollection()
         if (!isVideo && !isPlaylistLink) { inspectedUrl = ""; return@LaunchedEffect }
         delay(700)
         if (shownVideo?.url == trimmed || shownPlaylist?.url == trimmed) { inspectedUrl = trimmed; return@LaunchedEffect }
@@ -147,7 +212,8 @@ internal fun DownloadComposer(
         subtitles = if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "asli" else "",
         embedSubs = embedSubs && subtitleLang.isNotEmpty() && mode == MediaMode.VIDEO,
         thumbnail = false,
-        embedThumb = embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat),
+        // Spotify: sampul album hanya dipakai di aplikasi; sematan file akan memakai thumbnail video YouTube.
+        embedThumb = embedThumb && !isSpotifyLink && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat),
     )
 
     val entries = shownPlaylist?.entries.orEmpty()
@@ -166,23 +232,28 @@ internal fun DownloadComposer(
                 value = url,
                 onValueChange = { onUrl(it); if (shownPlaylist != null) clearPlaylist() },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Link video atau playlist") },
-                placeholder = { Text("https://youtu.be/… atau playlist?list=…") },
+                label = { Text("Link video, playlist, atau lagu Spotify") },
+                placeholder = { Text("https://youtu.be/… , playlist?list=… , atau open.spotify.com/track/…") },
                 singleLine = true,
-                isError = url.isNotBlank() && !isVideo && !isPlaylistLink,
+                isError = url.isNotBlank() && !isVideo && !isPlaylistLink && !isSpotifyLink,
                 supportingText = {
                     when {
                         busy -> Text(inspectProgressText)
-                        url.isNotBlank() && !isVideo && !isPlaylistLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
+                        spotifyBusy -> Text(
+                            (if (isSpotifyCollectionLink) spotifyCollection.phase else spotify.phase)
+                                ?.let(InspectionPhase::label) ?: "Membaca link Spotify…"
+                        )
+                        url.isNotBlank() && !isVideo && !isPlaylistLink && !isSpotifyLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
+                        isSpotifyLink -> Text("Terdeteksi link Spotify — audio diambil dari video YouTube yang cocok.")
                         hasList -> Text("Link ini bagian dari sebuah playlist.")
-                        else -> Text("Contoh: youtube.com, youtu.be, tiktok.com, soundcloud.com.")
+                        else -> Text("Contoh: youtube.com, youtu.be, tiktok.com, soundcloud.com, open.spotify.com.")
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (busy) {
+                        if (busy || spotifyBusy) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else if (url.isEmpty()) {
                             IconButton(onClick = {
@@ -199,12 +270,43 @@ internal fun DownloadComposer(
                     }
                 },
             )
-            if (busy) {
-                TextButton(onClick = cancelInspect, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            if (busy || spotifyBusy) {
+                TextButton(onClick = {
+                    when {
+                        isSpotifyCollectionLink -> clearSpotifyCollection()
+                        spotify.busy -> clearSpotify()
+                        else -> cancelInspect()
+                    }
+                }, contentPadding = PaddingValues(horizontal = 4.dp)) {
                     Icon(Icons.Outlined.Close, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Batalkan pemeriksaan")
                 }
+            }
+            // Dibatalkan atau gagal tanpa pesan: tetap sediakan jalan membaca ulang tautan yang sama.
+            if (isSpotifyTrackLink && !spotify.busy && spotifyTrack == null && spotify.error == null) {
+                ActionButton("Baca ulang link Spotify", inspectSpotify, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+            }
+            if (isSpotifyCollectionLink && !spotifyCollection.busy && spotifyCollectionData == null && spotifyCollection.error == null) {
+                ActionButton("Baca ulang link Spotify", inspectSpotifyCollection, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+            }
+            if (spotifyCollection.error != null && !spotifyCollection.busy && isSpotifyCollectionLink) {
+                AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text(spotifyCollection.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                } }, trailing = {
+                    ActionButton("Coba lagi", { inspectSpotifyCollection() }, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+                })
+            }
+            if (spotify.error != null && !spotify.busy && isSpotifyTrackLink) {
+                AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text(spotify.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                } }, trailing = {
+                    ActionButton("Coba lagi", { inspectSpotify() }, icon = Icons.Outlined.Refresh, emphasis = ActionEmphasis.Quiet)
+                })
             }
             if (hasList && isVideo) {
                 ActionButton(
@@ -253,6 +355,36 @@ internal fun DownloadComposer(
         if (shownVideo != null) {
             AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 VideoPreviewCard(shownVideo, if (mode == MediaMode.VIDEO) subtitleLang else "")
+            }
+        }
+
+        if (spotifyTrack != null) {
+            AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                SpotifyPreviewCard(spotifyTrack, spotify.candidates, selectedSpotify?.video?.url.orEmpty()) { spotifyCandidateUrl = it }
+            }
+        }
+
+        if (spotifyCollectionData != null) {
+            AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                SpotifyCollectionCard(
+                    collection = spotifyCollectionData,
+                    state = spotifyCollection,
+                    query = spotifyCollectionQuery,
+                    onQuery = { spotifyCollectionQuery = it },
+                    selected = selectedSpotifyIds,
+                    visible = visibleSpotifyTracks,
+                    allVisibleSelected = spotifyAllVisibleSelected,
+                    unmatchedCount = spotifyUnmatchedTracks.size,
+                    onToggle = { id ->
+                        selectedSpotifyIds = if (id in selectedSpotifyIds) selectedSpotifyIds - id else selectedSpotifyIds + id
+                    },
+                    onToggleAll = {
+                        selectedSpotifyIds = if (spotifyAllVisibleSelected) selectedSpotifyIds - spotifyVisibleSelectable.map { it.id }.toSet()
+                        else selectedSpotifyIds + spotifyVisibleSelectable.map { it.id }
+                    },
+                    onMatch = { matchSpotifyTracks(spotifyUnmatchedTracks) },
+                    onCancelMatch = cancelSpotifyMatch,
+                )
             }
         }
 
@@ -322,12 +454,17 @@ internal fun DownloadComposer(
                 }
         }
 
-        if (shownVideo != null || shownPlaylist != null) {
+        if (shownVideo != null || shownPlaylist != null || spotifyTrack != null || spotifyCollectionData != null) {
             Panel(
                 title = if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download",
-                description = if (shownPlaylist != null) "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu." else null,
+                description = when {
+                    shownPlaylist != null -> "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu."
+                    spotifyCollectionData != null -> "Setiap lagu menjadi job terpisah dengan tag Spotify; audionya dari video YouTube hasil pencocokan. Semua file masuk satu folder koleksi."
+                    spotifyTrack != null -> "Audio diunduh dari video YouTube yang dipilih; judul, artis, dan sampul di aplikasi memakai metadata Spotify."
+                    else -> null
+                },
             ) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    if (!isSpotifyLink) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = mode == MediaMode.VIDEO,
                             onClick = { mode = MediaMode.VIDEO; preset = "" },
@@ -343,6 +480,7 @@ internal fun DownloadComposer(
                             icon = { Icon(Icons.Outlined.Headphones, null, Modifier.size(18.dp)) },
                         )
                     }
+                    if (isSpotifyLink) Text("Link Spotify selalu diunduh sebagai audio.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Text("Pilihan cepat", style = MaterialTheme.typography.labelLarge)
                     ScrollRow {
@@ -412,7 +550,9 @@ internal fun DownloadComposer(
 
                             if (mode == MediaMode.AUDIO) {
                                 HorizontalDivider()
-                                if (Selection.coverSupported(mode, audioFormat)) {
+                                if (Selection.coverSupported(mode, audioFormat) && isSpotifyLink) {
+                                    Text("Sampul Spotify dipakai di kartu, Riwayat, dan Koleksi. Sematan gambar ke file tidak diaktifkan untuk tautan Spotify karena yang tersedia hanya thumbnail video YouTube.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else if (Selection.coverSupported(mode, audioFormat)) {
                                     ToggleRow(
                                         title = "Sampul album (cover)",
                                         description = "Sampul disematkan ke file audio — tidak ada file gambar terpisah.",
@@ -436,7 +576,7 @@ internal fun DownloadComposer(
             }
         }
 
-        if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty())) {
+        if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty()) || spotifyTrack != null || spotifyCollectionData != null) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 val summary = buildSummary(mode, videoFormat, audioFormat, quality, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
                 Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
@@ -445,32 +585,42 @@ internal fun DownloadComposer(
                         Spacer(Modifier.width(8.dp))
                         Text(summary, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         if (shownPlaylist != null) Text("$selectionCount video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        else if (spotifyCollectionData != null) Text("$spotifyMatchedSelected/${spotifySelectedTracks.size} cocok", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        else if (spotifyTrack != null) Text("Spotify · YouTube", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }
 
                 ActionButton(
                     text = when {
                         shownPlaylist != null -> "Antrekan $selectionCount video"
+                        spotifyCollectionData != null -> "Antrekan $spotifyMatchedSelected lagu"
+                        spotifyTrack != null -> "Download audio"
                         mode == MediaMode.VIDEO -> "Download video"
                         else -> "Download audio"
                     },
                     onClick = {
-                        if (shownPlaylist != null) {
-                            downloadPlaylist(entries.filter { it.id in selectedIds }, buildOptions(shownPlaylist.url))
-                        } else {
-                            download(buildOptions(trimmed))
+                        when {
+                            shownPlaylist != null -> downloadPlaylist(entries.filter { it.id in selectedIds }, buildOptions(shownPlaylist.url))
+                            spotifyCollectionData != null -> downloadSpotifyCollection(buildOptions(""), spotifySelectedTracks.filter { spotifyCollection.matches.containsKey(it.id) })
+                            spotifyTrack != null -> selectedSpotify?.let { downloadSpotify(buildOptions(it.video.url), it) }
+                            else -> download(buildOptions(trimmed))
                         }
                     },
                     icon = if (shownPlaylist != null) Icons.Outlined.Queue else Icons.Outlined.Download,
                     emphasis = ActionEmphasis.Primary,
-                    enabled = !busy && if (shownPlaylist != null) selectionCount > 0 && entries.isNotEmpty() else isVideo,
+                    enabled = !busy && !spotifyBusy && !spotifyCollection.matching && when {
+                        shownPlaylist != null -> selectionCount > 0 && entries.isNotEmpty()
+                        spotifyCollectionData != null -> spotifyMatchedSelected > 0
+                        spotifyTrack != null -> selectedSpotify != null
+                        else -> isVideo
+                    },
                     fillWidth = true,
                 )
             }
         }
 
         Text(
-            "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
+            "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan. Tautan Spotify memakai metadata resmi Spotify; audionya tetap dari video YouTube yang kamu pilih. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
@@ -542,6 +692,220 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+private fun spotifyDeltaLabel(delta: Long): String = when {
+    delta < 0 -> "durasi tidak diketahui"
+    delta == 0L -> "durasi sama"
+    else -> "selisih $delta dtk"
+}
+
+/** Metadata Spotify + pilihan video YouTube; audio tidak pernah diambil dari Spotify. */
+@Composable
+private fun SpotifyPreviewCard(track: SpotifyTrack, candidates: List<SpotifyCandidate>, selected: String, onSelect: (String) -> Unit) {
+    SectionCard {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AsyncImage(
+                    model = track.coverUrl,
+                    contentDescription = "Sampul album Spotify",
+                    modifier = Modifier.size(88.dp).clip(MaterialTheme.shapes.medium),
+                    contentScale = ContentScale.Crop,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                    Text(
+                        track.artists.ifBlank { "Artis tidak tercantum" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.MusicNote, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Spotify · ${Format.duration(track.durationSeconds)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+            HorizontalDivider()
+            Text("Sumber audio: YouTube", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "Spotify hanya dipakai untuk judul, artis, dan sampul. Pilih video yang cocok; file hasil unduhan memakai tag Spotify.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (candidates.isEmpty()) {
+                Text("Tidak ada video YouTube yang bisa dipakai. Coba lagi nanti.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            } else {
+                candidates.forEach { candidate ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { onSelect(candidate.video.url) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = candidate.video.url == selected, onClick = { onSelect(candidate.video.url) })
+                        Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(candidate.video.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                            Text(
+                                listOf(candidate.video.uploader.ifBlank { "Channel tidak diketahui" }, Format.duration(candidate.video.durationSeconds), spotifyDeltaLabel(candidate.durationDeltaSeconds)).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                val best = candidates.first()
+                if (!best.confident) {
+                    Text(
+                        "Kecocokan terbaik belum kuat (skor ${best.score}/100) — periksa judul dan durasi sebelum mengunduh.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Album/playlist Spotify: metadata di atas, daftar lagu dengan status pencocokan YouTube. */
+@Composable
+private fun SpotifyCollectionCard(
+    collection: SpotifyCollection,
+    state: SpotifyCollectionPreview,
+    query: String,
+    onQuery: (String) -> Unit,
+    selected: Set<String>,
+    visible: List<SpotifyTrack>,
+    allVisibleSelected: Boolean,
+    unmatchedCount: Int,
+    onToggle: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onMatch: () -> Unit,
+    onCancelMatch: () -> Unit,
+) {
+    val kindLabel = if (collection.kind == SpotifyKind.ALBUM) "Album" else "Playlist"
+    SectionCard {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AsyncImage(
+                    model = collection.coverUrl,
+                    contentDescription = "Sampul $kindLabel Spotify",
+                    modifier = Modifier.size(88.dp).clip(MaterialTheme.shapes.medium),
+                    contentScale = ContentScale.Crop,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(collection.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                    Text(
+                        collection.owner.ifBlank { "$kindLabel Spotify" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.MusicNote, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "$kindLabel · ${collection.tracks.size} lagu · ${Format.duration(collection.totalSeconds)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    if (collection.tracks.size >= 100) {
+                        Text("Halaman Spotify hanya memuat 100 lagu pertama.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            HorizontalDivider()
+            Text("Sumber audio: YouTube", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "Setiap lagu dicocokkan ke video YouTube lalu diantrekan sebagai job terpisah dengan tag Spotify. Pilih lagu yang ingin diunduh; yang belum cocok akan dilewati.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (collection.tracks.isEmpty()) {
+                Text("Tidak ada lagu yang bisa dibaca dari halaman ini.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            } else {
+                SearchField(query, onQuery, label = "Cari lagu di ${kindLabel.lowercase()}")
+                AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${selected.size} / ${collection.playableCount} dipilih",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                } }, trailing = {
+                    ActionButton(if (allVisibleSelected) "Kosongkan" else "Pilih semua", onToggleAll, emphasis = ActionEmphasis.Quiet)
+                })
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    visible.forEach { track ->
+                        val match = state.matches[track.id]
+                        val failure = state.failures[track.id]
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+                            Checkbox(
+                                checked = track.id in selected,
+                                onCheckedChange = { onToggle(track.id) },
+                                enabled = track.playable,
+                            )
+                            Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(track.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                Text(
+                                    "${track.artists.ifBlank { "Artis tidak tercantum" }} · ${Format.duration(track.durationSeconds)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                                when {
+                                    !track.playable -> Text("Tidak tersedia di Spotify — tidak bisa diunduh.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                    match != null -> {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Outlined.CheckCircle, null, Modifier.size(13.dp), tint = MaterialTheme.colorScheme.secondary)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("YouTube: ${match.video.title}", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                        }
+                                        Text(
+                                            "${match.video.uploader.ifBlank { "Channel tidak diketahui" }} · ${spotifyDeltaLabel(match.durationDeltaSeconds)}" +
+                                                if (match.confident) "" else " · kecocokan lemah, periksa dulu",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (match.confident) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                    failure != null -> Text("Gagal dicocokkan: $failure", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                    state.matching -> Text("Menunggu pencocokan…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (visible.isEmpty()) {
+                    Text("Tidak ada lagu yang cocok dengan \"$query\".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (state.matching) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mencocokkan ${state.done}/${state.total} lagu…", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                        TextButton(onClick = onCancelMatch) { Text("Batalkan") }
+                    }
+                } else if (unmatchedCount > 0) {
+                    ActionButton(
+                        "Cocokkan $unmatchedCount lagu",
+                        onMatch,
+                        icon = Icons.Outlined.Search,
+                        emphasis = ActionEmphasis.Quiet,
+                        fillWidth = true,
+                    )
+                }
+                if (state.failures.isNotEmpty() && !state.matching) {
+                    Text("Sebagian lagu gagal dicocokkan dan akan dilewati saat antre.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
