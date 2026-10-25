@@ -652,3 +652,131 @@ entri pada build ini.
 State Antrean aktif pada build release, pencarian/filter Riwayat >3 entri,
 TWS/Android 12+, fault injection provider/process death, runtime 16 KB,
 ABI/Android lain, dan matriks font/landscape belum diuji.
+
+## Unduhan Spotify (track/album/playlist) 1.1.33/code47 — 24 Oktober 2026
+
+Release arm64 **1.1.33/code47** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256
+`2f7e2fc7f321b65d66761db9b30de195fa2ec7f80e7247b76ed09d1684cbb317`,
+`base.apk` identik. Tidak uninstall, clear data, atau reset database.
+
+Di HP: (1) link track Spotify menampilkan metadata + 5 kandidat YouTube dan MP3
+128 terunduh dengan tag Spotify; (2) album 10 lagu dengan 2 lagu dipilih,
+dicocokkan, dan diantrekan ke subfolder `scott-buckley/`; (3) playlist 20 lagu
+dengan pencarian yang tidak mengubah pilihan, pencocokan dibatalkan pada 2/20
+lalu 3 lagu yang sudah cocok diantrekan ke folder slug playlist; (4) playlist
+150 lagu dibatasi 100 dengan pesan yang sesuai; (5) entri riwayat berlabel
+Spotify dan dapat diputar (MediaSession `state=3`). File hasil diperiksa dengan
+ffprobe: tag judul/artis Spotify, tanpa gambar tertanam. Tidak ada
+`FATAL EXCEPTION` pada PID aplikasi.
+
+427 tes Kotlin/98 Python, lint 0 error/3 warning. Audit APK 257 ELF, 13 kelas
+ZIP, zipalign 16 KB, signature v2; AAB 256.170.772 byte lulus. Batalkan metadata,
+mode pesawat penuh (VPN aktif tidak dapat diputus dari ADB), kecocokan lemah,
+force-stop, ganti folder, TalkBack/font/landscape, filter platform, dan
+**Unduh lagi** belum diuji. [Detail dan bukti](SPOTIFY_DEVICE_VALIDATION.md#9-hasil-validasi-perangkat--24-oktober-2026).
+
+## Pemutar video 1.1.35/code49 — 25 Oktober 2026
+
+Release arm64 **1.1.35/code49** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256
+`556985635e79abeea82dd281498c8d1f59efed4794c2730d667cb6b9b1a5b2cc`,
+`base.apk` identik. Tidak uninstall, clear data, atau reset database. Versi
+sebelumnya di perangkat adalah 1.1.33/code47.
+
+Host: **459 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK`, lint
+debug/release **0 error/3 warning** lama; `scripts/build_release.sh` lulus
+(14m41s). APK **76.135.624 byte**; AAB **273.003.343 byte**, SHA256
+`cb69a55acf02ae2c3d81b18ada335f6044c755ba250f93fd436cf4ed728a1085`.
+Audit APK **262 ELF**, 0 gagal alignment 16 KB; 13 kelas ZIP reflektif lulus;
+zipalign 16 KB dan signature v2 lulus; AAB `jarsigner` verified.
+
+Di HP: (1) `player-h264.mp4` (H.264/AAC, 2 track audio + 2 subtitle mov_text)
+diputar dari Koleksi; subtitle Indonesia tampil, pilihan track audio berpindah ke
+**Inggris** dan tetap terbaca saat sheet dibuka lagi; ukuran **Besar**, warna
+**Kuning**, dan delay **+0,25 dtk** dapat dipilih dan subtitle tetap tampil;
+(2) `player-av1-10bit-ac3.mkv` (AV1 10-bit + AC3 5.1) diputar setelah platform
+melaporkan AV1 10-bit tidak didukung; renderer FFmpeg dimuat
+`NextRenderersFactory`, video bergerak, AudioTrack 48 kHz 6 kanal aktif, dan
+video berlanjut ke item berikutnya; (3) orientasi **Lanskap** dari sheet Tampilan mengubah layar ke
+1520x720, lalu kembali potret saat pemutar ditutup; (4) PiP masuk dan
+`mLastReportedPictureInPictureMode=true`; (5) ACTION_VIEW video membuka pemutar
+langsung sebagai satu item `player-h264`, sedangkan ACTION_VIEW audio menutup
+video dan memutar `player-audio` di mini player; (6) resolver sistem menemukan
+TubeFlow untuk `video/mp4`, `audio/mpeg`, dan `video/x-matroska`. Tidak ada
+`FATAL EXCEPTION`; crash buffer kosong.
+
+**Temuan baru:**
+- **P2 — posisi subtitle “Tinggi” tidak menaikkan cue mov_text tertanam**; di
+  lanskap teks berada di bawah dan tertutup kontrol. Jalur subtitle sidecar belum
+  diuji, jadi belum pasti apakah ini khusus cue tertanam atau juga sidecar.
+- **P3 — label track pertama tidak terbaca:** berkas menandai track pertama
+  `ind`, tetapi UI menampilkan **Audio 1/Subtitle 1**, sedangkan track kedua tampil
+  **Inggris**. Perlu dicek apakah Media3 menormalkan tag ke kode 2 huruf atau peta
+  bahasa aplikasi belum mencakup kode 3 huruf; ini belum dipastikan.
+- **P3 — cakupan “Buka dengan” belum lengkap:** resolver tidak menemukan TubeFlow
+  untuk `application/octet-stream`; `ACTION_SEND`/`SEND_MULTIPLE` juga belum
+  terdaftar. `MediaIntent` tetap bisa membuka URI tersebut bila activity dipanggil
+  eksplisit dan ekstensi berkas dikenali.
+- **P3 — metadata audio masuk tidak dibaca:** MP3 dengan tag `artist=TubeFlow`
+  tampil sebagai **Artis belum diketahui** karena jalur incoming hanya mengirim
+  judul dari nama berkas.
+- **P2 (host review, belum direproduksi di HP)** — `isCodecFailure` belum
+  mencakup `ERROR_CODE_DECODER_QUERY_FAILED` dan
+  `ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES`; tombol **Coba lagi** juga
+  tidak melakukan apa pun bila `player == null` setelah kegagalan pembukaan.
+
+**Belum diuji:** delay subtitle secara presisi (baru memastikan pilihan
+tersimpan dan tidak crash), subtitle sidecar, fallback setelah decoder platform
+gagal saat runtime (bukan pemilihan awal), mode AUTO saat kunci rotasi sistem
+aktif, tombol aksi di jendela PiP, auto-PiP Android 12+, force-stop saat video
+aktif, runtime halaman 16 KB, dan ABI/Android lain. File uji baru masih berada di
+`Downloads/TubeFlow` (`player-h264.mp4`, `player-av1.mkv`,
+`player-av1-10bit-ac3.mkv`, `player-audio.mp3`).
+
+## Pemutar video 1.1.36/code50 — 25 Oktober 2026
+
+Release arm64 **1.1.36/code50** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256
+`e41cf773c6e8ee9a94cfbebf2cf2e675ed57cdedc9d63a4e6e2e45aa89ad81f3`,
+`base.apk` identik. Versi sebelumnya di perangkat adalah 1.1.35/code49. Tidak
+uninstall, clear data, atau reset database.
+
+Host: **464 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,816
+detik), lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh`
+lulus (17m45s). APK **76.254.890 byte**; AAB **273.162.811 byte**, SHA256
+`787dde4718a335c223c903f43083164e80faf1a4812628f617784bde4fbe1f64`.
+Audit APK **262 ELF**, 0 gagal alignment 16 KB; 13 kelas ZIP reflektif lulus;
+zipalign 16 KB dan signature v2 lulus; AAB `jarsigner` verified.
+
+Di HP: (1) `player-av1-10bit-ac3.mkv` (AV1 10-bit + AC3) diputar di mode
+**Otomatis**; dari lembar Opsi pemutar dekoder diganti ke **Perangkat saja** dan
+video dibuka ulang di posisi yang sama tanpa kehilangan detik, log
+`c2.android.av1.decoder` aktif ±26 fps, lalu kembali ke **Otomatis** tanpa
+crash; (2) chip cepat diuji satu ketuk: **EQ** Mati→Bass, **FX** Ruang→Studio,
+**CC** Otomatis→Indonesia, **Smart Enhance** Ringan, **Rasio** Penuh, **Ulangi**
+Satu — label dan status aktif berubah langsung, dan pilihan detail tetap bisa
+dibuka dari **Opsi pemutar**; (3) subtitle sidecar `player-h264.id.srt`
+ditambahkan saat video AV1 diputar: snackbar **Subtitle player-h264.id.srt
+ditambahkan**, cue tampil kuning/besar, chip menjadi **CC Indonesia**, dan cue
+tertanam juga mengikuti gaya pengguna (bukan gaya ASS bawaan);
+(4) chip **Foto** menyimpan
+`Pictures/TubeFlow/player-av1-10bit-ac3-20261025-141220.png` (263.889 byte,
+720x1520), terbaca lewat MediaStore; (5) resume menampilkan **Dilanjutkan dari
+0:09** dan **Mulai dari awal**; (6) lanskap 1520x720 menampilkan progress bar
+ringkas, chip cepat, dan subtitle tanpa terpotong; kembali ke layar sebelumnya
+tanpa crash. Tidak ada `FATAL EXCEPTION` atau ANR pada PID aplikasi.
+
+**Temuan baru:** tidak ada yang memblokir. Batas yang tersisa:
+- Kode error `DECODER_QUERY_FAILED` dan `DECODING_FORMAT_EXCEEDS_CAPABILITIES`
+  tidak dapat dipaksa muncul di perangkat ini karena dekoder platform masih mau
+  membuka AV1 10-bit; cakupan keduanya baru dibuktikan tes host.
+- Jalur **Coba lagi** saat `player == null` sudah diperbaiki di kode, tetapi
+  kegagalan pembukaan sinkron belum berhasil dipicu di HP; yang teruji hanya
+  pemulihan lewat **Coba dekoder software**.
+- Tombol aksi jendela PiP, auto-PiP Android 12+, force-stop saat video aktif,
+  runtime halaman 16 KB, dan ABI/Android lain belum diuji.
+- Delay subtitle belum diukur presisi; hanya dipastikan pilihan tersimpan dan
+  cue tetap tampil.
+- Posisi subtitle **Tinggi** vs **Bawah** pada cue tertanam belum dibandingkan
+  langsung di HP; yang terlihat hanya cue tampil lebih tinggi dari tepi bawah.

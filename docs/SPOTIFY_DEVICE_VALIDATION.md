@@ -1,8 +1,9 @@
 # Validasi perangkat — alur Spotify (track, album, playlist)
 
-Panduan ini dipakai untuk memvalidasi alur Spotify di HP fisik. **Status: belum
-dijalankan.** Yang sudah ada hanya bukti host: 427 tes Kotlin (0 gagal), lint
-debug 0 error/2 warning lama, dan parser diuji memakai markup embed Spotify asli
+Panduan ini dipakai untuk memvalidasi alur Spotify di HP fisik. **Status: sebagian
+tervalidasi pada 24 Oktober 2026** (hasil di §9; kasus yang belum diuji tetap
+dicantumkan). Bukti host: 427 tes Kotlin (0 gagal), 98 tes Python `OK`, lint
+debug 0 error/3 warning lama, dan parser diuji memakai markup embed Spotify asli
 yang diambil 23 Oktober 2026. Tes host tidak membuktikan perilaku Android,
 jaringan nyata, pencarian yt-dlp di perangkat, maupun tampilan Compose.
 
@@ -296,3 +297,33 @@ Alur Spotify album/playlist boleh disebut tervalidasi di perangkat hanya jika:
 - Tautan pendek `spotify.link` belum didukung; gunakan tautan
   `open.spotify.com/...` dari menu Bagikan Spotify.
 - Tidak ada pencarian halaman lanjutan playlist di luar 100 lagu pertama.
+
+## 9. Hasil validasi perangkat — 24 Oktober 2026
+
+Release **1.1.33/code47**, Realme RMX1821 (Realme 3 Pro), Android 10/API 29,
+arm64-v8a, halaman 4 KB. APK rilis 71.042.372 byte, SHA256
+`2f7e2fc7f321b65d66761db9b30de195fa2ec7f80e7247b76ed09d1684cbb317`;
+`base.apk` di HP identik. Update-r tanpa uninstall/clear data. Build host:
+427 tes Kotlin, 98 tes Python, lint 0 error/3 warning; audit 257 ELF/13 kelas
+ZIP, zipalign 16 KB, signature v2 `ebe3b40e…`.
+
+| ID | Kasus | Hasil diamati | Status |
+| --- | --- | --- | --- |
+| S1 | Track tunggal → MP3 | Share intent mengisi composer; kartu **Red/Scott Buckley/3:33**, 5 kandidat dengan channel, durasi, selisih. MP3 128 terunduh, `title=Red`, `artist=Scott Buckley`, tanpa `attached_pic`; riwayat berlabel Spotify. | Lulus |
+| S2 | Album kecil | **Library Songs 5**, 10 lagu/51:16, semua terpilih. Dipilih 2, keduanya cocok kuat (selisih 0 dan 1 dtk), diantrekan ke `scott-buckley/`. `Borealis` MP3 128 dengan tag Spotify. | Lulus |
+| S3 | Playlist kecil | **Alternative Music**, 20 lagu/1:08:56. Pencarian “Rush” menyaring 2 baris tanpa mengubah pilihan 20/20. Antrean menghasilkan `alternative-music-free-stock-music/` dengan tag Spotify. | Lulus |
+| S4 | Playlist > 100 lagu | **All Out 80s** menampilkan 100 lagu dan pesan **Halaman Spotify hanya memuat 100 lagu pertama.**; tidak ada permintaan halaman lanjutan. | Lulus |
+| S6 | Batalkan pencocokan | Mulai 20 lagu, dibatalkan pada `2/20`. Indikator berhenti, kandidat yang sudah ada tetap, tombol menjadi **Antrekan 3 lagu**, tidak ada teks “Menunggu”, dan tidak ada proses python/ffmpeg tersisa. | Lulus |
+| S7 | Gagal jaringan | Mode pesawat tidak dapat memutus VPN aktif di perangkat, jadi skenario offline tidak dijalankan. Sebagai gantinya album dengan ID tak dikenal menghasilkan pesan **Daftar lagu Spotify tidak bisa dibaca…** + **Coba lagi** (Spotify membalas HTTP 200 tanpa entity), tanpa crash. | Sebagian |
+| S9 | Duplikat | `Power` yang sudah selesai ikut tercocokkan lagi tetapi tidak menambah entri/file kedua; lagu lain tetap diantrekan. Hitungan “dilewati” pada snackbar tidak sempat dibaca. | Sebagian |
+| S13 | Riwayat/pemutar | Riwayat menampilkan sampul, judul, artis, dan label Spotify; memutar `Here I Come` memberi MediaSession `state=3` dengan metadata Spotify. Filter platform dan **Unduh lagi** belum diuji. | Sebagian |
+
+Bukti disimpan di luar repo (`spotify-S1-01-preview.png`,
+`spotify-S13-history.png`, `spotify-S1-Red.mp3`, `spotify-S2-Borealis.mp3`,
+`spotify-S3-Power.mp3`). Tidak ada `FATAL EXCEPTION` pada PID aplikasi selama
+pengujian.
+
+**Tidak diuji:** S5 (batalkan metadata), S7 offline penuh, S8 (kecocokan lemah),
+S10 (force-stop saat mencocokkan/antrean), S11 pergantian folder, dan S12
+(font/landscape/TalkBack). Sesuai §7, alur ini **belum** boleh disebut
+tervalidasi penuh sampai kasus tersebut dijalankan.

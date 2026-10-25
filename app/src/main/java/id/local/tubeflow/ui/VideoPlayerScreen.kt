@@ -6,10 +6,14 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Typeface
 import android.media.AudioManager
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +34,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -37,6 +43,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,8 +52,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Brightness6
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ClosedCaption
@@ -53,8 +63,13 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.FastRewind
 import androidx.compose.material.icons.outlined.Forward10
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Repeat
@@ -67,6 +82,7 @@ import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.SurroundSound
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,6 +110,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -122,15 +139,22 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import id.local.tubeflow.core.VideoAspect
+import id.local.tubeflow.core.VideoAudioEffect
+import id.local.tubeflow.core.VideoDecoderMode
+import id.local.tubeflow.core.VideoEnhance
+import id.local.tubeflow.core.VideoEqualizer
+import id.local.tubeflow.core.VideoOrientation
 import id.local.tubeflow.core.VideoPip
 import id.local.tubeflow.core.VideoPlayback
-import id.local.tubeflow.core.VideoOrientation
 import id.local.tubeflow.core.VideoPlayerViewModel
 import id.local.tubeflow.core.VideoRepeat
+import id.local.tubeflow.core.VideoScreenshot
+import id.local.tubeflow.core.VideoSubtitle
 import id.local.tubeflow.core.VideoSubtitleBackground
 import id.local.tubeflow.core.VideoSubtitlePosition
 import id.local.tubeflow.core.VideoSubtitleSize
 import id.local.tubeflow.core.VideoSubtitleStyle
+import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -140,7 +164,7 @@ private val PlayerMuted = Color.White.copy(alpha = 0.62f)
 private val SheetBackground = Color(0xFF1B1B1F)
 private val AccentBlue = Color(0xFF8AB4F8)
 
-private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, MORE }
+private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, EFFECTS, DECODER, QUEUE, MORE }
 
 private sealed interface GestureFeedback {
     data class Seek(val deltaMs: Long, val targetMs: Long) : GestureFeedback
@@ -174,10 +198,48 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     var feedback by remember { mutableStateOf<GestureFeedback?>(null) }
     var scrub by remember { mutableStateOf<Float?>(null) }
     var showResume by remember { mutableStateOf(false) }
+    var controlsLocked by remember { mutableStateOf(false) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
 
     fun touch() {
         controlsVisible = true
         interaction++
+    }
+
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val picked = externalSubtitle(context, uri)
+            if (picked == null) {
+                Toast.makeText(
+                    context,
+                    "Format subtitle tidak dikenali. Gunakan SRT, VTT, ASS/SSA, atau TTML.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            } else {
+                video.addExternalSubtitle(picked)
+                sheet = null
+                touch()
+                Toast.makeText(context, "Subtitle ${picked.label} ditambahkan", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun takeScreenshot() {
+        val view = playerView
+        if (view == null) {
+            Toast.makeText(context, "Frame video belum siap.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        VideoScreenshot.capture(context, view, state.entry?.displayTitle ?: "video") { result ->
+            result.fold(
+                onSuccess = {
+                    Toast.makeText(context, "Screenshot disimpan ke Pictures/TubeFlow", Toast.LENGTH_SHORT).show()
+                },
+                onFailure = {
+                    Toast.makeText(context, it.message ?: "Screenshot gagal", Toast.LENGTH_LONG).show()
+                },
+            )
+        }
     }
 
     fun setBrightness(value: Float) {
@@ -192,16 +254,26 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         VideoPip.enter(host, video.state.value)
     }
 
-    BackHandler { video.close() }
+    BackHandler {
+        if (controlsLocked) {
+            controlsLocked = false
+            touch()
+        } else {
+            video.close()
+        }
+    }
 
     // Kontrol disembunyikan saat diputar, tetap terlihat saat jeda; sentuhan apa pun memulai ulang timer.
-    LaunchedEffect(controlsVisible, state.playing, interaction, sheet, inPip) {
-        if (controlsVisible && state.playing && sheet == null && !inPip) {
+    LaunchedEffect(controlsVisible, state.playing, interaction, sheet, inPip, controlsLocked) {
+        if (controlsLocked) {
+            controlsVisible = false
+        } else if (controlsVisible && state.playing && sheet == null && !inPip) {
             delay(3_500)
             controlsVisible = false
         }
     }
     LaunchedEffect(state.playing) { if (!state.playing) controlsVisible = true }
+    LaunchedEffect(state.error) { if (state.error != null) controlsLocked = false }
     LaunchedEffect(state.entry?.uri, state.resumeFromMs) {
         showResume = state.resumeFromMs > 0
         if (showResume) {
@@ -225,7 +297,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
 
     // Beberapa perangkat menampilkan kembali system bar setelah rotasi; sembunyikan lagi agar
     // video tetap memakai seluruh layar di kedua orientasi.
-    LaunchedEffect(activity, landscape, inPip) {
+    LaunchedEffect(activity, landscape, inPip, sheet, interaction) {
         if (inPip) return@LaunchedEffect
         val window = activity?.window ?: return@LaunchedEffect
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -296,17 +368,18 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 PlayerView(viewContext).apply {
                     useController = false
                     keepScreenOn = true
-                }
+                }.also { playerView = it }
             },
             update = { view ->
                 view.player = video.exoPlayer
                 applyVideoAspect(view, videoAspect)
                 applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
             },
+            onRelease = { view -> if (playerView === view) playerView = null },
             modifier = Modifier.fillMaxSize(),
         )
 
-        if (!inPip) {
+        if (!inPip && !controlsLocked) {
             // Permukaan gestur berada di atas video tetapi di bawah kontrol, sehingga tombol tetap menang.
             Box(
                 Modifier
@@ -443,10 +516,17 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         onSeekBy = { video.seekBy(it); touch() },
                         onPrevious = { video.previous(); touch() },
                         onNext = { video.next(); touch() },
-                        onSpeed = { sheet = VideoSheet.SPEED },
-                        onSubtitles = { sheet = VideoSheet.SUBTITLES },
-                        onDisplay = { sheet = VideoSheet.DISPLAY },
+                        onSpeed = { video.cycleSpeed(); touch() },
+                        onSubtitles = { video.cycleSubtitle(); touch() },
+                        onDisplay = { video.cycleAspect(); touch() },
                         onRepeat = { video.cycleRepeat(); touch() },
+                        onEqualizer = { video.cycleEqualizer(); touch() },
+                        onAudioEffect = { video.cycleAudioEffect(); touch() },
+                        onEnhance = { video.cycleEnhance(); touch() },
+                        onDecoder = { video.cycleDecoderMode(); touch() },
+                        onScreenshot = ::takeScreenshot,
+                        onQueue = { sheet = VideoSheet.QUEUE },
+                        onLock = { controlsLocked = true },
                         isLandscape = landscape,
                         modifier = Modifier.align(Alignment.BottomCenter),
                     )
@@ -464,7 +544,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                    .padding(bottom = if (landscape) 120.dp else 196.dp, start = 16.dp, end = 16.dp),
+                    .padding(bottom = if (landscape) 110.dp else 156.dp, start = 16.dp, end = 16.dp),
             ) {
                 Surface(
                     shape = RoundedCornerShape(28.dp),
@@ -496,13 +576,50 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 PlayerErrorOverlay(
                     message = message,
                     hasNext = state.hasNext,
+                    showSoftwareFallback = state.decoderMode == VideoDecoderMode.HARDWARE,
                     onRetry = video::retry,
+                    onUseSoftware = video::useSoftwareDecoder,
                     onNext = video::next,
                     onClose = video::close,
                     onOpenExternal = { openExternalPlayer(context, state.entry?.uri) },
                 )
             }
+        }
 
+        // Mode terkunci hanya menyisakan satu tombol buka kunci; tidak ada tap-to-show atau gestur
+        // yang bisa mengubah video secara tidak sengaja.
+        if (!inPip && controlsLocked && state.error == null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { } },
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.End))
+                        .padding(12.dp)
+                        .clickable {
+                            controlsLocked = false
+                            touch()
+                        },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.55f),
+                    contentColor = PlayerContent,
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Outlined.LockOpen, null, Modifier.size(20.dp))
+                        Text("Buka kunci", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+
+        if (!inPip) {
             sheet?.let { kind ->
                 VideoOptionsSheet(
                     kind = kind,
@@ -510,12 +627,35 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     video = video,
                     orientation = orientation,
                     supportsPip = supportsPip,
+                    onScreenshot = {
+                        takeScreenshot()
+                        sheet = null
+                    },
+                    onPickSubtitle = {
+                        subtitlePicker.launch(
+                            arrayOf(
+                                "text/*",
+                                "application/x-subrip",
+                                "application/x-srt",
+                                "text/vtt",
+                                "text/x-ssa",
+                                "text/x-ass",
+                                "application/ttml+xml",
+                                "application/octet-stream",
+                            ),
+                        )
+                    },
                     onOpen = { sheet = it },
                     onOrientation = {
                         orientation = it
                         touch()
                     },
                     onEnterPip = { sheet = null; enterPip() },
+                    onLock = {
+                        sheet = null
+                        controlsLocked = true
+                        controlsVisible = false
+                    },
                     onDismiss = { sheet = null },
                 )
             }
@@ -596,6 +736,28 @@ private fun openExternalPlayer(context: Context, rawUri: String?) {
         }
 }
 
+/** Membaca nama/tipe berkas subtitle dari penyedia dokumen dan meminta izin baca persisten. */
+private fun externalSubtitle(context: Context, uri: Uri): VideoSubtitle? {
+    runCatching {
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val resolver = context.contentResolver
+    val name = runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        ?: "subtitle"
+    val mime = VideoPlayback.subtitleMime(name)
+        ?: VideoPlayback.subtitleMimeFromType(runCatching { resolver.getType(uri) }.getOrNull())
+        ?: return null
+    val language = VideoPlayback.languageFrom(name)
+    // Nama berkas dipakai sebagai label agar bisa dibedakan dari track subtitle tertanam yang
+    // kebetulan memakai bahasa yang sama.
+    return VideoSubtitle(uri.toString(), mime, language, name)
+}
+
 @Composable
 private fun PlayerTopBar(
     state: VideoPlayerViewModel.State,
@@ -666,8 +828,7 @@ private fun PlayerTopBar(
             Icon(Icons.Outlined.MoreVert, "Opsi pemutar")
         }
     }
-}
-
+}@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerBottomBar(
     state: VideoPlayerViewModel.State,
@@ -682,6 +843,13 @@ private fun PlayerBottomBar(
     onSubtitles: () -> Unit,
     onDisplay: () -> Unit,
     onRepeat: () -> Unit,
+    onEqualizer: () -> Unit,
+    onAudioEffect: () -> Unit,
+    onEnhance: () -> Unit,
+    onDecoder: () -> Unit,
+    onScreenshot: () -> Unit,
+    onQueue: () -> Unit,
+    onLock: () -> Unit,
     isLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -693,14 +861,14 @@ private fun PlayerBottomBar(
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.94f))))
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-            .padding(horizontal = if (isLandscape) 20.dp else 12.dp, vertical = 4.dp),
+            .padding(horizontal = if (isLandscape) 18.dp else 12.dp, vertical = 4.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 VideoPlayback.timeLabel(shownPosition),
                 color = PlayerContent,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.width(if (isLandscape) 60.dp else 52.dp),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.width(if (isLandscape) 54.dp else 46.dp),
             )
             Slider(
                 value = (scrub ?: state.positionMs.toFloat()).coerceIn(0f, duration.toFloat()),
@@ -708,111 +876,165 @@ private fun PlayerBottomBar(
                 onValueChangeFinished = onScrubFinished,
                 valueRange = 0f..duration.toFloat(),
                 enabled = state.durationMs > 0,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(28.dp),
+                thumb = {
+                    Box(Modifier.size(10.dp).background(PlayerContent, CircleShape))
+                },
+                track = { sliderState ->
+                    val range = sliderState.valueRange.endInclusive - sliderState.valueRange.start
+                    val fraction = if (range > 0f) {
+                        ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
+                    } else 0f
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(CircleShape)
+                            .background(PlayerContent.copy(alpha = 0.28f)),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(fraction)
+                                .height(3.dp)
+                                .clip(CircleShape)
+                                .background(PlayerContent),
+                        )
+                    }
+                },
                 colors = SliderDefaults.colors(
-                    thumbColor = PlayerContent,
-                    activeTrackColor = PlayerContent,
-                    inactiveTrackColor = PlayerContent.copy(alpha = 0.3f),
-                    disabledThumbColor = PlayerContent.copy(alpha = 0.5f),
-                    disabledActiveTrackColor = PlayerContent.copy(alpha = 0.3f),
+                    thumbColor = Color.Transparent,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent,
+                    disabledThumbColor = Color.Transparent,
+                    disabledActiveTrackColor = Color.Transparent,
+                    disabledInactiveTrackColor = Color.Transparent,
                 ),
             )
             Text(
                 if (state.durationMs > 0) VideoPlayback.timeLabel(state.durationMs) else "--:--",
                 color = PlayerMuted,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.End,
-                modifier = Modifier.width(if (isLandscape) 60.dp else 52.dp),
+                modifier = Modifier.width(if (isLandscape) 54.dp else 46.dp),
             )
         }
-        if (isLandscape) {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = onSpeed,
-                        colors = ButtonDefaults.textButtonColors(contentColor = PlayerContent),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text(VideoPlayback.speedLabel(state.speed), style = MaterialTheme.typography.labelLarge)
-                    }
-                    CompactPlayerAction(Icons.Outlined.ClosedCaption, "Pilih subtitle", subtitlesActive, onSubtitles)
-                    CompactPlayerAction(Icons.Outlined.AspectRatio, "Rasio ${state.aspect.label}", true, onDisplay)
-                }
-                Spacer(Modifier.weight(1f))
-                TransportControls(
-                    state = state,
-                    onToggle = onToggle,
-                    onSeekBy = onSeekBy,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                    compact = true,
-                )
-                Spacer(Modifier.weight(1f))
-                CompactPlayerAction(
-                    if (state.repeat == VideoRepeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
-                    "Ulangi: ${state.repeat.label}",
-                    state.repeat != VideoRepeat.OFF,
-                    onRepeat,
-                )
-            }
-        } else {
-            TransportControls(
-                state = state,
-                onToggle = onToggle,
-                onSeekBy = onSeekBy,
-                onPrevious = onPrevious,
-                onNext = onNext,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        TransportControls(
+            state = state,
+            onToggle = onToggle,
+            onSeekBy = onSeekBy,
+            onPrevious = onPrevious,
+            onNext = onNext,
+            compact = isLandscape,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+        )
+        // Semua tombol di bawah adalah siklus satu ketuk, seperti tombol Ulangi. Pilihan detail
+        // tetap tersedia lewat lembar "Opsi pemutar" di kanan atas.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(top = 2.dp, bottom = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            QuickChip(
+                icon = Icons.Outlined.Speed,
+                text = VideoPlayback.speedLabel(state.speed),
+                description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
+                active = abs(state.speed - 1f) > 0.001f,
+                onClick = onSpeed,
             )
-            Row(
-                Modifier.fillMaxWidth().padding(top = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PlayerActionPill(
-                    label = "Kecepatan",
-                    value = VideoPlayback.speedLabel(state.speed),
-                    icon = Icons.Outlined.Speed,
-                    active = true,
-                    onClick = onSpeed,
-                    modifier = Modifier.weight(1f),
-                )
-                PlayerActionPill(
-                    label = "Subtitle",
-                    value = subtitleSummary(state, subtitlesActive),
-                    icon = Icons.Outlined.ClosedCaption,
-                    active = subtitlesActive,
-                    onClick = onSubtitles,
-                    modifier = Modifier.weight(1f),
-                )
-                PlayerActionPill(
-                    label = "Rasio",
-                    value = state.aspect.label,
-                    icon = Icons.Outlined.AspectRatio,
-                    active = true,
-                    onClick = onDisplay,
-                    modifier = Modifier.weight(1f),
-                )
-                PlayerActionPill(
-                    label = "Ulangi",
-                    value = repeatSummary(state.repeat),
-                    icon = if (state.repeat == VideoRepeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
-                    active = state.repeat != VideoRepeat.OFF,
-                    onClick = onRepeat,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            QuickChip(
+                icon = Icons.Outlined.ClosedCaption,
+                text = subtitleChipLabel(state),
+                description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
+                active = subtitlesActive,
+                onClick = onSubtitles,
+            )
+            QuickChip(
+                icon = Icons.Outlined.GraphicEq,
+                text = "EQ ${state.equalizer.shortLabel}",
+                description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
+                active = state.equalizer != VideoEqualizer.OFF,
+                onClick = onEqualizer,
+            )
+            QuickChip(
+                icon = Icons.Outlined.SurroundSound,
+                text = "FX ${state.audioEffect.shortLabel}",
+                description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
+                active = state.audioEffect != VideoAudioEffect.OFF,
+                onClick = onAudioEffect,
+            )
+            QuickChip(
+                icon = Icons.Outlined.AutoAwesome,
+                text = state.enhance.shortLabel,
+                description = "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
+                active = state.enhance != VideoEnhance.OFF,
+                onClick = onEnhance,
+            )
+            QuickChip(
+                icon = Icons.Outlined.AspectRatio,
+                text = state.aspect.label,
+                description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
+                active = state.aspect != VideoAspect.FIT,
+                onClick = onDisplay,
+            )
+            QuickChip(
+                icon = if (state.repeat == VideoRepeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
+                text = repeatSummary(state.repeat),
+                description = "Ulangi ${state.repeat.label}. Ketuk untuk berikutnya",
+                active = state.repeat != VideoRepeat.OFF,
+                onClick = onRepeat,
+            )
+            QuickChip(
+                icon = Icons.Outlined.Memory,
+                text = "Dek ${state.decoderMode.shortLabel}",
+                description = "Dekoder ${state.decoderMode.label}. Ketuk untuk berikutnya",
+                active = state.decoderMode != VideoDecoderMode.AUTO,
+                onClick = onDecoder,
+            )
+            QuickChip(
+                icon = Icons.Outlined.PhotoCamera,
+                text = "Foto",
+                description = "Ambil screenshot video",
+                active = false,
+                onClick = onScreenshot,
+            )
+            QuickChip(
+                icon = Icons.AutoMirrored.Outlined.PlaylistPlay,
+                text = "${state.index + 1}/${state.entries.size}",
+                description = "Buka antrean video",
+                active = false,
+                onClick = onQueue,
+            )
+            QuickChip(
+                icon = Icons.Outlined.Lock,
+                text = "Kunci",
+                description = "Kunci kontrol pemutar",
+                active = false,
+                onClick = onLock,
+            )
         }
     }
 }
 
-private fun subtitleSummary(state: VideoPlayerViewModel.State, active: Boolean): String = when {
-    state.subtitlesDisabled -> "Nonaktif"
-    !active && state.textTracks.isEmpty() -> "Tidak ada"
-    else -> state.textTracks.firstOrNull { it.selected }?.label ?: "Otomatis"
+private fun subtitleChipLabel(state: VideoPlayerViewModel.State): String = when {
+    state.subtitlesDisabled -> "CC Mati"
+    state.textTracks.isEmpty() -> "CC —"
+    else -> {
+        val selected = state.textTracks.firstOrNull { it.selected }
+        val name = selected?.language?.takeIf { it.isNotBlank() }
+            ?.let(VideoPlayback::languageName)
+            ?.takeIf { it.isNotBlank() }
+            ?: selected?.label
+            ?: "Otomatis"
+        "CC ${name.take(10)}"
+    }
+}
+
+private fun subtitleChipDescription(state: VideoPlayerViewModel.State): String = when {
+    state.subtitlesDisabled -> "nonaktif"
+    state.textTracks.isEmpty() -> "belum tersedia"
+    else -> state.textTracks.firstOrNull { it.selected }?.label ?: "otomatis"
 }
 
 private fun repeatSummary(repeat: VideoRepeat): String = when (repeat) {
@@ -831,8 +1053,8 @@ private fun TransportControls(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val buttonSize = if (compact) 42.dp else 48.dp
-    val playSize = if (compact) 54.dp else 62.dp
+    val buttonSize = if (compact) 40.dp else 44.dp
+    val playSize = if (compact) 50.dp else 56.dp
     Row(
         modifier,
         horizontalArrangement = Arrangement.Center,
@@ -904,57 +1126,30 @@ private fun TransportControls(
 }
 
 @Composable
-private fun CompactPlayerAction(
+private fun QuickChip(
     icon: ImageVector,
+    text: String,
     description: String,
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(44.dp),
-        colors = IconButtonDefaults.iconButtonColors(
-            contentColor = if (active) PlayerContent else PlayerMuted,
-        ),
-    ) {
-        Icon(icon, description, Modifier.size(23.dp))
-    }
-}
-
-@Composable
-private fun PlayerActionPill(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    active: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
     Surface(
-        modifier = modifier.heightIn(min = 56.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = if (active) 0.14f else 0.07f),
-        contentColor = if (active) PlayerContent else PlayerMuted,
+        modifier = Modifier.height(36.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = if (active) 0.20f else 0.10f),
+        contentColor = if (active) PlayerContent else PlayerContent.copy(alpha = 0.82f),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Row(
+            Modifier.padding(horizontal = 10.dp).height(36.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Icon(icon, null, Modifier.size(18.dp))
+            Icon(icon, description, Modifier.size(16.dp))
             Text(
-                value,
+                text,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                label,
-                color = PlayerMuted,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -996,7 +1191,9 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
 private fun PlayerErrorOverlay(
     message: String,
     hasNext: Boolean,
+    showSoftwareFallback: Boolean,
     onRetry: () -> Unit,
+    onUseSoftware: () -> Unit,
     onNext: () -> Unit,
     onClose: () -> Unit,
     onOpenExternal: () -> Unit,
@@ -1035,6 +1232,11 @@ private fun PlayerErrorOverlay(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = PlayerContent),
                     ) { Text("Tutup") }
                 }
+                if (showSoftwareFallback) {
+                    TextButton(onClick = onUseSoftware) {
+                        Text("Coba dekoder software", color = PlayerContent)
+                    }
+                }
                 TextButton(onClick = onOpenExternal) {
                     Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -1056,9 +1258,12 @@ private fun VideoOptionsSheet(
     video: VideoPlayerViewModel,
     orientation: VideoOrientation,
     supportsPip: Boolean,
+    onPickSubtitle: () -> Unit,
+    onScreenshot: () -> Unit,
     onOpen: (VideoSheet) -> Unit,
     onOrientation: (VideoOrientation) -> Unit,
     onEnterPip: () -> Unit,
+    onLock: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -1085,6 +1290,9 @@ private fun VideoOptionsSheet(
                         VideoSheet.SUBTITLES -> "Subtitle"
                         VideoSheet.AUDIO -> "Track audio"
                         VideoSheet.DISPLAY -> "Tampilan"
+                        VideoSheet.EFFECTS -> "Suara & gambar"
+                        VideoSheet.DECODER -> "Dekoder video"
+                        VideoSheet.QUEUE -> "Antrean video"
                         VideoSheet.MORE -> "Opsi pemutar"
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -1120,6 +1328,14 @@ private fun VideoOptionsSheet(
                         selected = !state.subtitlesDisabled && state.textTracks.none { it.selected },
                         onClick = { video.automaticTracks(androidx.media3.common.C.TRACK_TYPE_TEXT); onDismiss() },
                     )
+                    SheetSection("Subtitle tambahan")
+                    OutlinedButton(
+                        onClick = onPickSubtitle,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PlayerContent),
+                    ) {
+                        Text("Pilih berkas SRT / VTT / ASS / TTML")
+                    }
                     if (state.textTracks.isEmpty()) {
                         SheetHint("Subtitle belum terbaca. Tunggu video siap, lalu buka lagi.")
                     } else {
@@ -1257,6 +1473,71 @@ private fun VideoOptionsSheet(
                         }
                     }
                 }
+                VideoSheet.EFFECTS -> {
+                    SheetSection("Equalizer")
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        VideoEqualizer.entries.forEach { preset ->
+                            ChoicePill(preset.label, state.equalizer == preset) { video.setEqualizer(preset) }
+                        }
+                    }
+                    SheetSection("Efek audio")
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        VideoAudioEffect.entries.forEach { effect ->
+                            ChoicePill(effect.label, state.audioEffect == effect) { video.setAudioEffect(effect) }
+                        }
+                    }
+                    SheetHint("Bass Boost dan Ruang bergantung pada dukungan audiofx perangkat. Equalizer video terpisah dari equalizer lagu.")
+                    SheetSection("Smart Enhance")
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        VideoEnhance.entries.forEach { preset ->
+                            ChoicePill(preset.label, state.enhance == preset) { video.setEnhance(preset) }
+                        }
+                    }
+                    SheetHint("Warna dan kontras diproses di GPU. Jika perangkat tidak mendukung efek video, video tetap diputar tanpa efek.")
+                }
+                VideoSheet.DECODER -> {
+                    VideoDecoderMode.entries.forEach { mode ->
+                        SheetChoice(
+                            label = when (mode) {
+                                VideoDecoderMode.AUTO -> "Otomatis · perangkat lalu software"
+                                VideoDecoderMode.HARDWARE -> "Perangkat saja"
+                                VideoDecoderMode.SOFTWARE -> "Software (FFmpeg/dav1d)"
+                            },
+                            selected = state.decoderMode == mode,
+                            onClick = { video.setDecoderMode(mode) },
+                        )
+                    }
+                    SheetHint("Mengganti dekoder membuka ulang video pada posisi yang sama. Mode Perangkat tidak jatuh ke software otomatis; dari layar error tersedia tombol Coba dekoder software.")
+                }
+                VideoSheet.QUEUE -> {
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                        itemsIndexed(state.entries) { index, entry ->
+                            SheetChoice(
+                                label = "${index + 1}. ${entry.displayTitle}",
+                                selected = index == state.index,
+                                onClick = {
+                                    video.jumpTo(index)
+                                    onDismiss()
+                                },
+                            )
+                        }
+                    }
+                    if (state.entries.size <= 1) {
+                        SheetHint("Belum ada video lain di antrean. Antrean diisi dari Koleksi atau Riwayat.")
+                    }
+                }
                 VideoSheet.MORE -> {
                     val audioLabel = state.audioTracks.firstOrNull { it.selected }?.label ?: "Otomatis"
                     val subtitleLabel = when {
@@ -1267,10 +1548,18 @@ private fun VideoOptionsSheet(
                     SheetChoice("Subtitle · $subtitleLabel", false) { onOpen(VideoSheet.SUBTITLES) }
                     SheetChoice("Track audio · $audioLabel", false) { onOpen(VideoSheet.AUDIO) }
                     SheetChoice("Tampilan · ${state.aspect.label} · ${orientation.label}", false) { onOpen(VideoSheet.DISPLAY) }
+                    SheetChoice("Equalizer & efek audio · ${state.equalizer.label} · ${state.audioEffect.label}", false) {
+                        onOpen(VideoSheet.EFFECTS)
+                    }
+                    SheetChoice("Smart Enhance · ${state.enhance.label}", false) { onOpen(VideoSheet.EFFECTS) }
+                    SheetChoice("Dekoder · ${state.decoderMode.label}", false) { onOpen(VideoSheet.DECODER) }
+                    SheetChoice("Antrean · ${state.index + 1} dari ${state.entries.size}", false) { onOpen(VideoSheet.QUEUE) }
+                    SheetChoice("Ambil screenshot", false, onScreenshot)
+                    SheetChoice("Kunci kontrol", false, onLock)
                     if (supportsPip) {
                         SheetChoice("Putar di jendela kecil", false, onEnterPip)
                     }
-                    SheetHint("Audio tetap memakai pemutar lagu terpisah; menutup video tidak mengubah antrean audio.")
+                    SheetHint("Tombol cepat di bawah pemutar berputar satu ketuk. Audio tetap memakai pemutar lagu terpisah; menutup video tidak mengubah antrean audio.")
                 }
             }
         }
@@ -1303,7 +1592,14 @@ private fun SheetChoice(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = PlayerContent, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            label,
+            color = PlayerContent,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         if (selected) Icon(Icons.Outlined.Check, null, tint = AccentBlue)
     }
 }

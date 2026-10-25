@@ -1,6 +1,76 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 23 Oktober 2026
+## Status terbaru — 25 Oktober 2026
+
+Rilis **1.1.36/code50** memperbaiki fallback dekoder video: kegagalan
+`DECODER_QUERY_FAILED` dan `DECODING_FORMAT_EXCEEDS_CAPABILITIES` kini ikut
+memicu dekoder software, dan **Coba lagi** membuat ulang pemutar bila
+pembukaan gagal sampai `player == null`. Bar bawah pemutar dirapikan: progress
+bar ringkas dan semua tombol cepat (kecepatan, subtitle, EQ, efek audio, Smart
+Enhance, rasio, ulangi, dekoder, screenshot, antrean, kunci) menjadi siklus satu
+ketuk seperti tombol Ulangi; pilihan detail tetap ada di lembar **Opsi pemutar**.
+Posisi subtitle kini diterapkan ke `SubtitleView` sehingga cue tertanam ikut
+naik, dan subtitle sidecar disimpan per video. **464 tes Kotlin** (0
+gagal/error/skip), **98 tes Python** `OK`, lint debug/release **0 error/3 warning**
+lama; `scripts/build_release.sh` lulus (17m45s). Signed ARM64 **76.254.890 byte**,
+SHA256 `e41cf773c6e8ee9a94cfbebf2cf2e675ed57cdedc9d63a4e6e2e45aa89ad81f3`; AAB
+**273.162.811 byte**, SHA256
+`787dde4718a335c223c903f43083164e80faf1a4812628f617784bde4fbe1f64`.
+Audit APK 262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB `jarsigner`
+lulus. Release terpasang update-r di Realme RMX1821 Android 10 (arm64, halaman
+4 KB) dari 1.1.35/code49; `base.apk` identik. Di HP: AV1 10-bit + AC3 diputar di
+mode Otomatis dan **Perangkat saja** dengan posisi tetap, chip EQ/FX/subtitle
+berganti satu ketuk, subtitle sidecar tampil berlabel **Indonesia**, screenshot
+tersimpan di `Pictures/TubeFlow/`, dan lanskap 1520x720 muat tanpa terpotong.
+Batas pengujian ada di [uji perangkat](DEVICE_TEST.md#pemutar-video-1136code50--25-oktober-2026).
+
+## Status sebelumnya — 1.1.35/code49 — 25 Oktober 2026
+
+Rilis **1.1.35/code49** menggabungkan pemutar video dengan orientasi manual,
+pengaturan subtitle, dan dekoder software NextLib/FFmpeg/dav1d, serta integrasi
+“Buka dengan”. **459 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK`,
+lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh` lulus
+(14m41s). Signed ARM64 **76.135.624 byte**, SHA256
+`556985635e79abeea82dd281498c8d1f59efed4794c2730d667cb6b9b1a5b2cc`; AAB
+**273.003.343 byte**, SHA256
+`cb69a55acf02ae2c3d81b18ada335f6044c755ba250f93fd436cf4ed728a1085`.
+Audit APK 262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB `jarsigner`
+lulus. Release terpasang update-r di Realme RMX1821 Android 10 (arm64, halaman
+4 KB); `base.apk` identik. Di HP: pemutaran H.264 dengan 2 audio/2 subtitle,
+pemilihan track audio dan gaya subtitle, AV1 10-bit + AC3 dengan renderer FFmpeg
+aktif,
+orientasi lanskap, PiP, ACTION_VIEW video/audio, dan auto-lanjut antrean lulus.
+Temuan baru (posisi subtitle tertanam, label track pertama, cakupan
+octet-stream/SEND, metadata audio masuk) serta batas pengujian ada di
+[uji perangkat](DEVICE_TEST.md#pemutar-video-1135code49--25-oktober-2026).
+
+## Status sebelumnya — 1.1.33/code47 — 24 Oktober 2026
+
+Rilis **1.1.33/code47** menambahkan unduhan **album/playlist Spotify** (metadata
+dari halaman embed, audio dari video YouTube hasil pencocokan, antrean per lagu).
+**427 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,693 detik),
+lint debug 0 error/3 warning lama. `scripts/build_release.sh` lulus (18m49s).
+Signed ARM64 **71.042.372 byte**, SHA256
+`2f7e2fc7f321b65d66761db9b30de195fa2ec7f80e7247b76ed09d1684cbb317`; AAB
+**256.170.772 byte**, SHA256
+`c86edea9fca18997edcacf5fc335b524effde9d7eb53624dad5f64cd46761522`.
+Audit APK 257 ELF/13 kelas ZIP, `zipalign -c -P 16 4`, dan signature v2 sertifikat
+`ebe3b40e…` lulus. Release terpasang sebagai update di Realme RMX1821 Android 10
+(arm64, halaman 4 KB); `base.apk` identik dengan artefak.
+
+Di HP: track `Red` menghasilkan MP3 128 bertag Spotify; album `Library Songs 5`
+dengan 2 lagu terpilih masuk `scott-buckley/`; playlist 20 lagu mendukung
+pencarian tanpa mengubah pilihan, pembatalan pencocokan 2/20, dan antrean ke
+folder slug playlist; playlist 150 lagu dibatasi 100 dengan pesan yang sesuai;
+riwayat Spotify tampil dan dapat diputar. File diperiksa dengan ffprobe (tag,
+bitrate, tanpa gambar tertanam). Tidak ada `FATAL EXCEPTION`.
+
+**Belum diuji:** batalkan pembacaan metadata, mode pesawat penuh (VPN aktif tidak
+bisa diputus lewat ADB), kecocokan lemah, force-stop saat mencocokkan/antrean,
+pergantian folder, TalkBack/font/landscape, filter platform, dan **Unduh lagi**.
+Detail ada di [validasi perangkat Spotify](SPOTIFY_DEVICE_VALIDATION.md#9-hasil-validasi-perangkat--24-oktober-2026).
+
+## Status sebelumnya — 1.1.31/code45
 
 Release **1.1.31/code45**: daftar **Antrean + Riwayat** terpadu tanpa tab
 segmented, composer URL selalu terlihat, pemisah hanya saat keduanya ada, dan

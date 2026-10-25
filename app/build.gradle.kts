@@ -3,7 +3,7 @@ android {
  namespace = "id.local.tubeflow"
  compileSdk = 37
  ndkVersion = "27.1.12297006"
- defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 47; versionName = "1.1.33" }
+ defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 50; versionName = "1.1.36" }
  splits { abi { isEnable = true; reset(); include("arm64-v8a", "armeabi-v7a", "x86_64"); isUniversalApk = false } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -33,6 +33,8 @@ dependencies {
  // Pemutar video dalam aplikasi; pemutar audio tetap memakai MediaPlayer (PlayerViewModel).
  implementation("androidx.media3:media3-exoplayer:1.11.1")
  implementation("androidx.media3:media3-ui:1.11.1")
+ // Efek warna Smart Enhance (Contrast/HslAdjustment) untuk renderer video.
+ implementation("androidx.media3:media3-effect:1.11.1")
  // Dekoder software Media3 (FFmpeg video/audio + dav1d AV1) untuk codec yang tidak didukung
  // GPU perangkat. Versi mengikuti media3 1.11.1 dan AAR-nya sudah selaras 16 KB.
  implementation("io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0")

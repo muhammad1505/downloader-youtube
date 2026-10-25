@@ -118,6 +118,8 @@ class VideoPlaybackTest {
         assertEquals("jv", VideoPlayback.languageFrom("film_jv.srt"))
         assertEquals("", VideoPlayback.languageFrom("film subtitle.srt"))
         assertEquals("Indonesia", VideoPlayback.languageName("id"))
+        assertEquals("Indonesia", VideoPlayback.languageName("ind"))
+        assertEquals("Inggris", VideoPlayback.languageName("ENG"))
         assertEquals("", VideoPlayback.languageName("xx"))
     }
 
@@ -257,12 +259,76 @@ class VideoPlaybackTest {
     fun codecFailuresAreRetriedWithSoftwareDecoder() {
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_INIT_FAILED))
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED))
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FAILED))
         assertFalse(
             "Masalah file/jaringan tidak perlu membuka ulang pemutar",
             VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
         )
         assertFalse(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_UNSPECIFIED))
+    }
+
+    @Test
+    fun quickButtonsCycleThroughEveryChoiceAndWrapAtTheEnd() {
+        assertEquals(1.25f, VideoPlayback.nextSpeed(1f))
+        assertEquals(0.25f, VideoPlayback.nextSpeed(2f))
+        assertEquals(VideoDecoderMode.HARDWARE, VideoDecoderMode.AUTO.next())
+        assertEquals(VideoDecoderMode.SOFTWARE, VideoDecoderMode.HARDWARE.next())
+        assertEquals(VideoDecoderMode.AUTO, VideoDecoderMode.SOFTWARE.next())
+        assertEquals(VideoEnhance.LIGHT, VideoEnhance.OFF.next())
+        assertEquals(VideoEnhance.OFF, VideoEnhance.SHARP.next())
+        assertEquals(VideoEqualizer.BASS, VideoEqualizer.OFF.next())
+        assertEquals(VideoEqualizer.OFF, VideoEqualizer.ROCK.next())
+        assertEquals(VideoAudioEffect.BASS_BOOST, VideoAudioEffect.OFF.next())
+        assertEquals(VideoAudioEffect.OFF, VideoAudioEffect.STUDIO.next())
+    }
+
+    @Test
+    fun equalizerCurvesOnlyBoostTheIntendedFrequencies() {
+        assertEquals(0f, VideoEqualizer.OFF.levelDb(80), 0.001f)
+        assertTrue(VideoEqualizer.BASS.levelDb(80) > VideoEqualizer.BASS.levelDb(2_000))
+        assertTrue(VideoEqualizer.VOCAL.levelDb(1_500) > VideoEqualizer.VOCAL.levelDb(80))
+        assertTrue(VideoEqualizer.CINEMA.levelDb(80) > 0f)
+        assertTrue(VideoEqualizer.ROCK.levelDb(10_000) > 0f)
+    }
+
+    @Test
+    fun subtitleTypesFillGapsForFilesWithoutExtensions() {
+        assertEquals("application/x-subrip", VideoPlayback.subtitleMimeFromType("application/x-subrip; charset=utf-8"))
+        assertEquals("text/vtt", VideoPlayback.subtitleMimeFromType("text/vtt"))
+        assertEquals("text/x-ssa", VideoPlayback.subtitleMimeFromType("text/x-ass"))
+        assertEquals("application/ttml+xml", VideoPlayback.subtitleMimeFromType("application/ttml+xml"))
+        assertNull(VideoPlayback.subtitleMimeFromType("video/mp4"))
+        assertNull(VideoPlayback.subtitleMimeFromType(null))
+    }
+
+    @Test
+    fun externalSubtitlesRoundTripAndDropInvalidEntries() {
+        val subtitles = listOf(
+            VideoSubtitle("content://sub/film.id.srt", "application/x-subrip", "id", "Indonesia"),
+            VideoSubtitle("content://sub/film.en.vtt", "text/vtt", "en", "Inggris"),
+            VideoSubtitle("content://sub/film.id.srt", "application/x-subrip", "id", "Duplikat"),
+            VideoSubtitle("", "text/vtt", "", "Tanpa URI"),
+            VideoSubtitle("content://sub/rusak", "", "", "Tanpa MIME"),
+        )
+
+        val decoded = VideoExternalSubtitleCodec.decode(VideoExternalSubtitleCodec.encode(subtitles))
+
+        assertEquals(listOf("content://sub/film.id.srt", "content://sub/film.en.vtt"), decoded.map { it.uri })
+        assertEquals("Indonesia", decoded[0].label)
+        assertEquals("text/vtt", decoded[1].mime)
+        assertTrue(VideoExternalSubtitleCodec.decode(null).isEmpty())
+        assertTrue(VideoExternalSubtitleCodec.decode("bukan json").isEmpty())
+    }
+
+    @Test
+    fun screenshotNamesAreSafeAndTimestamped() {
+        val titled = VideoPlayback.screenshotFileName("Video / Satu", 1_793_000_400_000L)
+        assertTrue(titled.startsWith("Video-Satu-"))
+        assertTrue(titled.endsWith(".png"))
+        assertEquals(68, VideoPlayback.screenshotFileName("a".repeat(80), 1_793_000_400_000L).length)
+        assertTrue(VideoPlayback.screenshotFileName("///", 1_793_000_400_000L).startsWith("video-"))
     }
 
     @Test

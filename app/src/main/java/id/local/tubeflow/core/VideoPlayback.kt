@@ -1,8 +1,11 @@
 package id.local.tubeflow.core
 
 import androidx.media3.common.PlaybackException
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLDecoder
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 /** Mode tampilan video di dalam PlayerView; urutannya adalah urutan tombol. */
@@ -20,6 +23,79 @@ enum class VideoRepeat(val label: String) {
     ONE("Satu video");
 
     fun next(): VideoRepeat = entries[(ordinal + 1) % entries.size]
+}
+
+/** Pilihan renderer video; perangkat tertentu hanya mampu memutar codec lewat FFmpeg. */
+enum class VideoDecoderMode(val label: String, val shortLabel: String) {
+    AUTO("Otomatis", "Auto"),
+    HARDWARE("Perangkat", "HW"),
+    SOFTWARE("Software", "SW");
+
+    fun next(): VideoDecoderMode = entries[(ordinal + 1) % entries.size]
+}
+
+/** Preset warna sederhana untuk Smart Enhance; efek dibuat di ViewModel (bukan di kelas host). */
+enum class VideoEnhance(val label: String, val shortLabel: String) {
+    OFF("Mati", "Mati"),
+    LIGHT("Ringan", "Ringan"),
+    VIVID("Vivid", "Vivid"),
+    SHARP("Tajam", "Tajam");
+
+    fun next(): VideoEnhance = entries[(ordinal + 1) % entries.size]
+}
+
+/** Preset equalizer untuk audio video, terpisah dari equalizer pemutar lagu. */
+enum class VideoEqualizer(val label: String, val shortLabel: String) {
+    OFF("Mati", "Mati"),
+    BASS("Bass", "Bass"),
+    VOCAL("Vokal", "Vokal"),
+    CINEMA("Bioskop", "Film"),
+    ROCK("Rock", "Rock");
+
+    fun next(): VideoEqualizer = entries[(ordinal + 1) % entries.size]
+
+    /** Kurva kasar per frekuensi tengah band; nilai dB akan dijepit ke rentang Equalizer. */
+    fun levelDb(centerHz: Int): Float = when (this) {
+        OFF -> 0f
+        BASS -> when {
+            centerHz < 150 -> 7f
+            centerHz < 400 -> 4f
+            centerHz < 1_000 -> 1f
+            centerHz < 4_000 -> 0f
+            else -> -1f
+        }
+        VOCAL -> when {
+            centerHz < 250 -> -3f
+            centerHz < 900 -> 1f
+            centerHz < 2_800 -> 4f
+            centerHz < 5_500 -> 2f
+            else -> 0f
+        }
+        CINEMA -> when {
+            centerHz < 120 -> 4f
+            centerHz < 500 -> 2f
+            centerHz < 1_500 -> 0f
+            centerHz < 3_500 -> 2f
+            else -> 4f
+        }
+        ROCK -> when {
+            centerHz < 120 -> 5f
+            centerHz < 500 -> 3f
+            centerHz < 1_500 -> 1f
+            centerHz < 4_000 -> 2f
+            else -> 3f
+        }
+    }
+}
+
+/** Efek audio tambahan di atas equalizer; ketersediaan bergantung pada perangkat. */
+enum class VideoAudioEffect(val label: String, val shortLabel: String) {
+    OFF("Mati", "Mati"),
+    BASS_BOOST("Bass Boost", "Bass"),
+    SPATIAL("Ruang", "Ruang"),
+    STUDIO("Studio", "Studio");
+
+    fun next(): VideoAudioEffect = entries[(ordinal + 1) % entries.size]
 }
 
 /**
@@ -93,29 +169,57 @@ object VideoPlayback {
 
     private val languages = mapOf(
         "id" to "Indonesia",
+        "ind" to "Indonesia",
         "en" to "Inggris",
+        "eng" to "Inggris",
         "jv" to "Jawa",
+        "jav" to "Jawa",
         "ms" to "Melayu",
+        "msa" to "Melayu",
+        "may" to "Melayu",
         "ar" to "Arab",
+        "ara" to "Arab",
         "ja" to "Jepang",
+        "jpn" to "Jepang",
         "ko" to "Korea",
+        "kor" to "Korea",
         "zh" to "Mandarin",
+        "zho" to "Mandarin",
+        "chi" to "Mandarin",
         "es" to "Spanyol",
+        "spa" to "Spanyol",
         "fr" to "Prancis",
+        "fra" to "Prancis",
+        "fre" to "Prancis",
         "de" to "Jerman",
+        "deu" to "Jerman",
+        "ger" to "Jerman",
         "pt" to "Portugis",
+        "por" to "Portugis",
         "ru" to "Rusia",
+        "rus" to "Rusia",
         "hi" to "Hindi",
+        "hin" to "Hindi",
         "th" to "Thai",
+        "tha" to "Thai",
         "vi" to "Vietnam",
+        "vie" to "Vietnam",
         "tr" to "Turki",
+        "tur" to "Turki",
         "it" to "Italia",
+        "ita" to "Italia",
         "nl" to "Belanda",
+        "nld" to "Belanda",
+        "dut" to "Belanda",
         "pl" to "Polandia",
+        "pol" to "Polandia",
         "uk" to "Ukraina",
+        "ukr" to "Ukraina",
     )
 
     private val languageToken = Regex("""(?:^|[._\- ])([a-z]{2,3})(?:[._\- ]|$)""")
+
+    private fun abs(value: Float): Float = if (value < 0) -value else value
 
     /** "01:23" atau "1:02:03"; nilai negatif dianggap 0. */
     fun timeLabel(ms: Long): String {
@@ -151,12 +255,44 @@ object VideoPlayback {
         return "${if (delayMs > 0) "+" else "−"}$seconds dtk"
     }
 
-    /** Kegagalan codec/decoder yang masih mungkin diselamatkan dekoder software. */
+    /**
+     * Kegagalan codec/decoder yang masih mungkin diselamatkan dekoder software. Query decoder
+     * dan format yang melebihi kapasitas sama-sama berarti dekoder perangkat tidak bisa dipakai.
+     */
     fun isCodecFailure(errorCode: Int): Boolean = when (errorCode) {
         PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
         PlaybackException.ERROR_CODE_DECODING_FAILED -> true
         else -> false
+    }
+
+    /** Kecepatan berikutnya untuk tombol cepat; urutan tetap dan berputar. */
+    fun nextSpeed(current: Float): Float {
+        val index = speeds.indexOfFirst { abs(it - current) < 0.001f }.takeIf { it >= 0 } ?: 3
+        return speeds[(index + 1) % speeds.size]
+    }
+
+    /** MIME subtitle dari tipe yang dilaporkan penyedia berkas, untuk berkas tanpa ekstensi. */
+    fun subtitleMimeFromType(type: String?): String? = when (type?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)) {
+        "application/x-subrip", "application/x-srt", "application/srt" -> "application/x-subrip"
+        "text/vtt", "text/webvtt" -> "text/vtt"
+        "text/x-ssa", "text/x-ass", "text/ass" -> "text/x-ssa"
+        "application/ttml+xml", "application/xml+ttml" -> "application/ttml+xml"
+        else -> null
+    }
+
+    /** Nama screenshot: buang karakter khusus, batasi panjang judul, lalu tambahkan waktu lokal. */
+    fun screenshotFileName(title: String, at: Long = System.currentTimeMillis()): String {
+        val safe = title.trim()
+            .replace(Regex("[^\\p{L}\\p{N} _-]"), "")
+            .replace(Regex("\\s+"), "-")
+            .trim('-', '_', ' ')
+            .take(48)
+            .ifBlank { "video" }
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(at))
+        return "$safe-$stamp.png"
     }
 
     /** Posisi lama hanya dipakai bila sudah cukup jauh dan bukan bagian akhir video. */
@@ -264,6 +400,45 @@ object VideoPlayback {
     private fun fileName(raw: String): String = runCatching {
         URLDecoder.decode(raw.substringBefore('?').substringBefore('#').substringAfterLast('/'), "UTF-8")
     }.getOrDefault(raw.substringBefore('?').substringAfterLast('/'))
+}
+
+/** Subtitle yang dipilih pengguna dari penyimpanan; disimpan per URI video agar tetap ada saat dibuka lagi. */
+object VideoExternalSubtitleCodec {
+    const val LIMIT = 12
+
+    fun encode(subtitles: List<VideoSubtitle>): String {
+        val array = JSONArray()
+        subtitles.filter { it.uri.isNotBlank() && it.mime.isNotBlank() }
+            .distinctBy { it.uri }
+            .take(LIMIT)
+            .forEach { subtitle ->
+                array.put(
+                    JSONObject()
+                        .put("uri", subtitle.uri)
+                        .put("mime", subtitle.mime)
+                        .put("language", subtitle.language)
+                        .put("label", subtitle.label),
+                )
+            }
+        return array.toString()
+    }
+
+    fun decode(raw: String?): List<VideoSubtitle> {
+        if (raw.isNullOrBlank()) return emptyList()
+        val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        return (0 until array.length()).mapNotNull { index ->
+            val value = array.optJSONObject(index) ?: return@mapNotNull null
+            val uri = value.optString("uri").trim()
+            val mime = value.optString("mime").trim()
+            if (uri.isBlank() || mime.isBlank()) null
+            else VideoSubtitle(
+                uri = uri,
+                mime = mime,
+                language = value.optString("language").trim(),
+                label = value.optString("label").trim().ifBlank { "Subtitle" },
+            )
+        }.distinctBy { it.uri }.take(LIMIT)
+    }
 }
 
 /**
