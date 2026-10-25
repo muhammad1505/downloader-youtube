@@ -75,14 +75,15 @@ fun Scrubber(
         modifier
             .fillMaxWidth()
             .height(touchHeight)
-            .pointerInput(enabled, duration) {
+            // Ukuran dibaca ulang di setiap kejadian. Rotasi/resize tidak mengulang blok ini
+            // karena key-nya tetap, jadi span yang disimpan di awal akan memakai lebar lama dan
+            // memetakan tap/geser ke posisi yang salah.
+            .pointerInput(enabled, duration, radiusPx) {
                 if (!enabled || duration <= 0f) return@pointerInput
-                val span = (size.width - 2 * radiusPx).coerceAtLeast(1f)
-                fun at(x: Float) = ((x - radiusPx) / span).coerceIn(0f, 1f) * duration
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         dragging = true
-                        onScrub(at(offset.x))
+                        onScrub(scrubberPositionAt(offset.x, size.width.toFloat(), radiusPx, duration))
                     },
                     onDragEnd = {
                         dragging = false
@@ -94,15 +95,14 @@ fun Scrubber(
                     },
                     onHorizontalDrag = { change, _ ->
                         change.consume()
-                        onScrub(at(change.position.x))
+                        onScrub(scrubberPositionAt(change.position.x, size.width.toFloat(), radiusPx, duration))
                     },
                 )
             }
-            .pointerInput(enabled, duration) {
+            .pointerInput(enabled, duration, radiusPx) {
                 if (!enabled || duration <= 0f) return@pointerInput
-                val span = (size.width - 2 * radiusPx).coerceAtLeast(1f)
                 detectTapGestures { offset ->
-                    onScrub((((offset.x - radiusPx) / span).coerceIn(0f, 1f)) * duration)
+                    onScrub(scrubberPositionAt(offset.x, size.width.toFloat(), radiusPx, duration))
                     onScrubFinished()
                 }
             }
@@ -150,4 +150,18 @@ fun Scrubber(
             drawCircle(color = contentColor, radius = knobRadius, center = Offset(knobX, centerY))
         }
     }
+}
+
+/**
+ * Mengubah koordinat x sentuhan menjadi posisi milidetik di dalam [duration].
+ *
+ * [width] wajib berasal dari ukuran widget pada saat kejadian sentuhan terjadi, bukan nilai yang
+ * disimpan saat `pointerInput` dimulai: lebar bisa berubah (rotasi/resize) tanpa memulai ulang
+ * detektor, sehingga geometri lama akan memetakan tap/geser ke posisi yang salah. Titik dan track
+ * di gambar menyisakan [radiusPx] di kedua ujung, jadi pemetaan memakai inset yang sama.
+ */
+internal fun scrubberPositionAt(x: Float, width: Float, radiusPx: Float, duration: Float): Float {
+    if (duration <= 0f) return 0f
+    val span = (width - 2f * radiusPx).coerceAtLeast(1f)
+    return ((x - radiusPx) / span).coerceIn(0f, 1f) * duration
 }

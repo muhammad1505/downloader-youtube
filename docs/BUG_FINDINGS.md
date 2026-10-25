@@ -820,3 +820,22 @@ mengosongkan preset. Perbaikan 1.1.42 mempertahankan tier 1080 pada state UI dan
 hanya mengirim 818 ke selector. Regresi mencakup pilihan yang tetap sama setelah
 refresh metadata serta filter piksel aktual.
 [Hasil dan batas verifikasi](RESOLUTION_FIXES_1_1_42.md).
+
+## BUG-081 — P2: Tap/geser Scrubber memakai lebar lama setelah rotasi/resize
+
+Risiko tambahan pada review 25 Oktober. Kedua blok `pointerInput` menghitung
+`span` sekali saat blok dimulai, sedangkan key-nya hanya `enabled`/`duration`.
+Setelah lebar berubah (rotasi, PiP, resize jendela) durasi tetap sama, jadi blok
+tidak diulang dan tap/geser dipetakan dengan lebar lama — posisi melompat dari
+yang ditunjuk. Perbaikan: pemetaan dipindah ke `scrubberPositionAt(x, width,
+radiusPx, duration)` dan setiap callback mengirim `size.width` saat kejadian.
+`PointerInputScope.size` dibaca dari `boundsSize` yang diperbarui tiap dispatch
+event, sehingga lebar baru langsung dipakai tanpa mengulang detektor (geseran
+yang sedang berjalan tidak terputus).
+
+Regresi `ScrubberGeometryTest` (5 kasus: ujung track, titik yang sama pada dua
+lebar, tengah masing-masing lebar, clamp di luar track, lebar/durasi
+degenerat) dikompilasi bersama salinan persis fungsi tersebut memakai
+kotlinc/JUnit dan lulus. Suite Gradle penuh belum dijalankan pada sesi ini
+(toolchain Android dan AAR FFmpeg tidak tersedia di workspace), dan uji rotasi
+di perangkat belum dilakukan; jangan anggap risiko runtime sudah tertutup.

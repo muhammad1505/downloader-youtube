@@ -5,7 +5,9 @@
 Snapshot 1.1.41 di bawah sudah disimpan dan dipush sebagai `0b2665f`.
 Tiga temuan R1/R2/R3 ditangani di **1.1.42/code56** dengan enam regresi baru;
 lihat [hasil implementasi dan verifikasi](RESOLUTION_FIXES_1_1_42.md).
-Risiko tambahan geometri Scrubber tetap memerlukan uji runtime tersendiri.
+Risiko tambahan geometri Scrubber sudah diperbaiki di sumber (BUG-081): pemetaan
+tap/geser membaca lebar terbaru setiap kejadian, bukan menyalin `span` saat
+`pointerInput` dimulai. Regresi host lulus; uji rotasi di HP belum dijalankan.
 
 ## Snapshot dan cakupan
 
@@ -93,6 +95,14 @@ berlangsung atau perbarui geometri handler ketika ukurannya berubah.
 [Kontrak pointerInput Android](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/understand-gestures)
 menjelaskan eksekusi ulang berdasarkan perubahan key.
 
+**Perbaikan (BUG-081):** kedua blok `pointerInput` memanggil
+`scrubberPositionAt(x, size.width.toFloat(), radiusPx, duration)` di dalam
+callback, sehingga `span` dibentuk ulang dari batas yang sedang berlaku.
+`PointerInputScope.size` adalah getter `boundsSize` yang diperbarui pada setiap
+dispatch event, bukan nilai yang disalin saat blok dimulai, dan blok itu tidak
+diulang hanya karena ukuran berubah. Uji runtime rotasi tetap perlu dilakukan
+pada perangkat; regresi host hanya membuktikan matematika pemetaan.
+
 ## Verifikasi dan batas
 
 - Laporan lokal yang tersedia berisi473tes Kotlin,0gagal/error/skip,
@@ -113,4 +123,5 @@ menjelaskan eksekusi ulang berdasarkan perubahan key.
 
 Scrubber.kt harus ikut disimpan dalam commit perubahan player; commit tracked
 files saja akan meninggalkan referensi Scrubber tanpa definisinya pada checkout
-lain. Status saat review dibuat: belum diperbaiki. Tindak lanjut terbaru ada di atas.
+lain. Status saat review dibuat: belum diperbaiki. Sekarang sudah diperbaiki di
+sumber dengan regresi host; verifikasi rotasi/resize di perangkat masih terbuka.

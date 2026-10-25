@@ -932,3 +932,12 @@ berhasil (13m 1s), lint 0 error/3 warning lama. Audit ARM64: 262 ELF/13 kelas ZI
 signature produksi dan zipalign 16 KB lulus. Release dipasang update di HP;
 preset/menu/ringkasan 1080p dan persistensi setelah rotasi berhasil diuji.
 AAB tidak dibangun ulang. [Laporan lengkap](RESOLUTION_FIXES_1_1_42.md).
+
+## 25 Oktober 2026 — Geometri Scrubber setelah rotasi/resize
+
+BUG-081: tap/geser Scrubber sekarang memetakan koordinat dengan `size.width`
+pada setiap kejadian lewat `scrubberPositionAt`, bukan `span` yang disalin saat
+`pointerInput` dimulai. Key `pointerInput` ditambah `radiusPx`. Lima regresi
+`ScrubberGeometryTest` lulus melalui harness kotlinc/JUnit di luar Gradle;
+suite Gradle penuh dan uji rotasi di HP belum dijalankan pada sesi ini.
+[Detail](BUG_FINDINGS.md).
