@@ -91,8 +91,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -815,6 +813,14 @@ private fun PlayerTopBar(
     }
 }
 
+/** Dibacakan TalkBack saat fokus berpindah ke bilah progres. */
+private fun stateDescriptionFor(positionMs: Long, durationMs: Long): String =
+    if (durationMs > 0) {
+        "${VideoPlayback.timeLabel(positionMs)} dari ${VideoPlayback.timeLabel(durationMs)}"
+    } else {
+        "Durasi belum diketahui"
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerBottomBar(
@@ -840,7 +846,15 @@ private fun PlayerBottomBar(
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.94f))))
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-            .padding(horizontal = if (isLandscape) 18.dp else 12.dp, vertical = 4.dp),
+            // Bar sistem disembunyikan saat memutar, jadi safeDrawing bawah = 0 dan kontrol sempat
+            // menempel ke tepi layar. Sisakan margin tetap agar bar tidak terasa mepet dan tetap
+            // terlihat saat bar sistem muncul sementara.
+            .padding(
+                start = if (isLandscape) 18.dp else 12.dp,
+                end = if (isLandscape) 18.dp else 12.dp,
+                top = 4.dp,
+                bottom = if (isLandscape) 16.dp else 14.dp,
+            ),
     ) {
         // Waktu kiri/kanan mengapit track dengan lebar sama supaya progres tetap seimbang.
         Row(
@@ -850,56 +864,31 @@ private fun PlayerBottomBar(
             Text(
                 VideoPlayback.timeLabel(shownPosition),
                 color = PlayerContent,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(52.dp),
+                modifier = Modifier.width(54.dp),
             )
-            Slider(
+            Scrubber(
                 value = (scrub ?: state.positionMs.toFloat()).coerceIn(0f, duration.toFloat()),
-                onValueChange = onScrub,
-                onValueChangeFinished = onScrubFinished,
-                valueRange = 0f..duration.toFloat(),
+                duration = duration.toFloat(),
+                buffered = state.bufferedMs.toFloat(),
+                onScrub = onScrub,
+                onScrubFinished = onScrubFinished,
+                contentColor = PlayerContent,
                 enabled = state.durationMs > 0,
-                modifier = Modifier.weight(1f).height(32.dp),
-                thumb = {
-                    Box(Modifier.size(9.dp).background(PlayerContent, CircleShape))
-                },
-                track = { sliderState ->
-                    val range = sliderState.valueRange.endInclusive - sliderState.valueRange.start
-                    val fraction = if (range > 0f) {
-                        ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
-                    } else 0f
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .clip(CircleShape)
-                            .background(PlayerContent.copy(alpha = 0.28f)),
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth(fraction)
-                                .height(2.dp)
-                                .clip(CircleShape)
-                                .background(PlayerContent),
-                        )
-                    }
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.Transparent,
-                    activeTrackColor = Color.Transparent,
-                    inactiveTrackColor = Color.Transparent,
-                    disabledThumbColor = Color.Transparent,
-                    disabledActiveTrackColor = Color.Transparent,
-                    disabledInactiveTrackColor = Color.Transparent,
-                ),
+                trackHeight = 3.dp,
+                thumbRadius = 5.dp,
+                touchHeight = 34.dp,
+                modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                contentDescription = "Posisi pemutaran video",
+                stateDescription = stateDescriptionFor(shownPosition, state.durationMs),
             )
             Text(
                 if (state.durationMs > 0) VideoPlayback.timeLabel(state.durationMs) else "--:--",
                 color = PlayerMuted,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(52.dp),
+                modifier = Modifier.width(54.dp),
             )
         }
         // Navigasi putar di tengah; kunci di kiri dan PiP/orientasi di kanan, seperti pemutar

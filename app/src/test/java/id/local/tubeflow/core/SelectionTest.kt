@@ -9,6 +9,21 @@ class SelectionTest {
   org.junit.Assert.assertEquals(1080, Selection.closestQuality(1080, emptyList()))
   org.junit.Assert.assertEquals(0, Selection.closestQuality(0, listOf(1080)))
  }
+ @Test fun tierLabelsMapToRealPixelHeightsForTheDownloadFilter() {
+  // Video 2.35:1: tier 1080p disediakan pada tinggi 818, jadi filter yt-dlp memakai 818.
+  val wide = listOf(VideoResolution(1634, 2160), VideoResolution(818, 1080), VideoResolution(544, 720))
+  org.junit.Assert.assertEquals(818, Selection.heightForTier(1080, wide))
+  org.junit.Assert.assertEquals(1634, Selection.heightForTier(2160, wide))
+  org.junit.Assert.assertEquals(544, Selection.heightForTier(900, wide))
+  org.junit.Assert.assertEquals(0, Selection.heightForTier(480, wide))
+  // Tanpa daftar resolusi dari sumber, angka preset dikirim apa adanya (Instagram).
+  org.junit.Assert.assertEquals(1080, Selection.heightForTier(1080, emptyList()))
+  org.junit.Assert.assertEquals(0, Selection.heightForTier(0, wide))
+  // Tinggi nyata yang sudah dipilih dari menu tidak boleh dipetakan ulang ke tier lebih rendah.
+  org.junit.Assert.assertEquals(818, Selection.heightForTier(818, wide))
+  // Video vertikal: tier 1080 tetap disediakan pada tinggi 1920.
+  org.junit.Assert.assertEquals(1920, Selection.heightForTier(1080, listOf(VideoResolution(1920, 1080))))
+ }
  @Test fun soundcloudTrackingAliasesMatchExistingOutput() {
   val clean = "https://soundcloud.com/bondanfade2black/ya-sudahlah"
   val shared = "$clean?utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing"

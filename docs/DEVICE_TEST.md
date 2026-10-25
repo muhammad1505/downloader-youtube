@@ -946,3 +946,40 @@ Di HP:
 - Mode **Perangkat** sengaja tidak ikut fallback otomatis; pada klip AV1 10-bit
   ini pengguna harus memilih dekoder software sendiri.
 - PiP, subtitle, dan TalkBack belum diulang pada rilis ini.
+
+## Progres dan label resolusi 1.1.41/code55 — 25 Oktober 2026
+
+Release arm64 **1.1.41/code55** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB dari 1.1.40/code54; SHA256
+`73da1d6b…3ef58665`, `base.apk` identik. Tidak uninstall, clear data, atau reset
+database.
+
+Host: **473 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (26,193
+detik), lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh`
+lulus (10m49s). APK **76.276.302 byte**; AAB **273.204.422 byte**, SHA256
+`907a2808…fe28af9e`. Audit APK **262 ELF**, 13 kelas ZIP reflektif, zipalign
+16 KB, signature v2, dan AAB `jar verified`.
+
+Di HP:
+1. Pemutar video (portret): geser bilah dari **0:43** ke **4:44 / 6:14** — titik
+   membesar saat digeser, bagian termuat tampil lebih terang, dan posisi mengikuti
+   jari. Baris transport (kunci, prev/play/next, PiP, orientasi) kini berjarak
+   dari tepi bawah layar, tidak lagi menempel.
+2. Pemutar audio penuh (file uji 45 detik): geser bilah **0:19 → 0:40 / 0:45**;
+   tombol putar tetap jeda dan waktu kanan redup.
+3. Detail link YouTube IPANK – MUTIARA (3840×1634, 2.35:1) menampilkan
+   **Resolusi tersedia: 2160p, 1440p, 1080p, 720p, 480p, 360p, 240p, 144p** —
+   bukan 1634p/1090p/818p seperti sebelumnya.
+4. Menu **Resolusi** berisi Auto diikuti 2160p … 144p; memilih 1080p menulis
+   **Resolusi: 1080p**, menandai chip **1080p MP4**, dan ringkasan opsi menjadi
+   **1080p · MP4**.
+5. Tidak ada `FATAL EXCEPTION` atau ANR selama pengujian.
+
+**Batas yang tersisa:**
+- Pemetaan tier → tinggi nyata (818 untuk 2.35:1, 1920 untuk video vertikal)
+  diverifikasi lewat unit test `heightForTier`; unduhan penuh dengan pilihan 1080p
+  belum diulang pada rilis ini.
+- Ketuk-untuk-lompat pada bilah video tidak bisa diverifikasi lewat `adb` di
+  sesi ini (koordinat ketuk sering meleset ke aplikasi lain); perilaku geser
+  terbukti benar, dan ketuk memakai pemetaan yang sama.
+- PiP, pemilihan subtitle, TalkBack, font besar, dan lanskap belum diulang.

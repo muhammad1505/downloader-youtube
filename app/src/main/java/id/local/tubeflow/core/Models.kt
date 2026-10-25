@@ -19,7 +19,14 @@ data class DownloadOptions(
  val thumbnail: Boolean = false,
  val embedThumb: Boolean = false,
 )
-data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "", /** Tinggi video (piksel) yang benar-benar disediakan sumber, urut menurun; kosong = sumber tidak melaporkan tinggi. */ val resolutions: List<Int> = emptyList())
+/**
+ * Satu resolusi yang benar-benar disediakan sumber. [height] adalah tinggi piksel nyata untuk filter
+ * `height<=?` yt-dlp, sedangkan [tier] adalah label "p" standar yang dikenal pengguna — video
+ * 1920×818 (2.35:1) tetap tampil dan dipilih sebagai 1080p, bukan 818p.
+ */
+data class VideoResolution(val height: Int, val tier: Int)
+
+data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "", /** Resolusi yang benar-benar disediakan sumber, urut menurun; kosong = sumber tidak melaporkan tinggi. */ val resolutions: List<VideoResolution> = emptyList())
 data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "")
 data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "", val seedMetadata: VideoMetadata? = null)
 @Entity(tableName = "downloads")
@@ -319,6 +326,18 @@ object Selection {
  fun closestQuality(requested: Int, available: List<Int>): Int {
   if (requested <= 0 || available.isEmpty()) return requested
   return available.filter { it <= requested }.maxOrNull() ?: 0
+ }
+ /**
+  * Tinggi piksel untuk tier yang diminta (mis. preset 1080p). Label tier dipakai untuk tampilan,
+  * tetapi yt-dlp memfilter dengan tinggi nyata, jadi tier 1080 pada video 2.35:1 mengirim 818.
+  * Mengembalikan 0 (Auto) bila tidak ada tier yang ≤ permintaan.
+  */
+ fun heightForTier(requested: Int, available: List<VideoResolution>): Int {
+  if (requested <= 0 || available.isEmpty()) return requested
+  // Nilai yang sudah berupa tinggi nyata (dipilih dari menu) tidak boleh dipetakan ulang, kalau
+  // tidak 818 pada video 2.35:1 akan turun sendiri ke tier 720 saat komposisi dibuat ulang.
+  if (available.any { it.height == requested }) return requested
+  return available.filter { it.tier <= requested }.maxByOrNull { it.tier }?.height ?: 0
  }
  /** Safe MediaStore folder name (single segment under Downloads/); null when unusable. */
  fun safeFolder(raw: String): String? {

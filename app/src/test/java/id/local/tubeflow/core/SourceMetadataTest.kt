@@ -165,12 +165,38 @@ class SourceMetadataTest {
             JSONObject().put("title", "Reel").put("formats", formats),
             "https://www.instagram.com/reel/ABC/",
         )
-        assertEquals(listOf(1080, 720), meta.resolutions)
+        assertEquals(listOf(VideoResolution(1080, 1080), VideoResolution(720, 720)), meta.resolutions)
+    }
+
+    @Test fun wideVideoLabelsUseStandardTiersInsteadOfRawPixelHeights() {
+        // Video YouTube 2.35:1: tinggi format 1634/818/544, label resmi 2160p/1080p/720p.
+        val formats = org.json.JSONArray()
+            .put(JSONObject().put("vcodec", "avc1").put("width", 3840).put("height", 1634).put("format_note", "2160p"))
+            .put(JSONObject().put("vcodec", "avc1").put("width", 1920).put("height", 818).put("format_note", "1080p"))
+            .put(JSONObject().put("vcodec", "vp9").put("width", 1280).put("height", 544).put("format_note", "720p60"))
+        val meta = SourceMetadata.parse(
+            JSONObject().put("title", "Mutiara").put("formats", formats),
+            "https://www.youtube.com/watch?v=abc",
+        )
+        assertEquals(
+            listOf(VideoResolution(1634, 2160), VideoResolution(818, 1080), VideoResolution(544, 720)),
+            meta.resolutions,
+        )
+    }
+
+    @Test fun portraitFormatUsesShortSideAsTierAndKeepsTrueHeight() {
+        val formats = org.json.JSONArray()
+            .put(JSONObject().put("vcodec", "avc1").put("width", 1080).put("height", 1920))
+        val meta = SourceMetadata.parse(
+            JSONObject().put("title", "Reel").put("formats", formats),
+            "https://www.instagram.com/reel/ABC/",
+        )
+        assertEquals(listOf(VideoResolution(1920, 1080)), meta.resolutions)
     }
 
     @Test fun missingFormatsMeansNoReportedResolutions() {
         val meta = SourceMetadata.parse(JSONObject().put("title", "Audio"), "https://soundcloud.com/a/b")
-        assertEquals(emptyList<Int>(), meta.resolutions)
+        assertEquals(emptyList<VideoResolution>(), meta.resolutions)
     }
 
     @Test fun rootHeightCoversExtractorsWithoutPerFormatHeights() {
@@ -178,7 +204,7 @@ class SourceMetadataTest {
             JSONObject().put("title", "Reel").put("height", 1920).put("formats", org.json.JSONArray()),
             "https://www.instagram.com/reel/ABC/",
         )
-        assertEquals(listOf(1920), meta.resolutions)
+        assertEquals(listOf(VideoResolution(1920, 1920)), meta.resolutions)
     }
 
     @Test fun conflictingStructuredTrackDoesNotAcquireAnUnrelatedPerformer() {

@@ -1,6 +1,32 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.40/code54 — 25 Oktober 2026
+## Status terbaru — 1.1.41/code55 — 25 Oktober 2026
+
+Rilis **1.1.41/code55** merapikan progres dan label resolusi. Pemutar video dan
+audio sekarang memakai satu `Scrubber` bersama: track tipis membulat, bagian
+termuat lebih terang, titik 10–12dp yang membesar saat digeser, celah 2dp antara
+titik dan track, serta geser/ketuk-untuk-lompat dengan pembacaan TalkBack lewat
+`progressBarRangeInfo`. Bar bawah pemutar video mendapat margin tetap 14dp
+(portret) / 16dp (lanskap) karena safe drawing bawah bernilai nol saat bar sistem
+disembunyikan — sebelumnya transport menempel ke tepi layar. Detail link kini
+menampilkan label **tier standar** (2160p … 144p) dari `format_note`/sisi pendek
+video, bukan tinggi piksel mentah; filter yt-dlp tetap memakai tinggi nyata
+(1920×818 = 1080p → `height<=?818`). **473 tes Kotlin** (0 gagal/error/skip),
+**98 tes Python** `OK` (26,193 detik), lint debug/release **0 error/3 warning**
+lama; `scripts/build_release.sh` lulus (10m49s). Signed ARM64 **76.276.302 byte**,
+SHA256 `73da1d6b0649239144b349b72da9bde3e121f6928adf9d8177e3ebc43ef58665`; AAB
+**273.204.422 byte**, SHA256
+`907a2808c1503e1b7006576ef76a894663250d1078aabb87da4e0045fe28af9e`. Audit APK
+262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB `jar verified`.
+Release terpasang update-r di Realme RMX1821 Android 10 (arm64, halaman 4 KB)
+dari 1.1.40/code54; `base.apk` identik (hash di atas). Di HP: geser bilah video
+dari 0:43 ke **4:44 / 6:14** dengan titik mengikuti jari, bilah audio 0:19 →
+**0:40 / 0:45**, transport video kini berjarak dari tepi bawah, dan detail link
+menampilkan **2160p, 1440p, 1080p, 720p, 480p, 360p, 240p, 144p**; memilih 1080p
+menulis **Resolusi: 1080p** dan ringkasan **1080p · MP4**. Batas pengujian ada di
+[uji perangkat](DEVICE_TEST.md#progres-dan-label-resolusi-1141code55--25-oktober-2026).
+
+## Status sebelumnya — 1.1.40/code54 — 25 Oktober 2026
 
 Rilis **1.1.40/code54** memperbaiki fallback dekoder setelah `ERROR_CODE_TIMEOUT`.
 Timeout renderer MediaCodec (gejala yang muncul pada AV1 10-bit/AC3 di perangkat

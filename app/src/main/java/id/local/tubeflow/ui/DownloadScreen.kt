@@ -196,8 +196,12 @@ internal fun DownloadComposer(
 
     // Resolusi yang tidak dilaporkan sumber tidak boleh dikirim ke yt-dlp: pilihan turun ke tinggi
     // terdekat yang ada, atau Auto bila tidak ada yang cocok (mis. reel Instagram tanpa height).
-    fun availableQuality(requested: Int): Int =
-        Selection.closestQuality(requested, shownVideo?.resolutions.orEmpty())
+    // Tier (1080p, 720p, …) dipetakan ke tinggi nyata video ini agar filter yt-dlp tetap tepat
+    // untuk video berasio lebar; sumber tanpa daftar resolusi tetap memakai angka preset apa adanya.
+    fun availableQuality(requested: Int): Int {
+        val resolutions = shownVideo?.resolutions.orEmpty()
+        return if (resolutions.isEmpty()) requested else Selection.heightForTier(requested, resolutions)
+    }
 
     fun applyPreset(p: Preset) {
         mode = p.mode; preset = p.label
@@ -218,12 +222,12 @@ internal fun DownloadComposer(
     val resolutionOptions = run {
         val heights = shownVideo?.resolutions.orEmpty()
         if (heights.isEmpty()) listOf(0 to "Auto · terbaik")
-        else listOf(0 to "Auto · terbaik") + heights.map { it to "${it}p" }
+        else listOf(0 to "Auto · terbaik") + heights.map { it.height to "${it.tier}p" }
     }
 
     val presets = if (mode == MediaMode.VIDEO) {
-        val heights = shownVideo?.resolutions.orEmpty()
-        videoPresets.filter { p -> p.quality == 0 || heights.isEmpty() || p.quality in heights }
+        val resolutions = shownVideo?.resolutions.orEmpty()
+        videoPresets.filter { p -> p.quality == 0 || resolutions.isEmpty() || resolutions.any { it.tier == p.quality } }
     } else audioPresets
     val activePreset = presets.find { it.label == preset }
 
@@ -610,7 +614,9 @@ internal fun DownloadComposer(
 
         if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty()) || spotifyTrack != null || spotifyCollectionData != null) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                val summary = buildSummary(mode, videoFormat, audioFormat, quality, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
+                // Ringkasan memakai label tier (1080p), bukan tinggi piksel mentah (818).
+                val qualityTier = shownVideo?.resolutions?.firstOrNull { it.height == quality }?.tier ?: quality
+                val summary = buildSummary(mode, videoFormat, audioFormat, qualityTier, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
                 Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Tune, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -701,7 +707,7 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 Icon(Icons.Outlined.Hd, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(
                     if (meta.resolutions.isEmpty()) "Resolusi: belum dilaporkan sumber"
-                    else "Resolusi tersedia: ${meta.resolutions.joinToString(", ") { "${it}p" }}",
+                    else "Resolusi tersedia: ${meta.resolutions.joinToString(", ") { "${it.tier}p" }}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

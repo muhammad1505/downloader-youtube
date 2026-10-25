@@ -90,8 +90,11 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
                     IconButton(onClick=player::stop) { Icon(Icons.Outlined.Close,"Tutup pemutar") }
                 } })
                 state.error?.let { Text(it,Modifier.padding(horizontal=14.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
-                LinearProgressIndicator(progress={ if (state.durationMs > 0) (state.positionMs.toFloat()/state.durationMs).coerceIn(0f,1f) else 0f },
-                    modifier=Modifier.fillMaxWidth().height(3.dp),color=accent,trackColor=accent.copy(alpha=0.18f))
+                // Progres mini player memakai pil membulat agar sebaris dengan bentuk kartu.
+                Box(Modifier.fillMaxWidth().height(3.dp).background(accent.copy(alpha=0.18f))) {
+                    Box(Modifier.fillMaxWidth(if (state.durationMs>0) (state.positionMs.toFloat()/state.durationMs).coerceIn(0f,1f) else 0f)
+                        .fillMaxHeight().background(accent))
+                }
             }
         }
     }
@@ -247,18 +250,18 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                         if (timer.afterTrack) stringResource(id.local.tubeflow.R.string.sleep_after_track) else stringResource(id.local.tubeflow.R.string.sleep_remaining, duration(timer.remainingMs)),
                         modifier = Modifier.clickable { sleepOpen = true }.padding(vertical = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     state.error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-                    // Bilah progres putih tipis di atas latar gelap — aksen hijau disimpan untuk tombol putar.
+                    // Bilah progres tipis: bagian terputar putih, sisanya redup, dan titik kecil yang
+                    // membesar saat digeser. Aksen hijau tetap disimpan untuk tombol putar.
                     val seekTint=MaterialTheme.colorScheme.onBackground
-                    val seekColors=SliderDefaults.colors(thumbColor=seekTint,activeTrackColor=seekTint,inactiveTrackColor=seekTint.copy(alpha=0.22f))
                     val seekSlider: @Composable (Modifier) -> Unit = { sliderModifier ->
-                        Slider(value=dragging ?: state.positionMs.toFloat().coerceIn(0f,state.durationMs.coerceAtLeast(1).toFloat()),
-                            onValueChange={ dragging=it }, onValueChangeFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
-                            modifier=sliderModifier.heightIn(min=48.dp),
-                            valueRange=0f..state.durationMs.coerceAtLeast(1).toFloat(),enabled=!state.loading && state.durationMs>0,
-                            colors=seekColors,
-                            thumb={ Box(Modifier.size(12.dp).background(seekTint,CircleShape)) },
-                            track={ sliderState -> SliderDefaults.Track(sliderState,modifier=Modifier.height(4.dp),
-                                colors=seekColors,thumbTrackGapSize=0.dp,drawStopIndicator=null) })
+                        Scrubber(value=dragging ?: state.positionMs.toFloat(),
+                            duration=state.durationMs.coerceAtLeast(1).toFloat(),
+                            onScrub={ dragging=it },
+                            onScrubFinished={ dragging?.let { player.seek(it.toLong()) }; dragging=null },
+                            contentColor=seekTint, enabled=!state.loading && state.durationMs>0,
+                            trackHeight=4.dp, thumbRadius=6.dp, touchHeight=44.dp,
+                            modifier=sliderModifier, contentDescription="Posisi pemutaran audio",
+                            stateDescription="${duration(dragging?.toLong() ?: state.positionMs)} dari ${duration(state.durationMs)}")
                     }
                     if (landscape) {
                         // Waktu mengapit slider agar satu baris lebih pendek — semua kontrol muat tanpa gulir.
@@ -269,7 +272,10 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                         }
                     } else {
                         seekSlider(Modifier.fillMaxWidth())
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium); Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium) }
+                        Row(Modifier.fillMaxWidth().padding(horizontal=4.dp),horizontalArrangement=Arrangement.SpaceBetween) {
+                            Text(duration((dragging?.toLong() ?: state.positionMs)),style=MaterialTheme.typography.labelMedium)
+                            Text(duration(state.durationMs),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     Row(Modifier.fillMaxWidth().padding(vertical=if(landscape) 2.dp else 8.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
                         IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }

@@ -71,7 +71,10 @@ class InspectionCache(
         put("thumbnail", metadata.thumbnail)
         put("url", metadata.url)
         put("subtitleLangs", JSONArray(metadata.subtitleLangs))
-        put("resolutions", JSONArray(metadata.resolutions))
+        // Pasangan [tinggi, label] supaya entri cache lama (array tinggi saja) tetap bisa dibaca.
+        put("resolutions", JSONArray().apply {
+            metadata.resolutions.forEach { put(JSONArray().put(it.height).put(it.tier)) }
+        })
         put("artist", metadata.artist)
         put("track", metadata.track)
         put("creator", metadata.creator)
@@ -91,7 +94,14 @@ class InspectionCache(
             (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf { it.isNotBlank() } }
         }.orEmpty(),
         resolutions = json.optJSONArray("resolutions")?.let { array ->
-            (0 until array.length()).mapNotNull { index -> array.optInt(index, 0).takeIf { it > 0 } }
+            (0 until array.length()).mapNotNull { index ->
+                when (val value = array.opt(index)) {
+                    is Int -> value.takeIf { it > 0 }?.let { VideoResolution(it, it) }
+                    is JSONArray -> value.optInt(0, 0).takeIf { it > 0 }
+                        ?.let { height -> VideoResolution(height, value.optInt(1, height)) }
+                    else -> null
+                }
+            }
         }.orEmpty(),
         artist = json.optString("artist"),
         track = json.optString("track"),

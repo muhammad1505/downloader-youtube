@@ -37,19 +37,56 @@ object SourceMetadata {
         return credits.distinctBy { creditWords(it.first) to normalized(it.second) }.singleOrNull()
     }
 
-    /** Tinggi video yang dilaporkan `formats[]`; audio/storyboard dan format tanpa tinggi dilewati. */
-    private fun videoResolutions(json: JSONObject): List<Int> {
-        val heights = json.optJSONArray("formats")?.let { formats ->
+    /** Tangga label "p" yang lazim dipakai pemutar dan situs video. */
+    private val standardTiers = listOf(144, 240, 360, 480, 720, 1080, 1440, 2160, 4320)
+
+    /** Label "p" dari `format_note` (mis. "1080p60"), atau tangga standar dari sisi pendek video. */
+    private val tierNote = Regex("""^(\d+)p""")
+    private fun tierOf(format: JSONObject, height: Int): Int {
+        tierNote.find(format.optString("format_note"))?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?.takeIf { it > 0 }?.let { return it }
+        val width = format.optInt("width", 0)
+        // Label "p" memakai sisi pendek, jadi video vertikal (1080×1920) tetap 1080p. Tanpa width
+        // tidak ada dasar untuk menebak label, jadi tinggi apa adanya yang dipakai.
+        return when {
+            width in 1 until height -> standardTiers.firstOrNull { it >= width } ?: width
+            width > height -> standardTiers.firstOrNull { it >= height } ?: height
+            else -> height
+        }
+    }
+
+    /**
+     * Resolusi video yang dilaporkan `formats[]`; audio/storyboard dan format tanpa tinggi dilewati.
+     * Tinggi asli disimpan untuk filter unduhan, label tier dipakai agar daftar terbaca seperti
+     * situs video (1080p, 720p, …) meskipun rasio videonya bukan 16:9.
+     */
+    private fun videoResolutions(json: JSONObject): List<VideoResolution> {
+        val found = json.optJSONArray("formats")?.let { formats ->
             (0 until formats.length()).mapNotNull { index ->
                 val format = formats.optJSONObject(index) ?: return@mapNotNull null
                 if (format.optString("vcodec") == "none") return@mapNotNull null
-                format.optInt("height", 0).takeIf { it > 0 }
+                val height = format.optInt("height", 0)
+                if (height <= 0) return@mapNotNull null
+                VideoResolution(height, tierOf(format, height))
             }
         }.orEmpty()
         // Sebagian extractor (mis. Instagram) hanya mengisi height di level info, bukan per format.
         val rootHeight = json.optInt("height", 0)
-        return (heights + listOfNotNull(rootHeight.takeIf { heights.isEmpty() && it > 0 }))
-            .distinct().sortedDescending()
+        val rootWidth = json.optInt("width", 0)
+        val resolved = if (found.isEmpty() && rootHeight > 0) {
+            val tier = when {
+                rootWidth in 1 until rootHeight -> standardTiers.firstOrNull { it >= rootWidth } ?: rootWidth
+                rootWidth > rootHeight -> standardTiers.firstOrNull { it >= rootHeight } ?: rootHeight
+                else -> rootHeight
+            }
+            listOf(VideoResolution(rootHeight, tier))
+        } else {
+            found
+        }
+        // Satu label per tier: ambil tinggi terbesar agar filter `height<=?` tetap menyertakan format itu.
+        return resolved.groupBy { it.tier }
+            .map { (tier, list) -> VideoResolution(list.maxOf { it.height }, tier) }
+            .sortedByDescending { it.tier }
     }
 
     fun parse(json: JSONObject, url: String): VideoMetadata {

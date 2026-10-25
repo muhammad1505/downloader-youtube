@@ -239,6 +239,13 @@ Panel: Pilih download
 [  ⬇  Download audio  ]     satu aksi utama, filled
 ```
 
+- **Label resolusi (1.1.41).** Daftar resolusi memakai tier standar (144p … 2160p),
+  bukan tinggi piksel mentah. Sumber yang melaporkan `format_note` dipakai apa
+  adanya; tanpa itu, tier dihitung dari sisi pendek video, jadi video 2.35:1
+  (1920×818) tampil sebagai **1080p** dan video vertikal 1080×1920 juga
+  **1080p**. Filter unduhan tetap memakai tinggi nyata (818) agar yt-dlp memilih
+  format yang benar; ringkasan opsi menampilkan tier, bukan 818p.
+
 ## Kritik
 
 Yang mudah terasa generik dan karena itu diubah: CTA gradien hijau (diganti satu
@@ -307,6 +314,21 @@ diganti diam-diam; mode **Software** selalu memakai FFmpeg/dav1d. Aturan ini ada
 di `VideoPlayback.shouldUseSoftwareFallback` supaya tidak bergantung pada state
 Compose, dan tombol **Coba lagi** tetap membuat ulang pemutar bila player sudah
 dilepas setelah kegagalan.
+
+### Bilah progres bersama (1.1.41)
+
+Video dan audio memakai satu `Scrubber`, bukan `Slider` Material. Bentuknya:
+track tipis membulat, bagian termuat (buffer video) lebih terang dari sisa
+track, bagian terputar memakai warna konten, dan titik bulat 10–12dp yang
+membesar 1,9× saat digeser. Titik dan track dipisah celah 2dp supaya keduanya
+terbaca sebagai satu kontrol, bukan garis yang menempel. Area sentuh setinggi
+34–44dp dengan geser dan ketuk-untuk-lompat; TalkBack membaca nilai serta waktu
+lewat `progressBarRangeInfo`.
+
+Karena bar sistem disembunyikan saat memutar, safe drawing bawah bernilai nol;
+bar bawah pemutar video karena itu menyisakan margin tetap 14dp (portret) /
+16dp (lanskap) agar transport tidak menempel ke tepi layar dan tetap terbaca
+saat bar sistem muncul sementara.
 
 ## Navigasi dan playlist (1.1.20)
 
