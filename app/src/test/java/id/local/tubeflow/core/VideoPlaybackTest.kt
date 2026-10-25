@@ -1,5 +1,6 @@
 package id.local.tubeflow.core
 
+import androidx.media3.common.PlaybackException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -250,6 +251,18 @@ class VideoPlaybackTest {
         assertEquals("0,00 dtk", VideoPlayback.subtitleDelayLabel(0))
         assertEquals("+0,25 dtk", VideoPlayback.subtitleDelayLabel(250))
         assertEquals("−1,50 dtk", VideoPlayback.subtitleDelayLabel(-1_500))
+    }
+
+    @Test
+    fun codecFailuresAreRetriedWithSoftwareDecoder() {
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED))
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_INIT_FAILED))
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FAILED))
+        assertFalse(
+            "Masalah file/jaringan tidak perlu membuka ulang pemutar",
+            VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
+        )
+        assertFalse(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_UNSPECIFIED))
     }
 
     @Test

@@ -16,6 +16,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -85,6 +86,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var lastDurationMs = 0L
     private var lastResumeSaveAt = 0L
     private var ticker: Job? = null
+    private var fallbackJob: Job? = null
+    private var softwareFallbackUsed = false
 
     /** Dibaca layar untuk dipasang ke PlayerView; null saat tidak ada video. */
     val exoPlayer: ExoPlayer? get() = player
@@ -121,6 +124,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            // Video berikutnya berhak mencoba dekoder perangkat lagi; reopen software memakai
+            // PLAYLIST_CHANGED sehingga status fallback tidak ikut direset.
+            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                softwareFallbackUsed = false
+            }
             val nextUri = mediaItem?.localConfiguration?.uri?.toString()
             if (nextUri != null) {
                 if (currentUri != null && currentUri != nextUri) {
@@ -173,6 +181,33 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         override fun onPlayerError(error: PlaybackException) {
             saveNow()
+            val entries = _state.value.entries
+            val index = player?.currentMediaItemIndex ?: _state.value.index
+            val position = player?.currentPosition?.coerceAtLeast(0) ?: _state.value.positionMs
+            // Codec yang tidak didukung GPU dicoba sekali lagi dengan FFmpeg/dav1d sebagai
+            // dekoder utama. Bila build software juga gagal, error akhir tetap ditampilkan.
+            if (VideoPlayback.isCodecFailure(error.errorCode) && !softwareFallbackUsed && entries.isNotEmpty()) {
+                softwareFallbackUsed = true
+                fallbackJob?.cancel()
+                _state.value = _state.value.copy(
+                    playing = false,
+                    buffering = true,
+                    ready = false,
+                    error = null,
+                )
+                fallbackJob = viewModelScope.launch {
+                    delay(75)
+                    if (!_state.value.active) return@launch
+                    releasePlayer()
+                    openInternal(
+                        entries = entries,
+                        start = index.coerceIn(entries.indices),
+                        startPosition = position,
+                        preferSoftware = true,
+                    )
+                }
+                return
+            }
             _state.value = _state.value.copy(
                 playing = false,
                 buffering = false,
@@ -189,6 +224,17 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val start = startIndex.coerceIn(entries.indices)
         val saved = resume.position(entries[start].uri)
         val startPosition = if (VideoPlayback.shouldResume(saved, 0)) saved ?: 0 else 0
+        softwareFallbackUsed = false
+        openInternal(entries, start, startPosition, preferSoftware = false)
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun openInternal(
+        entries: List<VideoEntry>,
+        start: Int,
+        startPosition: Long,
+        preferSoftware: Boolean,
+    ) {
         val preferences = preferencesState()
         _state.value = preferences.copy(
             entries = entries,
@@ -202,11 +248,16 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         lastPositionMs = startPosition
         lastDurationMs = 0
         try {
-            // Fallback ke decoder lain saat decoder utama perangkat menolak format (mis. codec
-            // MP4 yang hanya punya decoder software, atau profil H.264 yang tidak didukung GPU).
-            val renderers = VideoRenderersFactory(getApplication()) {
+            // ON memakai dekoder perangkat lebih dulu dan FFmpeg/dav1d saat format tidak
+            // didukung. PREFER memaksa jalur software setelah dekoder perangkat gagal init.
+            val mode = if (preferSoftware) {
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            } else {
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+            }
+            val renderers = VideoRenderersFactory(getApplication(), mode) {
                 _state.value.subtitleDelayMs * 1000L
-            }.setEnableDecoderFallback(true)
+            }
             val exo = ExoPlayer.Builder(getApplication(), renderers).build().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -384,17 +435,23 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun closeInternal(savePosition: Boolean) {
-        ticker?.cancel()
-        ticker = null
-        val exo = player
-        if (savePosition && exo != null) saveNow()
-        exo?.removeListener(listener)
-        exo?.release()
-        player = null
+        fallbackJob?.cancel()
+        fallbackJob = null
+        if (savePosition && player != null) saveNow()
+        releasePlayer()
         currentUri = null
         lastPositionMs = 0
         lastDurationMs = 0
+        softwareFallbackUsed = false
         _state.value = preferencesState()
+    }
+
+    private fun releasePlayer() {
+        ticker?.cancel()
+        ticker = null
+        player?.removeListener(listener)
+        player?.release()
+        player = null
     }
 
     private fun saveNow() {

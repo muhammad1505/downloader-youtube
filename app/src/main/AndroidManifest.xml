@@ -24,6 +24,17 @@
   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" android:theme="@style/Theme.TubeFlow.Splash">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
    <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>
+   <!-- Terdaftar sebagai pemutar di chooser "Buka dengan": audio masuk pemutar lagu, video masuk Media3. -->
+   <intent-filter>
+    <action android:name="android.intent.action.VIEW"/>
+    <category android:name="android.intent.category.DEFAULT"/>
+    <data android:scheme="content" android:mimeType="audio/*"/>
+    <data android:scheme="file" android:mimeType="audio/*"/>
+    <data android:scheme="content" android:mimeType="video/*"/>
+    <data android:scheme="file" android:mimeType="video/*"/>
+    <data android:scheme="content" android:mimeType="application/ogg"/>
+    <data android:scheme="file" android:mimeType="application/ogg"/>
+   </intent-filter>
   </activity>
   <!-- Klip Status sementara dibagikan lewat FileProvider; hanya cache/status-clips yang terbuka. -->
   <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.statusclips" android:exported="false" android:grantUriPermissions="true">

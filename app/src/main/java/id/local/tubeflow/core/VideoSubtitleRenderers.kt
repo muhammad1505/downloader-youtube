@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.text.TextRenderer
 import androidx.media3.extractor.text.SubtitleDecoder
 import androidx.media3.extractor.text.SubtitleInputBuffer
 import androidx.media3.extractor.text.SubtitleOutputBuffer
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 
 /**
  * TextRenderer dengan offset waktu subtitle. Offset diterapkan saat sampel subtitle masuk decoder,
@@ -22,8 +23,16 @@ import androidx.media3.extractor.text.SubtitleOutputBuffer
 @androidx.annotation.OptIn(UnstableApi::class)
 class VideoRenderersFactory(
     context: Context,
+    extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
     private val subtitleDelayUs: () -> Long,
-) : DefaultRenderersFactory(context) {
+) : NextRenderersFactory(context) {
+    init {
+        // ON: dekoder perangkat tetap prioritas; FFmpeg/dav1d dipakai saat formatnya tidak
+        // didukung. PREFER dipakai saat membuka ulang setelah kegagalan dekoder perangkat.
+        setExtensionRendererMode(extensionRendererMode)
+        setEnableDecoderFallback(true)
+    }
+
     override fun buildTextRenderers(
         context: Context,
         output: TextOutput,

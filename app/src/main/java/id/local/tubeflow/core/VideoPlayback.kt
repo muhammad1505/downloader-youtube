@@ -1,5 +1,6 @@
 package id.local.tubeflow.core
 
+import androidx.media3.common.PlaybackException
 import org.json.JSONObject
 import java.net.URLDecoder
 import java.util.Locale
@@ -148,6 +149,14 @@ object VideoPlayback {
         val magnitude = if (delayMs < 0) -delayMs else delayMs
         val seconds = String.format(Locale.ROOT, "%.2f", magnitude / 1000.0).replace('.', ',')
         return "${if (delayMs > 0) "+" else "−"}$seconds dtk"
+    }
+
+    /** Kegagalan codec/decoder yang masih mungkin diselamatkan dekoder software. */
+    fun isCodecFailure(errorCode: Int): Boolean = when (errorCode) {
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED -> true
+        else -> false
     }
 
     /** Posisi lama hanya dipakai bila sudah cukup jauh dan bukan bagian akhir video. */

@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, video: VideoPlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, onNavigationHandled: (String) -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, video: VideoPlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, incomingMedia: IncomingMedia? = null, onMediaHandled: () -> Unit = {}, onNavigationHandled: (String) -> Unit = {}) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var previousTab by rememberSaveable { mutableIntStateOf(1) }
@@ -92,6 +92,21 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         }
     }
 
+    // Berkas dari "Buka dengan" aplikasi lain memakai pemutar yang sudah ada: audio ke pemutar lagu,
+    // video ke Media3. State dikosongkan setelah dibuka agar rotasi tidak memutar ulang berkas.
+    LaunchedEffect(incomingMedia) {
+        val media = incomingMedia ?: return@LaunchedEffect
+        fullPlayer = false
+        karaoke.close()
+        when (media.kind) {
+            IncomingMedia.Kind.AUDIO -> {
+                video.close()
+                player.play(PlayerViewModel.Track(media.uri, media.title))
+            }
+            IncomingMedia.Kind.VIDEO -> playVideo(listOf(VideoEntry(media.uri, media.title)), 0)
+        }
+        onMediaHandled()
+    }
     LaunchedEffect(incomingUrl) {
         if (incomingUrl.isNotBlank()) {
             fullPlayer = false
