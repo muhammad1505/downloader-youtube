@@ -19,9 +19,16 @@ class InspectionCache(
             file.delete()
             return null
         }
-        return runCatching { fromJson(JSONObject(file.readText())) }.getOrNull()?.also { metadata ->
-            if (metadata.url != url.trim()) file.delete()
+        val metadata = runCatching {
+            val json = JSONObject(file.readText())
+            // Entri lama tanpa daftar resolusi tidak dipakai lagi agar detail selalu lengkap.
+            if (json.optInt("v", 1) < SCHEMA_VERSION) null else fromJson(json)
+        }.getOrNull()
+        if (metadata == null || metadata.url != url.trim()) {
+            file.delete()
+            return null
         }
+        return metadata
     }
 
     @Synchronized
@@ -57,12 +64,14 @@ class InspectionCache(
     }
 
     private fun toJson(metadata: VideoMetadata): JSONObject = JSONObject().apply {
+        put("v", SCHEMA_VERSION)
         put("title", metadata.title)
         put("uploader", metadata.uploader)
         put("durationSeconds", metadata.durationSeconds)
         put("thumbnail", metadata.thumbnail)
         put("url", metadata.url)
         put("subtitleLangs", JSONArray(metadata.subtitleLangs))
+        put("resolutions", JSONArray(metadata.resolutions))
         put("artist", metadata.artist)
         put("track", metadata.track)
         put("creator", metadata.creator)
@@ -81,6 +90,9 @@ class InspectionCache(
         subtitleLangs = json.optJSONArray("subtitleLangs")?.let { array ->
             (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf { it.isNotBlank() } }
         }.orEmpty(),
+        resolutions = json.optJSONArray("resolutions")?.let { array ->
+            (0 until array.length()).mapNotNull { index -> array.optInt(index, 0).takeIf { it > 0 } }
+        }.orEmpty(),
         artist = json.optString("artist"),
         track = json.optString("track"),
         creator = json.optString("creator"),
@@ -92,6 +104,7 @@ class InspectionCache(
 
     companion object {
         const val MAX_AGE_MS = 30 * 60 * 1000L
+        private const val SCHEMA_VERSION = 2
         private const val MAX_ENTRIES = 200
     }
 }

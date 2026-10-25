@@ -153,6 +153,34 @@ class SourceMetadataTest {
             .put("description","intro\n".repeat(60)+"Judul: Song\nArtis: Artist"),"https://youtu.be/example")
         assertEquals("Artist",meta.artist)
     }
+    @Test fun reportedVideoHeightsAreDeduplicatedAndIgnoreAudioOrUnknownFormats() {
+        val formats = org.json.JSONArray()
+            .put(JSONObject().put("format_id", "137").put("vcodec", "avc1").put("height", 1080))
+            .put(JSONObject().put("format_id", "136").put("vcodec", "avc1").put("height", 720))
+            .put(JSONObject().put("format_id", "135").put("vcodec", "avc1").put("height", 720))
+            .put(JSONObject().put("format_id", "140").put("vcodec", "none").put("height", 0))
+            .put(JSONObject().put("format_id", "sb0").put("vcodec", "none"))
+            .put(JSONObject().put("format_id", "ig").put("vcodec", "avc1"))
+        val meta = SourceMetadata.parse(
+            JSONObject().put("title", "Reel").put("formats", formats),
+            "https://www.instagram.com/reel/ABC/",
+        )
+        assertEquals(listOf(1080, 720), meta.resolutions)
+    }
+
+    @Test fun missingFormatsMeansNoReportedResolutions() {
+        val meta = SourceMetadata.parse(JSONObject().put("title", "Audio"), "https://soundcloud.com/a/b")
+        assertEquals(emptyList<Int>(), meta.resolutions)
+    }
+
+    @Test fun rootHeightCoversExtractorsWithoutPerFormatHeights() {
+        val meta = SourceMetadata.parse(
+            JSONObject().put("title", "Reel").put("height", 1920).put("formats", org.json.JSONArray()),
+            "https://www.instagram.com/reel/ABC/",
+        )
+        assertEquals(listOf(1920), meta.resolutions)
+    }
+
     @Test fun conflictingStructuredTrackDoesNotAcquireAnUnrelatedPerformer() {
         val meta=SourceMetadata.parse(JSONObject().put("title","Artist - Song - Other").put("track","Other")
             .put("description","Title: Song\nVoc: Artist"),"https://youtu.be/example")

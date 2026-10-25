@@ -41,6 +41,7 @@ fun MediaLibraryScreen(
     val playlists by model.playlists.collectAsStateWithLifecycle()
     val favorites by model.favorites.collectAsStateWithLifecycle()
     var managePlaylists by remember { mutableStateOf(false) }
+    var filterOpen by remember { mutableStateOf(false) }
     var addPlaylist by remember { mutableStateOf<MediaItem?>(null) }
     val filter by model.selectedFilter.collectAsStateWithLifecycle()
     val folders by model.folders.collectAsStateWithLifecycle()
@@ -57,6 +58,19 @@ fun MediaLibraryScreen(
     var clipStatus by remember { mutableStateOf<MediaItem?>(null) }
     // "Unduh lagi" mengganti file yang ada; pasangkan job sumber dengan item yang dikonfirmasi.
     var redownload by remember { mutableStateOf<Pair<DownloadJob, MediaItem>?>(null) }
+    // Favorit punya chip sendiri, jadi tidak dihitung dua kali di label Filter.
+    val favoritesOnly = filter.playlistId == PersonalLibrary.FAVORITES
+    val activeFilters = listOf(
+        filter.playlistId.isNotBlank() && !favoritesOnly, filter.folder.isNotBlank(),
+        filter.artist.isNotBlank(), filter.album.isNotBlank(), filter.sort != "recent",
+    ).count { it }
+    val hasAnyFilter = favoritesOnly || activeFilters > 0
+    val playlistOptions = listOf("" to stringResource(R.string.library_all_playlists), PersonalLibrary.FAVORITES to stringResource(R.string.library_favorites)) +
+        playlists.filter { it.id != PersonalLibrary.FAVORITES }.map { it.id to it.name }
+    val filterLabel = if (filter.kind != "VIDEO" && filter.playlistId.isNotBlank() && !favoritesOnly) {
+        (playlistOptions.firstOrNull { it.first == filter.playlistId }?.second ?: "Filter") +
+            if (activeFilters > 1) " · $activeFilters" else ""
+    } else if (activeFilters == 0) "Filter" else "Filter · $activeFilters"
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var openError by remember { mutableStateOf<String?>(null) }
@@ -77,47 +91,42 @@ fun MediaLibraryScreen(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.") }
+        val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
+        // Dua baris ringkas: jenis + aksi utama, lalu favorit + satu pintu filter.
+        // Urutan/folder/artis/album tidak lagi memenuhi layar; semuanya ada di dialog Filter.
         item { ScrollRow {
             listOf("" to "Semua", "AUDIO" to "Musik", "VIDEO" to "Video").forEach { (kind, name) ->
                 FilterChip(filter.kind == kind, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = kind)) }, label = { Text(name) })
             }
-        } }
-        val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
-        // Aksi koleksi berlabel supaya tujuan setiap tombol jelas tanpa menebak ikon.
-        item { ScrollRow {
             if (filter.kind != "VIDEO") {
                 ActionChip("Putar", { model.playSelection(player, shuffle = false) }, icon = Icons.Outlined.PlayArrow, enabled = playable.isNotEmpty())
                 ActionChip("Acak", { model.playSelection(player, shuffle = true) }, icon = Icons.Outlined.Shuffle, enabled = playable.size > 1)
             }
+        } }
+        if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Memeriksa media…") }
+        if (searchOpen) item {
+            SearchField(filter.query, { model.filter(filter.copy(query = it)) }, label = "Cari judul, artis, nama file")
+        }
+        item { ScrollRow {
+            if (filter.kind != "VIDEO") {
+                FilterChip(favoritesOnly, onClick = {
+                    model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = if (filter.playlistId == PersonalLibrary.FAVORITES) "" else PersonalLibrary.FAVORITES))
+                }, label = { Text(stringResource(R.string.library_favorites)) })
+            }
+            ActionChip(
+                filterLabel,
+                { filterOpen = true },
+                icon = Icons.Outlined.Tune,
+            )
             ActionChip(
                 if (searchOpen) "Tutup" else "Cari",
                 { if (searchOpen) model.filter(filter.copy(query = "")); searchOpen = !searchOpen },
                 icon = if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search,
             )
-        } }
-        if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Memeriksa media…") }
-        if (searchOpen) item {
-            SearchField(filter.query, { model.filter(filter.copy(query = it)) }, label = "Cari judul, artis, nama file")
-        }            // Semua kontrol filter memakai satu bentuk chip: Favorit (aktif/tidak), dropdown playlist,
-            // aksi kelola, dan dropdown urutan/folder/artis/album.
-            if (filter.kind != "VIDEO") item { ScrollRow {
-                FilterChip(filter.playlistId == PersonalLibrary.FAVORITES, onClick = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = if (filter.playlistId == PersonalLibrary.FAVORITES) "" else PersonalLibrary.FAVORITES)) }, label = { Text(stringResource(R.string.library_favorites)) })
-                MenuChip(
-                    label = stringResource(R.string.library_playlists),
-                    options = listOf("" to stringResource(R.string.library_all_playlists)) + playlists.filter { it.id != PersonalLibrary.FAVORITES }.map { it.id to it.name },
-                    selected = filter.playlistId,
-                    onSelect = { model.filter(MediaLibraryViewModel.Filter(kind = "AUDIO", playlistId = it)) },
-                )
+            if (filter.kind != "VIDEO") {
                 ActionChip(stringResource(R.string.library_manage_playlists), { managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd)
-            } }
-            item { ScrollRow {
-                MenuChip("Terbaru", listOf("recent" to "Terbaru", "name" to "Nama", "size" to "Ukuran", "duration" to "Durasi"), filter.sort, { model.filter(filter.copy(sort = it)) })
-                MenuChip("Semua folder", listOf("" to "Semua folder") + folders.map { it to it }, filter.folder, { model.filter(filter.copy(folder = it)) })
-                if (filter.kind == "AUDIO") {
-                    MenuChip("Semua artis", listOf("" to "Semua artis") + artists.map { it to it }, filter.artist, { model.filter(filter.copy(artist = it)) })
-                    MenuChip("Semua album", listOf("" to "Semua album") + albums.map { it to it }, filter.album, { model.filter(filter.copy(album = it)) })
-                }
-            } }
+            }
+        } }
         openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
         if (media.isEmpty() && !busy) item {
             if (filter.playlistId.isNotBlank()) EmptyState(Icons.Outlined.LibraryMusic, stringResource(if (filter.playlistId == PersonalLibrary.FAVORITES) R.string.library_favorites_empty else R.string.library_playlist_empty), stringResource(R.string.library_playlist_empty_help))
@@ -205,6 +214,63 @@ fun MediaLibraryScreen(
             ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
         }
     }
+    if (filterOpen) AlertDialog(
+        onDismissRequest = { filterOpen = false },
+        title = { Text("Filter koleksi") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OptionMenu(
+                    label = "Urutkan",
+                    options = listOf("recent" to "Terbaru", "name" to "Nama", "size" to "Ukuran", "duration" to "Durasi"),
+                    selected = filter.sort,
+                    onSelect = { model.filter(filter.copy(sort = it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OptionMenu(
+                    label = "Folder",
+                    options = listOf("" to "Semua folder") + folders.map { it to it },
+                    selected = filter.folder,
+                    onSelect = { model.filter(filter.copy(folder = it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (filter.kind != "VIDEO") {
+                    OptionMenu(
+                        label = stringResource(R.string.library_playlists),
+                        options = playlistOptions,
+                        selected = filter.playlistId,
+                        onSelect = { model.filter(filter.copy(playlistId = it)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OptionMenu(
+                        label = "Artis",
+                        options = listOf("" to "Semua artis") + artists.map { it to it },
+                        selected = filter.artist,
+                        onSelect = { model.filter(filter.copy(artist = it)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OptionMenu(
+                        label = "Album",
+                        options = listOf("" to "Semua album") + albums.map { it to it },
+                        selected = filter.album,
+                        onSelect = { model.filter(filter.copy(album = it)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Text(
+                    "Filter berlaku langsung pada daftar di belakang. Urutan dan folder juga tersedia untuk video.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { filterOpen = false }) { Text("Selesai") } },
+        dismissButton = {
+            TextButton(
+                enabled = hasAnyFilter,
+                onClick = { model.filter(MediaLibraryViewModel.Filter(kind = filter.kind, query = filter.query)) },
+            ) { Text("Reset filter") }
+        },
+    )
     if (managePlaylists) PersonalPlaylistDialog(model) { managePlaylists = false }
     addPlaylist?.let { selected -> AlertDialog(onDismissRequest = { addPlaylist = null },
         title = { Text(stringResource(R.string.library_add_playlist)) }, text = {

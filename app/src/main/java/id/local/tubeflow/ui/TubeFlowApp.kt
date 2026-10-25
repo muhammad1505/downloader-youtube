@@ -66,6 +66,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     // Antrean dan riwayat kini satu tab Download; Pengaturan tetap di luar bilah bawah.
     val settingsTab = 3
     var tab by rememberSaveable { mutableIntStateOf(1) }
+    // Kategori Pengaturan adalah layar terpisah; null berarti daftar kategori.
+    var settingsSection by rememberSaveable { mutableStateOf<String?>(null) }
     var highlightedJobId by rememberSaveable { mutableStateOf<String?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
@@ -176,7 +178,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val karaokeRequest by karaoke.requestId.collectAsStateWithLifecycle()
     val activeCount = DownloadSections.running(jobs)
 
-    BackHandler(enabled=tab == settingsTab && !fullPlayer) { tab=previousTab }
+    BackHandler(enabled=tab == settingsTab && !fullPlayer) {
+        if (settingsSection != null) settingsSection = null else tab = previousTab
+    }
     LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false else requestNotifications() }
     val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
         ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
@@ -204,10 +208,10 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         )
                     }
                 },
-                navigationIcon = { if (tab == settingsTab) IconButton(onClick={ tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Kembali") } },
+                navigationIcon = { if (tab == settingsTab) IconButton(onClick={ if (settingsSection != null) settingsSection = null else tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, if (settingsSection != null) "Kembali ke daftar pengaturan" else "Kembali") } },
                 actions = {
                     if (karaokeRequest != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
-                    if (tab != settingsTab) IconButton(onClick={ previousTab=tab; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
+                    if (tab != settingsTab) IconButton(onClick={ previousTab=tab; settingsSection=null; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -414,6 +418,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     clearingFiles = clearingFiles,
                     onClearStorage = { model.clearStorageFolder() },
                     engineUpdateBlockedReason = engineUpdateBlockedReason,
+                    section = settingsSection,
+                    onSection = { settingsSection = it },
                 )
             }
             }

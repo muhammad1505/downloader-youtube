@@ -918,17 +918,9 @@ private fun PlayerBottomBar(
                 modifier = Modifier.width(if (isLandscape) 54.dp else 46.dp),
             )
         }
-        TransportControls(
-            state = state,
-            onToggle = onToggle,
-            onSeekBy = onSeekBy,
-            onPrevious = onPrevious,
-            onNext = onNext,
-            compact = isLandscape,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
-        )
-        // Semua tombol di bawah adalah siklus satu ketuk, seperti tombol Ulangi. Pilihan detail
-        // tetap tersedia lewat lembar "Opsi pemutar" di kanan atas.
+        // Pengaturan cepat berada DI ATAS tombol navigasi putar agar tidak menumpuk di bawah
+        // kontrol utama. Semua tombol adalah siklus satu ketuk; pilihan detail tetap tersedia
+        // lewat lembar "Opsi pemutar" di kanan atas.
         Row(
             Modifier
                 .fillMaxWidth()
@@ -1014,6 +1006,15 @@ private fun PlayerBottomBar(
                 onClick = onLock,
             )
         }
+        TransportControls(
+            state = state,
+            onToggle = onToggle,
+            onSeekBy = onSeekBy,
+            onPrevious = onPrevious,
+            onNext = onNext,
+            compact = isLandscape,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+        )
     }
 }
 

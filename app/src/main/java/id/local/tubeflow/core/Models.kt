@@ -19,7 +19,7 @@ data class DownloadOptions(
  val thumbnail: Boolean = false,
  val embedThumb: Boolean = false,
 )
-data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "")
+data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "", /** Tinggi video (piksel) yang benar-benar disediakan sumber, urut menurun; kosong = sumber tidak melaporkan tinggi. */ val resolutions: List<Int> = emptyList())
 data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "")
 data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "", val seedMetadata: VideoMetadata? = null)
 @Entity(tableName = "downloads")
@@ -315,6 +315,11 @@ object Selection {
  fun coverSupported(mode: MediaMode, format: String): Boolean = mode == MediaMode.AUDIO && format in coverFormats
  /** Auto keeps native audio unless the user explicitly requests a target bitrate. Artwork never selects a codec. */
  fun audioTargetFormat(format: String, bitrate: Int): String = if (format == "auto") { if (bitrate > 0) "mp3" else "best" } else format
+ /** Pilihan resolusi yang benar-benar tersedia: tinggi terdekat ≤ permintaan, atau Auto bila tidak ada. */
+ fun closestQuality(requested: Int, available: List<Int>): Int {
+  if (requested <= 0 || available.isEmpty()) return requested
+  return available.filter { it <= requested }.maxOrNull() ?: 0
+ }
  /** Safe MediaStore folder name (single segment under Downloads/); null when unusable. */
  fun safeFolder(raw: String): String? {
   val name = raw.trim()
@@ -512,11 +517,13 @@ object Selection {
    "opus" -> "bestaudio[ext=m4a]/bestaudio/best"
    else -> "bestaudio/best"
   } else "bestaudio/best"
-  val height = if (options.quality > 0) "[height<=${options.quality}]" else ""
+  // `<=?` mengizinkan format yang tidak melaporkan tinggi (umum di Instagram), dan `/best` terakhir
+  // menjaga unduhan tetap berhasil bila sumber tidak punya format yang cocok sama sekali.
+  val height = if (options.quality > 0) "[height<=?${options.quality}]" else ""
   return when(options.format) {
-   "mp4", "mov", "avi" -> "bestvideo$height[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best$height[ext=mp4][vcodec^=avc1]/bestvideo$height[ext=mp4]+bestaudio[ext=m4a]/best$height[ext=mp4]"
-   "webm" -> "bestvideo$height[ext=webm]+bestaudio[ext=webm]/best$height[ext=webm]"
-   else -> "bestvideo$height+bestaudio/best$height"
+   "mp4", "mov", "avi" -> "bestvideo$height[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best$height[ext=mp4][vcodec^=avc1]/bestvideo$height[ext=mp4]+bestaudio[ext=m4a]/best$height[ext=mp4]/best"
+   "webm" -> "bestvideo$height[ext=webm]+bestaudio[ext=webm]/best$height[ext=webm]/best"
+   else -> "bestvideo$height+bestaudio/best$height/best"
   }
  }
 }

@@ -154,8 +154,8 @@ tetap semantik. Tidak menambahkan hiasan gradien pada panel pengaturan atau empt
 - Margin halaman/panel 16dp; antar elemen 8/12dp; antar kelompok 24dp.
 - Radius 12dp untuk elemen kecil, 20dp panel media, 24/28dp untuk sheet/dialog.
 - Target sentuh minimal 48dp; isi memanjang dan font besar boleh membungkus.
-- Navigasi mempertahankan Ringkasan, Download, Antrean, Koleksi, Riwayat;
-  Pengaturan lewat top bar. Mini player tetap di atas navigasi.
+- Navigasi mempertahankan Ringkasan, Download, Koleksi; Pengaturan lewat top
+  bar, lalu daftar kategori dan subhalaman. Mini player tetap di atas navigasi.
 
 ## Pola halaman
 
@@ -172,7 +172,7 @@ Bagian atau panel
   satu aksi utama, tindakan tambahan lebih tenang
 
 [Mini player: sampul, judul/artis, putar/jeda]
-Ringkasan  Download  Antrean  Koleksi  Riwayat
+Ringkasan  Download  Koleksi
 ```
 
 Panel mengelompokkan kontrol yang terkait. Lagu menggunakan sampul dan identitas
@@ -201,10 +201,16 @@ per layar.
   tombol berlabel di baris kartu Riwayat/Antrean: label panjang memakan ruang
   daftar dan membuat kartu tinggi. Teks tetap dipakai untuk aksi di header,
   panel, dialog, dan tautan dalam pesan galat.
-- **Filter Koleksi.** Satu bentuk chip untuk seluruh deret: `FilterChip` untuk
-  Favorit, `MenuChip` untuk dropdown playlist/urutan/folder/artis/album, dan
-  `ActionChip` untuk "Kelola playlist". Sebelumnya ukuran dan bentuknya campur
-  (chip, tombol outlined, tombol teks).
+- **Filter Koleksi (1.1.38).** Dua baris chip saja: jenis + Putar/Acak, lalu
+  Favorit/Filter/Cari/Kelola playlist. Urutan, folder, playlist, artis, dan album
+  pindah ke dialog **Filter**; chip menampilkan jumlah filter aktif dan dialog
+  menyediakan **Reset filter**. Sebelumnya empat baris chip memenuhi bagian atas
+  daftar sebelum kartu pertama.
+- **Pengaturan berkategori (1.1.38).** Daftar utama hanya berisi tujuh kartu
+  kategori dengan ikon, ringkasan nilai aktif, dan chevron. Setiap kategori
+  membuka subhalaman berjudul tunggal; Tentang (privasi, versi, disclaimer)
+  terpisah. Kembali dari subhalaman kembali ke daftar kategori, bukan langsung
+  keluar ke tab sebelumnya.
 - **Aksi kartu media.** Koleksi dan Riwayat memakai satu `MediaCardPlan.card`
   dan `MediaActionBar`: **enam aksi harian tampil langsung di kartu** (Putar/Buka,
   Favorit, Bagikan, Ubah nama, Cari lirik, Hapus) dan sisanya di menu ⋮ yang

@@ -37,6 +37,21 @@ object SourceMetadata {
         return credits.distinctBy { creditWords(it.first) to normalized(it.second) }.singleOrNull()
     }
 
+    /** Tinggi video yang dilaporkan `formats[]`; audio/storyboard dan format tanpa tinggi dilewati. */
+    private fun videoResolutions(json: JSONObject): List<Int> {
+        val heights = json.optJSONArray("formats")?.let { formats ->
+            (0 until formats.length()).mapNotNull { index ->
+                val format = formats.optJSONObject(index) ?: return@mapNotNull null
+                if (format.optString("vcodec") == "none") return@mapNotNull null
+                format.optInt("height", 0).takeIf { it > 0 }
+            }
+        }.orEmpty()
+        // Sebagian extractor (mis. Instagram) hanya mengisi height di level info, bukan per format.
+        val rootHeight = json.optInt("height", 0)
+        return (heights + listOfNotNull(rootHeight.takeIf { heights.isEmpty() && it > 0 }))
+            .distinct().sortedDescending()
+    }
+
     fun parse(json: JSONObject, url: String): VideoMetadata {
         fun text(key: String) = if (json.isNull(key)) "" else json.optString(key).trim().takeUnless { it == "null" }.orEmpty()
         fun usable(value: String) = value.takeUnless { TitleSplit.creditKey(it) in setOf("null", "unknown", "unknownartist", "variousartists") }.orEmpty()
@@ -56,6 +71,7 @@ object SourceMetadata {
                 json.optJSONArray("thumbnails")?.let { list -> (list.length() - 1 downTo 0).firstNotNullOfOrNull { list.optJSONObject(it)?.optString("url")?.takeIf(String::isNotBlank) } }.orEmpty()
             }, url, artist = artist.ifBlank { credit?.first.orEmpty() }, track = track.ifBlank { credit?.second.orEmpty() }, creator = text("creator").ifBlank { text("uploader") },
             platformId = SourcePlatforms.fromUrl(url).id, sourceId = text("id"), extractor = text("extractor_key").ifBlank { text("extractor") },
-            artistEvidence = if (artist.isBlank() && credit != null) "source_description_credit" else "")
+            artistEvidence = if (artist.isBlank() && credit != null) "source_description_credit" else "",
+            resolutions = videoResolutions(json))
     }
 }

@@ -1,6 +1,57 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 25 Oktober 2026
+## Status terbaru — 1.1.38/code52 — 25 Oktober 2026
+
+Rilis **1.1.38/code52** menata ulang Pengaturan dan Koleksi agar tidak menjadi
+satu daftar panjang. Pengaturan utama kini berisi **tujuh kategori** (Unduhan,
+Penyimpanan, Tampilan, Pemutaran, Riwayat, Media & alat, Tentang) dengan ringkasan
+nilai aktif; setiap kategori membuka subhalaman sendiri dan Tentang terpisah dari
+pengaturan lain. Tombol kembali top bar maupun tombol sistem kembali dari
+subhalaman ke daftar kategori, lalu ke tab sebelumnya. Koleksi dipadatkan menjadi
+**dua baris chip**: jenis + Putar/Acak, lalu Favorit/Filter/Cari/Kelola playlist.
+Urutan, folder, playlist, artis, dan album pindah ke dialog **Filter**; chip
+menampilkan jumlah filter aktif dan dialog menyediakan **Reset filter**.
+**469 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,797 detik),
+lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh` lulus
+(9m35s). Signed ARM64 **76.266.998 byte**, SHA256
+`919fdc5742c0733ecbab0d65703711722a385c633f968dc432e069137ccb9c0c`; AAB
+**273.184.427 byte**, SHA256
+`ad0a997836ec270b8e3434f6fd6405cfdef8dd40a11f9e26d01d123266c46369`.
+Audit APK 262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB
+`jarsigner` lulus. Release terpasang update-r di Realme RMX1821 Android 10
+(arm64, halaman 4 KB) dari 1.1.37/code51; `base.apk` identik. Di HP: tujuh
+kategori muat satu layar, subhalaman hanya menampilkan satu judul, kembali
+top-bar/sistem kembali ke daftar lalu Koleksi, dua baris chip Koleksi muat tanpa
+terpotong, dan dialog filter mengubah urutan menjadi **Nama** (`Filter · 1`) serta
+mengembalikan **Terbaru** lewat **Reset filter**. Batas pengujian ada di
+[uji perangkat](DEVICE_TEST.md#pengaturan-berkategori-dan-koleksi-ringkas-1138code52--25-oktober-2026).
+
+## Status sebelumnya — 1.1.37/code51 — 25 Oktober 2026
+
+Rilis **1.1.37/code51** merapikan pemutar video dan detail tautan. Baris
+pengaturan cepat (kecepatan, subtitle, EQ, efek audio, Smart Enhance, rasio,
+ulangi, dekoder, screenshot, antrean, kunci) dipindah **di atas tombol navigasi
+putar**, bukan menumpuk di bawahnya. Pratinjau tautan kini menyajikan data nyata
+dari `formats[]`: daftar resolusi yang benar-benar tersedia dan status subtitle,
+dan pilihan resolusi hanya memuat tinggi tersebut. Pemilih format memakai
+filter `height<=?` plus fallback `/best`, jadi sumber seperti Instagram yang
+tidak melaporkan tinggi format tidak lagi gagal karena resolusi pilihan tidak
+ada. **469 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,980
+detik), lint debug/release **0 error/3 warning** lama. Signed ARM64
+**76.257.558 byte**, SHA256
+`fe826a744552ed7b3b8543634c0cf9beda700e837817339659c9ed57edc816b8`; AAB
+**273.169.852 byte**, SHA256
+`88bbec8a49f58fa2e9a3fac632bc3154de71e1864e05b4bb6899b876bc989fc0`.
+Audit APK 262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB `jarsigner`
+lulus. Release terpasang update-r di Realme RMX1821 Android 10 (arm64, halaman
+4 KB) dari 1.1.36/code50; `base.apk` identik. Di HP: pratinjau **Big Buck Bunny**
+menampilkan **2160p–144p** tanpa subtitle, **Me at the zoo** menampilkan
+**240p/144p** dan **Subtitle tersedia: de, en**; dropdown resolusi hanya memuat
+tinggi tersebut, memilih **1080p** memperbarui ringkasan, dan baris pengaturan
+cepat tampil di atas tombol putar. Batas pengujian ada di
+[uji perangkat](DEVICE_TEST.md#pemutar-video-dan-detail-tautan-1137code51--25-oktober-2026).
+
+## Status sebelumnya — 1.1.36/code50 — 25 Oktober 2026
 
 Rilis **1.1.36/code50** memperbaiki fallback dekoder video: kegagalan
 `DECODER_QUERY_FAILED` dan `DECODING_FORMAT_EXCEEDS_CAPABILITIES` kini ikut

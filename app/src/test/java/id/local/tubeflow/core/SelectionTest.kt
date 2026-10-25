@@ -2,6 +2,13 @@ package id.local.tubeflow.core
 import org.junit.Assert.*
 import org.junit.Test
 class SelectionTest {
+ @Test fun qualityFallsBackToTheClosestReportedHeight() {
+  org.junit.Assert.assertEquals(1080, Selection.closestQuality(1080, listOf(1080, 720, 480)))
+  org.junit.Assert.assertEquals(720, Selection.closestQuality(1080, listOf(720, 480)))
+  org.junit.Assert.assertEquals(0, Selection.closestQuality(360, listOf(720)))
+  org.junit.Assert.assertEquals(1080, Selection.closestQuality(1080, emptyList()))
+  org.junit.Assert.assertEquals(0, Selection.closestQuality(0, listOf(1080)))
+ }
  @Test fun soundcloudTrackingAliasesMatchExistingOutput() {
   val clean = "https://soundcloud.com/bondanfade2black/ya-sudahlah"
   val shared = "$clean?utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing"
@@ -119,7 +126,13 @@ class SelectionTest {
   assertTrue(job.matchesOutput(url, DownloadOptions(url, MediaMode.VIDEO, "mp4", 720)))
   assertFalse(job.matchesOutput("https://www.tiktok.com/@user/video/9999999999", DownloadOptions(url, MediaMode.VIDEO, "mp4", 720)))
  }
- @Test fun explicitQualityConstrainsAllFallbacks() { val selector=Selection.selector(DownloadOptions("https://youtu.be/x",quality=720)); assertEquals("bestvideo[height<=720]+bestaudio/best[height<=720]",selector) }
+ @Test fun explicitQualityConstrainsAllFallbacks() { val selector=Selection.selector(DownloadOptions("https://youtu.be/x",quality=720)); assertEquals("bestvideo[height<=?720]+bestaudio/best[height<=?720]/best",selector) }
+ @Test fun unknownHeightsStayEligibleAndBestIsTheLastResort() {
+  // Instagram tidak selalu melaporkan height; `<=?` harus tetap mencocokkan format tersebut.
+  val selector = Selection.selector(DownloadOptions("https://www.instagram.com/reel/ABC/", format="mp4", quality=1080))
+  org.junit.Assert.assertTrue(selector.contains("height<=?1080"))
+  org.junit.Assert.assertTrue(selector.endsWith("/best"))
+ }
  @Test fun mp4UsesCompatibleAudio() { assertTrue(Selection.selector(DownloadOptions("https://youtu.be/x",format="mp4")).contains("bestaudio[ext=m4a]")) }
  @Test(expected=IllegalArgumentException::class) fun rejectsFormatForWrongMode() { Selection.validate(DownloadOptions("https://youtu.be/x",mode=MediaMode.AUDIO,format="mkv")) }
  @Test fun acceptsPlaylistPageButRejectsItAsSingleVideo() {
@@ -254,8 +267,8 @@ class SelectionTest {
  }
  @Test fun extendedVideoSelectorPrefersCompatibleCodec() {
   assertTrue(Selection.selector(DownloadOptions("https://youtu.be/x",format="mov")).contains("[vcodec^=avc1]"))
-  assertEquals("bestvideo[height<=720][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4][vcodec^=avc1]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]",Selection.selector(DownloadOptions("https://youtu.be/x",format="avi",quality=720)))
-  assertEquals("bestvideo[height<=720]+bestaudio/best[height<=720]",Selection.selector(DownloadOptions("https://youtu.be/x",format="auto",quality=720)))
+  assertEquals("bestvideo[height<=?720][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4][vcodec^=avc1]/bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4]/best",Selection.selector(DownloadOptions("https://youtu.be/x",format="avi",quality=720)))
+  assertEquals("bestvideo[height<=?720]+bestaudio/best[height<=?720]/best",Selection.selector(DownloadOptions("https://youtu.be/x",format="auto",quality=720)))
  }
  @Test fun audioManualBitrateKeepsCrossContainerWithFallback() {
   // Wadah sumber sengaja berbeda: yt-dlp me-remux (copy) bila codec cocok dan --audio-quality diabaikan —

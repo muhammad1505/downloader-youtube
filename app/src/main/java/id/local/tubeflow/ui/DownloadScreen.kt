@@ -194,13 +194,37 @@ internal fun DownloadComposer(
         if (isPlaylistLink && !isVideo) inspectPlaylist() else inspect()
     }
 
+    // Resolusi yang tidak dilaporkan sumber tidak boleh dikirim ke yt-dlp: pilihan turun ke tinggi
+    // terdekat yang ada, atau Auto bila tidak ada yang cocok (mis. reel Instagram tanpa height).
+    fun availableQuality(requested: Int): Int =
+        Selection.closestQuality(requested, shownVideo?.resolutions.orEmpty())
+
     fun applyPreset(p: Preset) {
         mode = p.mode; preset = p.label
-        if (p.mode == MediaMode.VIDEO) { videoFormat = p.format; quality = p.quality }
+        if (p.mode == MediaMode.VIDEO) {
+            videoFormat = p.format
+            val target = availableQuality(p.quality)
+            quality = target
+            if (target != p.quality) preset = ""
+        }
         else { audioFormat = p.format; bitrate = p.bitrate }
     }
 
-    val presets = if (mode == MediaMode.VIDEO) videoPresets else audioPresets
+    LaunchedEffect(shownVideo?.url, shownVideo?.resolutions) {
+        val target = availableQuality(quality)
+        if (target != quality) { quality = target; preset = "" }
+    }
+
+    val resolutionOptions = run {
+        val heights = shownVideo?.resolutions.orEmpty()
+        if (heights.isEmpty()) listOf(0 to "Auto · terbaik")
+        else listOf(0 to "Auto · terbaik") + heights.map { it to "${it}p" }
+    }
+
+    val presets = if (mode == MediaMode.VIDEO) {
+        val heights = shownVideo?.resolutions.orEmpty()
+        videoPresets.filter { p -> p.quality == 0 || heights.isEmpty() || p.quality in heights }
+    } else audioPresets
     val activePreset = presets.find { it.label == preset }
 
     fun buildOptions(target: String) = DownloadOptions(
@@ -499,7 +523,15 @@ internal fun DownloadComposer(
                     AnimatedVisibility(advanced, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (mode == MediaMode.VIDEO) {
-                                OptionMenu("Resolusi", listOf(0 to "Auto · terbaik", 4320 to "4320p · 8K", 2160 to "2160p · 4K", 1440 to "1440p", 1080 to "1080p · Full HD", 720 to "720p · HD", 480 to "480p", 360 to "360p"), quality, onSelect = { quality = it; preset = "" })
+                                OptionMenu("Resolusi", resolutionOptions, quality, onSelect = { quality = it; preset = "" })
+                                Text(
+                                    if (shownVideo?.resolutions.isNullOrEmpty())
+                                        "Sumber ini tidak melaporkan daftar resolusi; unduhan memakai format terbaik yang tersedia."
+                                    else
+                                        "Hanya resolusi yang benar-benar disediakan video ini yang muncul di daftar.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                                 OptionMenu("Format video", listOf("auto" to "Auto · format asli", "mp4" to "MP4 · kompatibel", "mkv" to "MKV", "webm" to "WebM", "mov" to "MOV · Apple", "avi" to "AVI · lama"), videoFormat, onSelect = { videoFormat = it; preset = "" })
                             } else {
                                 if (audioFormat !in listOf("flac", "wav", "vorbis")) OptionMenu("Bitrate audio", listOf(0 to "Auto · terbaik", 320 to "320 kbps", 256 to "256 kbps", 192 to "192 kbps", 128 to "128 kbps", 64 to "64 kbps"), bitrate, onSelect = { bitrate = it; preset = "" })
@@ -664,6 +696,16 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 Icon(Icons.Outlined.CheckCircle, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.secondary)
                 Spacer(Modifier.width(6.dp))
                 Text("Siap diunduh · ${Format.duration(meta.durationSeconds)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Hd, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    if (meta.resolutions.isEmpty()) "Resolusi: belum dilaporkan sumber"
+                    else "Resolusi tersedia: ${meta.resolutions.joinToString(", ") { "${it}p" }}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
             }
             if (meta.subtitleLangs.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -780,3 +780,88 @@ tanpa crash. Tidak ada `FATAL EXCEPTION` atau ANR pada PID aplikasi.
   cue tetap tampil.
 - Posisi subtitle **Tinggi** vs **Bawah** pada cue tertanam belum dibandingkan
   langsung di HP; yang terlihat hanya cue tampil lebih tinggi dari tepi bawah.
+
+## Pemutar video dan detail tautan 1.1.37/code51 — 25 Oktober 2026
+
+Release arm64 **1.1.37/code51** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256
+`fe826a744552ed7b3b8543634c0cf9beda700e837817339659c9ed57edc816b8`,
+`base.apk` identik. Versi sebelumnya di perangkat adalah 1.1.36/code50. Tidak
+uninstall, clear data, atau reset database.
+
+Host: **469 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,980
+detik), lint debug/release **0 error/3 warning** lama. APK **76.257.558 byte**;
+AAB **273.169.852 byte**, SHA256
+`88bbec8a49f58fa2e9a3fac632bc3154de71e1864e05b4bb6899b876bc989fc0`.
+Audit APK **262 ELF**, 0 gagal alignment 16 KB; 13 kelas ZIP reflektif lulus;
+zipalign 16 KB dan signature v2 lulus; AAB `jarsigner` verified.
+
+Di HP: (1) tautan YouTube `aqz-KE-bpKQ` menampilkan pratinjau nyata
+**Resolusi tersedia: 2160p, 1440p, 1080p, 720p, 480p, 360p, 240p, 144p** dan
+**Video ini tidak punya subtitle/CC tercatat**; (2) tautan `jNQXAC9IVRw`
+menampilkan **240p, 144p** dan **Subtitle tersedia: de, en**; (3) dropdown
+**Resolusi** hanya berisi **Auto** + tinggi yang dilaporkan (tanpa 4320p/8K),
+memilih **1080p** mengubah chip menjadi **Resolusi: 1080p** dan ringkasan menjadi
+**1080p · MP4**; (4) chip preset 4K/1080p/720p hanya muncul bila tingginya ada;
+(5) di pemutar, baris chip pengaturan cepat kini berada **di atas** tombol
+previous/play/next, dengan progress bar tetap paling atas. Tidak ada
+`FATAL EXCEPTION` atau ANR pada PID aplikasi.
+
+**Batas yang tersisa:**
+- Tautan Instagram yang gagal tidak tersedia saat pengujian, jadi perilaku
+  `height<=?` dan fallback `/best` di sumber nyata belum diulang di HP; keduanya
+  dibuktikan tes host (`SelectionTest`, `SourceMetadataTest`).
+- Daftar resolusi bergantung pada `formats[]`/`height` yang dilaporkan yt-dlp;
+  sumber yang tidak melaporkan tinggi hanya menawarkan **Auto** dan memakai
+  format terbaik.
+- Unduhan percobaan tidak dijalankan pada kedua tautan uji (hanya pratinjau dan
+  pemilihan opsi), jadi hasil file untuk resolusi 1080p belum diperiksa ulang.
+
+## Pengaturan berkategori dan Koleksi ringkas 1.1.38/code52 — 25 Oktober 2026
+
+Release arm64 **1.1.38/code52** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256 `919fdc57…ccb9c0c`,
+`base.apk` identik. Versi sebelumnya 1.1.37/code51. Tidak uninstall, clear data,
+atau reset database.
+
+Host: **469 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (28,797
+detik), lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh`
+lulus (9m35s). APK **76.266.998 byte**; AAB **273.184.427 byte**, SHA256
+`ad0a9978…66c46369`. Audit APK **262 ELF**, 13 kelas ZIP reflektif, zipalign
+16 KB, signature v2, dan AAB `jarsigner` lulus.
+
+Di HP:
+1. Top bar **Pengaturan** menampilkan tujuh kartu kategori (Unduhan,
+   Penyimpanan, Tampilan, Pemutaran, Riwayat, Media & alat, Tentang) beserta
+   ringkasan nilai aktif; semuanya muat satu layar tanpa menggulir, dengan
+   disclaimer tetap di bawah.
+2. Membuka **Tampilan** menampilkan satu judul halaman dan satu panel tanpa
+   judul ganda; tombol kembali top bar mengembalikan ke daftar kategori.
+3. Tombol sistem kembali dari subhalaman juga kembali ke daftar kategori, dan
+   kembali sekali lagi ke tab **Koleksi** sebelumnya.
+4. **Tentang** terpisah dari pengaturan lain: privasi, versi **1.1.38 (52)**, dan
+   disclaimer berada di subhalaman sendiri.
+5. Koleksi memakai dua baris chip; seluruh kontrol utama (Semua/Musik/Video,
+   Putar/Acak, Favorit/Filter/Cari/Kelola playlist) terlihat tanpa gulir pada
+   lebar 720 px. Menekan **Cari** membuka kolom pencarian; mengetik `av1`
+   menyisakan dua kartu AV1, dan **Tutup** membersihkan pencarian.
+6. Dialog **Filter koleksi** menampilkan Urutkan, Folder, Playlist, Artis, dan
+   Album. Memilih **Urutkan: Nama** langsung mengubah urutan kartu dan chip
+   menjadi **Filter · 1**; **Selesai** menutup dialog; **Reset filter**
+   mengembalikan **Terbaru** dan urutan semula (chip kembali **Filter**).
+   Menyalakan **Favorit** mengganti judul menjadi **Koleksi musik** tanpa
+   menduplikasi label filter; dialog menampilkan **Playlist: Favorit**, dan
+   **Reset filter** mengembalikan playlist ke semua.
+7. Tidak ada `FATAL EXCEPTION` atau ANR; PID aplikasi tetap hidup setelah
+   rangkaian navigasi.
+
+**Batas yang tersisa:**
+- Filter **Playlist**, **Artis**, dan **Album** belum diuji dengan data audio;
+  pustaka perangkat hanya berisi tiga video uji dan tanpa playlist.
+- Pencarian yang digabung dengan filter lain, font >1,3x, TalkBack, dan lanskap
+  belum diuji pada rilis ini.
+- Perangkat uji Android 10, jadi **Warna dinamis** dan izin Bluetooth Android
+  12+ tidak tercakup; keduanya tetap memakai guard versi yang sudah ada.
+- Subhalaman Pengaturan adalah state navigasi in-app (bukan deep link terpisah);
+  Activity yang dibuat ulang memulihkan subhalaman, tetapi force-stop atau
+  membuka ulang aplikasi kembali ke daftar kategori.

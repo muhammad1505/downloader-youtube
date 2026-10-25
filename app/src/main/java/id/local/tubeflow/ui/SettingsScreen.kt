@@ -8,13 +8,17 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,7 +29,10 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.Format
@@ -53,6 +60,8 @@ fun SettingsScreen(
     clearingFiles: Boolean = false,
     onClearStorage: () -> Unit = {},
     engineUpdateBlockedReason: String? = null,
+    section: String? = null,
+    onSection: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -127,15 +136,71 @@ fun SettingsScreen(
         }
     }
 
+    val scroll = rememberScrollState()
+    LaunchedEffect(section) { scroll.scrollTo(0) }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(UiSpacing.screen),
+        Modifier.fillMaxSize().verticalScroll(scroll).padding(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
-        PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
-        MediaToolsSettings(karaoke, player)
+        if (section == null) {
+            PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
+            val smartCount = listOf(
+                SettingsStore.autoRename, SettingsStore.autoTag, SettingsStore.autoArtwork,
+                SettingsStore.autoLyrics, SettingsStore.autoLibrary,
+            ).count { it }
+            SettingsCategoryCard(
+                title = "Unduhan",
+                summary = "Antrean ${SettingsStore.maxConcurrent}× · Smart Media $smartCount/5 · notifikasi",
+                icon = Icons.Outlined.Download,
+                onClick = { onSection("downloads") },
+            )
+            SettingsCategoryCard(
+                title = "Penyimpanan",
+                summary = (if (tree != null) "Folder pilihan" else "Downloads/${SettingsStore.storageFolder}") +
+                    " · ukuran, cache, dan pembersihan",
+                icon = Icons.Outlined.Folder,
+                onClick = { onSection("storage") },
+            )
+            SettingsCategoryCard(
+                title = "Tampilan",
+                summary = "${themeModeLabel(themeMode)} · ${if (SettingsStore.artworkAccent) "aksen dari sampul" else "aksen tema"}",
+                icon = Icons.Outlined.Palette,
+                onClick = { onSection("display") },
+            )
+            SettingsCategoryCard(
+                title = "Pemutaran",
+                summary = "Lanjutkan otomatis setelah terputus" + if (Build.VERSION.SDK_INT >= 31) " · Bluetooth" else "",
+                icon = Icons.Outlined.PlayCircle,
+                onClick = { onSection("playback") },
+            )
+            SettingsCategoryCard(
+                title = "Riwayat",
+                summary = if (SettingsStore.historyAutoDays == 0) "Hapus otomatis nonaktif"
+                    else "Hapus otomatis setelah ${SettingsStore.historyAutoDays} hari",
+                icon = Icons.Outlined.History,
+                onClick = { onSection("history") },
+            )
+            SettingsCategoryCard(
+                title = "Media & alat",
+                summary = "Karaoke, cadangan lirik, dan pembaruan mesin",
+                icon = Icons.Outlined.Build,
+                onClick = { onSection("media") },
+            )
+            SettingsCategoryCard(
+                title = "Tentang",
+                summary = "Versi ${BuildConfig.VERSION_NAME} · privasi dan ketentuan",
+                icon = Icons.Outlined.Info,
+                onClick = { onSection("about") },
+            )
+        } else {
+            val (title, subtitle) = settingsSectionInfo(section)
+            PageHeading(title, subtitle)
+        }
+        if (section == "media") {
+            MediaToolsSettings(karaoke, player)
+        }
 
-        Panel(
-            title = "Riwayat unduhan",
+        if (section == "history") Panel(
             description = "Bersihkan catatan riwayat lama tanpa menghapus file media.",
         ) {
             OptionMenu(
@@ -156,7 +221,7 @@ fun SettingsScreen(
             )
         }
 
-        Panel(title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.playback_settings_title)) {
+        if (section == "playback") Panel {
             ToggleRow(
                 title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title),
                 description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_description),
@@ -166,8 +231,7 @@ fun SettingsScreen(
             )
         }
 
-        Panel(
-            title = "Tampilan",
+        if (section == "display") Panel(
             description = "Pilih mode tema yang paling nyaman untuk mata kamu.",
         ) {
             OptionMenu(
@@ -196,7 +260,7 @@ fun SettingsScreen(
             }
         }
 
-        Panel(title = "Penyimpanan") {
+        if (section == "storage") Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
@@ -337,7 +401,7 @@ fun SettingsScreen(
                 )
         }
 
-        Panel(
+        if (section == "downloads") Panel(
             title = "Notifikasi",
             description = "Izinkan notifikasi agar progres download tetap terlihat saat aplikasi ditutup.",
         ) {
@@ -353,7 +417,7 @@ fun SettingsScreen(
             )
         }
 
-        Panel(
+        if (section == "downloads") Panel(
             title = "Antrean",
             description = "Unduhan yang boleh berjalan bersamaan.",
         ) {
@@ -370,7 +434,7 @@ fun SettingsScreen(
             )
         }
 
-        Panel(
+        if (section == "downloads") Panel(
             title = "Smart Media",
             description = "Berlaku untuk download baru. Lirik dan sampul di panel download tetap dapat dipilih secara eksplisit.",
         ) {
@@ -386,11 +450,11 @@ fun SettingsScreen(
             Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
         }
 
-        EngineUpdatePanel(engineUpdateBlockedReason)
+        if (section == "media") EngineUpdatePanel(engineUpdateBlockedReason)
 
-        if (Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
+        if (section == "playback" && Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
 
-        Panel(title = "Privasi") {
+        if (section == "about") Panel(title = "Privasi") {
             Text(
                 "Riwayat dan antrean tersimpan di HP kamu. Download menggunakan koneksi perangkat langsung ke penyedia konten, tanpa server perantara.",
                 style = MaterialTheme.typography.bodySmall,
@@ -398,18 +462,78 @@ fun SettingsScreen(
             )
         }
 
-        Panel(title = "Tentang TubeFlow") {
+        if (section == "about") Panel {
             Text("Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
             Text("Simpan momen. Putar kapan saja.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        Text(
-            "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(4.dp))
+        if (section == null || section == "about") {
+            Text(
+                "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+private fun themeModeLabel(mode: String): String = when (mode) {
+    SettingsStore.MODE_LIGHT -> "Mode terang"
+    SettingsStore.MODE_DARK -> "Mode gelap"
+    else -> "Ikut sistem"
+}
+
+private fun settingsSectionInfo(section: String): Pair<String, String> = when (section) {
+    "downloads" -> "Unduhan" to "Antrean, notifikasi, dan Smart Media untuk unduhan baru."
+    "storage" -> "Penyimpanan" to "Tujuan file, pemakaian ruang, dan pembersihan."
+    "display" -> "Tampilan" to "Tema, aksen, dan warna sistem."
+    "playback" -> "Pemutaran" to "Perilaku saat pemutaran terputus dan sambungan Bluetooth."
+    "history" -> "Riwayat" to "Batas umur catatan unduhan; file media tidak ikut dihapus."
+    "media" -> "Media & alat" to "Karaoke, cadangan lirik, dan mesin media."
+    else -> "Tentang TubeFlow" to "Versi, privasi, dan ketentuan pemakaian."
+}
+
+/** Satu baris kategori: ikon, judul, ringkasan nilai aktif, dan tanda buka. */
+@Composable
+private fun SettingsCategoryCard(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    SectionCard(
+        Modifier.fillMaxWidth().clickable(onClickLabel = "Buka $title", onClick = onClick),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                Icons.Outlined.ChevronRight,
+                null,
+                Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

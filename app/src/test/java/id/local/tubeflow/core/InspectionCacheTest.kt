@@ -24,6 +24,7 @@ class InspectionCacheTest {
         sourceId = "abc",
         extractor = "Youtube",
         artistEvidence = "metadata_artist",
+        resolutions = listOf(1080, 720, 480),
     )
 
     @Test
