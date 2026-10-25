@@ -62,7 +62,6 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.FastRewind
-import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -72,10 +71,7 @@ import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.Replay
-import androidx.compose.material.icons.outlined.Replay10
 import androidx.compose.material.icons.outlined.ScreenLockLandscape
 import androidx.compose.material.icons.outlined.ScreenLockPortrait
 import androidx.compose.material.icons.outlined.ScreenRotation
@@ -474,16 +470,27 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    PlayerTopBar(
-                        state = state,
-                        supportsPip = supportsPip,
-                        onClose = video::close,
-                        onEnterPip = ::enterPip,
-                        orientation = orientation,
-                        onRotate = { orientation = orientation.next() },
-                        onMore = { sheet = VideoSheet.MORE },
-                        modifier = Modifier.align(Alignment.TopCenter),
-                    )
+                    // Kontrol atas hanya berisi navigasi keluar/antrean/opsi; pengaturan cepat
+                    // menjadi deretan ikon tanpa label tepat di bawahnya, terpisah dari tombol putar.
+                    Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+                        PlayerTopBar(
+                            state = state,
+                            onClose = video::close,
+                            onQueue = { sheet = VideoSheet.QUEUE },
+                            onMore = { sheet = VideoSheet.MORE },
+                        )
+                        QuickSettingsBar(
+                            state = state,
+                            onSpeed = { video.cycleSpeed(); touch() },
+                            onSubtitles = { video.cycleSubtitle(); touch() },
+                            onEqualizer = { video.cycleEqualizer(); touch() },
+                            onAudioEffect = { video.cycleAudioEffect(); touch() },
+                            onEnhance = { video.cycleEnhance(); touch() },
+                            onDecoder = { video.cycleDecoderMode(); touch() },
+                            onScreenshot = ::takeScreenshot,
+                            onDisplay = { video.cycleAspect(); touch() },
+                        )
+                    }
                     if (!state.playing && !state.buffering && state.error == null) {
                         FilledIconButton(
                             onClick = {
@@ -513,19 +520,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                             touch()
                         },
                         onToggle = { video.togglePlay(); touch() },
-                        onSeekBy = { video.seekBy(it); touch() },
                         onPrevious = { video.previous(); touch() },
                         onNext = { video.next(); touch() },
-                        onSpeed = { video.cycleSpeed(); touch() },
-                        onSubtitles = { video.cycleSubtitle(); touch() },
-                        onDisplay = { video.cycleAspect(); touch() },
-                        onRepeat = { video.cycleRepeat(); touch() },
-                        onEqualizer = { video.cycleEqualizer(); touch() },
-                        onAudioEffect = { video.cycleAudioEffect(); touch() },
-                        onEnhance = { video.cycleEnhance(); touch() },
-                        onDecoder = { video.cycleDecoderMode(); touch() },
-                        onScreenshot = ::takeScreenshot,
-                        onQueue = { sheet = VideoSheet.QUEUE },
+                        supportsPip = supportsPip,
+                        orientation = orientation,
+                        onEnterPip = ::enterPip,
+                        onRotate = { orientation = orientation.next() },
                         onLock = { controlsLocked = true },
                         isLandscape = landscape,
                         modifier = Modifier.align(Alignment.BottomCenter),
@@ -761,11 +761,8 @@ private fun externalSubtitle(context: Context, uri: Uri): VideoSubtitle? {
 @Composable
 private fun PlayerTopBar(
     state: VideoPlayerViewModel.State,
-    supportsPip: Boolean,
-    orientation: VideoOrientation,
     onClose: () -> Unit,
-    onEnterPip: () -> Unit,
-    onRotate: () -> Unit,
+    onQueue: () -> Unit,
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -801,24 +798,12 @@ private fun PlayerTopBar(
                 )
             }
         }
-        if (supportsPip) {
-            IconButton(
-                onClick = onEnterPip,
-                modifier = Modifier.size(44.dp),
-                colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
-            ) {
-                Icon(Icons.Outlined.PictureInPictureAlt, "Putar di jendela kecil")
-            }
-        }
         IconButton(
-            onClick = onRotate,
+            onClick = onQueue,
             modifier = Modifier.size(44.dp),
             colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
         ) {
-            Icon(
-                orientation.icon,
-                "Orientasi ${orientation.label}. Ketuk untuk ${orientation.next().label.lowercase()}",
-            )
+            Icon(Icons.AutoMirrored.Outlined.PlaylistPlay, "Antrean video")
         }
         IconButton(
             onClick = onMore,
@@ -828,7 +813,9 @@ private fun PlayerTopBar(
             Icon(Icons.Outlined.MoreVert, "Opsi pemutar")
         }
     }
-}@OptIn(ExperimentalMaterial3Api::class)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerBottomBar(
     state: VideoPlayerViewModel.State,
@@ -836,26 +823,18 @@ private fun PlayerBottomBar(
     onScrub: (Float) -> Unit,
     onScrubFinished: () -> Unit,
     onToggle: () -> Unit,
-    onSeekBy: (Long) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onSpeed: () -> Unit,
-    onSubtitles: () -> Unit,
-    onDisplay: () -> Unit,
-    onRepeat: () -> Unit,
-    onEqualizer: () -> Unit,
-    onAudioEffect: () -> Unit,
-    onEnhance: () -> Unit,
-    onDecoder: () -> Unit,
-    onScreenshot: () -> Unit,
-    onQueue: () -> Unit,
+    supportsPip: Boolean,
+    orientation: VideoOrientation,
+    onEnterPip: () -> Unit,
+    onRotate: () -> Unit,
     onLock: () -> Unit,
     isLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val duration = state.durationMs.coerceAtLeast(1)
     val shownPosition = scrub?.toLong() ?: state.positionMs
-    val subtitlesActive = state.textTracks.isNotEmpty() && !state.subtitlesDisabled
     Column(
         modifier
             .fillMaxWidth()
@@ -863,12 +842,17 @@ private fun PlayerBottomBar(
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
             .padding(horizontal = if (isLandscape) 18.dp else 12.dp, vertical = 4.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Waktu kiri/kanan mengapit track dengan lebar sama supaya progres tetap seimbang.
+        Row(
+            Modifier.fillMaxWidth().height(34.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 VideoPlayback.timeLabel(shownPosition),
                 color = PlayerContent,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.width(if (isLandscape) 54.dp else 46.dp),
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(52.dp),
             )
             Slider(
                 value = (scrub ?: state.positionMs.toFloat()).coerceIn(0f, duration.toFloat()),
@@ -876,9 +860,9 @@ private fun PlayerBottomBar(
                 onValueChangeFinished = onScrubFinished,
                 valueRange = 0f..duration.toFloat(),
                 enabled = state.durationMs > 0,
-                modifier = Modifier.weight(1f).height(28.dp),
+                modifier = Modifier.weight(1f).height(32.dp),
                 thumb = {
-                    Box(Modifier.size(10.dp).background(PlayerContent, CircleShape))
+                    Box(Modifier.size(9.dp).background(PlayerContent, CircleShape))
                 },
                 track = { sliderState ->
                     val range = sliderState.valueRange.endInclusive - sliderState.valueRange.start
@@ -888,14 +872,14 @@ private fun PlayerBottomBar(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
+                            .height(2.dp)
                             .clip(CircleShape)
                             .background(PlayerContent.copy(alpha = 0.28f)),
                     ) {
                         Box(
                             Modifier
                                 .fillMaxWidth(fraction)
-                                .height(3.dp)
+                                .height(2.dp)
                                 .clip(CircleShape)
                                 .background(PlayerContent),
                         )
@@ -913,122 +897,150 @@ private fun PlayerBottomBar(
             Text(
                 if (state.durationMs > 0) VideoPlayback.timeLabel(state.durationMs) else "--:--",
                 color = PlayerMuted,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(if (isLandscape) 54.dp else 46.dp),
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(52.dp),
             )
         }
-        // Pengaturan cepat berada DI ATAS tombol navigasi putar agar tidak menumpuk di bawah
-        // kontrol utama. Semua tombol adalah siklus satu ketuk; pilihan detail tetap tersedia
-        // lewat lembar "Opsi pemutar" di kanan atas.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(top = 2.dp, bottom = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Navigasi putar di tengah; kunci di kiri dan PiP/orientasi di kanan, seperti pemutar
+        // video biasa. Tidak ada chip pengaturan yang menumpuk di baris ini.
+        Box(
+            Modifier.fillMaxWidth().height(if (isLandscape) 52.dp else 58.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            QuickChip(
-                icon = Icons.Outlined.Speed,
-                text = VideoPlayback.speedLabel(state.speed),
-                description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
-                active = abs(state.speed - 1f) > 0.001f,
-                onClick = onSpeed,
-            )
-            QuickChip(
-                icon = Icons.Outlined.ClosedCaption,
-                text = subtitleChipLabel(state),
-                description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
-                active = subtitlesActive,
-                onClick = onSubtitles,
-            )
-            QuickChip(
-                icon = Icons.Outlined.GraphicEq,
-                text = "EQ ${state.equalizer.shortLabel}",
-                description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
-                active = state.equalizer != VideoEqualizer.OFF,
-                onClick = onEqualizer,
-            )
-            QuickChip(
-                icon = Icons.Outlined.SurroundSound,
-                text = "FX ${state.audioEffect.shortLabel}",
-                description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
-                active = state.audioEffect != VideoAudioEffect.OFF,
-                onClick = onAudioEffect,
-            )
-            QuickChip(
-                icon = Icons.Outlined.AutoAwesome,
-                text = state.enhance.shortLabel,
-                description = "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
-                active = state.enhance != VideoEnhance.OFF,
-                onClick = onEnhance,
-            )
-            QuickChip(
-                icon = Icons.Outlined.AspectRatio,
-                text = state.aspect.label,
-                description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
-                active = state.aspect != VideoAspect.FIT,
-                onClick = onDisplay,
-            )
-            QuickChip(
-                icon = if (state.repeat == VideoRepeat.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
-                text = repeatSummary(state.repeat),
-                description = "Ulangi ${state.repeat.label}. Ketuk untuk berikutnya",
-                active = state.repeat != VideoRepeat.OFF,
-                onClick = onRepeat,
-            )
-            QuickChip(
-                icon = Icons.Outlined.Memory,
-                text = "Dek ${state.decoderMode.shortLabel}",
-                description = "Dekoder ${state.decoderMode.label}. Ketuk untuk berikutnya",
-                active = state.decoderMode != VideoDecoderMode.AUTO,
-                onClick = onDecoder,
-            )
-            QuickChip(
-                icon = Icons.Outlined.PhotoCamera,
-                text = "Foto",
-                description = "Ambil screenshot video",
-                active = false,
-                onClick = onScreenshot,
-            )
-            QuickChip(
-                icon = Icons.AutoMirrored.Outlined.PlaylistPlay,
-                text = "${state.index + 1}/${state.entries.size}",
-                description = "Buka antrean video",
-                active = false,
-                onClick = onQueue,
-            )
-            QuickChip(
-                icon = Icons.Outlined.Lock,
-                text = "Kunci",
-                description = "Kunci kontrol pemutar",
-                active = false,
+            IconButton(
                 onClick = onLock,
+                modifier = Modifier.align(Alignment.CenterStart).size(44.dp),
+                colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
+            ) {
+                Icon(Icons.Outlined.Lock, "Kunci kontrol pemutar")
+            }
+            TransportControls(
+                state = state,
+                onToggle = onToggle,
+                onPrevious = onPrevious,
+                onNext = onNext,
+                compact = isLandscape,
+                modifier = Modifier.align(Alignment.Center),
             )
+            Row(
+                Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (supportsPip) {
+                    IconButton(
+                        onClick = onEnterPip,
+                        modifier = Modifier.size(44.dp),
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
+                    ) {
+                        Icon(Icons.Outlined.PictureInPictureAlt, "Putar di jendela kecil")
+                    }
+                }
+                IconButton(
+                    onClick = onRotate,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
+                ) {
+                    Icon(
+                        orientation.icon,
+                        "Orientasi ${orientation.label}. Ketuk untuk ${orientation.next().label.lowercase()}",
+                    )
+                }
+            }
         }
-        TransportControls(
-            state = state,
-            onToggle = onToggle,
-            onSeekBy = onSeekBy,
-            onPrevious = onPrevious,
-            onNext = onNext,
-            compact = isLandscape,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+    }
+}
+
+/** Deretan pengaturan cepat: ikon saja, tanpa caption, dipisah dari tombol navigasi putar. */
+@Composable
+private fun QuickSettingsBar(
+    state: VideoPlayerViewModel.State,
+    onSpeed: () -> Unit,
+    onSubtitles: () -> Unit,
+    onEqualizer: () -> Unit,
+    onAudioEffect: () -> Unit,
+    onEnhance: () -> Unit,
+    onDecoder: () -> Unit,
+    onScreenshot: () -> Unit,
+    onDisplay: () -> Unit,
+) {
+    val subtitlesActive = state.textTracks.isNotEmpty() && !state.subtitlesDisabled
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        QuickIcon(
+            icon = Icons.Outlined.Speed,
+            description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
+            active = abs(state.speed - 1f) > 0.001f,
+            onClick = onSpeed,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.ClosedCaption,
+            description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
+            active = subtitlesActive,
+            onClick = onSubtitles,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.GraphicEq,
+            description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
+            active = state.equalizer != VideoEqualizer.OFF,
+            onClick = onEqualizer,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.SurroundSound,
+            description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
+            active = state.audioEffect != VideoAudioEffect.OFF,
+            onClick = onAudioEffect,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.AutoAwesome,
+            description = "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
+            active = state.enhance != VideoEnhance.OFF,
+            onClick = onEnhance,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.Memory,
+            description = "Dekoder ${state.decoderMode.label}. Ketuk untuk berikutnya",
+            active = state.decoderMode != VideoDecoderMode.AUTO,
+            onClick = onDecoder,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.PhotoCamera,
+            description = "Ambil screenshot video",
+            active = false,
+            onClick = onScreenshot,
+        )
+        QuickIcon(
+            icon = Icons.Outlined.AspectRatio,
+            description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
+            active = state.aspect != VideoAspect.FIT,
+            onClick = onDisplay,
         )
     }
 }
 
-private fun subtitleChipLabel(state: VideoPlayerViewModel.State): String = when {
-    state.subtitlesDisabled -> "CC Mati"
-    state.textTracks.isEmpty() -> "CC —"
-    else -> {
-        val selected = state.textTracks.firstOrNull { it.selected }
-        val name = selected?.language?.takeIf { it.isNotBlank() }
-            ?.let(VideoPlayback::languageName)
-            ?.takeIf { it.isNotBlank() }
-            ?: selected?.label
-            ?: "Otomatis"
-        "CC ${name.take(10)}"
+@Composable
+private fun QuickIcon(
+    icon: ImageVector,
+    description: String,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    Surface(
+        modifier = Modifier.size(40.dp).clickable(onClickLabel = description, onClick = onClick),
+        shape = CircleShape,
+        color = if (active) accent.copy(alpha = 0.24f) else Color.Black.copy(alpha = 0.42f),
+        contentColor = if (active) accent else PlayerContent,
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, description, Modifier.size(20.dp))
+        }
     }
 }
 
@@ -1038,17 +1050,10 @@ private fun subtitleChipDescription(state: VideoPlayerViewModel.State): String =
     else -> state.textTracks.firstOrNull { it.selected }?.label ?: "otomatis"
 }
 
-private fun repeatSummary(repeat: VideoRepeat): String = when (repeat) {
-    VideoRepeat.OFF -> "Mati"
-    VideoRepeat.ALL -> "Semua"
-    VideoRepeat.ONE -> "Satu"
-}
-
 @Composable
 private fun TransportControls(
     state: VideoPlayerViewModel.State,
     onToggle: () -> Unit,
-    onSeekBy: (Long) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1058,7 +1063,7 @@ private fun TransportControls(
     val playSize = if (compact) 50.dp else 56.dp
     Row(
         modifier,
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
@@ -1071,13 +1076,6 @@ private fun TransportControls(
             ),
         ) {
             Icon(Icons.Outlined.SkipPrevious, "Video sebelumnya")
-        }
-        IconButton(
-            onClick = { onSeekBy(-VideoPlayback.SEEK_STEP_MS) },
-            modifier = Modifier.size(buttonSize),
-            colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
-        ) {
-            Icon(Icons.Outlined.Replay10, "Mundur 10 detik")
         }
         FilledIconButton(
             onClick = onToggle,
@@ -1106,13 +1104,6 @@ private fun TransportControls(
             }
         }
         IconButton(
-            onClick = { onSeekBy(VideoPlayback.SEEK_STEP_MS) },
-            modifier = Modifier.size(buttonSize),
-            colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
-        ) {
-            Icon(Icons.Outlined.Forward10, "Maju 10 detik")
-        }
-        IconButton(
             onClick = onNext,
             enabled = state.hasNext,
             modifier = Modifier.size(buttonSize),
@@ -1122,36 +1113,6 @@ private fun TransportControls(
             ),
         ) {
             Icon(Icons.Outlined.SkipNext, "Video berikutnya")
-        }
-    }
-}
-
-@Composable
-private fun QuickChip(
-    icon: ImageVector,
-    text: String,
-    description: String,
-    active: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.height(36.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
-        color = Color.White.copy(alpha = if (active) 0.20f else 0.10f),
-        contentColor = if (active) PlayerContent else PlayerContent.copy(alpha = 0.82f),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 10.dp).height(36.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Icon(icon, description, Modifier.size(16.dp))
-            Text(
-                text,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-            )
         }
     }
 }

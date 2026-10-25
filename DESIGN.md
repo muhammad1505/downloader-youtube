@@ -270,6 +270,44 @@ Acak/Ulangi/Karaoke/Antrean menetap di dasar kolom kanan dalam satu baris empat
 slot agar tidak perlu digulir. Portrait tetap satu kolom bergulir dengan pager
 sampul/lirik dan indikator mengambang.
 
+## Pemutar video (1.1.39)
+
+Pemutar video memakai tiga lapis kontrol yang tidak saling menumpuk:
+
+- **Top bar:** back, judul/posisi antrean, ikon antrean, dan ⋮ Opsi pemutar.
+- **Pengaturan cepat:** satu baris ikon bulat tanpa caption di bawah top bar
+  (kecepatan, subtitle, EQ, efek audio, Smart Enhance, dekoder, screenshot,
+  rasio). Status aktif ditandai warna aksen, bukan teks.
+- **Bar bawah:** waktu kiri/kanan dengan lebar sama, track progres tipis dan
+  thumb titik; kunci di kiri, previous/play/next di tengah, PiP dan orientasi di
+  kanan. Pengaturan detail (termasuk Ulangi dan antrean) tetap di lembar Opsi.
+
+```text
+←  player-h264                 ☰   ⋮
+(⏱) (CC) (EQ) (FX) (✦) (▣) (📷) (⤢)
+
+          video / subtitle
+
+0:11 ──────────●──────── 0:20
+🔒        ⏮   ▶   ⏭        ⧉   ⤢
+```
+
+Tombol ±10 detik tidak ditampilkan agar transport tetap lapang; seek memakai
+track, double-tap, dan gestur. Semua ikon tetap memiliki nama TalkBack yang
+menyebut nilai aktifnya.
+
+### Kebijakan dekoder (1.1.40)
+
+Mode **Otomatis** membuka dengan dekoder perangkat lalu, bila gagal, membuka
+ulang sekali dengan FFmpeg/dav1d. Kegagalan yang memicu fallback: decoder init,
+query decoder, format melebihi kapasitas, decoding gagal, dan **timeout** —
+timeout inilah yang muncul pada AV1 10-bit/AC3 setelah rotasi atau resume, saat
+MediaCodec berhenti melapor. Mode **Perangkat** adalah pilihan manual dan tidak
+diganti diam-diam; mode **Software** selalu memakai FFmpeg/dav1d. Aturan ini ada
+di `VideoPlayback.shouldUseSoftwareFallback` supaya tidak bergantung pada state
+Compose, dan tombol **Coba lagi** tetap membuat ulang pemutar bila player sudah
+dilepas setelah kegagalan.
+
 ## Navigasi dan playlist (1.1.20)
 
 - Notifikasi musik memakai MediaStyle native dan MediaSession, bukan salinan mini

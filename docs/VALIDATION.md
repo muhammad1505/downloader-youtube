@@ -1,6 +1,58 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.38/code52 — 25 Oktober 2026
+## Status terbaru — 1.1.40/code54 — 25 Oktober 2026
+
+Rilis **1.1.40/code54** memperbaiki fallback dekoder setelah `ERROR_CODE_TIMEOUT`.
+Timeout renderer MediaCodec (gejala yang muncul pada AV1 10-bit/AC3 di perangkat
+uji setelah rotasi atau resume) kini dianggap kegagalan codec, sama seperti
+query decoder gagal dan format melebihi kapasitas, sehingga pemutaran otomatis
+dibuka ulang dengan dekoder software FFmpeg/dav1d. Fallback tetap hanya sekali
+dan **tidak menimpa pilihan manual mode Perangkat**; aturannya dipindah ke
+`VideoPlayback.shouldUseSoftwareFallback` agar bisa diuji tanpa Activity. Layar
+error mendapat pesan khusus timeout yang menyarankan **Coba lagi**, dan tombol itu
+tetap membuat ulang pemutar bila player sudah dilepas. **470 tes Kotlin**
+(0 gagal/error/skip), **98 tes Python** `OK` (27,233 detik), lint debug/release
+**0 error/3 warning** lama; `scripts/build_release.sh` lulus (8m59s). Signed
+ARM64 **76.264.926 byte**, SHA256
+`61c0c2d17a50edaa500f47c70a23c1f0b793a1cc2a99c34b95d769a629a6f844`; AAB
+**273.188.764 byte**, SHA256
+`5491bc474f9a52e3edfd7e4edd031403b2ba587ec92eda371dedfa4a3dda9d0f`. Audit APK
+262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB `jar verified`.
+Release terpasang update-r di Realme RMX1821 Android 10 (arm64, halaman 4 KB)
+dari 1.1.39/code53; `base.apk` identik (hash di atas). Di HP, klip
+**player-av1-10bit-ac3** (20 detik) diputar lalu diputar-ulang lanskap→portret→
+lanskap lewat kontrol orientasi aplikasi, diteruskan Home lalu dibuka kembali:
+pemutaran berlanjut dengan frame bergerak dan logcat bersih dari
+`PlaybackException`/`ERROR_CODE_TIMEOUT`. Batas pengujian ada di
+[uji perangkat](DEVICE_TEST.md#fallback-timeout-1140code54--25-oktober-2026).
+
+## Status sebelumnya — 1.1.39/code53 — 25 Oktober 2026
+
+Rilis **1.1.39/code53** merapikan kontrol pemutar video mengikuti pola MX Player.
+Pengaturan cepat (kecepatan, subtitle, EQ, efek audio, Smart Enhance, dekoder,
+screenshot, dan rasio) menjadi deretan **ikon bulat tanpa caption** di bawah top
+bar. Tombol putar dipisah ke bar bawah: kunci di kiri, previous/play/next di
+tengah, PiP dan orientasi di kanan. Bar progres memakai kolom waktu kiri/kanan
+sama lebar dengan thumb titik 9dp sehingga durasi selalu terlihat dan track
+seimbang. Antrean pindah ke ikon top bar; Ulangi tetap di lembar **Opsi pemutar**.
+Tombol ±10 detik dilepas dari bar transport agar tidak padat; seek tetap tersedia
+lewat slider, double-tap, dan gestur. **469 tes Kotlin** (0 gagal/error/skip),
+**98 tes Python** `OK` (38,079 detik), lint debug/release **0 error/3 warning**
+lama; `scripts/build_release.sh` lulus (7m33s). Signed ARM64 **76.264.790 byte**,
+SHA256 `9465fc12994dbc612f4a1573b7c7c2f0eb03e0af1fb9221610265989d11cef41`; AAB
+**273.188.639 byte**, SHA256
+`402bc2521a66a77f7d7cde87916497647d6843320450b0ea4fb9a88020a0c3a4`.
+Audit APK 262 ELF/13 kelas ZIP, zipalign 16 KB, signature v2, dan AAB
+`jarsigner` lulus. Release terpasang update-r di Realme RMX1821 Android 10
+(arm64, halaman 4 KB) dari 1.1.38/code52; `base.apk` identik. Di HP: 8 ikon
+pengaturan cepat muat satu baris tanpa teks; progres menampilkan **0:13 / 0:20**
+setelah seek dan titik berada tepat di track; kunci, buka kunci, antrean, dan
+rotasi lanskap/portret bekerja; tombol putar tidak lagi bercampur dengan chip
+pengaturan. Satu percobaan resume AV1 10-bit sempat menampilkan
+`ERROR_CODE_TIMEOUT`, lalu **Coba lagi** memulihkan pemutaran. Batas pengujian ada
+di [uji perangkat](DEVICE_TEST.md#kontrol-pemutar-ikon-1139code53--25-oktober-2026).
+
+## Status sebelumnya — 1.1.38/code52 — 25 Oktober 2026
 
 Rilis **1.1.38/code52** menata ulang Pengaturan dan Koleksi agar tidak menjadi
 satu daftar panjang. Pengaturan utama kini berisi **tujuh kategori** (Unduhan,

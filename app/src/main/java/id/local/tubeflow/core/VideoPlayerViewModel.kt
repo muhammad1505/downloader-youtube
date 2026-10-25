@@ -204,10 +204,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             // dekoder utama. Bila build software juga gagal, error akhir tetap ditampilkan.
             // Mode Perangkat adalah pilihan manual: jangan diam-diam menggantinya; pengguna
             // mendapat tombol "Coba dekoder software" di layar error.
-            if (VideoPlayback.isCodecFailure(error.errorCode) &&
-                _state.value.decoderMode != VideoDecoderMode.HARDWARE &&
-                !softwareFallbackUsed &&
-                entries.isNotEmpty()
+            if (VideoPlayback.shouldUseSoftwareFallback(
+                    errorCode = error.errorCode,
+                    mode = _state.value.decoderMode,
+                    alreadyTried = softwareFallbackUsed,
+                ) && entries.isNotEmpty()
             ) {
                 softwareFallbackUsed = true
                 fallbackJob?.cancel()
@@ -797,6 +798,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
         PlaybackException.ERROR_CODE_DECODING_FAILED ->
             "Format video atau audio ini tidak didukung pemutar di perangkat."
+        PlaybackException.ERROR_CODE_TIMEOUT ->
+            "Dekoder video melewati batas waktu. Coba lagi; TubeFlow akan memakai dekoder software bila perlu."
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
         PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ->
             "Berkas video rusak atau kontainernya tidak dikenali."

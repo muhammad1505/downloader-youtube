@@ -865,3 +865,84 @@ Di HP:
 - Subhalaman Pengaturan adalah state navigasi in-app (bukan deep link terpisah);
   Activity yang dibuat ulang memulihkan subhalaman, tetapi force-stop atau
   membuka ulang aplikasi kembali ke daftar kategori.
+
+## Kontrol pemutar ikon 1.1.39/code53 — 25 Oktober 2026
+
+Release arm64 **1.1.39/code53** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB; sertifikat `ebe3b40e…`, SHA256 `9465fc12…11cef41`,
+`base.apk` identik. Versi sebelumnya 1.1.38/code52. Tidak uninstall, clear data,
+atau reset database.
+
+Host: **469 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (38,079
+detik), lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh`
+lulus (7m33s). APK **76.264.790 byte**; AAB **273.188.639 byte**, SHA256
+`402bc252…a0c3a4`. Audit APK **262 ELF**, 13 kelas ZIP reflektif, zipalign
+16 KB, signature v2, dan AAB `jarsigner` lulus.
+
+Di HP:
+1. Portrait: top bar hanya back/judul/antrean/⋮; tepat di bawahnya delapan ikon
+   bulat (kecepatan, subtitle, EQ, efek audio, Smart Enhance, dekoder, screenshot,
+   rasio) tanpa caption. Semua muat satu baris pada lebar 720 px.
+2. Bar bawah terpisah: waktu **0:11 / 0:20** mengapit track, lalu kunci di kiri,
+   previous/play/next di tengah, PiP dan orientasi di kanan. Tidak ada chip teks
+   yang menumpuk di dekat tombol putar.
+3. Mengetuk track di **0:13** memindahkan thumb ke posisi tersebut dan kedua
+   waktu tetap terlihat; tombol play berubah jeda/putar sesuai status.
+4. Ikon kecepatan mengubah nilai menjadi **1,25×** (dibaca di lembar Opsi),
+   ikon EQ/efek audio mengubah status aktif, dan warna hijau menandai pengaturan
+   yang hidup tanpa menambah label.
+5. Ikon antrean di top bar membuka daftar tiga video; ikon kunci menyembunyikan
+   seluruh kontrol dan menyisakan pill **Buka kunci**; orientasi berpindah ke
+   lanskap dan kembali ke portrait.
+6. Landscape: baris ikon tetap satu baris, progres dan transport berada di bawah
+   tanpa terpotong; subtitle tampil di area video, bukan menimpa tombol.
+7. Tidak ada `FATAL EXCEPTION` atau ANR. Satu percobaan setelah rotasi/resume
+   AV1 10-bit menampilkan `ERROR_CODE_TIMEOUT`; **Coba lagi** memulai ulang video
+   pada posisi tersimpan dan pemutaran berjalan kembali.
+
+**Batas yang tersisa:**
+- Tombol ±10 detik sengaja dilepas dari bar transport; double-tap dan gestur
+  belum diulang pada rilis ini, sedangkan seek lewat slider sudah lulus.
+- Timeout AV1 10-bit belum direproduksi ulang secara terkontrol; belum jelas
+  apakah terkait rotasi, resume, atau dekoder perangkat. Perlu uji terpisah
+  sebelum dianggap regresi pemutar.
+- Kontrol tanpa caption mengandalkan ikon dan TalkBack; uji TalkBack, font besar,
+  dan layar sempit belum dilakukan.
+- PiP belum diuji ulang pada rilis ini; tombolnya tetap memakai jalur 1.1.35.
+
+## Fallback timeout 1.1.40/code54 — 25 Oktober 2026
+
+Release arm64 **1.1.40/code54** terpasang update-r pada Realme RMX1821 Android
+10/API29/arm64/4 KB dari 1.1.39/code53; sertifikat `ebe3b40e…`, SHA256
+`61c0c2d1…a6f844`, `base.apk` identik. Tidak uninstall, clear data, atau reset
+database.
+
+Host: **470 tes Kotlin** (0 gagal/error/skip), **98 tes Python** `OK` (27,233
+detik), lint debug/release **0 error/3 warning** lama; `scripts/build_release.sh`
+lulus (8m59s). APK **76.264.926 byte**; AAB **273.188.764 byte**, SHA256
+`5491bc47…3dda9d0f`. Audit APK **262 ELF**, 13 kelas ZIP reflektif, zipalign
+16 KB, signature v2, dan AAB `jar verified`.
+
+Klip uji: **player-av1-10bit-ac3**, 20 detik, AV1 Main 10-bit + AC3; dekoder
+perangkat menolak profil 10-bit (`NoSupport [codec.profileLevel,
+av01.0.00M.10, video/av01]`), jadi jalur yang aktif adalah dav1d software.
+
+Di HP:
+1. Klip diputar penuh (lanskap, 0:00→0:11 lalu jeda) tanpa error.
+2. Tombol orientasi di bar bawah: lanskap→portret. Video tetap tampil dan waktu
+   berjalan **00:00:11.960** pada frame uji; tidak ada `ERROR_CODE_TIMEOUT` maupun
+   `PlaybackException` di logcat. Portret→lanskap juga mulus.
+3. Home lalu buka kembali aplikasi: pemutar melanjutkan klip yang sama dalam
+   portret; setelah play, frame uji bergerak ke **00:00:07.000** dan logcat tetap
+   bersih.
+4. Rotasi lewat `adb shell settings put system user_rotation` ditolak
+   (`WRITE_SETTINGS` tidak diberikan ke shell), jadi rotasi diuji lewat tombol
+   orientasi aplikasi — jalur yang sama dengan pemakaian nyata.
+
+**Batas yang tersisa:**
+- `ERROR_CODE_TIMEOUT` asli belum berhasil dipicu ulang secara deterministik;
+  fallback software diverifikasi lewat unit test `isCodecFailure` dan
+  `shouldUseSoftwareFallback`, lalu klip yang sama diuji setelah rotasi/resume.
+- Mode **Perangkat** sengaja tidak ikut fallback otomatis; pada klip AV1 10-bit
+  ini pengguna harus memilih dekoder software sendiri.
+- PiP, subtitle, dan TalkBack belum diulang pada rilis ini.

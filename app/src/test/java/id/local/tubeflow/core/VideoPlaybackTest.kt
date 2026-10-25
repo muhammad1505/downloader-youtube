@@ -262,11 +262,56 @@ class VideoPlaybackTest {
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FAILED))
+        // Renderer MediaCodec yang macet pada berkas lokal memakai TIMEOUT; coba software.
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_TIMEOUT))
         assertFalse(
             "Masalah file/jaringan tidak perlu membuka ulang pemutar",
             VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
         )
         assertFalse(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_UNSPECIFIED))
+    }
+
+    @Test
+    fun automaticSoftwareFallbackRunsOnceAndRespectsManualHardwareMode() {
+        // Timeout AV1 10-bit/AC3 pada perangkat uji memakai jalur ini.
+        assertTrue(
+            VideoPlayback.shouldUseSoftwareFallback(
+                PlaybackException.ERROR_CODE_TIMEOUT,
+                VideoDecoderMode.AUTO,
+                alreadyTried = false,
+            ),
+        )
+        assertTrue(
+            VideoPlayback.shouldUseSoftwareFallback(
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                VideoDecoderMode.SOFTWARE,
+                alreadyTried = false,
+            ),
+        )
+        assertFalse(
+            "Fallback software tidak boleh berulang tanpa batas",
+            VideoPlayback.shouldUseSoftwareFallback(
+                PlaybackException.ERROR_CODE_TIMEOUT,
+                VideoDecoderMode.AUTO,
+                alreadyTried = true,
+            ),
+        )
+        assertFalse(
+            "Mode Perangkat adalah pilihan manual dan tidak boleh diganti diam-diam",
+            VideoPlayback.shouldUseSoftwareFallback(
+                PlaybackException.ERROR_CODE_TIMEOUT,
+                VideoDecoderMode.HARDWARE,
+                alreadyTried = false,
+            ),
+        )
+        assertFalse(
+            "Error I/O bukan kegagalan dekoder",
+            VideoPlayback.shouldUseSoftwareFallback(
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                VideoDecoderMode.AUTO,
+                alreadyTried = false,
+            ),
+        )
     }
 
     @Test

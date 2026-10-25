@@ -256,17 +256,26 @@ object VideoPlayback {
     }
 
     /**
-     * Kegagalan codec/decoder yang masih mungkin diselamatkan dekoder software. Query decoder
-     * dan format yang melebihi kapasitas sama-sama berarti dekoder perangkat tidak bisa dipakai.
+     * Kegagalan yang layak dicoba ulang dengan dekoder software: codec/query/performa
+     * perangkat dan TIMEOUT renderer. Pada berkas lokal, MediaCodec yang macet memakai
+     * TIMEOUT; percobaan ulang dengan FFmpeg/dav1d lebih berguna daripada langsung error.
      */
     fun isCodecFailure(errorCode: Int): Boolean = when (errorCode) {
         PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
         PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
         PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
-        PlaybackException.ERROR_CODE_DECODING_FAILED -> true
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        PlaybackException.ERROR_CODE_TIMEOUT -> true
         else -> false
     }
+
+    /** Fallback otomatis hanya sekali dan tidak menimpa pilihan manual "Perangkat". */
+    fun shouldUseSoftwareFallback(
+        errorCode: Int,
+        mode: VideoDecoderMode,
+        alreadyTried: Boolean,
+    ): Boolean = !alreadyTried && mode != VideoDecoderMode.HARDWARE && isCodecFailure(errorCode)
 
     /** Kecepatan berikutnya untuk tombol cepat; urutan tetap dan berputar. */
     fun nextSpeed(current: Float): Float {
