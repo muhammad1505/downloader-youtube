@@ -37,10 +37,7 @@ object SourceMetadata {
         return credits.distinctBy { creditWords(it.first) to normalized(it.second) }.singleOrNull()
     }
 
-    /** Tangga label "p" yang lazim dipakai pemutar dan situs video. */
-    private val standardTiers = listOf(144, 240, 360, 480, 720, 1080, 1440, 2160, 4320)
-
-    /** Label "p" dari `format_note` (mis. "1080p60"), atau tangga standar dari sisi pendek video. */
+    /** Label sumber, atau sisi pendek sebenarnya ketika sumber tidak menyebut label. */
     private val tierNote = Regex("""^(\d+)p""")
     private fun tierOf(format: JSONObject, height: Int): Int {
         tierNote.find(format.optString("format_note"))?.groupValues?.getOrNull(1)?.toIntOrNull()
@@ -48,11 +45,7 @@ object SourceMetadata {
         val width = format.optInt("width", 0)
         // Label "p" memakai sisi pendek, jadi video vertikal (1080×1920) tetap 1080p. Tanpa width
         // tidak ada dasar untuk menebak label, jadi tinggi apa adanya yang dipakai.
-        return when {
-            width in 1 until height -> standardTiers.firstOrNull { it >= width } ?: width
-            width > height -> standardTiers.firstOrNull { it >= height } ?: height
-            else -> height
-        }
+        return if (width > 0) minOf(width, height) else height
     }
 
     /**
@@ -72,14 +65,8 @@ object SourceMetadata {
         }.orEmpty()
         // Sebagian extractor (mis. Instagram) hanya mengisi height di level info, bukan per format.
         val rootHeight = json.optInt("height", 0)
-        val rootWidth = json.optInt("width", 0)
         val resolved = if (found.isEmpty() && rootHeight > 0) {
-            val tier = when {
-                rootWidth in 1 until rootHeight -> standardTiers.firstOrNull { it >= rootWidth } ?: rootWidth
-                rootWidth > rootHeight -> standardTiers.firstOrNull { it >= rootHeight } ?: rootHeight
-                else -> rootHeight
-            }
-            listOf(VideoResolution(rootHeight, tier))
+            listOf(VideoResolution(rootHeight, tierOf(json, rootHeight)))
         } else {
             found
         }

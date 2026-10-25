@@ -983,3 +983,17 @@ Di HP:
   sesi ini (koordinat ketuk sering meleset ke aplikasi lain); perilaku geser
   terbukti benar, dan ketuk memakai pemetaan yang sama.
 - PiP, pemilihan subtitle, TalkBack, font besar, dan lanskap belum diulang.
+
+## Tier resolusi dan preset 1.1.42/code56 — 25 Oktober 2026
+
+Release signed diperbarui di Realme RMX1821 Android 10/API29, ARM64, halaman
+4 KB; hash `base.apk` identik dengan APK lokal:
+`8cbf6c07f4821f1d11f8a0b8d7c74cde2494ee9112818c4bf91b65e359e66daa`.
+Inspeksi link IPANK – MUTIARA, pilih preset 1080p MP4: chip tercentang,
+ringkasan 1080p · MP4, dan pengaturan lanjutan Resolusi: 1080p. Rotasi
+lanskap→potret mempertahankan centang dan ringkasan. Orientasi awal dipulihkan.
+Tidak memulai download, menghapus media atau mereset data pengguna.
+
+Kasus vertikal/540p dan pemetaan `[height<=?818]` diuji di host. Download penuh,
+playback, LRCLIB, matriks aksesibilitas dan runtime 16 KB belum diulang.
+[Bukti dan batas rinci](RESOLUTION_FIXES_1_1_42.md).

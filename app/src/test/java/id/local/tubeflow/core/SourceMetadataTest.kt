@@ -194,6 +194,19 @@ class SourceMetadataTest {
         assertEquals(listOf(VideoResolution(1920, 1080)), meta.resolutions)
     }
 
+    @Test fun nonstandardResolutionWithoutSourceLabelIsNotRoundedUp() {
+        val formats = org.json.JSONArray()
+            .put(JSONObject().put("vcodec", "avc1").put("width", 960).put("height", 540))
+        val meta = SourceMetadata.parse(JSONObject().put("formats", formats), "https://www.tiktok.com/@test/video/1")
+        assertEquals(listOf(VideoResolution(540, 540)), meta.resolutions)
+    }
+
+    @Test fun rootDimensionsUseTheActualShortSideWithoutRoundingUp() {
+        val meta = SourceMetadata.parse(JSONObject().put("width", 540).put("height", 960),
+            "https://www.instagram.com/reel/test/")
+        assertEquals(listOf(VideoResolution(960, 540)), meta.resolutions)
+    }
+
     @Test fun missingFormatsMeansNoReportedResolutions() {
         val meta = SourceMetadata.parse(JSONObject().put("title", "Audio"), "https://soundcloud.com/a/b")
         assertEquals(emptyList<VideoResolution>(), meta.resolutions)

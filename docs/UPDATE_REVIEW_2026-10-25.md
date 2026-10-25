@@ -1,5 +1,12 @@
 # Pemeriksaan update TubeFlow — 25 Oktober 2026
 
+## Tindak lanjut
+
+Snapshot 1.1.41 di bawah sudah disimpan dan dipush sebagai `0b2665f`.
+Tiga temuan R1/R2/R3 ditangani di **1.1.42/code56** dengan enam regresi baru;
+lihat [hasil implementasi dan verifikasi](RESOLUTION_FIXES_1_1_42.md).
+Risiko tambahan geometri Scrubber tetap memerlukan uji runtime tersendiri.
+
 ## Snapshot dan cakupan
 
 Git main/origin/main berada pada `41ce217` (1.1.40). Working tree sudah
@@ -106,4 +113,4 @@ menjelaskan eksekusi ulang berdasarkan perubahan key.
 
 Scrubber.kt harus ikut disimpan dalam commit perubahan player; commit tracked
 files saja akan meninggalkan referensi Scrubber tanpa definisinya pada checkout
-lain. Temuan ini laporan review, belum berstatus diperbaiki.
+lain. Status saat review dibuat: belum diperbaiki. Tindak lanjut terbaru ada di atas.

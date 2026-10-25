@@ -1,6 +1,22 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.41/code55 — 25 Oktober 2026
+## Status terbaru — 1.1.42/code56 — 25 Oktober 2026
+
+Tiga temuan review 1.1.41 diperbaiki: pemilihan tier tidak lagi tertukar dengan
+tinggi piksel, resolusi tanpa label sumber tidak dibulatkan naik, dan preset
+1080p tetap dipilih untuk video ultrawide. Cache inspeksi menjadi schema 3;
+Room tetap 10, tanpa migrasi/dependensi/izin baru. **479 tes Kotlin** lulus
+(0 gagal/error/skip); **98 tes Python** lulus (24,689 detik). Lint debug/release
+**0 error/3 warning** lama. Build debug dan release signed lulus (13m 1s).
+ARM64 **76.274.746 byte**, SHA256
+`8cbf6c07f4821f1d11f8a0b8d7c74cde2494ee9112818c4bf91b65e359e66daa`.
+Audit APK: 262 ELF/13 kelas ZIP tanpa kegagalan, signature produksi dan
+zipalign 16 KB lulus. Terpasang update di HP Android 10 dengan hash identik;
+preset/menu/ringkasan 1080p dan persistensi setelah rotasi lulus. AAB tidak
+dibangun ulang. Rincian dan cakupan perangkat:
+[laporan perbaikan](RESOLUTION_FIXES_1_1_42.md).
+
+## Status sebelumnya — 1.1.41/code55 — 25 Oktober 2026
 
 Rilis **1.1.41/code55** merapikan progres dan label resolusi. Pemutar video dan
 audio sekarang memakai satu `Scrubber` bersama: track tipis membulat, bagian

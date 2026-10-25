@@ -21,8 +21,8 @@ data class DownloadOptions(
 )
 /**
  * Satu resolusi yang benar-benar disediakan sumber. [height] adalah tinggi piksel nyata untuk filter
- * `height<=?` yt-dlp, sedangkan [tier] adalah label "p" standar yang dikenal pengguna — video
- * 1920×818 (2.35:1) tetap tampil dan dipilih sebagai 1080p, bukan 818p.
+ * `height<=?` yt-dlp, sedangkan [tier] adalah label "p" dari sumber atau sisi pendek aktual sebagai fallback.
+ * Video 1920×818 dengan label sumber 1080p tetap tampil dan dipilih sebagai 1080p.
  */
 data class VideoResolution(val height: Int, val tier: Int)
 
@@ -327,18 +327,15 @@ object Selection {
   if (requested <= 0 || available.isEmpty()) return requested
   return available.filter { it <= requested }.maxOrNull() ?: 0
  }
- /**
-  * Tinggi piksel untuk tier yang diminta (mis. preset 1080p). Label tier dipakai untuk tampilan,
-  * tetapi yt-dlp memfilter dengan tinggi nyata, jadi tier 1080 pada video 2.35:1 mengirim 818.
-  * Mengembalikan 0 (Auto) bila tidak ada tier yang ≤ permintaan.
-  */
- fun heightForTier(requested: Int, available: List<VideoResolution>): Int {
-  if (requested <= 0 || available.isEmpty()) return requested
-  // Nilai yang sudah berupa tinggi nyata (dipilih dari menu) tidak boleh dipetakan ulang, kalau
-  // tidak 818 pada video 2.35:1 akan turun sendiri ke tier 720 saat komposisi dibuat ulang.
-  if (available.any { it.height == requested }) return requested
-  return available.filter { it.tier <= requested }.maxByOrNull { it.tier }?.height ?: 0
+ /** Resolves a requested UI tier to the source label and the actual download height. */
+ fun resolutionForTier(requestedTier: Int, available: List<VideoResolution>): VideoResolution {
+  if (requestedTier <= 0) return VideoResolution(0, 0)
+  if (available.isEmpty()) return VideoResolution(requestedTier, requestedTier)
+  return available.filter { it.tier <= requestedTier }.maxByOrNull { it.tier } ?: VideoResolution(0, 0)
  }
+ /** Input is always a tier; pixel heights are only emitted at the download boundary. */
+ fun heightForTier(requestedTier: Int, available: List<VideoResolution>): Int =
+  resolutionForTier(requestedTier, available).height
  /** Safe MediaStore folder name (single segment under Downloads/); null when unusable. */
  fun safeFolder(raw: String): String? {
   val name = raw.trim()

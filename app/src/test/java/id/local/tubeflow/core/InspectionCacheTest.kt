@@ -37,6 +37,27 @@ class InspectionCacheTest {
     }
 
     @Test
+    fun wideResolutionKeepsTierAndHeightSeparateInCache() {
+        val cache = InspectionCache(temporary.newFolder("wide"))
+        val wide = metadata().copy(resolutions = listOf(VideoResolution(818, 1080), VideoResolution(540, 540)))
+        cache.write(wide.url, wide)
+        assertEquals(wide, cache.read(wide.url))
+    }
+
+    @Test
+    fun cacheWithFormerRoundedTiersMustFetchFreshMetadata() {
+        val folder = temporary.newFolder("old-tiers")
+        val cache = InspectionCache(folder)
+        cache.write(metadata().url, metadata())
+        val file = folder.listFiles()!!.single { it.name.endsWith(".json") }
+        val json = org.json.JSONObject(file.readText()).put("v", 2)
+            .put("resolutions", org.json.JSONArray().put(org.json.JSONArray().put(540).put(720)))
+        file.writeText(json.toString())
+        assertNull(cache.read(metadata().url))
+        assertEquals(0, folder.listFiles()!!.size)
+    }
+
+    @Test
     fun trimmedUrlUsesTheSameEntry() {
         val cache = InspectionCache(temporary.newFolder("cache"))
         cache.write("  https://youtu.be/abc  ", metadata())

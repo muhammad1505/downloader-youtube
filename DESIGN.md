@@ -239,12 +239,13 @@ Panel: Pilih download
 [  ⬇  Download audio  ]     satu aksi utama, filled
 ```
 
-- **Label resolusi (1.1.41).** Daftar resolusi memakai tier standar (144p … 2160p),
-  bukan tinggi piksel mentah. Sumber yang melaporkan `format_note` dipakai apa
-  adanya; tanpa itu, tier dihitung dari sisi pendek video, jadi video 2.35:1
-  (1920×818) tampil sebagai **1080p** dan video vertikal 1080×1920 juga
-  **1080p**. Filter unduhan tetap memakai tinggi nyata (818) agar yt-dlp memilih
-  format yang benar; ringkasan opsi menampilkan tier, bukan 818p.
+- **Label resolusi (1.1.42).** Label `format_note` sumber diprioritaskan.
+  Tanpa label tersebut, tampilkan sisi pendek aktual; 960×540 tetap 540p.
+  Video 1920×818 dengan label sumber 1080p tetap memakai 1080p di UI dan 818
+  pada filter download. State formulir menyimpan tier; konversi ke tinggi
+  dilakukan saat membentuk DownloadOptions. Menu, ringkasan dan sorotan
+  preset memakai tier yang sama. Cache inspeksi v3 menyegarkan label lama
+  saat URL dibaca kembali, tanpa mengubah riwayat atau file media.
 
 ## Kritik
 

@@ -917,3 +917,18 @@ font 0,9×, dan status ulangi semula dipulihkan setelah uji. **Belum:** TalkBack
 kedaluwarsa, pengukuran
 recomposition/perfetto, dan celah `createDocument` → `dao.pending` (BUG-008) masih
 terbuka — jurnal-intent sebelum create belum dirancang.
+
+## 25 Oktober 2026 — Tiga temuan resolusi, 1.1.42/code56
+
+Update pengguna 1.1.41 beserta Scrubber baru sudah disimpan dan dipush pada
+`0b2665f`. Perbaikan berikutnya menangani BUG-078/079/080: state kualitas
+menyimpan tier, cap piksel baru dibentuk di DownloadOptions; label tanpa bukti
+menggunakan sisi pendek aktual; preset ultrawide tetap terpilih. Cache inspeksi
+schema 3 menolak label lama, Room tetap 10 tanpa migrasi.
+
+Tiga regresi gagal pada kode lama; setelah perbaikan **479 tes Kotlin** dan
+**98 tes Python** lulus. Gradle test/lint debug+release/assemble debug+release
+berhasil (13m 1s), lint 0 error/3 warning lama. Audit ARM64: 262 ELF/13 kelas ZIP,
+signature produksi dan zipalign 16 KB lulus. Release dipasang update di HP;
+preset/menu/ringkasan 1080p dan persistensi setelah rotasi berhasil diuji.
+AAB tidak dibangun ulang. [Laporan lengkap](RESOLUTION_FIXES_1_1_42.md).

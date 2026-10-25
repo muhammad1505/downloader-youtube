@@ -21,7 +21,7 @@ class InspectionCache(
         }
         val metadata = runCatching {
             val json = JSONObject(file.readText())
-            // Entri lama tanpa daftar resolusi tidak dipakai lagi agar detail selalu lengkap.
+            // Cache lama dapat berisi tier yang dibulatkan naik; ambil ulang metadata sumber.
             if (json.optInt("v", 1) < SCHEMA_VERSION) null else fromJson(json)
         }.getOrNull()
         if (metadata == null || metadata.url != url.trim()) {
@@ -114,7 +114,7 @@ class InspectionCache(
 
     companion object {
         const val MAX_AGE_MS = 30 * 60 * 1000L
-        private const val SCHEMA_VERSION = 2
+        private const val SCHEMA_VERSION = 3
         private const val MAX_ENTRIES = 200
     }
 }

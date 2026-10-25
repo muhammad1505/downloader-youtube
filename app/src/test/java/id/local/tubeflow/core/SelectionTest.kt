@@ -19,10 +19,29 @@ class SelectionTest {
   // Tanpa daftar resolusi dari sumber, angka preset dikirim apa adanya (Instagram).
   org.junit.Assert.assertEquals(1080, Selection.heightForTier(1080, emptyList()))
   org.junit.Assert.assertEquals(0, Selection.heightForTier(0, wide))
-  // Tinggi nyata yang sudah dipilih dari menu tidak boleh dipetakan ulang ke tier lebih rendah.
-  org.junit.Assert.assertEquals(818, Selection.heightForTier(818, wide))
+  // Parameter selalu tier; tinggi aktual tidak diinterpretasikan sebagai pilihan menu.
+  org.junit.Assert.assertEquals(544, Selection.heightForTier(818, wide))
   // Video vertikal: tier 1080 tetap disediakan pada tinggi 1920.
   org.junit.Assert.assertEquals(1920, Selection.heightForTier(1080, listOf(VideoResolution(1920, 1080))))
+ }
+ @Test fun presetTierDoesNotMatchThePixelHeightOfALowerPortraitFormat() {
+  val portrait = listOf(VideoResolution(1620, 1080), VideoResolution(1080, 720))
+  assertEquals(1620, Selection.heightForTier(1080, portrait))
+  assertEquals(1080, Selection.heightForTier(720, portrait))
+ }
+ @Test fun widePresetKeepsItsTierThroughMetadataRefreshAndProducesAPixelSelector() {
+  val wide = listOf(VideoResolution(1634, 2160), VideoResolution(818, 1080), VideoResolution(544, 720))
+  val chosen = Selection.resolutionForTier(1080, wide)
+  assertEquals(VideoResolution(818, 1080), chosen)
+  val refreshed = Selection.resolutionForTier(chosen.tier, wide)
+  assertEquals(chosen, refreshed)
+  assertEquals(1080, refreshed.tier)
+  val options = DownloadOptions("https://youtu.be/test", quality = Selection.heightForTier(refreshed.tier, wide))
+  assertTrue(Selection.selector(options).contains("[height<=?818]"))
+  assertFalse(Selection.selector(options).contains("[height<=?1080]"))
+  assertEquals(VideoResolution(544, 720), Selection.resolutionForTier(900, wide))
+  assertEquals(VideoResolution(0, 0), Selection.resolutionForTier(480, wide))
+  assertEquals(VideoResolution(1080, 1080), Selection.resolutionForTier(1080, emptyList()))
  }
  @Test fun soundcloudTrackingAliasesMatchExistingOutput() {
   val clean = "https://soundcloud.com/bondanfade2black/ya-sudahlah"

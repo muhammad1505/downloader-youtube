@@ -101,9 +101,10 @@ internal fun DownloadComposer(
     var advanced by rememberSaveable { mutableStateOf(false) }
     var videoFormat by rememberSaveable { mutableStateOf("mp4") }
     var audioFormat by rememberSaveable { mutableStateOf("mp3") }
-    var quality by rememberSaveable { mutableIntStateOf(0) }
+    // A separate saveable group discards the former pixel-height UI state on upgrade.
+    var qualityTier by key("video-quality-tier") { rememberSaveable { mutableIntStateOf(0) } }
     var bitrate by rememberSaveable { mutableIntStateOf(0) }
-    var preset by rememberSaveable { mutableStateOf("") }
+    var preset by key("tier-aware-preset") { rememberSaveable { mutableStateOf("") } }
     var selectedIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var playlistQuery by rememberSaveable { mutableStateOf("") }
     var showFailureDetails by remember(url.trim()) { mutableStateOf(false) }
@@ -194,35 +195,29 @@ internal fun DownloadComposer(
         if (isPlaylistLink && !isVideo) inspectPlaylist() else inspect()
     }
 
-    // Resolusi yang tidak dilaporkan sumber tidak boleh dikirim ke yt-dlp: pilihan turun ke tinggi
-    // terdekat yang ada, atau Auto bila tidak ada yang cocok (mis. reel Instagram tanpa height).
-    // Tier (1080p, 720p, …) dipetakan ke tinggi nyata video ini agar filter yt-dlp tetap tepat
-    // untuk video berasio lebar; sumber tanpa daftar resolusi tetap memakai angka preset apa adanya.
-    fun availableQuality(requested: Int): Int {
-        val resolutions = shownVideo?.resolutions.orEmpty()
-        return if (resolutions.isEmpty()) requested else Selection.heightForTier(requested, resolutions)
-    }
+    fun availableTier(requestedTier: Int): Int =
+        Selection.resolutionForTier(requestedTier, shownVideo?.resolutions.orEmpty()).tier
 
     fun applyPreset(p: Preset) {
         mode = p.mode; preset = p.label
         if (p.mode == MediaMode.VIDEO) {
             videoFormat = p.format
-            val target = availableQuality(p.quality)
-            quality = target
+            val target = availableTier(p.quality)
+            qualityTier = target
             if (target != p.quality) preset = ""
         }
         else { audioFormat = p.format; bitrate = p.bitrate }
     }
 
     LaunchedEffect(shownVideo?.url, shownVideo?.resolutions) {
-        val target = availableQuality(quality)
-        if (target != quality) { quality = target; preset = "" }
+        val target = availableTier(qualityTier)
+        if (target != qualityTier) { qualityTier = target; preset = "" }
     }
 
     val resolutionOptions = run {
         val heights = shownVideo?.resolutions.orEmpty()
         if (heights.isEmpty()) listOf(0 to "Auto · terbaik")
-        else listOf(0 to "Auto · terbaik") + heights.map { it.height to "${it.tier}p" }
+        else listOf(0 to "Auto · terbaik") + heights.map { it.tier to "${it.tier}p" }
     }
 
     val presets = if (mode == MediaMode.VIDEO) {
@@ -235,7 +230,7 @@ internal fun DownloadComposer(
         url = target,
         mode = mode,
         format = if (mode == MediaMode.VIDEO) videoFormat else audioFormat,
-        quality = if (mode == MediaMode.VIDEO) quality else 0,
+        quality = if (mode == MediaMode.VIDEO) Selection.heightForTier(qualityTier, shownVideo?.resolutions.orEmpty()) else 0,
         bitrate = if (mode == MediaMode.AUDIO && audioFormat !in listOf("flac", "wav", "vorbis")) bitrate else 0,
         subtitles = if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "asli" else "",
         embedSubs = embedSubs && subtitleLang.isNotEmpty() && mode == MediaMode.VIDEO,
@@ -527,7 +522,7 @@ internal fun DownloadComposer(
                     AnimatedVisibility(advanced, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (mode == MediaMode.VIDEO) {
-                                OptionMenu("Resolusi", resolutionOptions, quality, onSelect = { quality = it; preset = "" })
+                                OptionMenu("Resolusi", resolutionOptions, qualityTier, onSelect = { qualityTier = it; preset = "" })
                                 Text(
                                     if (shownVideo?.resolutions.isNullOrEmpty())
                                         "Sumber ini tidak melaporkan daftar resolusi; unduhan memakai format terbaik yang tersedia."
@@ -614,8 +609,6 @@ internal fun DownloadComposer(
 
         if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty()) || spotifyTrack != null || spotifyCollectionData != null) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Ringkasan memakai label tier (1080p), bukan tinggi piksel mentah (818).
-                val qualityTier = shownVideo?.resolutions?.firstOrNull { it.height == quality }?.tier ?: quality
                 val summary = buildSummary(mode, videoFormat, audioFormat, qualityTier, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
                 Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

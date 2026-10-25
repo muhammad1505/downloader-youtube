@@ -795,3 +795,28 @@ Fault storage/DB, font besar modal baru dan seluruh OEM tidak dinyatakan lulus.
   baris sempit/font besar, kontrol player2/4kolom dan rail pada jendela lebar.
 - **Bukti dan batas:** [laporan kontrol adaptif](ADAPTIVE_CONTROLS_1_1_25.md).
   Tidak menyatakan seluruh matriks perangkat telah diuji.
+
+
+## BUG-078 — P2: Preset tier tertukar dengan tinggi piksel
+
+R1 pada review 25 Oktober. Input ganda ke `heightForTier` membuat preset 1080p
+memilih 720×1080 meskipun 1080×1620 tersedia. Perbaikan 1.1.42 memisahkan state
+tier dari cap piksel; pemetaan dilakukan di batas DownloadOptions. Regresi
+vertikal gagal pada kode lama dan lulus setelah diperbaiki.
+[Hasil dan batas verifikasi](RESOLUTION_FIXES_1_1_42.md).
+
+## BUG-079 — P2: Label resolusi tanpa bukti dibulatkan naik
+
+R2 pada review 25 Oktober. 960×540 tanpa `format_note` dilabeli 720p. Perbaikan
+1.1.42 memakai label sumber atau sisi pendek aktual, termasuk fallback root;
+cache inspeksi v3 menolak label tersimpan lama. Regresi 540p format/root gagal
+pada kode lama dan lulus setelah diperbaiki.
+[Hasil dan batas verifikasi](RESOLUTION_FIXES_1_1_42.md).
+
+## BUG-080 — P3: Sorotan preset hilang setelah konversi ultrawide
+
+R3 pada review 25 Oktober. `applyPreset` membandingkan 1080 dengan 818 lalu
+mengosongkan preset. Perbaikan 1.1.42 mempertahankan tier 1080 pada state UI dan
+hanya mengirim 818 ke selector. Regresi mencakup pilihan yang tetap sama setelah
+refresh metadata serta filter piksel aktual.
+[Hasil dan batas verifikasi](RESOLUTION_FIXES_1_1_42.md).
