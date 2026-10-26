@@ -1056,3 +1056,35 @@ Verifikasi: `:app:testDebugUnitTest` **526 tes, 0 gagal**, `:app:lintDebug`
 0 error dan 2 peringatan lama, `:app:assembleDebug` sukses. Build uji memakai
 `applicationIdSuffix` sementara agar tidak menimpa aplikasi rilis; konfigurasi
 itu sudah dikembalikan dan APK final dibangun tanpa suffix.
+
+## Rilis 1.1.43/code57 — 26 Oktober 2026
+
+Rilis ini mengemas pekerjaan yang belum pernah keluar dari build 1.1.42/code56:
+login dan episode Premium Bstation lewat WebView resmi (sesi AES-GCM di
+`noBackupFilesDir`, cookie hanya untuk host Bstation), pemilih subtitle yang
+mengikuti sumber (YouTube memakai "Bahasa asli", Bstation menampilkan bahasa
+yang benar-benar dilaporkan), subtitle unduhan yang aktif otomatis, perbaikan
+geometri Scrubber setelah perubahan lebar, serta tier resolusi dan kredit seri
+episode. Rincian perilaku ada di
+[BSTATION_EPISODES_2026-10-25.md](BSTATION_EPISODES_2026-10-25.md) dan
+[RESOLUTION_FIXES_1_1_42.md](RESOLUTION_FIXES_1_1_42.md).
+
+Verifikasi host pada 26 Oktober 2026 (`bash scripts/build_release.sh
+--no-daemon`, 41m 17s, BUILD SUCCESSFUL):
+
+- **526 tes Kotlin**, 0 gagal/error/skip.
+- `:app:lintDebug` dan `:app:lintRelease`: **0 error, 3 warning** lama
+  (`SelectedPhotoAccess`, `AndroidGradlePluginVersion`, `GradleDependency`).
+- Suite Python: **98 tes lulus** (45,8 detik).
+- APK ARM64 76.320.802 byte, SHA256
+  `46721f650be26aa924112ac247fa7980bb1c2a046f143dd12e94da0b370d9a42`;
+  signature produksi v2 (`CN=TubeFlow Release`), non-debuggable,
+  zipalign 16 KB lulus, **262 ELF** dan **13 kelas ZIP** diaudit tanpa
+  kegagalan. AAB 273.266.413 byte, SHA256
+  `233555ca4f7d5c7a1b98d7054885ed0b62c9c9fd8ffafcd82710fd098f12035f`.
+- Artefak berada di `app/build/outputs/apk/release/` dan
+  `app/build/outputs/bundle/release/`.
+
+Uji perangkat tercatat di [DEVICE_TEST.md](DEVICE_TEST.md). Login Bstation
+dengan akun nyata, akses episode Premium/geo dari jaringan Indonesia, dan
+pemutaran episode Bstation belum dijalankan pada build ini.

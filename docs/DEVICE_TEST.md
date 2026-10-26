@@ -997,3 +997,24 @@ Tidak memulai download, menghapus media atau mereset data pengguna.
 Kasus vertikal/540p dan pemetaan `[height<=?818]` diuji di host. Download penuh,
 playback, LRCLIB, matriks aksesibilitas dan runtime 16 KB belum diulang.
 [Bukti dan batas rinci](RESOLUTION_FIXES_1_1_42.md).
+
+## Rilis 1.1.43/code57 — 26 Oktober 2026
+
+Update `adb install -r` di atas 1.1.42/code56 pada Realme RMX1821 Android
+10/API29, ARM64, halaman memori 4 KB, tanpa uninstall maupun reset data.
+Versi terpasang 1.1.43/code57; `base.apk` yang ditarik dari HP identik dengan
+artefak lokal:
+`46721f650be26aa924112ac247fa7980bb1c2a046f143dd12e94da0b370d9a42`.
+
+- Aplikasi dibuka dari launcher dan tetap di `MainActivity`; log PID aplikasi
+  tanpa `FATAL EXCEPTION` atau `AndroidRuntime`.
+- Layar Download menampilkan petunjuk tautan yang menyebut `bilibili.tv`;
+  tidak ada input tautan atau unduhan pada sesi ini.
+- Pengaturan menampilkan kategori **Akun Bstation** dengan status
+  *Belum masuk · episode Premium terkunci*, di samping kategori 1.1.38.
+
+**Batas:** login Bstation lewat WebView, penyimpanan/decrypt sesi, katalog
+season, antrean episode, subtitle episode, pemutaran dan rotasi pemutar,
+serta unduhan penuh belum diuji pada build ini. Tidak ada akun Bstation yang
+dipakai di sesi ini; API katalog dan `playurl` dari IP Indonesia masih perlu
+dibuktikan lewat uji perangkat berikutnya.
