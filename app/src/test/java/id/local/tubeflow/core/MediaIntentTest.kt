@@ -77,6 +77,12 @@ class MediaIntentTest {
         assertEquals("rekaman", media?.title)
     }
 
+    @Test fun uriFallbackDecodesSpacesOnceAndPreservesLiteralPlus() {
+        assertEquals("E01 - The Battle Begins", MediaIntent.from("file:///Movies/E01%20-%20The%20Battle%20Begins.mp4", "video/mp4", null)?.title)
+        assertEquals("A+B", MediaIntent.from("file:///Movies/A+B.mp4", "video/mp4", null)?.title)
+        assertEquals("100%20Ready", MediaIntent.from("file:///Movies/a.mp4", "video/mp4", "100%20Ready.mp4")?.title)
+    }
+
     @Test
     fun localSchemeIsRequired() {
         assertTrue(MediaIntent.isLocalMediaUri("content://media/external/video/media/1"))

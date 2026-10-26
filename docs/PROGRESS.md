@@ -1,12 +1,26 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dicatat **9 Oktober 2026**. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
-## Dua batch perbaikan yang sudah dijalankan
+## Titik mulai terbaru — 27 Oktober 2026
+
+Baseline sebelum perubahan **1.1.44/code58**, Room 10, Media3 1.11.1. Ringkasan rilis
+1.1.43/1.1.44 dan hasil Bstation berada di akhir kronologi ini serta di
+[DEVICE_TEST](DEVICE_TEST.md). Bagian Batch A/B berikut adalah arsip 9 Oktober;
+heartbeat progres, skema 3 dan batas dukungannya bukan spesifikasi saat ini.
+Gunakan kode, [VALIDATION](VALIDATION.md), dan status terbaru
+[BUG_FINDINGS](BUG_FINDINGS.md) saat melanjutkan pekerjaan.
+
+Implementasi 1.1.45/code60: rasio video, kecerahan otomatis, status lampiran
+bersama, ketuk Riwayat untuk memutar, preview Status dan penghemat baterai.
+[Laporan dan checkpoint](MEDIA_POLISH_1_1_45.md). Jangan menyimpulkan semua bug
+lama sudah tertutup dari keberhasilan satu rilis.
+
+## Arsip 9 Oktober — dua batch perbaikan
 
 ### Batch A — perbaikan sesuai permintaan pengguna (terverifikasi di perangkat)
 
-1. **Progres ke 100%** — `DownloadWorker.publish` monotonic 0–99 + heartbeat (500 ms) setelah file terakhir ≥98% (maks 98), fase salin 99, `dao.finish` = 100. Terverifikasi di perangkat: 91→96→98→100 tanpa membeku di 90.
+1. **Progres ke 100% (historis, diganti 10 Oktober oleh BUG-017)** — `DownloadWorker.publish` monotonic 0–99 + heartbeat (500 ms) setelah file terakhir ≥98% (maks 98), fase salin 99, `dao.finish` = 100. Terverifikasi di perangkat: 91→96→98→100 tanpa membeku di 90.
 2. **Batas konkurensi 3+4=7** — semaphore per-key diganti gerbang tunggal `gateLock`/`activeWorkers` yang membaca `SettingsStore.maxConcurrent` (1–4) setiap kali. Terverifikasi: pengaturan 3 menjalankan tepat 3 paralel.
 3. **Jeda/lanjut/batal per-job dan massal** — `JobState.PAUSED`, DAO `pause/pauseAll/resume` (resume naikkan `generation`), aksi di QueueScreen + JobCard. Terverifikasi: jeda di 96%, lanjut, batal tunggal, dialog batal semua.
 4. **BUG-001 penyebab utama SAF** — `createDocument` menerima tree URI mentah → Android 10 melempar "Invalid URI" → semua simpanan gagal ±90% saat folder SAF dipilih. Diperbaiki dengan `treeRootUri()`. Terverifikasi: 11 MP3 masuk `/storage/emulated/0/Download/TubeFlow/Denny-Caknan/`.
@@ -18,11 +32,17 @@ Catatan: satu kegagalan perangkat adalah HTTP 403 dari YouTube (rate-limit, buka
 
 Dikerjakan sesuai urutan yang disarankan dokumen. Semua lolos `testDebugUnitTest lintDebug assembleDebug` (43 tes Kotlin) dan `python3 -m unittest` (24 tes Python).
 
-## Keputusan desain yang perlu diketahui penerus
+## Keputusan desain checkpoint 9 Oktober (historis)
 
-- **Token eksekusi `generation` (BUG-002):** kolom INTEGER DEFAULT 0 di `downloads`, naik saat `resume`/`revive`. SEMUA mutasi status oleh worker memakai `WHERE generation = :gen` (`progress`, `title`, `pending`, `finish`, `failOwned`, `interrupted`, `cancelOwned`); ViewModel memakai versi tanpa syarat generasi. `doWork` membaca generasi SEBELUM `acquireSlot()`. Jangan menghapus syarat ini agar "jeda→lanjut cepat" tidak kena race. Regresi host: `test_stale_generation_cannot_touch_resumed_job`.
+Bukan kontrak kode saat ini. Gunakan invariant pada skill `tubeflow-dev` dan
+laporan bug terbaru. Room kini v10; heartbeat sudah dihapus; `false` pada
+penghapusan mencakup kegagalan memastikan file hilang, bukan hanya file yang
+terbukti ada. Jurnal sebelum write tidak menutup celah create → journal.
+
+
+- **Token eksekusi `generation` (BUG-002):** kolom INTEGER DEFAULT 0 di `downloads`, naik saat `resume`/`revive`. Mutasi status utama worker pada checkpoint ini memakai `WHERE generation = :gen` (`progress`, `title`, `pending`, `finish`, `failOwned`, `interrupted`, `cancelOwned`); ViewModel memakai versi tanpa syarat generasi. `doWork` membaca generasi SEBELUM `acquireSlot()`. Jangan menghapus syarat ini agar "jeda→lanjut cepat" tidak kena race. Regresi host: `test_stale_generation_cannot_touch_resumed_job`.
 - **Migrasi Room 2→3** menambah `generation`, `durationSeconds`, `lyricStatus`, `sidecarPending`. Schema snapshot v3 ada di `app/schemas/…/3.json`; regresi host `test_migration_2_3_alter_columns_match_schema_v3` memastikan SQL migrasi tangan sama persis dengan skema Room. Jangan menambah kolom tanpa memperbarui keduanya.
-- **`StorageUris` (BUG-003):** satu-satunya jalur hapus untuk worker, riwayat, dan recovery. Mengembalikan `false` hanya bila file MASIH ADA — pemanggil wajib menganggap gagal (jangan melapor sukses). Jangan kembali ke `contentResolver.delete` langsung.
+- **`StorageUris` (BUG-003):** satu-satunya jalur hapus untuk worker, riwayat, dan recovery. `false` berarti file belum terbukti hilang, termasuk query/izin provider gagal; pemanggil wajib menganggap gagal dan mempertahankan jejak recovery. Jangan kembali ke `contentResolver.delete` langsung.
 - **`matchesOutput` (BUG-005):** cek duplikat membandingkan seluruh opsi keluaran lewat satu fungsi. Opsi berbeda (mis. MP3 128 vs 320) = job baru yang sah.
 - **`sidecarPending` (BUG-008):** URI sidecar dicatat ke DB SEBELUM ditulis; dibersihkan setelah publikasi sukses dan di awal run/recovery. Proses mati di tengah penulisan harus meninggalkan jejak yang bisa dibersihkan — jangan memperpendek jendela ini.
 - **Identitas playlist (BUG-007):** `inspectPlaylist` menginspeksi URL kanonis (`canonicalPlaylistUrl`, host YouTube saja) tetapi `.copy(url=original)` agar cocok dengan `shownPlaylist` yang membandingkan URL persis dengan input. Tautan watch/shorts/youtu.be + `list` tetap membuka VIDEO lebih dulu; buka playlist lewat tombol.
@@ -173,7 +193,7 @@ Permintaan pengguna: 9 poin perbaikan (identifikasi artis, penamaan file konsist
 3. **Resume download (P1)** — akar: yt-dlp default `-c` (lanjut) + `--retries 10`; aplikasi menurunkan retries ke 3 dan MENGHAPUS parsial saat FAILED, sehingga "Coba lagi" selalu dari nol. Perbaikan: parsial dipertahankan untuk PAUSED/QUEUED/FAILED (hanya CANCELLED dibersihkan; recovery tidak menghapus parsial job gagal), retries & fragment-retries kembali ke 10, pesan gagal/putus menjelaskan lanjut dari progres terakhir, kartu antrean menampilkan hint "Progres tersimpan" bila direktori kerja job masih ada. Validasi keaslian parsial saat lanjut tetap tugas yt-dlp (Range/ukuran) — tidak ditempel buta.
 4. **Auto-folder (P2)** — `playlistFolder(title, channel, provenArtist, entryArtists)`: prioritas artis terbukti (dihitung `TitleSplit.identify` dari judul playlist) → suara terbanyak artis entri (≥2) → channel HANYA untuk Mix (invariant: Mix radio = kreator; konsisten dengan format "DJ JAUH KO PERGI - MAMAN FVNDY RMX") → heuristik judul lama. Playlist biasa tidak memakai channel pemilik (sering label/perusahaan).
 5. **Platform sumber (P2)** — diturunkan dari URL via `Selection.platform` (sumber data sama di antrean & riwayat; tanpa kolom baru). Ikon platform baru (`PlatformIcon` di components.kt; peta ringkas + globe untuk platform baru) tampil di kartu Antrean DAN Riwayat.
-6. **Thumbnail (P2)** — thumbnail SELALU diminta ke yt-dlp (`--write-thumbnail --convert-thumbnails jpg` + kompresi); worker menyalinnya ke `covers/<id>.jpg` (jalur internal bertahan setelah direktori kerja dibersihkan) dan mencatat kolom baru `coverPath` (v7). Kartu menampilkan sampul via `CoverThumb` (decode di IO; gagal/tanpa sampul = ikon mode lama). Sidecar thumbnail tetap hanya bila diminta pengguna; cache ikut dibersihkan bersama direktori job.
+6. **Thumbnail (P2)** — pada checkpoint ini thumbnail selalu diminta ke yt-dlp (`--write-thumbnail --convert-thumbnails jpg` + kompresi); worker menyalinnya ke `covers/<id>.jpg` (jalur internal bertahan setelah direktori kerja dibersihkan) dan mencatat kolom baru `coverPath` (v7). Kartu menampilkan sampul via `CoverThumb` (decode di IO; gagal/tanpa sampul = ikon mode lama). Sidecar thumbnail tetap hanya bila diminta pengguna; cache ikut dibersihkan bersama direktori job.
 7. **Regresi** — 89 tes Kotlin lulus (baru: `TitleSplitTest` 8 tes, `playlistFolderPrefersProvenArtistOverChannel`, `channelEmbeddedInTitleCountsAsEvidence`, `artistAndCoverUpdatesAreGenerationGuarded`; `FormatTest`/`SelectionTest` disesuaikan kontrak bukti); 46 tes Python lulus (migrasi 6→7 diverifikasi kolom-per-kolom terhadap `7.json`); lintDebug + assembleDebug sukses. Snapshot `app/schemas/.../7.json` tergenerasi.
 
 Belum diverifikasi di perangkat: resume setelah kegagalan nyata, tampilan sampul/ikon platform, migrasi 6→7 di aplikasi terpasang (perlu build release + install).
@@ -918,6 +938,10 @@ kedaluwarsa, pengukuran
 recomposition/perfetto, dan celah `createDocument` → `dao.pending` (BUG-008) masih
 terbuka — jurnal-intent sebelum create belum dirancang.
 
+Catatan implementasi saat ini: engine hanya meminta thumbnail bila `job.thumbnail`
+atau `job.embedThumb` aktif; preview sumber memakai CoverCache terpisah. Aturan
+"selalu diminta" pada arsip 13 Oktober tidak lagi berlaku.
+
 ## 25 Oktober 2026 — Tiga temuan resolusi, 1.1.42/code56
 
 Update pengguna 1.1.41 beserta Scrubber baru sudah disimpan dan dipush pada
@@ -1111,3 +1135,23 @@ Uji perangkat dengan akun Bstation nyata berhasil untuk login email, katalog
 season, kunci Premium, dan unduhan satu episode gratis 720p. Rincian dan dua
 temuan baru (BUG-087 subtitle season tidak ikut subfolder, BUG-088 judul
 `file://` ber-`%20`) ada di [DEVICE_TEST.md](DEVICE_TEST.md).
+
+## Player dan lampiran 1.1.45/code60 — 27 Oktober 2026
+
+Rasio GL diperbaiki dengan Presentation, geometri software terpisah, dan
+persiapan ulang saat jeda mempertahankan posisi/play intent. Kecerahan otomatis,
+penghemat sistem/aktif/nonaktif, info lampiran bersama, ketuk Riwayat, dan
+preview Status terintegrasi. Penemuan subtitle satu folder dipakai label dan
+player; pekerjaan async dijaga identitas sesi. Room 10 tetap, tanpa dependensi,
+izin atau migrasi baru.
+
+536 tes Kotlin/98 Python lulus, lint debug/release 0 error/3 warning lama;
+build debug/release signed lulus 11m13s. Final ARM64 76.357.958 byte,
+SHA256 `64899c7b4e26e1d133026aa07ec7b768e1d815ee057f00ca28803d7880458c4c`.
+Audit 262 ELF/13 kelas ZIP, signature/zipalign16KB lulus. Update di Android10
+berhasil, hash identik, 15 path media tetap. AAB tidak dibangun ulang.
+
+HP membuktikan subtitle terlihat dan tiga rasio berubah saat jeda di7:12.
+Preview final dibuka tanpa ekspor; pemeriksaan rentang/play-to-end sebelumnya
+tercatat terpisah. BUG-087 publikasi baru dan BUG-092 galat sesaat sesi audio
+lama tetap terbuka. [Bukti, batas dan catatan pemeliharaan](MEDIA_POLISH_1_1_45.md).

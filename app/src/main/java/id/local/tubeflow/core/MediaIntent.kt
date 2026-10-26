@@ -59,7 +59,8 @@ object MediaIntent {
         if (!isLocalMediaUri(raw)) return null
         val name = displayName?.takeIf { it.isNotBlank() }
         val kind = kind(mimeType, name.orEmpty()) ?: kind(mimeType, raw) ?: return null
-        val fallback = raw.substringAfterLast('/').substringBefore('?')
+        val encoded = raw.substringBefore('?').substringBefore('#').substringAfterLast('/')
+        val fallback = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), "UTF-8") }.getOrDefault(encoded)
         return IncomingMedia(raw, title(name.orEmpty()).ifBlank { title(fallback) }, kind)
     }
 

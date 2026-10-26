@@ -344,3 +344,26 @@ saat bar sistem muncul sementara.
   file musik. Nama form dikosongkan setelah operasi database berhasil.
 - Cache lirik menampilkan status berjalan dan hasil sukses/kosong/parsial; LRC dan
   cooldown penyedia tetap dipertahankan. Bukan tombol untuk melewati batas LRCLIB.
+
+
+## Player dan lampiran — 1.1.45
+
+Riwayat, Koleksi dan antrean putar memakai `AttachmentInfo` bersama, labelSmall
+serta ikon Lyrics/ClosedCaption 14dp, spasi 4dp. Status tersedia/absen/tidak
+terbaca dibedakan lewat teks, berdasarkan file/track nyata. Tidak memakai
+pilihan subtitle/lirik saat download sebagai bukti ketersediaan.
+
+Kartu Riwayat selesai dapat diketuk untuk memutar seperti Koleksi. Tombol
+sekunder tetap memakai aksi yang sama, tanpa meneruskan klik ke induk.
+Dialog potong Status menambah preview 16:9 sumber lokal pada rentang pilihan,
+dijeda saat awal potongan digeser dan dilepas saat dialog ditutup/diproses.
+
+Rasio Pas memakai seluruh gambar tanpa distorsi; Penuh mengisi layar dengan
+peregangan; Zoom mempertahankan rasio lalu memotong tepi. Ukuran permukaan
+mengikuti ruang aktual serta rasio piksel, dihitung ulang setelah rotasi.
+Kecerahan video mengikuti adaptif Android atau sensor cahaya selama layar
+video aktif, tanpa menulis pengaturan brightness global.
+
+Penghemat baterai berada di Pengaturan → Pemutaran (Ikuti sistem/Aktif/Nonaktif).
+Mode ini mengurangi frekuensi pembaruan posisi dan sementara melepas efek
+Smart Enhance, mempertahankan preferensi efek pengguna untuk dipakai kembali.

@@ -208,4 +208,26 @@
     <string name="engine_rollback_confirm">Kembalikan</string>
     <string name="engine_security_note">Pembaruan tidak otomatis. Hanya rilis stabil resmi dari host GitHub yang diterima; batas ukuran, versi di dalam zipapp, dan checksum diperiksa sebelum dipasang.</string>
     <string name="engine_cancel">Batalkan unduhan</string>
+    <string name="power_saver_title">Penghemat baterai</string>
+    <string name="power_saver_system">Ikuti sistem</string>
+    <string name="power_saver_on">Aktif</string>
+    <string name="power_saver_off">Nonaktif</string>
+    <string name="power_saver_help">Mengurangi pembaruan posisi pemutar dan menonaktifkan sementara Smart Enhance video. Kualitas file, download, lirik dan efek audio tetap dipertahankan.</string>
+    <string name="video_brightness_help">Kecerahan video otomatis mengikuti pencahayaan ruangan. Gunakan kecerahan adaptif Android; jika nonaktif, sensor cahaya HP dipakai hanya selama layar video terbuka. Tanpa sensor, kecerahan mengikuti sistem.</string>
+    <string name="attachments_checking">Memeriksa lampiran…</string>
+    <string name="attachments_unreadable">Lampiran belum dapat diperiksa</string>
+    <string name="lyrics_available">Lirik tersedia</string>
+    <string name="lyrics_absent">Belum ada lirik</string>
+    <string name="subtitles_absent">Belum ada subtitle</string>
+    <plurals name="subtitles_available"><item quantity="other">%d subtitle tersedia</item></plurals>
+    <string name="clip_preview">Pratinjau bagian terpilih</string>
+    <string name="clip_preview_help">Putar untuk melihat rentang yang akan dipotong. Menggeser awal klip menjeda pratinjau; file asli tetap utuh.</string>
+    <string name="clip_preview_error">Pratinjau tidak dapat diputar di perangkat ini. Pilih bagian berdasarkan waktu atau coba video lain.</string>
+    <string name="power_saver_short">Hemat</string>
+    <string name="power_saver_effects">Penghemat baterai aktif. Smart Enhance sementara tidak diterapkan; pilihan efek tetap disimpan.</string>
+    <string name="video_brightness_automatic">Kecerahan otomatis</string>
+    <string name="clip_start_position">Awal potongan Status</string>
+    <string name="clip_preview_play">Putar pratinjau</string>
+    <string name="clip_preview_pause">Jeda pratinjau</string>
+    <string name="clip_preview_position">Posisi pratinjau potongan</string>
 </resources>

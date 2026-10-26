@@ -1,6 +1,17 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.42/code56 — 25 Oktober 2026
+## Status terbaru — 1.1.45/code60 — 27 Oktober 2026
+
+Rasio video, lampiran bersama, ketuk Riwayat, preview Status, kecerahan otomatis
+dan penghemat baterai. Room tetap 10; tanpa migrasi/dependensi/izin baru.
+**536 tes Kotlin/98 tes Python** lulus; lint debug/release **0 error/3 warning**
+lama. Build debug/release signed lulus **11m 13s**. APK ARM64 **76.357.958 byte**,
+SHA256 `64899c7b4e26e1d133026aa07ec7b768e1d815ee057f00ca28803d7880458c4c`.
+Audit 262 ELF/13 kelas ZIP, signature produksi dan zipalign 16 KB lulus.
+Update terpasang di Android 10 dengan hash identik. AAB tidak dibangun ulang;
+[hasil perangkat dan batas verifikasi](MEDIA_POLISH_1_1_45.md).
+
+## Status historis — 1.1.42/code56 — 25 Oktober 2026
 
 Tiga temuan review 1.1.41 diperbaiki: pemilihan tier tidak lagi tertukar dengan
 tinggi piksel, resolusi tanpa label sumber tidak dibulatkan naik, dan preset

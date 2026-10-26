@@ -25,6 +25,11 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -166,7 +171,7 @@ private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, EFFECTS, DECOD
 private sealed interface GestureFeedback {
     data class Seek(val deltaMs: Long, val targetMs: Long) : GestureFeedback
     data class Volume(val percent: Int) : GestureFeedback
-    data class Brightness(val percent: Int) : GestureFeedback
+    data object AutoBrightness : GestureFeedback
 }
 
 /** Konfirmasi singkat setelah tombol pengaturan cepat mengubah sesuatu. */
@@ -181,6 +186,7 @@ private data class PlayerNotice(
  * pemutar audio: sebelum dibuka pemanggil mem-pause audio, dan setelah ditutup ExoPlayer dilepas.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     val state by video.state.collectAsStateWithLifecycle()
@@ -191,7 +197,6 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val audio = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val supportsPip = remember(context) { VideoPip.supports(context) }
-    val originalBrightness = remember { activity?.window?.attributes?.screenBrightness ?: -1f }
     val originalOrientation = remember { activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -250,13 +255,6 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 },
             )
         }
-    }
-
-    fun setBrightness(value: Float) {
-        val window = activity?.window ?: return
-        val attributes = window.attributes
-        attributes.screenBrightness = value.coerceIn(0.01f, 1f)
-        window.attributes = attributes
     }
 
     fun enterPip() {
@@ -349,15 +347,9 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
         controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller?.hide(WindowInsetsCompat.Type.systemBars())
-        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
             controller?.show(WindowInsetsCompat.Type.systemBars())
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            if (window != null) {
-                val attributes = window.attributes
-                attributes.screenBrightness = if (originalBrightness >= 0f) originalBrightness else -1f
-                window.attributes = attributes
-            }
             activity?.requestedOrientation = originalOrientation
             VideoPip.disableAutoEnter(activity)
         }
@@ -373,6 +365,16 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    LaunchedEffect(state.playing, inPip, activity) {
+        activity?.window?.let { window ->
+            if (state.playing && !inPip) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+    val saving = id.local.tubeflow.core.PlaybackPower.saving
+    AutomaticVideoBrightness(activity, inPip, saving)
+    LaunchedEffect(saving) { video.refreshPowerPolicy() }
+
     val videoAspect = state.aspect
     val subtitleSize = state.subtitleSize
     val subtitleStyle = state.subtitleStyle
@@ -382,21 +384,31 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         // Setiap pergantian dekoder membuat ExoPlayer baru. Permukaan PlayerView ikut dibuat
         // ulang agar video tidak tertinggal di surface milik player lama (audio tetap jalan).
         key(state.playerVersion) {
+            BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().onSizeChanged { video.setViewport(it.width, it.height) }, contentAlignment = Alignment.Center) {
+                val (surfaceWidth, surfaceHeight) = if (state.effectPresentation) maxWidth.value to maxHeight.value else id.local.tubeflow.core.VideoViewport.size(
+                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
+                )
             AndroidView(
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
                         useController = false
-                        keepScreenOn = true
+                        keepScreenOn = false
                     }.also { playerView = it }
                 },
                 update = { view ->
                     view.player = video.exoPlayer
-                    applyVideoAspect(view, videoAspect)
+                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    view.keepScreenOn = state.playing && !inPip
                     applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
                 },
-                onRelease = { view -> if (playerView === view) playerView = null },
-                modifier = Modifier.fillMaxSize(),
+                onRelease = { view ->
+                    view.player = null
+                    if (playerView === view) playerView = null
+                },
+                modifier = Modifier.wrapContentSize(Alignment.Center, unbounded = true)
+                    .requiredSize(surfaceWidth.dp, surfaceHeight.dp),
             )
+            }
         }
 
         if (!inPip && !controlsLocked) {
@@ -405,21 +417,18 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 Modifier
                     .fillMaxSize()
                     .pointerInput(state.entry?.uri) {
-                        var axis = 0 // 0 belum diputuskan, 1 seek, 2 volume, 3 kecerahan
+                        var axis = 0 // 1 seek, 2 volume; kecerahan mengikuti ruangan.
                         var total = Offset.Zero
                         var startPosition = 0L
                         var startVolume = 0
-                        var startBrightness = 0.5f
                         var startX = 0f
                         detectDragGestures(
                             onDragStart = { offset ->
+                                startX = offset.x
                                 axis = 0
                                 total = Offset.Zero
-                                startX = offset.x
                                 startPosition = video.state.value.positionMs
                                 startVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                startBrightness = activity?.window?.attributes?.screenBrightness
-                                    ?.takeIf { it >= 0f } ?: 0.5f
                             },
                             onDrag = { change, amount ->
                                 change.consume()
@@ -442,12 +451,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                         audio.setStreamVolume(AudioManager.STREAM_MUSIC, value, 0)
                                         feedback = GestureFeedback.Volume(value * 100 / maximum)
                                     }
-                                    3 -> {
-                                        val delta = -total.y / size.height
-                                        val value = (startBrightness + delta).coerceIn(0.01f, 1f)
-                                        setBrightness(value)
-                                        feedback = GestureFeedback.Brightness((value * 100).toInt())
-                                    }
+                                    3 -> feedback = GestureFeedback.AutoBrightness
                                 }
                             },
                             onDragEnd = {
@@ -761,15 +765,6 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 )
             }
         }
-    }
-}
-
-@androidx.annotation.OptIn(UnstableApi::class)
-private fun applyVideoAspect(view: PlayerView, aspect: VideoAspect) {
-    view.resizeMode = when (aspect) {
-        VideoAspect.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        VideoAspect.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-        VideoAspect.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 }
 
@@ -1098,9 +1093,9 @@ private fun QuickSettingsBar(
         )
         QuickIcon(
             icon = Icons.Outlined.AutoAwesome,
-            label = state.enhance.shortLabel,
-            description = "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
-            active = state.enhance != VideoEnhance.OFF,
+            label = if (id.local.tubeflow.core.PlaybackPower.saving) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_short) else state.enhance.shortLabel,
+            description = if (id.local.tubeflow.core.PlaybackPower.saving) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects) else "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
+            active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
             onClick = onEnhance,
         )
         QuickIcon(
@@ -1288,7 +1283,7 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
     val icon = when (feedback) {
         is GestureFeedback.Seek -> if (feedback.deltaMs >= 0) Icons.Outlined.FastForward else Icons.Outlined.FastRewind
         is GestureFeedback.Volume -> Icons.AutoMirrored.Outlined.VolumeUp
-        is GestureFeedback.Brightness -> Icons.Outlined.Brightness6
+        GestureFeedback.AutoBrightness -> Icons.Outlined.Brightness6
     }
     val text = when (feedback) {
         is GestureFeedback.Seek -> {
@@ -1296,7 +1291,7 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
             "$sign${abs(feedback.deltaMs) / 1000} dtk · ${VideoPlayback.timeLabel(feedback.targetMs)}"
         }
         is GestureFeedback.Volume -> "Volume ${feedback.percent}%"
-        is GestureFeedback.Brightness -> "Kecerahan ${feedback.percent}%"
+        GestureFeedback.AutoBrightness -> androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_automatic)
     }
     Surface(
         modifier,
@@ -1624,6 +1619,7 @@ private fun VideoOptionsSheet(
                     }
                     SheetHint("Bass Boost dan Ruang bergantung pada dukungan audiofx perangkat. Equalizer video terpisah dari equalizer lagu.")
                     SheetSection("Smart Enhance")
+                    if (id.local.tubeflow.core.PlaybackPower.saving) SheetHint(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects))
                     FlowRow(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1652,6 +1648,7 @@ private fun VideoOptionsSheet(
                 VideoSheet.QUEUE -> {
                     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                         itemsIndexed(state.entries) { index, entry ->
+                            Column {
                             SheetChoice(
                                 label = "${index + 1}. ${entry.displayTitle}",
                                 selected = index == state.index,
@@ -1660,6 +1657,8 @@ private fun VideoOptionsSheet(
                                     onDismiss()
                                 },
                             )
+                            AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
+                            }
                         }
                     }
                     if (state.entries.size <= 1) {

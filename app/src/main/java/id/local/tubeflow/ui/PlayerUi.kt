@@ -554,6 +554,7 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                                     Text(queued.title,style=MaterialTheme.typography.titleSmall,fontWeight=if (current) FontWeight.Bold else FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis)
                                     Text(queued.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,
                                         color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    AttachmentInfo(queued.uri, true, queued.lyricUri)
                                     if (current) Text("Sedang diputar",style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold,color=accent)
                                 }
                             }

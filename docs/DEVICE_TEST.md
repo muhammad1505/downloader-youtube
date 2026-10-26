@@ -1,5 +1,27 @@
 # Pengujian perangkat fisik
 
+## Cara membaca dan status terkini — 27 Oktober 2026
+
+Dokumen ini adalah kronologi, bukan checklist semua fitur pada APK terbaru.
+Bagian lama di bawah tetap berlaku hanya untuk versi dan skenario yang disebut.
+Baseline terbaru saat pekerjaan ini dimulai adalah **1.1.44/code58**; hasil
+[login dan unduhan 1.1.44](#login-bstation-dan-unduhan-1144code58--26-oktober-2026)
+menggantikan batas login yang tertulis pada laporan 1.1.43.
+
+- Login email Bstation, katalog season dan satu episode gratis terbukti pada
+  1.1.44. Unduhan Premium dan login sosial belum terbukti.
+- Sesi diagnosis 1.1.44 pernah berganti signature/reset data; itu kejadian
+  historis, bukan prosedur upgrade. Update berikutnya memakai signing release
+  yang sama, tanpa uninstall/reset.
+- Lokasi subtitle season (BUG-087) masih perlu reproduksi terkontrol. Kode
+  worker saat ini tidak menolak akhiran bahasa; jangan memakai dugaan lama
+  sebagai akar yang sudah terbukti.
+- Pekerjaan 1.1.45/code60: [laporan player dan lampiran](MEDIA_POLISH_1_1_45.md)
+  mencatat rasio saat jeda, preview Status, lampiran dan penghemat baterai.
+  Bukti historis di bawah tidak otomatis menjadi tes build terbaru.
+
+## Arsip pengujian per versi
+
 Pembaruan1.1.30/code44: update-r sukses pada Realme RMX1821 Android10; hash `base.apk` identik dengan artefak.
 Fase inspeksi terlihat (`Mengambil detail video… · 13dtk`), cancel kembali ke
 input tanpa hasil, dan URL yang sama langsung hit cache setelah force-stop.
@@ -1059,3 +1081,28 @@ tombol **Putar** di Riwayat.
 - Panel subtitle tidak dapat dibuka lewat koordinat ADB pada sesi ini karena
   kontrol auto-hide; pengujian subtitle memakai Riwayat/job, bukan bukti
   tampilan teks.
+
+## Player, lampiran dan Status 1.1.45/code60 — 27 Oktober 2026
+
+Realme RMX1821, Android 10/API29, ARM64, halaman 4 KB. Update-r memakai
+sertifikat produksi yang sama, tanpa uninstall/reset. APK terpasang identik
+SHA256 `64899c7b4e26e1d133026aa07ec7b768e1d815ee057f00ca28803d7880458c4c`.
+
+- Final: ketuk kartu Riwayat membuka video; SRT ditemukan/aktif otomatis dan
+  teksnya terlihat. Pas/Penuh/Zoom berubah pada posisi tetap 7:12 tanpa play;
+  subtitle tetap tersedia setelah tiga pergantian, antrean menghitung satu.
+- Kandidat sebelumnya: geometri dengan hemat aktif, software dan efek aktif
+  sudah diperiksa. Antrean audio/Koleksi membedakan lirik tersedia dan absen.
+- Final: preview Status terbuka 0:00/0:30 dan ditutup dengan Batal. Pada kandidat
+  dengan implementasi preview yang sama, pilihan 8:00–8:30 berubah frame dan
+  berhenti di 0:30; tidak menjalankan ekspor.
+- Penghemat dipulihkan Ikuti sistem, dekoder Otomatis dan rasio Penuh. Mode
+  brightness sistem tetap adaptif (1). Tidak menulis pengaturan global.
+- 15 path media sebelum/sesudah sama. Sigar dapat diputar hingga 0:34, dijeda,
+  membuka video dan kembali tanpa berubah posisi/error. Pesan galat sesaat
+  sesi lama setelah update tetap dicatat sebagai BUG-092.
+
+Batas: unduhan penuh baru, LRCLIB/timing vokal, ekspor Status, sensor fallback
+fisik, rotasi terkontrol pada versi ini, tema/font/TalkBack dan runtime 16 KB
+belum diuji ulang. BUG-087 tetap perlu reproduksi publikasi baru.
+[Laporan lengkap, artefak dan file terdampak](MEDIA_POLISH_1_1_45.md).

@@ -17,6 +17,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -77,6 +78,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val audioEffect: VideoAudioEffect = VideoAudioEffect.OFF,
         val videoWidth: Int = 0,
         val videoHeight: Int = 0,
+        val pixelRatio: Float = 1f,
+        val effectPresentation: Boolean = false,
     ) {
         val active: Boolean get() = entries.isNotEmpty()
         val entry: VideoEntry? get() = entries.getOrNull(index)
@@ -98,6 +101,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var lastResumeSaveAt = 0L
     private var ticker: Job? = null
     private var fallbackJob: Job? = null
+    private var attachmentJob: Job? = null
+    private val attachmentChecked = mutableSetOf<String>()
     private var softwareFallbackUsed = false
     private var pendingSubtitleLabel: String? = null
 
@@ -105,6 +110,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var pendingSubtitleLanguages: List<String> = emptyList()
     private var pendingSubtitleSelection = false
     private var playerVersion = 0
+    private var viewportWidth = 0
+    private var viewportHeight = 0
 
     /** Dibaca layar untuk dipasang ke PlayerView; null saat tidak ada video. */
     val exoPlayer: ExoPlayer? get() = player
@@ -184,10 +191,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             )
             _state.value.entries.getOrNull(index)?.let(::prepareSubtitleSelection)
             refreshTracks()
+            discoverCurrentSubtitles()
         }
 
         override fun onTracksChanged(tracks: Tracks) {
             refreshTracks(tracks)
+            syncVideoGeometry()
         }
 
         @androidx.annotation.OptIn(UnstableApi::class)
@@ -197,9 +206,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
+            if (syncVideoGeometry()) return
             _state.value = _state.value.copy(
                 videoWidth = videoSize.width,
                 videoHeight = videoSize.height,
+                pixelRatio = videoSize.pixelWidthHeightRatio,
             )
         }
 
@@ -252,11 +263,32 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun open(entries: List<VideoEntry>, startIndex: Int = 0) {
         if (entries.isEmpty()) return
         closeInternal(savePosition = true)
+        attachmentChecked.clear()
         val start = startIndex.coerceIn(entries.indices)
         val saved = resume.position(entries[start].uri)
         val startPosition = if (VideoPlayback.shouldResume(saved, 0)) saved ?: 0 else 0
         softwareFallbackUsed = false
         openInternal(entries.map(::withStoredSubtitles), start, startPosition, preferSoftware = false)
+    }
+
+    private fun discoverCurrentSubtitles() {
+        attachmentJob?.cancel()
+        val current = _state.value
+        val entry = current.entry ?: return
+        if (entry.subtitles.isNotEmpty() || entry.uri in attachmentChecked) return
+        val version = playerVersion
+        attachmentJob = viewModelScope.launch {
+            val subtitles = MediaAttachments.localVideoSubtitles(getApplication(), entry.uri)
+            val latest = _state.value
+            if (version != playerVersion || latest.index != current.index ||
+                latest.entry?.uri != entry.uri || latest.entry?.subtitles?.isNotEmpty() == true) return@launch
+            attachmentChecked.add(entry.uri)
+            if (subtitles.isEmpty()) return@launch
+            val entries = latest.entries.toMutableList()
+            entries[current.index] = entry.copy(subtitles = subtitles)
+            _state.value = latest.copy(entries = entries)
+            reopenAtCurrent(forceSoftware = false)
+        }
     }
 
     /** Video dengan subtitle unduhan memilih track otomatis; video tanpa subtitle tetap nonaktif. */
@@ -284,6 +316,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         start: Int,
         startPosition: Long,
         preferSoftware: Boolean,
+        startPlaying: Boolean = true,
     ) {
         val preferences = preferencesState()
         playerVersion += 1
@@ -328,6 +361,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 addListener(listener)
             }
             player = exo
+            _state.value = _state.value.copy(effectPresentation = false)
             audioFx.attach(exo.audioSessionId, preferences.equalizer, preferences.audioEffect)
             // Efek GL memakai pipeline frame platform; renderer FFmpeg/dav1d bisa gagal saat
             // efek warna dipasang. Lewati efek untuk sesi software, bukan menggagalkan video.
@@ -336,7 +370,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
             exo.setMediaItems(entries.map(::mediaItem), start, startPosition)
             exo.prepare()
-            exo.play()
+            exo.playWhenReady = startPlaying
             startTicker()
         } catch (failure: Exception) {
             audioFx.release()
@@ -437,6 +471,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun setAspect(value: VideoAspect) {
         preferences.edit { putString(KEY_ASPECT, value.name) }
         _state.value = _state.value.copy(aspect = value)
+        refreshPowerPolicy()
     }
 
     fun cycleAspect() = setAspect(_state.value.aspect.next())
@@ -469,8 +504,28 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _state.value = _state.value.copy(enhance = value)
         // Sesi software tidak memakai pipeline efek GL; nilainya tetap diingat untuk sesi
         // berikutnya yang memakai dekoder perangkat.
+        refreshPowerPolicy()
+    }
+
+    fun setViewport(width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        if (width == viewportWidth && height == viewportHeight) return
+        viewportWidth = width
+        viewportHeight = height
+        refreshPowerPolicy()
+    }
+
+    fun refreshPowerPolicy() {
+        val exo = player ?: return
         val softwareSession = _state.value.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed
-        if (!softwareSession) player?.let { applyVideoEffects(it, value) }
+        if (softwareSession) return
+        // The default effects pipeline cannot replay a cached frame. Reprepare only when paused,
+        // preserving both position and play intent; normal playback updates the effects in place.
+        if (!exo.playWhenReady && exo.playbackState == Player.STATE_READY) {
+            reopenAtCurrent(forceSoftware = false)
+        } else {
+            applyVideoEffects(exo, _state.value.enhance)
+        }
     }
 
     fun cycleEnhance() = setEnhance(_state.value.enhance.next())
@@ -530,12 +585,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             list[current.index] = entry.copy(subtitles = mergedSubtitles)
         }
         val position = player?.currentPosition ?: current.positionMs
+        val startPlaying = player?.playWhenReady ?: current.playing
         releasePlayer()
         openInternal(
             entries = entries,
             start = current.index.coerceIn(entries.indices),
             startPosition = position,
             preferSoftware = current.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed,
+            startPlaying = startPlaying,
         )
     }
 
@@ -663,6 +720,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun releasePlayer() {
+        attachmentJob?.cancel()
+        attachmentJob = null
         ticker?.cancel()
         ticker = null
         player?.removeListener(listener)
@@ -677,19 +736,21 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (current.entries.isEmpty()) return
         val index = (player?.currentMediaItemIndex ?: current.index).coerceIn(current.entries.indices)
         val position = player?.currentPosition ?: current.positionMs
+        val startPlaying = player?.playWhenReady ?: current.playing
         releasePlayer()
         openInternal(
             entries = current.entries,
             start = index,
             startPosition = position.coerceAtLeast(0),
             preferSoftware = forceSoftware || current.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed,
+            startPlaying = startPlaying,
         )
     }
 
     /** Efek warna real-time Media3; preset hanya memakai API yang stabil untuk video SDR/HDR. */
     @androidx.annotation.OptIn(UnstableApi::class)
     private fun applyVideoEffects(exo: ExoPlayer, enhance: VideoEnhance) {
-        val effects: List<Effect> = when (enhance) {
+        val effects: List<Effect> = when (if (PlaybackPower.saving) VideoEnhance.OFF else enhance) {
             VideoEnhance.OFF -> emptyList()
             VideoEnhance.LIGHT -> listOf(
                 Contrast(0.05f),
@@ -707,7 +768,16 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
         // Efek GL tidak didukung semua kombinasi dekoder/GPU; kegagalan efek tidak boleh
         // menghentikan pemutaran video.
-        runCatching { exo.setVideoEffects(effects) }
+        val layout = when (_state.value.aspect) {
+            VideoAspect.FIT -> Presentation.LAYOUT_SCALE_TO_FIT
+            VideoAspect.FILL -> Presentation.LAYOUT_STRETCH_TO_FIT
+            VideoAspect.ZOOM -> Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+        }
+        // The GL pipeline letterboxes independently of PlayerView.resizeMode.
+        val presentation = if (viewportWidth > 0 && viewportHeight > 0)
+            Presentation.createForWidthAndHeight(viewportWidth, viewportHeight, layout) else null
+        val applied = runCatching { exo.setVideoEffects(effects + listOfNotNull(presentation)) }.isSuccess
+        _state.value = _state.value.copy(effectPresentation = applied)
     }
 
     private fun saveNow() {
@@ -722,13 +792,25 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         ticker = viewModelScope.launch {
             while (isActive && player != null) {
                 syncProgress()
-                delay(500)
+                delay(PlaybackPolicy.videoTickMs(PlaybackPower.saving))
             }
         }
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun syncVideoGeometry(): Boolean {
+        val format = player?.videoFormat ?: return false
+        val geometry = VideoViewport.sourceSize(format.width, format.height, format.rotationDegrees, format.pixelWidthHeightRatio) ?: return false
+        val current = _state.value
+        if (current.videoWidth != geometry.first || current.videoHeight != geometry.second || current.pixelRatio != geometry.third) {
+            _state.value = current.copy(videoWidth = geometry.first, videoHeight = geometry.second, pixelRatio = geometry.third)
+        }
+        return true
+    }
+
     private fun syncProgress() {
         val exo = player ?: return
+        syncVideoGeometry()
         val duration = exo.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: 0
         val position = exo.currentPosition.coerceAtLeast(0)
         val buffered = exo.bufferedPosition.coerceAtLeast(0).let { if (duration > 0) it.coerceAtMost(duration) else it }

@@ -328,7 +328,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (!stopAtTrackBoundary()) current.seekTo(preview.startMs, MediaPlayer.SEEK_CLOSEST)
                 }
                 updateEngine { it.copy(positionMs = position, playing = current.isPlaying) }; checkpoint()
-                if (current.isPlaying) handler.postDelayed(this, 200)
+                if (current.isPlaying) handler.postDelayed(this, PlaybackPolicy.audioTickMs(PlaybackPower.saving, _state.value.track?.lyricUri != null))
             } catch (_: IllegalStateException) { fail("Pemutaran terhenti. Coba putar ulang.") }
         }
     }

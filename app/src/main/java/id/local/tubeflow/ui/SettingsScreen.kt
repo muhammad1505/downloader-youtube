@@ -299,6 +299,18 @@ fun SettingsScreen(
         }
 
         if (section == "playback") Panel {
+            OptionMenu(
+                label = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_title),
+                options = listOf(
+                    id.local.tubeflow.core.PlaybackPolicy.SYSTEM to androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_system),
+                    id.local.tubeflow.core.PlaybackPolicy.ON to androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_on),
+                    id.local.tubeflow.core.PlaybackPolicy.OFF to androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_off),
+                ),
+                selected = SettingsStore.powerMode,
+                onSelect = { SettingsStore.setPowerMode(context, it) },
+            )
+            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_help), style = MaterialTheme.typography.bodySmall)
+            Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_help), style = MaterialTheme.typography.bodySmall)
             ToggleRow(
                 title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_title),
                 description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.resume_interruption_description),

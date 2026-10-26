@@ -163,6 +163,8 @@ fun MediaLibraryScreen(
                         if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                AttachmentInfo(item.location, item.kind == "AUDIO", item.lyricUri,
+                    completedJobs[item.jobId]?.sidecarUris, item.checkedAt to item.lyricStatus)
                 // Aksi kartu memakai rencana bersama dengan Riwayat; semua aksi tampil langsung.
                 val sourceJob = completedJobs[item.jobId]
                 MediaActionBar(

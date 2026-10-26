@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import id.local.tubeflow.core.location
 import id.local.tubeflow.core.MediaItem
 import id.local.tubeflow.core.StatusClip
 import id.local.tubeflow.core.StatusClipper
@@ -99,6 +99,7 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
+                    if (!busy) StatusClipPreview(item.location, startMs, endMs)
                     Text(
                         "Pilih awal klip. Video yang lebih pendek dari 30 detik akan dipakai seluruhnya.",
                         style = MaterialTheme.typography.bodySmall,
@@ -108,10 +109,15 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                     if (maxStartSec > 0) {
-                        Slider(
-                            value = startSec.coerceIn(0f, maxStartSec.toFloat()),
-                            onValueChange = { startSec = it.roundToInt().toFloat().coerceIn(0f, maxStartSec.toFloat()) },
-                            valueRange = 0f..maxStartSec.toFloat(),
+                        Scrubber(
+                            value = startSec * 1_000f,
+                            duration = maxStartSec * 1_000f,
+                            onScrub = { startSec = (it / 1_000f).roundToInt().toFloat().coerceIn(0f, maxStartSec.toFloat()) },
+                            onScrubFinished = {},
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            touchHeight = 48.dp,
+                            enabled = !busy,
+                            contentDescription = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.clip_start_position),
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Text(

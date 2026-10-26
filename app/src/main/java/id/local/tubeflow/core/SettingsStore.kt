@@ -22,6 +22,14 @@ object SettingsStore {
     var dynamicColor by mutableStateOf(true)
         private set
 
+    var powerMode by mutableStateOf(PlaybackPolicy.SYSTEM); private set
+
+    fun setPowerMode(context: Context, value: String) {
+        if (value !in setOf(PlaybackPolicy.SYSTEM, PlaybackPolicy.ON, PlaybackPolicy.OFF)) return
+        powerMode = value
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putString("playback_power", value) }
+    }
+
     var artworkAccent by mutableStateOf(true); private set
 
     fun setArtworkAccent(context: Context, enabled: Boolean) {
@@ -80,6 +88,9 @@ object SettingsStore {
 
     fun load(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        powerMode = prefs.getString("playback_power", PlaybackPolicy.SYSTEM)
+            ?.takeIf { it in setOf(PlaybackPolicy.SYSTEM, PlaybackPolicy.ON, PlaybackPolicy.OFF) } ?: PlaybackPolicy.SYSTEM
+        PlaybackPower.initialize(context)
         resumeAfterInterruption = prefs.getBoolean("resume_interruption", true)
         autoRename = prefs.getBoolean("smart_rename", true)
         autoTag = prefs.getBoolean("smart_tag", true)

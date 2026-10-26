@@ -1,6 +1,14 @@
 # Signing produksi TubeFlow
 
-Terbaru **1.1.42/code56**, 25 Oktober 2026: APK ARM64 signed
+Terbaru **1.1.45/code60**, 27 Oktober 2026: APK ARM64 signed/minified,
+non-debuggable **76.357.958 byte**, SHA256
+`64899c7b4e26e1d133026aa07ec7b768e1d815ee057f00ca28803d7880458c4c`.
+Sertifikat produksi tetap; signature, zipalign 16 KB, 262 ELF dan 13 kelas ZIP
+lulus. Pemasangan update tanpa uninstall/reset berhasil di Realme Android 10;
+hash `base.apk` identik. APK debug/release dibangun; **AAB tidak dibangun ulang**,
+tidak ada publikasi toko. [Bukti dan batas pengujian](MEDIA_POLISH_1_1_45.md).
+
+Historis **1.1.42/code56**, 25 Oktober 2026: APK ARM64 signed
 **76.274.746 byte**, SHA256
 `8cbf6c07f4821f1d11f8a0b8d7c74cde2494ee9112818c4bf91b65e359e66daa`.
 Sertifikat produksi sama; non-debuggable, signature, zipalign 16 KB, 262 ELF dan

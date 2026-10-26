@@ -6,6 +6,27 @@ Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, 
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
+## Status aktual — 27 Oktober 2026
+
+Baseline sebelum pekerjaan ini: **1.1.44/code58** (`08a893b`). Bagian bertanggal
+9/13 Oktober dan pembaruan 1.1.30 di bawah adalah sejarah; status per bug serta
+laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai.
+
+| ID | Status terbaru dan batas |
+| --- | --- |
+| BUG-078/079/080 | Diperbaiki 1.1.42; regresi serta preset/rotasi HP terbukti pada [laporan resolusi](RESOLUTION_FIXES_1_1_42.md). |
+| BUG-081 | Geometri Scrubber diperbaiki setelah 1.1.42; regresi host tercatat. Risiko ini bukan lagi kode yang belum disentuh. |
+| BUG-082–085 | Perbaikan Bstation/subtitle tersedia; batas setiap skenario tetap berlaku. |
+| BUG-086 | Login email nyata berhasil pada 1.1.44; login sosial popup dan Premium belum terbukti. |
+| BUG-087 | Terbuka untuk reproduksi publikasi baru. Snapshot awal dan query terbaru menunjukkan SRT/MP4 di folder season yang sama; dugaan penolakan suffix bahasa belum terbukti. |
+| BUG-088 | Judul URI ber-encoding diperbaiki pada pekerjaan 1.1.45; hasil tes di [laporan](MEDIA_POLISH_1_1_45.md). |
+| BUG-089/090/091 | Rasio video, ketukan Riwayat dan info lampiran diperbaiki pada 1.1.45; bukti serta batas uji ada di [laporan](MEDIA_POLISH_1_1_45.md). |
+| BUG-092 | Pengamatan terbuka: sesi audio lama sempat galat sesudah update/uji video; memilih lagu ulang dan kembali dari video normal. Akar penyebab belum terbukti. |
+
+Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
+[laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
+status historis dan rujukan; jangan membacanya sebagai daftar regresi terbaru.
+
 ## Status dan titik mulai
 
 **Pembaruan 13 Oktober:** daftar mencapai BUG-039. 1.0.12 memperbaiki alias SoundCloud ber-UTM dan tie kandidat lirik. Lamunan sebelumnya dikonfirmasi sinkron; estimasi terbaru Ya Sudahlah sekitar1detik. Koreksi per lagu1.1.0 teruji secara struktural, koreksi per rekaman total−2s pada1.1.0 dikonfirmasi sinkron oleh pengguna. Detail dan cakupan: [laporan lirik/platform](LYRICS_PLATFORMS_2026-10-13.md). **Rilis 1.1.1/code15** (dashboard Ringkasan media + penguatan cari ulang lirik/BUG-016) kini terpasang di HP — hasil host/perangkat dan batas cakupan ada pada [laporan DASHBOARD_LYRICS](DASHBOARD_LYRICS_2026-10-13.md) dan [DEVICE_TEST](DEVICE_TEST.md); tidak ada temuan ID baru dalam batch ini.
@@ -950,26 +971,91 @@ interstitial unduh-aplikasi. Skrip tidak menyentuh kredensial dan hanya berjalan
 di WebView login.
 
 Setelah perbaikan, dialog di WebView yang sama menampilkan latar putih dan
-keempat pilihan masuk di posisi yang benar. Login dengan akun nyata, katalog
-season, episode Premium, dan unduhan belum dijalankan pada build 1.1.44.
+keempat pilihan masuk di posisi yang benar. Kalimat awal yang menyebut login
+belum diuji digantikan hasil akhir: login email nyata, katalog season dan satu
+episode gratis berhasil pada 1.1.44. Premium tidak diunduh karena akun uji tidak
+berlangganan; login sosial popup belum berhasil diverifikasi. Lihat
+[hasil perangkat 1.1.44](DEVICE_TEST.md#login-bstation-dan-unduhan-1144code58--26-oktober-2026).
 
 ## BUG-087 — P2: Subtitle episode season tertinggal di akar folder, bukan di subfolder season
 
 Unduhan episode Bstation `E01 - The Battle Begins` (720p) selesai dan videonya
 berada di `Downloads/TubeFlow/black-clover-season-2/`, tetapi subtitle
 Indonesianya tersimpan di `Downloads/TubeFlow/E01 - The Battle Begins.id.srt`.
-Nama sidecar memuat akhiran bahasa (`.id`), sedangkan pencocokan publikasi
-memakai nama dasar video tanpa akhiran itu, sehingga sidecar tidak ikut
-dipindahkan dan tidak tercatat pada `sidecarUris` job. Akibatnya pemutar yang
-dibuka dari Riwayat tidak menemukan track subtitle.
+Saat itu subtitle tidak tersedia pada job/pemutar; ini pengamatan yang sah,
+tetapi belum membuktikan kedua file berasal dari proses publikasi yang sama.
 
-Perbaikan yang diusulkan: terima sidecar dengan pola `<nama>.<lang>.<ext>`
-saat publikasi dan catat URI-nya; tambahkan regresi untuk season Bstation.
-Belum diperbaiki per 26 Oktober 2026.
+Pemeriksaan lanjutan menemukan subtitle berukuran 23.761 byte
+lebih tua **5 jam 39 menit 11 detik** daripada video season 157.600.788 byte.
+Koreksi lokasi: snapshot filesystem awal pekerjaan 1.1.45 dan query MediaStore
+27 Oktober menempatkan MP4/SRT di folder season. Tidak ada bukti keduanya
+berasal dari satu publikasi yang sama.
+Sebelumnya juga tercatat reset data aplikasi pada sesi diagnosis. Worker saat
+ini memeriksa semua ekstensi sidecar yang didukung, mempertahankan suffix
+bahasa, dan memakai `relativePath`/`parentDoc` yang sama dengan media. Jadi
+klaim awal bahwa `<nama>.<lang>.srt` ditolak pencocokan basename tidak didukung
+kode terkini.
+
+**Tetap terbuka:** ulangi satu unduhan dengan subtitle dipilih secara eksplisit;
+catat waktu, folder aktual media/sidecar dan `sidecarUris` dari job yang sama.
+Jangan memindahkan subtitle lama ke subfolder lain otomatis berdasarkan nama
+saja. Hasil kode baru dan batasnya ada pada [laporan](MEDIA_POLISH_1_1_45.md).
 
 ## BUG-088 — P3: Judul video `file://` menampilkan `%20`
 
 Membuka video lewat `ACTION_VIEW` dengan URI
 `file:///…/E01%20-%20The%20Battle%20Begins.mp4` menampilkan judul
 `E01%20-%20The%20Battle%20Begins` di pemutar. Nama dari URI perlu di-decode
-sebelum dipakai sebagai judul. Belum diperbaiki per 26 Oktober 2026.
+sebelum dipakai sebagai judul. Pada pekerjaan 1.1.45, decoding dilakukan
+sekali hanya pada fallback URI, dengan tanda `+` dipertahankan. Display name
+asli provider tidak di-decode ulang. Regresi mencakup spasi, plus dan nama
+literal `%20`; verifikasi terbaru ada di [laporan](MEDIA_POLISH_1_1_45.md).
+
+## BUG-089 — P2: Rasio video berubah label tetapi permukaan tetap sama
+
+Terulang pada 1.1.44 di RMX1821 Android 10: saat video dijeda pada frame yang
+sama, Pas dan Zoom tetap menampilkan bidang video 720×405 di tengah layar
+720×1520. Mengganti `PlayerView.resizeMode` saja tidak mengubah ukuran permukaan
+pada pipeline efek Media3 ini. Perbaikan 1.1.45 memakai Presentation
+fit/stretch/crop pada pipeline hardware, dengan output dibatasi ukuran layar.
+Jalur software memakai geometri viewport eksplisit; dimensi sumber diambil
+dari videoFormat bila callback VideoSize tidak tersedia. Rasio piksel ikut
+diperhitungkan. Saat jeda, perubahan visual menyiapkan ulang player pada posisi
+dan play intent yang sama agar frame langsung berubah tanpa menjalankan video.
+Hasil host/perangkat: [laporan](MEDIA_POLISH_1_1_45.md).
+
+## BUG-090 — P3: Kartu Riwayat tidak memutar media lewat ketukan
+
+Koleksi mempunyai `clickable`, sedangkan JobCard Riwayat hanya menyediakan
+ikon Putar. Perbaikan 1.1.45 memakai callback yang sama pada kartu selesai
+ber-URI valid. Ikon aksi terpisah tetap menang atas ketukan induk.
+[Verifikasi dan batas](MEDIA_POLISH_1_1_45.md).
+
+## BUG-091 — P3: Informasi lirik/subtitle tidak konsisten antar daftar
+
+Label Riwayat bergantung opsi saat download dan Koleksi tidak mempunyai
+ringkasan subtitle. Status sukses lama belum membuktikan lampiran masih dapat
+dibaca. Perbaikan 1.1.45 memakai pemeriksaan bersama di thread IO untuk kartu
+Riwayat/Koleksi dan antrean putar: LRC yang dapat dibaca, subtitle eksternal
+bernama dasar sama dan track tertanam. Lampiran tak terbaca dibedakan dari
+kosong. Player juga menemukan subtitle dengan aturan folder/stem yang sama
+bila asosiasi lama tidak ada, tanpa memindahkan file atau menimpa pilihan
+subtitle pengguna. Pengujian dan batas ada di [laporan](MEDIA_POLISH_1_1_45.md).
+
+## BUG-092 — P3: Sesi audio lama sempat galat setelah update dan uji video
+
+Pada sesi fisik 1.1.45/code60, mini player Sigar sempat menampilkan
+“Audio tidak dapat diputar. Periksa file atau codec perangkat.” sesudah
+update dan pengujian video. Belum terbukti apakah ini masalah pemulihan sesi,
+interupsi, atau galat MediaPlayer lain. Tidak ada bukti bahwa file hilang.
+
+Memilih Sigar lagi dari Koleksi berhasil memutar sampai 0:34 lalu dijeda.
+Membuka video dan kembali ke audio mempertahankan 0:34/jeda tanpa galat.
+Belum ada reproduksi konsisten; jangan menutup temuan hanya karena retry normal.
+
+Titik investigasi berikutnya: `PlayerViewModel.load`/`setOnErrorListener`,
+pemulihan `PlaybackSessionStore` dan pelepasan audio focus. Catat kode
+`what`/`extra`, state prepared/loading, token sesi dan urutan interupsi tanpa
+menulis URI bertoken atau data akun ke log. Bandingkan sesi dipulihkan setelah
+update dengan pemilihan lagu baru; pertahankan media/antrean untuk reproduksi.
+[Hasil dan batas](MEDIA_POLISH_1_1_45.md).

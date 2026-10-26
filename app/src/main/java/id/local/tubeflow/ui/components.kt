@@ -10,6 +10,7 @@ import android.os.Looper
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.compositeOver
@@ -502,7 +503,10 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
     val accent=rememberCoverAccent(job.coverPath)
     val song=job.songIdentity()
     Card(
-        modifier.fillMaxWidth(),
+        modifier.fillMaxWidth().clickable(
+            enabled = job.state == JobState.COMPLETED && !job.outputUri.isNullOrBlank() && play != null,
+            onClickLabel = if (job.mode == MediaMode.AUDIO) "Putar lagu" else "Putar video",
+        ) { play?.invoke() },
         colors = mediaCardColors(accent),
         border = if (highlighted) BorderStroke(2.dp, accent) else null,
     ) {
@@ -579,9 +583,13 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
             }
             if (job.state != JobState.FAILED && job.resumeNotice.isNotBlank())
                 Text(job.resumeNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (job.state == JobState.COMPLETED) job.outputUri?.let { raw ->
+                AttachmentInfo(raw, job.mode == MediaMode.AUDIO, sidecars = job.sidecarUris,
+                    revision = job.lyricStatus to job.completedAt)
+            }
             // Status lirik terpisah dari status audio: audio sukses tetap "Selesai" walau lirik tidak ada (BUG-014).
             if (job.processingNotice.isNotBlank()) Text(job.processingNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-            if (job.state == JobState.COMPLETED && job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty() && job.lyricStatus.isNotBlank()) {
+            if (job.state == JobState.COMPLETED && job.mode == MediaMode.AUDIO && job.lyricStatus.isNotBlank() && job.lyricStatus != LyricStatus.SAVED) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                     Icon(
                         if (job.lyricStatus == LyricStatus.SAVED) Icons.Outlined.Lyrics else Icons.Outlined.Warning,
