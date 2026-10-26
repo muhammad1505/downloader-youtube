@@ -210,3 +210,21 @@ ditampilkan sebagai `0:00` — baik di kartu maupun di badge thumbnail.
   saat extractor upstream berubah.
 - WebView login membuka halaman resmi Bstation. OAuth pihak ketiga yang menolak
   embedded WebView berada di luar kendali aplikasi; gunakan login email/telepon.
+
+## Perbaikan tampilan login di WebView (BUG-086, 26 Oktober 2026)
+
+WebView di perangkat uji mengukur `vh` sebagai 0 px walau `window.innerHeight`
+715 px. Karena panel login Bstation memakai `max-height: 90vh`, kotaknya runtuh
+setinggi nol: hanya teks yang terlihat, tanpa latar putih maupun tombol metode
+login. `BstationLoginDialog` kini:
+
+- mengaktifkan `useWideViewPort`/`loadWithOverviewMode` agar halaman dilayout
+  pada lebar perangkat, bukan lebar fisik dengan skala 1:1;
+- menyuntikkan gaya pada `onPageFinished` yang mengganti batas tinggi dialog
+  login dengan piksel (`0,86 × innerHeight`) dan memperbaruinya saat resize;
+- menutup otomatis interstitial “Silakan unduh aplikasi untuk konten lengkap”
+  yang tadinya menutupi panel login.
+
+Bukti: melalui CDP, dialog login di WebView menampilkan latar putih dan empat
+tombol masuk setelah perbaikan. Login dengan akun nyata dan unduhan episode
+masih harus diuji.

@@ -1088,3 +1088,26 @@ Verifikasi host pada 26 Oktober 2026 (`bash scripts/build_release.sh
 Uji perangkat tercatat di [DEVICE_TEST.md](DEVICE_TEST.md). Login Bstation
 dengan akun nyata, akses episode Premium/geo dari jaringan Indonesia, dan
 pemutaran episode Bstation belum dijalankan pada build ini.
+
+## Rilis 1.1.44/code58 — 26 Oktober 2026
+
+Rilis ini memperbaiki login Bstation di WebView (BUG-086). Halaman memakai
+`max-height: 90vh`, sedangkan WebView perangkat mengukur `vh` sebagai 0 px
+walau `innerHeight` 715 px; kotak dialog login runtuh setinggi nol sehingga
+hanya teks yang terlihat dan tombol Facebook/Google/Twitter/Email tidak
+tergambar. `BstationLoginDialog` kini menghormati `<meta viewport>`,
+mengganti batas tinggi dialog dengan piksel (`0,86 × innerHeight`, diperbarui
+saat resize), dan menutup otomatis interstitial “Silakan unduh aplikasi”.
+Bukti sebelum/sesudah diambil lewat remote debugging WebView (CDP).
+
+Verifikasi host (`bash scripts/build_release.sh --no-daemon`, 20m 26s):
+**526 tes Kotlin** 0 gagal, lint debug/release **0 error/3 warning** lama,
+APK ARM64 76.322.174 byte SHA256
+`78c35a53959172a114e546148b71f1b5ea2aa57a2940cf610949fd2dfe67447d`,
+signature produksi, zipalign 16 KB, 262 ELF dan 13 kelas ZIP diaudit tanpa
+kegagalan.
+
+Uji perangkat dengan akun Bstation nyata berhasil untuk login email, katalog
+season, kunci Premium, dan unduhan satu episode gratis 720p. Rincian dan dua
+temuan baru (BUG-087 subtitle season tidak ikut subfolder, BUG-088 judul
+`file://` ber-`%20`) ada di [DEVICE_TEST.md](DEVICE_TEST.md).

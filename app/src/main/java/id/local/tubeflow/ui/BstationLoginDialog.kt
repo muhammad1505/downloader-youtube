@@ -51,6 +51,53 @@ import kotlinx.coroutines.delay
 private const val BSTATION_HOME = "https://www.bilibili.tv/id"
 
 /**
+ * Perbaikan tampilan halaman login Bstation di WebView.
+ *
+ * Halaman Bstation memakai `max-height: 90vh` untuk kotak dialog login. Di WebView perangkat
+ * uji, `vh` diukur 0 px walau `window.innerHeight` 715 px, sehingga kotak itu runtuh setinggi
+ * nol: judul, syarat, dan checkbox terlihat menempel di atas halaman tanpa latar putih, dan
+ * tombol Facebook/Google/Twitter/Email tidak tampak. Gaya di bawah mengganti batas tinggi
+ * berbasis `vh` dengan piksel dari `innerHeight` yang benar.
+ *
+ * Interstitial "Silakan unduh aplikasi untuk konten lengkap" juga menutupi dialog login saat
+ * dibuka dari WebView. Tombol batalnya ditekan otomatis supaya pengguna bisa memilih metode
+ * login; skrip ini tidak menyentuh kredensial dan hanya berjalan di WebView login ini.
+ */
+private val LOGIN_LAYOUT_FIX_JS = """
+    (function () {
+      if (window.__tfLoginFix) return;
+      window.__tfLoginFix = true;
+      function applySize() {
+        var viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+        var maxHeight = Math.max(320, Math.round(viewport * 0.86));
+        var style = document.getElementById('tf-login-fix');
+        if (!style) {
+          style = document.createElement('style');
+          style.id = 'tf-login-fix';
+          document.head.appendChild(style);
+        }
+        style.textContent = '.dialog--mobile .dialog__container{max-height:' + maxHeight +
+          'px !important;height:auto !important;}';
+      }
+      function closeStoreDialog() {
+        var dialogs = document.querySelectorAll('[class*=dialog__wrap]');
+        for (var i = 0; i < dialogs.length; i++) {
+          var dialog = dialogs[i];
+          if ((dialog.innerText || '').indexOf('Silakan unduh aplikasi') !== 0) continue;
+          var cancel = dialog.querySelector('[class*=dialog__cancel]');
+          if (cancel) cancel.click(); else dialog.remove();
+        }
+      }
+      applySize();
+      window.addEventListener('resize', applySize);
+      closeStoreDialog();
+      if (document.body) {
+        new MutationObserver(closeStoreDialog).observe(document.body, {childList: true, subtree: true});
+      }
+    })();
+""".trimIndent()
+
+/**
  * Login resmi Bstation di WebView. Cookie HttpOnly ikut terbaca lewat CookieManager, lalu
  * disimpan terenkripsi oleh [BstationAuth]; halaman tidak pernah menyentuh kata sandi pengguna.
  */
@@ -138,6 +185,11 @@ fun BstationLoginDialog(
                             WebView(viewContext).apply {
                                 setBackgroundColor(Color.WHITE)
                                 settings.apply {
+                                    // Benar-benar menghormati <meta viewport>: tanpa ini halaman
+                                    // dilayout pada lebar fisik dengan rasio 1:1 sehingga teks dan
+                                    // dialog login tampil terlalu kecil.
+                                    useWideViewPort = true
+                                    loadWithOverviewMode = true
                                     javaScriptEnabled = true
                                     domStorageEnabled = true
                                     loadsImagesAutomatically = true
@@ -161,6 +213,7 @@ fun BstationLoginDialog(
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         loading = false
+                                        view?.evaluateJavascript(LOGIN_LAYOUT_FIX_JS, null)
                                     }
 
                                     override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {

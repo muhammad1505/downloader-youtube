@@ -921,3 +921,55 @@ memasang `PlayerView` di dalam `key(playerVersion)` sehingga permukaan video
 dibuat ulang bersama player baru. Perubahan ini tetap dipertahankan karena
 menghilangkan ketergantungan pada perilaku `PlayerView` saat player dilepas,
 tetapi bukan bukti bahwa kasus perangkat pengguna sudah hilang.
+
+## BUG-086 — P1: Dialog login Bstation runtuh di WebView sehingga metode login tidak terlihat
+
+Dilaporkan saat uji login 26 Oktober 2026: setelah menekan **Masuk ke Bstation**,
+halaman Bstation tampil, tetapi panel login hanya memperlihatkan judul
+“Login Bstation”, teks syarat, dan tautan registrasi tanpa latar putih dan tanpa
+tombol Facebook/Google/Twitter/Email. Pengguna menggambarkannya sebagai
+“transparan”.
+
+Reproduksi memakai remote debugging WebView (CDP) pada RMX1821 Android 10,
+WebView `155.0.8059.46`:
+
+- `window.innerHeight` = 715 px, tetapi elemen uji `height: 50vh` terukur
+  **0 px**. Unit `vh` di WebView ini diukur dari viewport 0.
+- Aturan situs `.dialog--mobile .dialog__container { max-height: 90vh }`
+  menghasilkan `max-height: 0px`; container setinggi **0 px** sedangkan
+  anak-anaknya tetap dirender (overflow), sehingga latar putih dan tombol
+  tidak tergambar.
+- Interstitial “Silakan unduh aplikasi untuk konten lengkap” juga bisa muncul
+  di atas panel login dan menutupi pilihannya.
+
+Perbaikan di `ui/BstationLoginDialog.kt`: `useWideViewPort`/`loadWithOverviewMode`
+agar halaman memakai lebar perangkat, lalu skrip yang disuntikkan pada
+`onPageFinished` mengganti batas tinggi dialog menjadi piksel
+(`0,86 × innerHeight`, diperbarui saat resize) dan menutup otomatis
+interstitial unduh-aplikasi. Skrip tidak menyentuh kredensial dan hanya berjalan
+di WebView login.
+
+Setelah perbaikan, dialog di WebView yang sama menampilkan latar putih dan
+keempat pilihan masuk di posisi yang benar. Login dengan akun nyata, katalog
+season, episode Premium, dan unduhan belum dijalankan pada build 1.1.44.
+
+## BUG-087 — P2: Subtitle episode season tertinggal di akar folder, bukan di subfolder season
+
+Unduhan episode Bstation `E01 - The Battle Begins` (720p) selesai dan videonya
+berada di `Downloads/TubeFlow/black-clover-season-2/`, tetapi subtitle
+Indonesianya tersimpan di `Downloads/TubeFlow/E01 - The Battle Begins.id.srt`.
+Nama sidecar memuat akhiran bahasa (`.id`), sedangkan pencocokan publikasi
+memakai nama dasar video tanpa akhiran itu, sehingga sidecar tidak ikut
+dipindahkan dan tidak tercatat pada `sidecarUris` job. Akibatnya pemutar yang
+dibuka dari Riwayat tidak menemukan track subtitle.
+
+Perbaikan yang diusulkan: terima sidecar dengan pola `<nama>.<lang>.<ext>`
+saat publikasi dan catat URI-nya; tambahkan regresi untuk season Bstation.
+Belum diperbaiki per 26 Oktober 2026.
+
+## BUG-088 — P3: Judul video `file://` menampilkan `%20`
+
+Membuka video lewat `ACTION_VIEW` dengan URI
+`file:///…/E01%20-%20The%20Battle%20Begins.mp4` menampilkan judul
+`E01%20-%20The%20Battle%20Begins` di pemutar. Nama dari URI perlu di-decode
+sebelum dipakai sebagai judul. Belum diperbaiki per 26 Oktober 2026.

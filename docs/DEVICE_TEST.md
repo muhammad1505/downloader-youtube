@@ -1018,3 +1018,44 @@ season, antrean episode, subtitle episode, pemutaran dan rotasi pemutar,
 serta unduhan penuh belum diuji pada build ini. Tidak ada akun Bstation yang
 dipakai di sesi ini; API katalog dan `playurl` dari IP Indonesia masih perlu
 dibuktikan lewat uji perangkat berikutnya.
+
+## Login Bstation dan unduhan episode 1.1.44/code58 — 26 Oktober 2026
+
+Release dipasang sebagai update di Realme RMX1821 Android 10/API29, ARM64,
+halaman 4 KB; versi terpasang 1.1.44/code58, SHA256 ARM64
+`78c35a53959172a114e546148b71f1b5ea2aa57a2940cf610949fd2dfe67447d`.
+Aplikasi sempat dipasang sebagai build debug untuk diagnosis WebView, lalu
+dipasang ulang sebagai release; karena perbedaan signature, data aplikasi
+(pengaturan/riwayat) ter-reset dua kali. Berkas di `Downloads/TubeFlow` tidak
+tersentuh.
+
+**Login.** Panel login yang sebelumnya runtuh (BUG-086) kini tampil dengan
+latar putih dan empat pilihan. Login berhasil memakai **Login dengan Email**;
+status di Pengaturan berubah menjadi **Akun Bstation aktif** dan jendela
+tertutup otomatis. Tombol Google/Facebook/Twitter membuka popup
+`window.open` yang tidak didukung WebView, sehingga bukan jalur yang dipakai.
+
+**Katalog season.** `https://www.bilibili.tv/id/play/2432940` menampilkan
+**Black Clover Season 2**, **4 episode · 1 spesial · 1 Premium** dengan pesan
+“Kamu sudah masuk…”. E01–E03 tercentang otomatis; E04 bertanda **Premium ·
+hanya untuk akun berlangganan** dan tidak tercentang. Sebelum login, E04
+terkunci; sesudah login checkbox-nya aktif dengan catatan akses mengikuti
+langganan. Episode Premium tidak diantrekan karena akun uji tidak berlangganan.
+
+**Unduhan.** Satu episode gratis (E01, 720p MP4, 1 episode) selesai:
+`Downloads/TubeFlow/black-clover-season-2/E01 - The Battle Begins.mp4`,
+157.600.788 byte, ffprobe H.264 1280×720 + AAC, durasi 23:50. Riwayat
+menampilkan **Selesai · 26 Okt 2026 · 17:45**. Berkas diputar ulang dari
+tombol **Putar** di Riwayat.
+
+**Temuan saat uji.**
+
+- **BUG-087:** subtitle hasil unduhan tersimpan sebagai
+  `Downloads/TubeFlow/E01 - The Battle Begins.id.srt` (akar folder), bukan di
+  subfolder season bersama videonya. Player tidak menemukan track subtitle
+  dari job tersebut; verifikasi teks subtitle di layar belum berhasil.
+- **BUG-088:** membuka berkas lewat `ACTION_VIEW` `file://…E01%20-%20…mp4`
+  menampilkan judul dengan `%20` apa adanya.
+- Panel subtitle tidak dapat dibuka lewat koordinat ADB pada sesi ini karena
+  kontrol auto-hide; pengujian subtitle memakai Riwayat/job, bukan bukti
+  tampilan teks.
