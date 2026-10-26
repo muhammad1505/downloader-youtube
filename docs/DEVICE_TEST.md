@@ -2,6 +2,9 @@
 
 ## Cara membaca dan status terkini — 27 Oktober 2026
 
+Terbaru **1.1.46/code61**: Manual/Auto dan penguat PCM diuji di HP; pengguna
+mengonfirmasi +6 dB jelas/bersih. [Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+
 Dokumen ini adalah kronologi, bukan checklist semua fitur pada APK terbaru.
 Bagian lama di bawah tetap berlaku hanya untuk versi dan skenario yang disebut.
 Baseline terbaru saat pekerjaan ini dimulai adalah **1.1.44/code58**; hasil
@@ -1106,3 +1109,23 @@ Batas: unduhan penuh baru, LRCLIB/timing vokal, ekspor Status, sensor fallback
 fisik, rotasi terkontrol pada versi ini, tema/font/TalkBack dan runtime 16 KB
 belum diuji ulang. BUG-087 tetap perlu reproduksi publikasi baru.
 [Laporan lengkap, artefak dan file terdampak](MEDIA_POLISH_1_1_45.md).
+
+## Kecerahan dan volume 1.1.46/code61 — 27 Oktober 2026
+
+Kecerahan Otomatis/Manual pada Tampilan, gestur kiri ke Manual, serta penguat
+video Normal/+3/+6/+9dB melalui PCM dengan pembatas puncak. Musik, file asli,
+volume/brightness global, Room10 dan izin tetap. Normal memakai jalur semula;
+boost melepas passthrough/offload hanya pada sesi yang memakainya.
+
+543 tes Kotlin/98 Python lulus; lint debug/release0error/3warning lama. Build
+debug/release signed lulus11m57s, ARM64 76.376.658byte, SHA256
+`e80bd42ce9251941e0971727df63cd134d4fc1eb9b88227142fa6efcff06a4ca`. Audit262ELF/13ZIP,
+signature/zipalign16KB lulus; update Android10 berhasil, hash identik.
+Manual24→65% mengubah override498→1340; Auto mengembalikan−1. Gain6/9/Normal
+mempertahankan14:57/jeda/subtitle; Software+6 aktif. Pengguna mengonfirmasi
++6dB jelas/bersih pada volume HP terlapor50%; penguat6 dipertahankan, kecerahan
+Auto dan dekoderAuto.15path media tetap. AAB tidak dibangun ulang.
+
+[Bukti, batas dan file terdampak](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Sensor
+fallback/ruangan terkontrol, semua rute/codec/ABI, runtime16KB dan performa
+belum teruji menyeluruh; BUG087/092 tetap, tidak ada klaim produksi lengkap.

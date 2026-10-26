@@ -1,6 +1,16 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.45/code60 — 27 Oktober 2026
+## Status terbaru — 1.1.46/code61 — 27 Oktober 2026
+
+543 tes Kotlin/98 Python lulus, lint debug/release0error/3warning lama;
+build debug/release signed lulus11m57s. ARM64 76.376.658byte, SHA256
+`e80bd42ce9251941e0971727df63cd134d4fc1eb9b88227142fa6efcff06a4ca`.
+Audit262ELF/13ZIP, signature/zipalign16KB lulus; update Android10/hash identik.
+Manual/Auto dan gain PCM diperiksa di HP; pengguna mengonfirmasi +6dB jelas.
+Room10, tanpa migrasi/dependensi/izin baru. AAB tidak dibangun ulang.
+[Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+
+## Status sebelumnya — 1.1.45/code60 — 27 Oktober 2026
 
 Rasio video, lampiran bersama, ketuk Riwayat, preview Status, kecerahan otomatis
 dan penghemat baterai. Room tetap 10; tanpa migrasi/dependensi/izin baru.

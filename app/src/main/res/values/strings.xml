@@ -213,7 +213,7 @@
     <string name="power_saver_on">Aktif</string>
     <string name="power_saver_off">Nonaktif</string>
     <string name="power_saver_help">Mengurangi pembaruan posisi pemutar dan menonaktifkan sementara Smart Enhance video. Kualitas file, download, lirik dan efek audio tetap dipertahankan.</string>
-    <string name="video_brightness_help">Kecerahan video otomatis mengikuti pencahayaan ruangan. Gunakan kecerahan adaptif Android; jika nonaktif, sensor cahaya HP dipakai hanya selama layar video terbuka. Tanpa sensor, kecerahan mengikuti sistem.</string>
+    <string name="video_brightness_help">Player video menyediakan Otomatis dan Manual di Opsi pemutar → Tampilan. Otomatis mengikuti adaptif Android atau sensor cahaya. Manual hanya mengubah jendela player; pengaturan kecerahan HP tetap dipertahankan.</string>
     <string name="attachments_checking">Memeriksa lampiran…</string>
     <string name="attachments_unreadable">Lampiran belum dapat diperiksa</string>
     <string name="lyrics_available">Lirik tersedia</string>
@@ -225,9 +225,21 @@
     <string name="clip_preview_error">Pratinjau tidak dapat diputar di perangkat ini. Pilih bagian berdasarkan waktu atau coba video lain.</string>
     <string name="power_saver_short">Hemat</string>
     <string name="power_saver_effects">Penghemat baterai aktif. Smart Enhance sementara tidak diterapkan; pilihan efek tetap disimpan.</string>
-    <string name="video_brightness_automatic">Kecerahan otomatis</string>
     <string name="clip_start_position">Awal potongan Status</string>
     <string name="clip_preview_play">Putar pratinjau</string>
     <string name="clip_preview_pause">Jeda pratinjau</string>
     <string name="clip_preview_position">Posisi pratinjau potongan</string>
+    <string name="video_brightness_title">Kecerahan video</string>
+    <string name="video_brightness_auto">Otomatis</string>
+    <string name="video_brightness_manual">Manual</string>
+    <string name="video_brightness_percent">Kecerahan manual %1$d%%</string>
+    <string name="video_brightness_auto_help">Mengikuti kecerahan adaptif Android atau sensor cahaya. Geser sisi kiri video untuk beralih ke manual.</string>
+    <string name="video_brightness_manual_help">Geser bilah atau sisi kiri video. Hanya berlaku di player; kecerahan HP dipulihkan saat keluar.</string>
+    <string name="video_volume_boost_title">Penguat volume video</string>
+    <string name="video_volume_normal">Normal</string>
+    <string name="video_volume_boost_db">+%1$d dB</string>
+    <string name="video_volume_boost_help">Normal memakai level asli. Pilih penguat untuk video bersuara pelan; volume HP dan file asli tidak diubah.</string>
+    <string name="video_volume_boost_active">Penguat aktif hanya untuk video, dengan pembatas puncak suara. Kurangi penguat jika suara terasa pecah.</string>
+    <string name="video_volume_boost_pending">Penguat akan diterapkan setelah track audio siap.</string>
+    <string name="video_volume_boost_unavailable">Format audio ini belum mendukung penguat. Audio tetap diputar pada level normal.</string>
 </resources>

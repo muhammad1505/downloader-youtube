@@ -8,6 +8,10 @@ Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPME
 
 ## Status aktual — 27 Oktober 2026
 
+Terbaru **1.1.46/code61** menambahkan kontrol kecerahan dan menangani kasus
+volume video pelan lewat penguat opsional (BUG-093, terkonfirmasi pengguna).
+[Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+
 Baseline sebelum pekerjaan ini: **1.1.44/code58** (`08a893b`). Bagian bertanggal
 9/13 Oktober dan pembaruan 1.1.30 di bawah adalah sejarah; status per bug serta
 laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai.
@@ -22,6 +26,7 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-088 | Judul URI ber-encoding diperbaiki pada pekerjaan 1.1.45; hasil tes di [laporan](MEDIA_POLISH_1_1_45.md). |
 | BUG-089/090/091 | Rasio video, ketukan Riwayat dan info lampiran diperbaiki pada 1.1.45; bukti serta batas uji ada di [laporan](MEDIA_POLISH_1_1_45.md). |
 | BUG-092 | Pengamatan terbuka: sesi audio lama sempat galat sesudah update/uji video; memilih lagu ulang dan kembali dari video normal. Akar penyebab belum terbukti. |
+| BUG-093 | Kasus uji teratasi: pengguna mengonfirmasi +6 dB jelas/bersih pada volume HP terlapor50%. Penguat PCM1.1.46 teruji; tidak mengklaim semua sumber/rute sama dengan pemutar lain. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
@@ -1059,3 +1064,28 @@ pemulihan `PlaybackSessionStore` dan pelepasan audio focus. Catat kode
 menulis URI bertoken atau data akun ke log. Bandingkan sesi dipulihkan setelah
 update dengan pemilihan lagu baru; pertahankan media/antrean untuk reproduksi.
 [Hasil dan batas](MEDIA_POLISH_1_1_45.md).
+
+## BUG-093 — P2: Volume video kecil pada headset dan speaker
+
+Pengelola melaporkan video hanya jelas pada volume sistem tinggi; musik
+normal. Video yang sama lebih keras di pemutar lain pada volume HP yang sama.
+EQ dan efek video Mati tidak banyak mengubah hasil. Ini berbeda dari
+BUG-092, yang menyangkut pesan galat pemulihan sesi musik.
+
+Sampel sumber AAC stereo mempunyai rata-rata−32,5dBFS dan−27,6dBFS pada dua
+rentang60detik. Kode player memakai volume penuh1,0; tidak ada kontrol gain
+positif di atas level sumber. Belum ada bukti terukur penyebab selisih antarpemutar
+atau bahwa pemutar lain memakai gain internal yang sama. Jangan menyimpulkan
+semuanya karena volume HP rendah atau memastikan EQ penyebabnya tanpa bukti.
+
+1.1.46 menyediakan Normal/+3/+6/+9dB melalui AudioProcessor PCM, pembatas puncak
+lembut, isolasi dari engine musik dan tanpa mengubah file. Normal mempertahankan
+jalur asli; boost memerlukan PCM sehingga passthrough/offload dilepas hanya
+pada sesi yang memakai penguat. HP uji tidak melaporkan LoudnessEnhancer vendor.
+Status format yang tidak didukung ditampilkan dan audio tetap diputar normal.
+
+**Verifikasi:** regresi stereo/float, overflow, monotonic/simetri, bypass dan
+flush; pengujian perangkat dan dengar pengguna dicatat di
+[laporan1.1.46](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Pengguna mengonfirmasi
++6 dB jelas/bersih pada volume HP terlapor50%; kasus uji ditangani. Penguat
+opsional bukan bukti akar seluruh perbedaan antarpemutar sudah tertutup.

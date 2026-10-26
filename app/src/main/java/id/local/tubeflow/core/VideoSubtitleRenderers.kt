@@ -4,9 +4,15 @@ import android.content.Context
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.AudioOffloadSupport
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.text.SubtitleDecoderFactory
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.text.TextRenderer
@@ -24,6 +30,8 @@ import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 class VideoRenderersFactory(
     context: Context,
     extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
+    private val volumeBoostDb: Int = 0,
+    private val onBoostSupport: (Boolean) -> Unit = {},
     private val subtitleDelayUs: () -> Long,
 ) : NextRenderersFactory(context) {
     init {
@@ -31,6 +39,24 @@ class VideoRenderersFactory(
         // didukung. PREFER dipakai saat membuka ulang setelah kegagalan dekoder perangkat.
         setExtensionRendererMode(extensionRendererMode)
         setEnableDecoderFallback(true)
+    }
+
+    override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink? {
+        if (volumeBoostDb <= 0) return super.buildAudioSink(context, enableFloatOutput, enableAudioOutputPlaybackParams)
+        val sink = DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(false)
+            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+            .setAudioProcessors(arrayOf<AudioProcessor>(VideoVolumeProcessor(volumeBoostDb, onBoostSupport)))
+            .build()
+        // Compressed passthrough/offload bypasses PCM processors. Decode only boosted sessions.
+        return object : ForwardingAudioSink(sink) {
+            override fun supportsFormat(format: Format): Boolean =
+                format.sampleMimeType == MimeTypes.AUDIO_RAW && super.supportsFormat(format)
+            override fun getFormatSupport(format: Format): Int =
+                if (format.sampleMimeType == MimeTypes.AUDIO_RAW) super.getFormatSupport(format) else AudioSink.SINK_FORMAT_UNSUPPORTED
+            override fun getFormatOffloadSupport(format: Format): AudioOffloadSupport = AudioOffloadSupport.DEFAULT_UNSUPPORTED
+            override fun setOffloadMode(offloadMode: Int) = super.setOffloadMode(AudioSink.OFFLOAD_MODE_DISABLED)
+        }
     }
 
     override fun buildTextRenderers(

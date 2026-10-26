@@ -4,6 +4,10 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
+Terbaru **1.1.46/code61** sudah terpasang: kontrol kecerahan dan penguat video.
+[Hasil build, uji HP dan konfirmasi dengar](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+Catatan baseline 1.1.44 berikut mengacu pada awal pekerjaan player 1.1.45.
+
 Baseline sebelum perubahan **1.1.44/code58**, Room 10, Media3 1.11.1. Ringkasan rilis
 1.1.43/1.1.44 dan hasil Bstation berada di akhir kronologi ini serta di
 [DEVICE_TEST](DEVICE_TEST.md). Bagian Batch A/B berikut adalah arsip 9 Oktober;
@@ -1155,3 +1159,23 @@ HP membuktikan subtitle terlihat dan tiga rasio berubah saat jeda di7:12.
 Preview final dibuka tanpa ekspor; pemeriksaan rentang/play-to-end sebelumnya
 tercatat terpisah. BUG-087 publikasi baru dan BUG-092 galat sesaat sesi audio
 lama tetap terbuka. [Bukti, batas dan catatan pemeliharaan](MEDIA_POLISH_1_1_45.md).
+
+## Kecerahan dan volume 1.1.46/code61 — 27 Oktober 2026
+
+Kecerahan Otomatis/Manual pada Tampilan, gestur kiri ke Manual, serta penguat
+video Normal/+3/+6/+9dB melalui PCM dengan pembatas puncak. Musik, file asli,
+volume/brightness global, Room10 dan izin tetap. Normal memakai jalur semula;
+boost melepas passthrough/offload hanya pada sesi yang memakainya.
+
+543 tes Kotlin/98 Python lulus; lint debug/release0error/3warning lama. Build
+debug/release signed lulus11m57s, ARM64 76.376.658byte, SHA256
+`e80bd42ce9251941e0971727df63cd134d4fc1eb9b88227142fa6efcff06a4ca`. Audit262ELF/13ZIP,
+signature/zipalign16KB lulus; update Android10 berhasil, hash identik.
+Manual24→65% mengubah override498→1340; Auto mengembalikan−1. Gain6/9/Normal
+mempertahankan14:57/jeda/subtitle; Software+6 aktif. Pengguna mengonfirmasi
++6dB jelas/bersih pada volume HP terlapor50%; penguat6 dipertahankan, kecerahan
+Auto dan dekoderAuto.15path media tetap. AAB tidak dibangun ulang.
+
+[Bukti, batas dan file terdampak](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Sensor
+fallback/ruangan terkontrol, semua rute/codec/ABI, runtime16KB dan performa
+belum teruji menyeluruh; BUG087/092 tetap, tidak ada klaim produksi lengkap.

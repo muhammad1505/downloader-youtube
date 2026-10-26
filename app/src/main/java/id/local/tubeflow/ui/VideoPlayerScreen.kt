@@ -1,5 +1,6 @@
 package id.local.tubeflow.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -8,10 +9,12 @@ import android.graphics.Typeface
 import android.media.AudioManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -118,6 +121,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -141,6 +146,9 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import id.local.tubeflow.core.VideoAspect
+import id.local.tubeflow.core.VideoBrightnessMode
+import id.local.tubeflow.core.VideoBrightnessPolicy
+import id.local.tubeflow.core.VideoVolumePolicy
 import id.local.tubeflow.core.VideoAudioEffect
 import id.local.tubeflow.core.VideoDecoderMode
 import id.local.tubeflow.core.VideoEnhance
@@ -168,10 +176,15 @@ private val AccentBlue = Color(0xFF8AB4F8)
 
 private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, EFFECTS, DECODER, QUEUE, MORE }
 
+private fun currentVideoBrightness(activity: Activity?): Float = VideoBrightnessPolicy.initial(
+    activity?.window?.attributes?.screenBrightness ?: -1f,
+    activity?.let { Settings.System.getInt(it.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 127) } ?: 127,
+)
+
 private sealed interface GestureFeedback {
     data class Seek(val deltaMs: Long, val targetMs: Long) : GestureFeedback
     data class Volume(val percent: Int) : GestureFeedback
-    data object AutoBrightness : GestureFeedback
+    data class Brightness(val percent: Int) : GestureFeedback
 }
 
 /** Konfirmasi singkat setelah tombol pengaturan cepat mengubah sesuatu. */
@@ -192,7 +205,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     val state by video.state.collectAsStateWithLifecycle()
     if (!state.active) return
     val context = LocalContext.current
-    val activity = context as? ComponentActivity
+    val activity = LocalActivity.current as? ComponentActivity
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val lifecycleOwner = LocalLifecycleOwner.current
     val audio = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -372,7 +385,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         }
     }
     val saving = id.local.tubeflow.core.PlaybackPower.saving
-    AutomaticVideoBrightness(activity, inPip, saving)
+    val brightnessOverride = rememberVideoBrightness(activity, inPip, saving, state.brightnessMode, state.manualBrightness)
     LaunchedEffect(saving) { video.refreshPowerPolicy() }
 
     val videoAspect = state.aspect
@@ -417,10 +430,11 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 Modifier
                     .fillMaxSize()
                     .pointerInput(state.entry?.uri) {
-                        var axis = 0 // 1 seek, 2 volume; kecerahan mengikuti ruangan.
+                        var axis = 0 // 1 seek, 2 volume, 3 kecerahan manual.
                         var total = Offset.Zero
                         var startPosition = 0L
                         var startVolume = 0
+                        var startBrightness = 0.5f
                         var startX = 0f
                         detectDragGestures(
                             onDragStart = { offset ->
@@ -429,6 +443,8 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                 total = Offset.Zero
                                 startPosition = video.state.value.positionMs
                                 startVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                startBrightness = if (video.state.value.brightnessMode == VideoBrightnessMode.MANUAL)
+                                    video.state.value.manualBrightness else currentVideoBrightness(activity)
                             },
                             onDrag = { change, amount ->
                                 change.consume()
@@ -451,16 +467,24 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                         audio.setStreamVolume(AudioManager.STREAM_MUSIC, value, 0)
                                         feedback = GestureFeedback.Volume(value * 100 / maximum)
                                     }
-                                    3 -> feedback = GestureFeedback.AutoBrightness
+                                    3 -> {
+                                        val level = VideoBrightnessPolicy.clamp(startBrightness - total.y / size.height)
+                                        video.setManualBrightness(level, persist = false)
+                                        feedback = GestureFeedback.Brightness((level * 100).toInt())
+                                    }
                                 }
                             },
                             onDragEnd = {
                                 if (axis == 1) {
                                     (feedback as? GestureFeedback.Seek)?.let { video.seekTo(it.targetMs) }
                                 }
+                                if (axis == 3) video.setManualBrightness(video.state.value.manualBrightness)
                                 axis = 0
                             },
-                            onDragCancel = { axis = 0 },
+                            onDragCancel = {
+                                if (axis == 3) video.setManualBrightness(video.state.value.manualBrightness)
+                                axis = 0
+                            },
                         )
                     }
                     .pointerInput(Unit) {
@@ -732,6 +756,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     video = video,
                     orientation = orientation,
                     supportsPip = supportsPip,
+                    brightnessOverride = brightnessOverride,
                     onScreenshot = {
                         takeScreenshot()
                         sheet = null
@@ -1283,7 +1308,7 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
     val icon = when (feedback) {
         is GestureFeedback.Seek -> if (feedback.deltaMs >= 0) Icons.Outlined.FastForward else Icons.Outlined.FastRewind
         is GestureFeedback.Volume -> Icons.AutoMirrored.Outlined.VolumeUp
-        GestureFeedback.AutoBrightness -> Icons.Outlined.Brightness6
+        is GestureFeedback.Brightness -> Icons.Outlined.Brightness6
     }
     val text = when (feedback) {
         is GestureFeedback.Seek -> {
@@ -1291,7 +1316,7 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
             "$sign${abs(feedback.deltaMs) / 1000} dtk · ${VideoPlayback.timeLabel(feedback.targetMs)}"
         }
         is GestureFeedback.Volume -> "Volume ${feedback.percent}%"
-        GestureFeedback.AutoBrightness -> androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_automatic)
+        is GestureFeedback.Brightness -> androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_percent, feedback.percent)
     }
     Surface(
         modifier,
@@ -1381,6 +1406,7 @@ private fun VideoOptionsSheet(
     video: VideoPlayerViewModel,
     orientation: VideoOrientation,
     supportsPip: Boolean,
+    brightnessOverride: Float,
     onPickSubtitle: () -> Unit,
     onScreenshot: () -> Unit,
     onOpen: (VideoSheet) -> Unit,
@@ -1389,12 +1415,14 @@ private fun VideoOptionsSheet(
     onLock: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val host = LocalActivity.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = SheetBackground,
         contentColor = PlayerContent,
         dragHandle = { BottomSheetDefaults.DragHandle(color = PlayerContent.copy(alpha = 0.4f)) },
     ) {
+        VideoDialogBrightness((LocalView.current.parent as? DialogWindowProvider)?.window, brightnessOverride)
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp),
         ) {
@@ -1564,6 +1592,33 @@ private fun VideoOptionsSheet(
                     if (state.audioTracks.isEmpty()) SheetHint("Track audio belum terbaca.")
                 }
                 VideoSheet.DISPLAY -> {
+                    SheetSection(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_title))
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ChoicePill(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_auto), state.brightnessMode == VideoBrightnessMode.AUTO) {
+                            video.setBrightnessMode(VideoBrightnessMode.AUTO, currentVideoBrightness(host))
+                        }
+                        ChoicePill(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_manual), state.brightnessMode == VideoBrightnessMode.MANUAL) {
+                            video.setBrightnessMode(VideoBrightnessMode.MANUAL, currentVideoBrightness(host))
+                        }
+                    }
+                    if (state.brightnessMode == VideoBrightnessMode.MANUAL) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("${(state.manualBrightness * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                            Scrubber(value = state.manualBrightness * 100, duration = 100f,
+                                onScrub = { video.setManualBrightness(it / 100, persist = false) },
+                                onScrubFinished = { video.setManualBrightness(video.state.value.manualBrightness) },
+                                contentColor = MaterialTheme.colorScheme.primary, touchHeight = 48.dp,
+                                contentDescription = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_brightness_title),
+                                modifier = Modifier.weight(1f))
+                        }
+                    }
+                    SheetHint(androidx.compose.ui.res.stringResource(if (state.brightnessMode == VideoBrightnessMode.AUTO)
+                        id.local.tubeflow.R.string.video_brightness_auto_help else id.local.tubeflow.R.string.video_brightness_manual_help))
                     SheetSection("Rasio layar")
                     FlowRow(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -1597,6 +1652,22 @@ private fun VideoOptionsSheet(
                     }
                 }
                 VideoSheet.EFFECTS -> {
+                    SheetSection(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_volume_boost_title))
+                    FlowRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VideoVolumePolicy.steps.forEach { db ->
+                            ChoicePill(if (db == 0) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_volume_normal)
+                                else androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.video_volume_boost_db, db), state.volumeBoostDb == db) {
+                                video.setVolumeBoost(db)
+                            }
+                        }
+                    }
+                    SheetHint(androidx.compose.ui.res.stringResource(when {
+                        state.volumeBoostDb == 0 -> id.local.tubeflow.R.string.video_volume_boost_help
+                        state.volumeBoostAvailable == false -> id.local.tubeflow.R.string.video_volume_boost_unavailable
+                        state.volumeBoostAvailable == true -> id.local.tubeflow.R.string.video_volume_boost_active
+                        else -> id.local.tubeflow.R.string.video_volume_boost_pending
+                    }))
                     SheetSection("Equalizer")
                     FlowRow(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),

@@ -367,3 +367,30 @@ video aktif, tanpa menulis pengaturan brightness global.
 Penghemat baterai berada di Pengaturan → Pemutaran (Ikuti sistem/Aktif/Nonaktif).
 Mode ini mengurangi frekuensi pembaruan posisi dan sementara melepas efek
 Smart Enhance, mempertahankan preferensi efek pengguna untuk dipakai kembali.
+
+## Kecerahan player — 1.1.46
+
+Penyempurnaan Operate, ENERGY2/RHYTHM1/MOTION1. Pilihan Otomatis/Manual berada
+di lembar Tampilan yang sudah ada; tidak menambah dialog atau halaman. Gunakan
+ChoicePill, Scrubber tipis dengan target48dp, labelSmall dan spasi8/12/20dp,
+warna SheetBackground/PlayerContent serta aksen tema yang sama. Mode aktif
+ditandai selected dan teks. Persentase hanya tampil saat manual.
+
+```text
+Tampilan
+Kecerahan
+[Otomatis] [Manual]
+   50% [bilah kecerahan jika Manual]
+Rasio layar … / Rotasi … / Ulangi …
+```
+
+Geser vertikal sisi kiri beralih ke manual dengan titik awal kecerahan yang
+sedang digunakan. Otomatis mengikuti adaptif Android/sensor; manual hanya
+mengubah jendela player dan dipulihkan saat keluar/PiP/Stop. Kritik: mengecilkan
+target sentuh atau membuat slider baru akan merusak konsistensi; pakai kontrol
+bersama dan jangan mengubah volume atau brightness sistem untuk mereset mode.
+
+Penguat video berada di awal lembar Suara & gambar, memakai ChoicePill yang
+sama: Normal/+3/+6/+9dB. Normal tidak mengaktifkan pemrosesan tambahan; status
+menunggu/aktif/format tidak didukung berasal dari pipeline audio. Pembatas
+puncak tidak ditampilkan sebagai klaim normalisasi otomatis atau kualitas baru.

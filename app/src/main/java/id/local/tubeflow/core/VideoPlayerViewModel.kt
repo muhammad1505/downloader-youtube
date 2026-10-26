@@ -80,6 +80,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val videoHeight: Int = 0,
         val pixelRatio: Float = 1f,
         val effectPresentation: Boolean = false,
+        val brightnessMode: VideoBrightnessMode = VideoBrightnessMode.AUTO,
+        val manualBrightness: Float = 0.5f,
+        val volumeBoostDb: Int = 0,
+        val volumeBoostAvailable: Boolean? = null,
     ) {
         val active: Boolean get() = entries.isNotEmpty()
         val entry: VideoEntry? get() = entries.getOrNull(index)
@@ -344,7 +348,16 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                 else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
             }
-            val renderers = VideoRenderersFactory(getApplication(), mode) {
+            val version = playerVersion
+            val renderers = VideoRenderersFactory(getApplication(), mode,
+                volumeBoostDb = preferences.volumeBoostDb,
+                onBoostSupport = { supported ->
+                    viewModelScope.launch {
+                        if (playerVersion == version && _state.value.active)
+                            _state.value = _state.value.copy(volumeBoostAvailable = supported)
+                    }
+                },
+            ) {
                 _state.value.subtitleDelayMs * 1000L
             }
             val exo = ExoPlayer.Builder(getApplication(), renderers).build().apply {
@@ -356,6 +369,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     true,
                 )
                 setHandleAudioBecomingNoisy(true)
+                volume = 1f
                 repeatMode = preferences.repeat.media3Value()
                 setPlaybackSpeed(preferences.speed)
                 addListener(listener)
@@ -476,6 +490,25 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun cycleAspect() = setAspect(_state.value.aspect.next())
 
+    fun setBrightnessMode(mode: VideoBrightnessMode, initial: Float) {
+        val level = if (preferences.contains(KEY_BRIGHTNESS_LEVEL)) _state.value.manualBrightness
+                    else VideoBrightnessPolicy.clamp(initial)
+        preferences.edit {
+            putString(KEY_BRIGHTNESS_MODE, mode.name)
+            if (mode == VideoBrightnessMode.MANUAL) putFloat(KEY_BRIGHTNESS_LEVEL, level)
+        }
+        _state.value = _state.value.copy(brightnessMode = mode, manualBrightness = level)
+    }
+
+    fun setManualBrightness(value: Float, persist: Boolean = true) {
+        val level = VideoBrightnessPolicy.clamp(value)
+        _state.value = _state.value.copy(brightnessMode = VideoBrightnessMode.MANUAL, manualBrightness = level)
+        if (persist) preferences.edit {
+            putString(KEY_BRIGHTNESS_MODE, VideoBrightnessMode.MANUAL.name)
+            putFloat(KEY_BRIGHTNESS_LEVEL, level)
+        }
+    }
+
     fun setRepeat(value: VideoRepeat) {
         preferences.edit { putString(KEY_REPEAT, value.name) }
         player?.repeatMode = value.media3Value()
@@ -545,6 +578,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun cycleAudioEffect() = setAudioEffect(_state.value.audioEffect.next())
+
+    fun setVolumeBoost(db: Int) {
+        val value = VideoVolumePolicy.boostDb(db)
+        if (_state.value.volumeBoostDb == value) return
+        preferences.edit { putInt(KEY_VOLUME_BOOST, value) }
+        _state.value = _state.value.copy(volumeBoostDb = value, volumeBoostAvailable = null)
+        reopenAtCurrent(forceSoftware = false)
+    }
 
     /** Lompat ke video lain di antrean tanpa menutup layar pemutar. */
     fun jumpTo(index: Int) {
@@ -925,6 +966,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun preferencesState(): State = State(
+        brightnessMode = storedEnum(KEY_BRIGHTNESS_MODE, VideoBrightnessMode.AUTO),
+        manualBrightness = VideoBrightnessPolicy.clamp(preferences.getFloat(KEY_BRIGHTNESS_LEVEL, 0.5f)),
+        volumeBoostDb = VideoVolumePolicy.boostDb(preferences.getInt(KEY_VOLUME_BOOST, 0)),
         speed = preferences.getFloat(KEY_SPEED, 1f).coerceIn(0.25f, 3f),
         aspect = runCatching {
             VideoAspect.valueOf(preferences.getString(KEY_ASPECT, VideoAspect.FIT.name) ?: VideoAspect.FIT.name)
@@ -986,6 +1030,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private companion object {
+        const val KEY_VOLUME_BOOST = "video_volume_boost_db"
+        const val KEY_BRIGHTNESS_MODE = "brightness_mode"
+        const val KEY_BRIGHTNESS_LEVEL = "brightness_level"
         const val KEY_SPEED = "speed"
         const val KEY_ASPECT = "aspect"
         const val KEY_REPEAT = "repeat"
