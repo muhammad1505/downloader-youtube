@@ -22,6 +22,8 @@ object SourcePlatforms {
         SourcePlatform("threads", "Threads", setOf("threads.net")),
         SourcePlatform("bandcamp", "Bandcamp", setOf("bandcamp.com"), "wave"),
         SourcePlatform("bilibili", "Bilibili", setOf("bilibili.com", "b23.tv"), "video"),
+        // Bstation/Bilibili TV: episode dan halaman season (katalog episode lewat pemilih).
+        SourcePlatform(BstationUrls.PLATFORM_ID, BstationUrls.LABEL, BstationUrls.domains, "video"),
         SourcePlatform("likee", "Likee", setOf("likee.video")),
         SourcePlatform("snapchat", "Snapchat", setOf("snapchat.com")),
         // Spotify hanya sumber metadata: audio tetap diambil dari video YouTube hasil pencocokan.

@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.core.*
@@ -70,6 +71,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     var settingsSection by rememberSaveable { mutableStateOf<String?>(null) }
     var highlightedJobId by rememberSaveable { mutableStateOf<String?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
+    var bstationLoginOpen by rememberSaveable { mutableStateOf(false) }
+    val bstationSession = BstationAuth.session
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     val screenState = rememberSaveableStateHolder()
@@ -189,6 +192,15 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     if (!fullPlayer) LyricsSearchDialog(library)
     lyricTiming?.let { LyricTimingDialog(it, library) { lyricTiming = null } }
     KaraokeDialog(karaoke, player, requestNotifications)
+    if (bstationLoginOpen) BstationLoginDialog(
+        onDismiss = { bstationLoginOpen = false },
+        onSignedIn = {
+            bstationLoginOpen = false
+            appScope.launch { snackbar.showSnackbar("Akun Bstation tersimpan. Episode Premium sekarang bisa dipilih.") }
+            // Katalog dimuat ulang dengan cookie: penanda akses Premium dapat berubah setelah login.
+            if (BstationUrls.isSeasonOnly(url)) model.inspectPlaylist(url.trim())
+        },
+    )
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
     val tabs = listOf("Ringkasan", "Download", "Koleksi")
     val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.LibraryMusic)
@@ -302,6 +314,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     inspectStartedAt = inspectStartedAt,
                     inspectError = inspectError,
                     inspectDetails = inspectDetails,
+                    bstationSignedIn = bstationSession != null,
+                    onBstationLogin = { bstationLoginOpen = true },
                     inspect = { model.inspect(url.trim()) },
                     inspectPlaylist = { model.inspectPlaylist(url.trim()) },
                     retryInspect = { model.retryInspect(url.trim()) },
@@ -373,7 +387,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         play = { list, index ->
                             val job = list.getOrNull(index)
                             if (job?.mode == MediaMode.VIDEO) {
-                                val (entries, start) = VideoPlayback.videoEntries(list, job.id)
+                                val (entries, start) = VideoPlayback.videoEntries(list, job.id, nameOf = { raw -> displayName(context, raw.toUri()) })
                                 playVideo(entries, start)
                             } else {
                                 job?.let { player.playJobs(listOf(it), 0) }
@@ -418,6 +432,13 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     clearingFiles = clearingFiles,
                     onClearStorage = { model.clearStorageFolder() },
                     engineUpdateBlockedReason = engineUpdateBlockedReason,
+                    bstationSignedIn = bstationSession != null,
+                    bstationAccountId = bstationSession?.accountId.orEmpty(),
+                    onBstationLogin = { bstationLoginOpen = true },
+                    onBstationLogout = {
+                        BstationAuth.clear(context)
+                        appScope.launch { snackbar.showSnackbar("Sesi Bstation dihapus dari TubeFlow.") }
+                    },
                     section = settingsSection,
                     onSection = { settingsSection = it },
                 )

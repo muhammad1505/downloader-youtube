@@ -51,6 +51,19 @@ class FailureDetailsTest {
         assertTrue(legacy.text().contains("Waktu: Tidak tercatat"))
         assertTrue(FailureDetails.safe("x".repeat(5000)).length <= 2000)
     }
+    @Test fun emptySeasonCatalogGetsItsOwnMessage() {
+        val empty = report(BstationUrls.SEASON_EMPTY)
+        assertEquals("empty", empty.category)
+        assertTrue(empty.userMessage.contains("episode"))
+    }
+    @Test fun geoAndPremiumRestrictionsGetActionableMessages() {
+        val geo = report("ERROR: [BiliIntl] This video is not available from your location due to geo restriction")
+        assertEquals("geo", geo.category)
+        assertTrue(geo.userMessage.contains("wilayah"))
+        val premium = report("ERROR: [BiliIntl] This video is only available for registered users")
+        assertEquals("premium", premium.category)
+        assertTrue(premium.userMessage.contains("login") || premium.userMessage.contains("premium"))
+    }
     @Test fun lyricHttpEvidenceSurvivesPersistenceAndSeparatesAccessFromServerErrors() {
         val denied=FailureDetails.lyrics(LyricStatus.SERVICE,httpCode=403)
         assertEquals("access",denied.category)

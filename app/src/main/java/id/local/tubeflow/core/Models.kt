@@ -27,7 +27,7 @@ data class DownloadOptions(
 data class VideoResolution(val height: Int, val tier: Int)
 
 data class VideoMetadata(val title: String, val uploader: String, val durationSeconds: Long, val thumbnail: String, val url: String, val subtitleLangs: List<String> = emptyList(), /** Nama artis bila platform menyediakannya (metadata asli, bukan tebakan channel). */ val artist: String = "", val track: String = "", val creator: String = "", val platformId: String = "", val sourceId: String = "", val extractor: String = "", val artistEvidence: String = "", /** Resolusi yang benar-benar disediakan sumber, urut menurun; kosong = sumber tidak melaporkan tinggi. */ val resolutions: List<VideoResolution> = emptyList())
-data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "")
+data class PlaylistEntry(val id: String, val title: String, val durationSeconds: Long, val url: String, val uploader: String = "", val artist: String = "", val track: String = "", val thumbnail: String = "", /** Nomor episode season Bstation; null untuk PV/spesial. */ val episodeNumber: Int? = null, /** true bila katalog Bstation menandai episode ini Premium; null bila tidak diketahui. */ val premium: Boolean? = null)
 data class PlaylistMetadata(val title: String, val url: String, val entries: List<PlaylistEntry>, val channel: String = "", val folderName: String = "", val seedMetadata: VideoMetadata? = null)
 @Entity(tableName = "downloads")
 data class DownloadJob(
@@ -100,6 +100,19 @@ fun DownloadJob.songIdentity(): SongIdentity = if (trackTitle.isNotBlank())
 else TitleSplit.identify(rawTitle.ifBlank { title })
 
 fun DownloadJob.withMetadata(meta: VideoMetadata): DownloadJob {
+    // Episode season Bstation bukan lagu: pertahankan judul episode (termasuk padding E01) dan
+    // jangan mengarang artis/versi dari pemisah " - " pada judulnya.
+    if (BstationUrls.isSeriesEpisode(url)) {
+        val exact = BstationSeason.episodeTitle(
+            BstationSeason.episodeNumber("", meta.title), "", "", meta.title,
+        ).ifBlank { title }
+        return copy(rawTitle = exact, trackTitle = exact, title = exact,
+            artist = "", creator = "", remixer = "", versionTag = "", artistEvidence = "",
+            platformId = meta.platformId.ifBlank { SourcePlatforms.fromUrl(url).id },
+            thumbnailUrl = meta.thumbnail.ifBlank { thumbnailUrl }, sourceId = meta.sourceId, extractor = meta.extractor,
+            durationSeconds = meta.durationSeconds.takeIf { it > 0 } ?: durationSeconds,
+            subfolder = automaticSubfolder(SongIdentity(exact, null)))
+    }
     val retained = meta.artist.isBlank() && !TitleSplit.isRemixTitle(meta.title) && "cover" !in LyricMatch.versionSet(meta.title) && artistEvidence.startsWith("collection_") && artist.isNotBlank() &&
         (TitleSplit.segments(meta.title).any { TitleSplit.creditKey(it) == TitleSplit.creditKey(artist) } ||
             (artistEvidence == "collection_album_credit" && rawTitle == meta.title && Selection.identity(url)?.let { it == Selection.identity(meta.url) } == true))
@@ -317,6 +330,9 @@ object Selection {
  val videoFormats = setOf("auto", "mp4", "mkv", "webm", "mov", "avi")
  val audioFormats = setOf("auto", "mp3", "m4a", "opus", "flac", "wav", "aac", "vorbis")
  val subtitleChoices = setOf("", "asli", "id", "en", ".*")
+ /** Tag bahasa ISO 639 (mis. `id`, `en`, `th`, `pt-BR`) — sumber seperti Bstation punya track yang tidak ada di daftar lama. */
+ private val subtitleLangTag = Regex("[a-z]{2,3}(?:-[a-z0-9]{2,8})?")
+ fun validSubtitleChoice(value: String): Boolean = value in subtitleChoices || subtitleLangTag.matches(value.lowercase())
  /** Audio formats whose cover art can be embedded without the missing `mutagen` package (ffmpeg fallback path). */
  val coverFormats = setOf("auto", "mp3", "m4a")
  fun coverSupported(mode: MediaMode, format: String): Boolean = mode == MediaMode.AUDIO && format in coverFormats
@@ -419,6 +435,12 @@ object Selection {
   return ((if (mix) "mix-" else "") + artist.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "-").trim('-'))
    .take(40).trimEnd('-').takeIf { it.isNotBlank() }?.let(::safeFolder)
  }
+ /** Satu folder untuk satu season Bstation; fallback ID season bila judul tidak aman. */
+ fun seriesFolder(title: String, seasonId: String): String {
+  val slug = title.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "-")
+   .trim('-').take(36).trimEnd('-')
+  return safeFolder(slug) ?: "bstation-${seasonId.filter(Char::isDigit).takeLast(12).ifBlank { "season" }}"
+ }
  private val hosts = setOf("youtube.com","www.youtube.com","m.youtube.com","music.youtube.com","youtu.be")
  /**
  * Platform non-YouTube yang didukung yt-dlp; subdomain ikut diterima (mis. vm.tiktok.com).
@@ -431,24 +453,28 @@ object Selection {
   require(options.format in if (options.mode == MediaMode.VIDEO) videoFormats else audioFormats) { "Format tidak didukung." }
   require(options.quality in setOf(0,360,480,720,1080,1440,2160,4320))
   require(options.bitrate in setOf(0,64,128,192,256,320))
-  require(options.subtitles in subtitleChoices) { "Pilihan subtitle tidak didukung." }
+  require(validSubtitleChoice(options.subtitles)) { "Pilihan subtitle tidak didukung." }
   require(!options.embedSubs || options.mode == MediaMode.VIDEO) { "Sematkan subtitle hanya untuk video." }
  }
  fun validUrl(raw: String): Boolean = runCatching {
   val uri = URI(raw.trim()); val host = uri.host?.lowercase() ?: return false
   if (uri.scheme != "https" || uri.userInfo != null || (uri.port != -1 && uri.port != 443)) return false
   if (host in hosts) return (if (host == "youtu.be") uri.path.length > 1 else uri.path == "/watch" && uri.rawQuery?.split('&')?.any { it.startsWith("v=") && it.length > 2 } == true || uri.path.startsWith("/shorts/") || uri.path.startsWith("/live/"))
+  // Bstation hanya episode (/play/<season>/<ep>, /video/<id>); halaman season sengaja ditolak.
+  if (BstationUrls.isHost(host)) return BstationUrls.canonical(raw) != null
   // Platform lain: cukup https + host di allowlist + ada path — validasi isi biar engine (yt-dlp).
   val path = uri.path ?: return false
   otherPlatforms.any { host == it || host.endsWith(".$it") } && path.isNotBlank() && path != "/"
  }.getOrDefault(false)
  /**
  * Identitas sumber untuk deteksi duplikat: ID video YouTube (alias watch/youtu.be/Shorts sama),
- * SoundCloud mengabaikan parameter pelacakan utm_*; parameter akses tetap dipertahankan.
+ * Bstation memakai bentuk kanonis tanpa locale/query pelacakan, SoundCloud mengabaikan parameter
+ * pelacakan utm_*; parameter akses tetap dipertahankan.
  * Platform lain memakai URL utuh tanpa fragment. Null bila URL tidak valid.
  */
  fun identity(raw: String): String? {
     videoId(raw)?.let { return it }
+    BstationUrls.canonical(raw)?.let { return it }
     val source = raw.trim().substringBefore('#').takeIf(::validUrl) ?: return null
     val uri = URI(source)
     if (uri.host.lowercase() !in setOf("soundcloud.com", "www.soundcloud.com", "m.soundcloud.com")) return source
@@ -537,7 +563,7 @@ object Selection {
   // menjaga unduhan tetap berhasil bila sumber tidak punya format yang cocok sama sekali.
   val height = if (options.quality > 0) "[height<=?${options.quality}]" else ""
   return when(options.format) {
-   "mp4", "mov", "avi" -> "bestvideo$height[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best$height[ext=mp4][vcodec^=avc1]/bestvideo$height[ext=mp4]+bestaudio[ext=m4a]/best$height[ext=mp4]/best"
+   "mp4", "mov", "avi" -> "bestvideo$height[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best$height[ext=mp4][vcodec^=avc1]/bestvideo$height[ext=mp4][vcodec^=avc1]+bestaudio/best$height[ext=mp4]/bestvideo$height+bestaudio/best$height/best"
    "webm" -> "bestvideo$height[ext=webm]+bestaudio[ext=webm]/best$height[ext=webm]/best"
    else -> "bestvideo$height+bestaudio/best$height/best"
   }

@@ -838,4 +838,86 @@ lebar, tengah masing-masing lebar, clamp di luar track, lebar/durasi
 degenerat) dikompilasi bersama salinan persis fungsi tersebut memakai
 kotlinc/JUnit dan lulus. Suite Gradle penuh belum dijalankan pada sesi ini
 (toolchain Android dan AAR FFmpeg tidak tersedia di workspace), dan uji rotasi
-di perangkat belum dilakukan; jangan anggap risiko runtime sudah tertutup.
+di perangkat belum dilakukan; jangan anggap risiko sudah tertutup.
+
+## BUG-082 — P1: Subtitle Bstation tidak pernah terdeteksi
+
+Ditemukan saat uji perangkat 26 Oktober: episode Bstation yang jelas punya
+subtitle (API `/web/v2/subtitle` mengembalikan `en`, `th`, `id`) tampil sebagai
+"Video ini tidak punya subtitle/CC tercatat", dan pilihan "Bahasa asli" tidak
+mengunduh apa pun.
+
+Penyebabnya di inspeksi, bukan di parser. `extract_subtitles()` milik yt-dlp
+hanya memanggil `_get_subtitles()` extractor bila `writesubtitles` atau
+`listsubtitles` aktif; `--dump-single-json --skip-download` tidak menyalakan
+keduanya. Extractoryang mengisi `subtitles` secara langsung (YouTube) tetap
+bekerja, sedangkan BiliIntl yang mengambil daftar lewat `extract_subtitles()`
+selalu mengembalikan `subtitles` kosong.
+
+Perbaikan: `Engine.dumpInfo` menambahkan `--write-subs` (tanpa menulis file,
+karena tetap `--skip-download`). Logika daftar bahasa dan pemilihan "asli"
+dipindah ke `SourceMetadata.subtitleLangs`/`SourceMetadata.originalSubtitleLang`
+supaya bisa diuji tanpa Android. Pemilihan "asli" kini deterministik: bahasa
+yang dideklarasikan video, lalu auto-caption `-orig`, lalu bahasa perangkat
+(bila tersedia sebagai track manual), lalu `en`, lalu pilihan terurut — urutan
+kunci `subtitles` JSON tidak dijamin sehingga tanpa ini "asli" bisa berarti
+Inggris atau Thailand secara acak.
+
+Regresi `SourceMetadataTest` (3 kasus baru) lulus di suite Gradle. Uji perangkat:
+preview menampilkan "Subtitle tersedia: en, id, th" setelah cache inspeksi
+dibersihkan (cache lama 30 menit menyimpan daftar kosong).
+
+## BUG-083 — P1: Subtitle yang sudah terunduh tidak muncul di pemutar
+
+Ditemukan saat uji perangkat 26 Oktober. Unduhan episode Bstation dengan
+pilihan subtitle Indonesia berhasil: `E01 - The Battle Begins.id.srt` (318 cue,
+00:00:02–00:22:11) tersimpan di samping video dan `downloads.sidecarUris`
+berisi `sub|content://media/external/downloads/197934`. Namun chip subtitle di
+pemutar menampilkan "—" (tidak ada track) dan tidak ada teks di layar.
+
+Penyebabnya ada di pembacaan sidecar, bukan di unduhan. `sidecarUris` menyimpan
+URI MediaStore yang hanya berisi ID numerik; `VideoPlayback.subtitlesFromSidecars`
+menebak MIME dan bahasa dari ekstensi nama berkas di URI tersebut. URI
+`…/197934` tidak punya ekstensi, sehingga `subtitleMime` mengembalikan null dan
+sidecar dibuang sebelum MediaItem dibuat. Jalur SAF (`content://…/document/…`)
+tidak terkena karena URI-nya memuat nama berkas.
+
+Perbaikan: `subtitlesFromSidecars` menerima pencari nama tampilan
+(`nameOf`). Bila ekstensi tidak ada di URI, nama dibaca lewat
+`OpenableColumns.DISPLAY_NAME` (`E01 - The Battle Begins (1).id.srt`), lalu MIME
+(`.srt` → `application/x-subrip`) dan bahasa (`id` → Indonesia) diturunkan dari
+nama itu. Pencarian hanya dilakukan saat URI tidak punya ekstensi. Pemanggil di
+`TubeFlowApp` (Riwayat) dan `MediaLibraryScreen` (Koleksi) meneruskan resolver;
+baris sidecar lama dan baru sama-sama terbaca tanpa migrasi database.
+
+Regresi `VideoPlaybackTest.mediaStoreSidecarsUseResolvedDisplayNameForFormatAndLanguage`
+lulus bersama suite 523 tes. Terverifikasi di perangkat: `content query` atas
+URI sidecar mengembalikan `_display_name=E01 - The Battle Begins (1).id.srt`,
+`mime_type=text/plain`. Tampilan chip subtitle di pemutar belum dapat
+difoto ulang karena perangkat sedang dipakai; verifikasi itu masih tersisa.
+
+## BUG-084 — P2: Tombol transport menutupi navigasi sistem
+
+Bar sistem disembunyikan selama pemutar terbuka, sehingga `safeDrawing` bawah
+bernilai 0. `PlayerBottomBar` hanya menyisakan 14 dp (potret) dan 16 dp
+(lanskap), sehingga baris putar/jeda, sebelumnya/berikutnya, PiP, dan rotasi
+masih masuk ke area navigasi gestur atau tombol sistem tiga tombol.
+
+Perbaikan: jarak bawah dinaikkan menjadi 48 dp di potret dan 28 dp di lanskap.
+Verifikasi di RMX1821: pusat tombol putar berada di y≈1400 px dan lingkaran
+putar berakhir di y≈1433 px, sedangkan area navigasi mulai sekitar y=1450 px.
+
+## BUG-085 — P2: Permukaan video berpotensi tertinggal saat ExoPlayer dibuat ulang
+
+Mengganti dekoder memanggil `reopenAtCurrent`, yang melepas ExoPlayer lalu
+membuat player baru. `PlayerView` tetap memegang permukaan milik player lama;
+pada sebagian perangkat hasilnya audio tetap jalan tetapi gambar berhenti.
+Mekanisme ini belum dapat direproduksi di RMX1821 dengan episode H.264
+(852×480): pergantian Perangkat → Software → Perangkat berjalan dan frame
+video tetap berubah.
+
+Mitigasi: setiap `openInternal` menaikkan `State.playerVersion`, dan layar
+memasang `PlayerView` di dalam `key(playerVersion)` sehingga permukaan video
+dibuat ulang bersama player baru. Perubahan ini tetap dipertahankan karena
+menghilangkan ketergantungan pada perilaku `PlayerView` saat player dilepas,
+tetapi bukan bukti bahwa kasus perangkat pengguna sudah hilang.

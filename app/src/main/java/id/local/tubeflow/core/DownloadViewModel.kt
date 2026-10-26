@@ -455,7 +455,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   // Playlist biasa dinormalkan; Mix mempertahankan video awal (BUG-007/018).
   // identitas metadata tetap URL asli agar cocok dengan input pengguna di layar.
   val original=url.trim()
-  val canonical=Selection.playlistInspectionUrl(original) ?: original
+  val canonical=BstationUrls.canonicalSeason(original) ?: Selection.playlistInspectionUrl(original) ?: original
   val cachedSeed=inspectionState.state.value.metadata?.takeIf { Selection.videoId(it.url) == Selection.videoId(canonical) }
   inspectionState.begin(id); _error.value=null
   inspection=viewModelScope.launch {
@@ -465,7 +465,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      Engine.inspect(getApplication(), "https://www.youtube.com/watch?v=${Selection.videoId(canonical)}", id)
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { null } else null
-    inspectionState.playlist(id,result.copy(folderName=Selection.collectionFolder(result, seed), seedMetadata=seed))
+    // Season memakai folder yang sudah dihitung dari judul; jangan ditimpa policy artis/musik.
+    val folder=result.folderName.ifBlank {
+     if (BstationUrls.isSeasonOnly(original)) Selection.seriesFolder(result.title, BstationUrls.seasonId(original).orEmpty())
+     else Selection.collectionFolder(result, seed)
+    }
+    inspectionState.playlist(id,result.copy(folderName=folder, seedMetadata=seed))
    }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
@@ -486,6 +491,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   }
  /** Facebook sering menolak inspeksi (privat, butuh login, atau tautan kedaluwarsa) — pesan bawaan mesin tidak menjelaskan itu bagi pengguna. */
  private fun inspectErrorMessage(url: String, details: FailureDetails): String {
+  if (details.category == "empty") return details.userMessage
   // Jangan tuduh tautan privat saat masalahnya DNS/jaringan/penyimpanan — pakai pesan kategori itu.
   if(Selection.platform(url) != "Facebook" || details.category in setOf("dns","network","rate_limit","storage","permission")) return details.userMessage
   return "Tautan Facebook tidak dapat dibaca — video mungkin privat, butuh login, atau tautannya sudah kedaluwarsa. Coba salin tautan video publik langsung dari aplikasi Facebook."
@@ -495,23 +501,35 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  fun retryInspect(url: String) { if(lastInspectPlaylist) inspectPlaylist(url) else inspect(url) }
  /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
   try {
-   val folder = Selection.safeFolder(playlist.folderName) ?: Selection.collectionFolder(playlist)
-   val credits=CollectionCredit.learn(playlist)
-   var queued=0; var skipped=0
+   val season = BstationUrls.isSeasonOnly(playlist.url)
+   val folder = Selection.safeFolder(playlist.folderName)
+     ?: if (season) Selection.seriesFolder(playlist.title, BstationUrls.seasonId(playlist.url).orEmpty())
+        else Selection.collectionFolder(playlist)
+   val credits=if (options.mode == MediaMode.AUDIO && !season) CollectionCredit.learn(playlist) else null
+   // Episode Premium hanya boleh diantrekan setelah pengguna masuk. Pemeriksaan di sini menutup
+   // jalur selain pemilih (mis. state UI lama) sehingga antrean tidak pernah membuang episode diam-diam.
+   val premiumAllowed = !season || BstationAuth.isSignedIn(getApplication())
+   var queued=0; var skipped=0; var premiumSkipped=0
    var firstQueued: String? = null
    entries.forEach { entry ->
+    if (season && BstationSeason.premiumLocked(entry, premiumAllowed)) { premiumSkipped++; return@forEach }
     try {
      val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
        artist = entry.artist, track = entry.track, creator = entry.uploader,
        platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
-     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=if (options.mode == MediaMode.AUDIO) credits.apply(meta) else meta, autoFolder="collection", onQueued = { id ->
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=credits?.apply(meta) ?: meta, autoFolder=if (season) "" else "collection", onQueued = { id ->
       if (firstQueued == null) { firstQueued = id; onQueued?.invoke(id) }
      })
      queued++
     } catch(cancelled: CancellationException) { throw cancelled }
     catch(_: Exception) { skipped++ }
    }
-   _notice.value="Playlist: $queued video diantrekan; semua file masuk folder $folder." + if(skipped > 0) " $skipped dilewati." else ""
+   _notice.value=buildString {
+    append(if (season) "Season: $queued episode diantrekan" else "Playlist: $queued video diantrekan")
+    append("; semua file masuk folder $folder.")
+    if (skipped > 0) append(" $skipped dilewati.")
+    if (premiumSkipped > 0) append(" $premiumSkipped Premium terkunci — masuk ke Bstation dulu.")
+   }
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) { _error.value=error.message }
    finally { submitting=false }

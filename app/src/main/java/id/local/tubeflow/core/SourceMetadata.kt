@@ -76,6 +76,42 @@ object SourceMetadata {
             .sortedByDescending { it.tier }
     }
 
+    /**
+     * Bahasa subtitle yang benar-benar disediakan sumber: track manual, plus bahasa asli auto-caption.
+     * Datanya berasal dari `subtitles`/`automatic_captions` hasil dump yt-dlp. Extractor yang membaca
+     * subtitle lewat `extract_subtitles()` (mis. BiliIntl) hanya mengisi kunci itu bila inspeksi meminta
+     * subtitle — lihat `Engine.dumpInfo`.
+     */
+    fun subtitleLangs(json: JSONObject): List<String> {
+        val manual = json.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty()
+        val auto = json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty()
+        val original = auto.firstOrNull { it.endsWith("-orig") }?.removeSuffix("-orig")
+        return (manual + listOfNotNull(original)).distinct()
+            .filterNot { it == "live_chat" || it == "orig" }.sorted()
+    }
+
+    /**
+     * Kode subtitle "asli" untuk pilihan "Bahasa asli". Urutannya deterministik karena urutan kunci
+     * `subtitles` tidak dijamin: bahasa yang dideklarasikan video, lalu auto-caption `-orig`, lalu
+     * subtitle manual yang cocok dengan bahasa perangkat, lalu `en`, lalu pilihan pertama terurut.
+     * Sumber seperti BiliIntl tidak menandai bahasa asli, jadi tanpa preferensi ini pilihan bisa
+     * berubah-ubah (mis. Inggris vs Thailand) hanya karena urutan JSON.
+     */
+    fun originalSubtitleLang(json: JSONObject, preferred: String? = null): String? {
+        val manual = json.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty()
+            .filterNot { it == "live_chat" }
+        val declared = json.optString("language").trim().lowercase()
+        if (declared.isNotEmpty() && manual.any { it.equals(declared, ignoreCase = true) }) return declared
+        json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty()
+            .firstOrNull { it.endsWith("-orig") }?.let { return it }
+        preferred?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+            ?.let { want -> manual.firstOrNull { it.equals(want, ignoreCase = true) || it.startsWith("$want-", ignoreCase = true) } }
+            ?.let { return it }
+        manual.firstOrNull { it.equals("en", ignoreCase = true) || it.startsWith("en-", ignoreCase = true) }
+            ?.let { return it }
+        return manual.sorted().firstOrNull()
+    }
+
     fun parse(json: JSONObject, url: String): VideoMetadata {
         fun text(key: String) = if (json.isNull(key)) "" else json.optString(key).trim().takeUnless { it == "null" }.orEmpty()
         fun usable(value: String) = value.takeUnless { TitleSplit.creditKey(it) in setOf("null", "unknown", "unknownartist", "variousartists") }.orEmpty()

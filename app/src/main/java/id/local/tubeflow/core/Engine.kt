@@ -95,14 +95,17 @@ object Engine {
   signalOwned(execution.controlFile,execution.token)
   YoutubeDL.getInstance().destroyProcessById(execution.token)
  }
- private suspend fun execute(request: YoutubeDLRequest, id: String, callback: ((Float,Long,String)->Unit)? = null): String {
+ private suspend fun execute(request: YoutubeDLRequest, id: String, cookieFile: File? = null, callback: ((Float,Long,String)->Unit)? = null): String {
   var executionThread: Thread? = null
   val token=java.util.UUID.randomUUID().toString().replace("-", "")
   val controlFile=File(processDirectory,"$token.json")
   request.addOption("--cache-dir", extractorCache.absolutePath)
   request.addCommands(listOf("--tubeflow-process-file",controlFile.absolutePath,"--tubeflow-process-token",token))
   var execution: Execution? = null
-  try { return suspendCancellableCoroutine { continuation ->
+  try {
+   // File cookie hanya dibuat untuk host Bstation; cookie Bstation tidak boleh terkirim ke platform lain.
+   if (cookieFile != null) request.addOption("--cookies", cookieFile.absolutePath)
+   return suspendCancellableCoroutine { continuation ->
   val thread = Thread {
    try {
     if (continuation.isActive) {
@@ -121,38 +124,47 @@ object Engine {
   }
   thread.start()
   } } finally {
+   cookieFile?.delete()
    if (!currentCoroutineContext().isActive) withContext(NonCancellable + Dispatchers.IO) {
     execution?.let(::cancelExecution)
     executionThread?.join(5000)
    }
   }
  }
+ /** File cookie sementara hanya untuk URL Bstation; null membuat engine memakai jalur tanpa login. */
+ private fun cookieFile(context: Context, url: String): File? {
+  val host = runCatching { java.net.URI(url.trim()).host }.getOrNull() ?: return null
+  if (!BstationUrls.isHost(host)) return null
+  return BstationAuth.cookieFile(context)
+ }
  private suspend fun dumpInfo(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): JSONObject {
   onPhase(InspectionPhase.PREPARING_ENGINE)
   initialize(context)
   onPhase(InspectionPhase.FETCHING_METADATA)
-  val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--socket-timeout", 20)
-  return JSONObject(execute(request,id))
- }
- /** Bahasa yang benar-benar disediakan video: track manual + bahasa asli auto-caption (bukan terjemahan mesin). */
- private fun genuineSubtitleLangs(json: JSONObject): List<String> {
-  val manual = json.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty()
-  val auto = json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty()
-  val original = auto.firstOrNull { it.endsWith("-orig") }?.removeSuffix("-orig")
-  return (manual + listOfNotNull(original)).distinct().filterNot { it == "live_chat" || it == "orig" }.sorted()
- }
- /** Kode subtitle "asli": subtitle manual (dari kreator, paling akurat) didahulukan, baru auto-caption bahasa asli (bukan terjemahan mesin). */
- private fun originalSubtitleRequest(json: JSONObject): String? {
-  json.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty().firstOrNull { it != "live_chat" }?.let { return it }
-  return json.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty().firstOrNull { it.endsWith("-orig") }
+  // `--write-subs` diminta walau tidak ada yang ditulis (mode --skip-download): extractor yang membaca
+  // subtitle lewat extract_subtitles() — BiliIntl/Bstation, antara lain — hanya mengisi daftar subtitle
+  // di JSON dump bila subtitle diminta. Tanpa flag ini Bstation selalu tampak "tanpa subtitle".
+  val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--write-subs").addOption("--socket-timeout", 20)
+  return JSONObject(execute(request,id,cookieFile(context,url)))
  }
  suspend fun inspect(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): VideoMetadata {
+  // Season bukan satu video; pipeline unduhan memakai satu nama keluaran sehingga tidak boleh
+  // menerima daftar episode. Tolak dengan pesan yang menjelaskan sebelum menyentuh engine.
+  require(!BstationUrls.isSeasonOnly(url)) { BstationUrls.SEASON_AS_VIDEO }
   require(Selection.validUrl(url)) { "Gunakan tautan video dari platform yang didukung." }
   val json = dumpInfo(context, url, id, onPhase)
-  val langs = genuineSubtitleLangs(json).take(8)
-  return SourceMetadata.parse(json, url.trim()).copy(subtitleLangs = langs)
+  val langs = SourceMetadata.subtitleLangs(json).take(8)
+  val parsed = SourceMetadata.parse(json, url.trim()).copy(subtitleLangs = langs)
+  if (parsed.uploader.isNotBlank()) return parsed
+  // Info dict BiliIntl tidak memuat uploader maupun durasi. Judul seri dipakai sebagai kredit
+  // sumber; durasi tidak dikarang — UI menyembunyikan durasi yang belum diketahui.
+  val seasonId = BstationUrls.seasonIdOfEpisode(url) ?: return parsed
+  val series = BstationSeason.seriesTitle(context, seasonId)
+  return if (series.isBlank()) parsed else parsed.copy(uploader = series)
  }
  suspend fun inspectPlaylist(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): PlaylistMetadata {
+  // Season Bstation memakai katalog API-nya sendiri; sisanya tetap jalur playlist YouTube.
+  BstationUrls.canonicalSeason(url)?.let { return BstationSeason.inspect(context, it, onPhase) }
   require(Selection.validPlaylistUrl(url)) { "Gunakan tautan playlist YouTube yang valid." }
   onPhase(InspectionPhase.PREPARING_ENGINE)
   initialize(context)
@@ -220,7 +232,9 @@ object Engine {
   if (job.subtitles.isNotEmpty() && !skipSubtitles) {
    // "asli" = bahasa asli video; kode aslinya (mis. "en-orig") diresolve per video biar bukan terjemahan mesin.
    var subLangs = job.subtitles
-   if (subLangs == "asli") subLangs = originalSubtitleRequest(dumpInfo(context, job.url, job.id)) ?: ""
+   if (subLangs == "asli") subLangs = SourceMetadata.originalSubtitleLang(
+     dumpInfo(context, job.url, job.id), java.util.Locale.getDefault().language,
+    ) ?: ""
    if (subLangs.isNotEmpty()) {
     request.addOption("--write-subs").addOption("--write-auto-subs").addCommands(listOf("--sub-langs",subLangs)).addOption("--sub-format","srt/best")
     if (job.embedSubs) request.addOption("--embed-subs")
@@ -231,7 +245,7 @@ object Engine {
  if (embedCover || (job.embedThumb && job.mode == MediaMode.VIDEO)) request.addOption("--embed-thumbnail")
   val manifest=File(directory,"result.txt")
   request.addCommands(listOf("--print-to-file","after_move:filepath",manifest.absolutePath))
-  execute(request,job.id) { _, _, line ->
+  execute(request,job.id,cookieFile(context,job.url)) { _, _, line ->
    if (line.contains("[tubeflow-resume]")) resumeNotice(line.substringAfter("[tubeflow-resume]").trim())
    if (line.contains("[tubeflow-processing]")) processingNotice(line.substringAfter("[tubeflow-processing]").trim())
    DownloadProgress.parse(line)?.let(callback)

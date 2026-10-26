@@ -337,6 +337,41 @@ object VideoPlayback {
 
     fun languageName(tag: String): String = languages[tag.trim().lowercase(Locale.ROOT)].orEmpty()
 
+    /** Tag bahasa dinormalkan ke nama yang sama agar `id`, `id-ID`, dan `ind` dianggap setara. */
+    private fun canonicalLanguage(tag: String): String {
+        val primary = tag.trim().lowercase(Locale.ROOT).substringBefore('-').substringBefore('_')
+        if (primary.isBlank()) return ""
+        return languages[primary] ?: primary
+    }
+
+    /**
+     * Track subtitle yang dipilih otomatis saat video dibuka. Subtitle hasil unduhan diutamakan
+     * agar berkas `.srt` yang baru diunduh langsung tampil, lalu di dalamnya bahasa perangkat
+     * menang (mis. ponsel Indonesia memilih `id` walau ada subtitle Inggris). Track bawaan video
+     * hanya dipakai bila tidak ada subtitle unduhan yang cocok.
+     *
+     * @return indeks pada [languages], atau -1 bila tidak ada track.
+     */
+    fun preferredSubtitleIndex(
+        languages: List<String>,
+        downloadedLanguages: List<String> = emptyList(),
+        preferredLanguages: List<String> = emptyList(),
+    ): Int {
+        if (languages.isEmpty()) return -1
+        val downloaded = downloadedLanguages.map(::canonicalLanguage).filter { it.isNotBlank() }.toSet()
+        val preferred = preferredLanguages.map(::canonicalLanguage).filter { it.isNotBlank() }
+        for (tag in preferred) {
+            languages.indices.firstOrNull {
+                canonicalLanguage(languages[it]) == tag && canonicalLanguage(languages[it]) in downloaded
+            }?.let { return it }
+        }
+        languages.indices.firstOrNull { canonicalLanguage(languages[it]) in downloaded }?.let { return it }
+        for (tag in preferred) {
+            languages.indices.firstOrNull { canonicalLanguage(languages[it]) == tag }?.let { return it }
+        }
+        return 0
+    }
+
     fun languageFrom(name: String): String {
         val stem = name.substringBeforeLast('.').lowercase(Locale.ROOT)
         return languageToken.findAll(stem).map { it.groupValues[1] }
@@ -355,15 +390,23 @@ object VideoPlayback {
     /**
      * Subtitle hasil unduhan. Satu baris `sub|<uri>` menjadi satu pilihan; bahasa dibaca dari nama
      * berkas bila jelas (mis. `judul.id.srt`), selain itu label memakai nama berkas.
+     *
+     * Baris MediaStore hanya berupa ID (`content://media/.../197934`) tanpa nama, sehingga ekstensi
+     * dan bahasanya tidak bisa ditebak. [nameOf] membaca nama tampilan dari penyedia berkas agar
+     * subtitle yang sudah terunduh tetap muncul di pemutar.
      */
-    fun subtitlesFromSidecars(sidecars: String?): List<VideoSubtitle> {
+    fun subtitlesFromSidecars(sidecars: String?, nameOf: (String) -> String? = { null }): List<VideoSubtitle> {
         if (sidecars.isNullOrBlank()) return emptyList()
         return sidecars.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("sub|") }
             .mapNotNull { line ->
                 val uri = line.substringAfter('|', "").trim()
-                val name = fileName(uri)
+                if (uri.isEmpty()) return@mapNotNull null
+                val fromUri = fileName(uri)
+                // Hanya tanya penyedia bila URI tidak memuat ekstensi (baris MediaStore berangka).
+                val name = if (subtitleMime(fromUri) != null) fromUri
+                else nameOf(uri)?.takeIf { subtitleMime(it) != null } ?: fromUri
                 val mime = subtitleMime(name) ?: return@mapNotNull null
                 val language = languageFrom(name)
                 val label = languageName(language).ifBlank { name.ifBlank { "Subtitle" } }
@@ -373,10 +416,10 @@ object VideoPlayback {
             .toList()
     }
 
-    fun entry(item: MediaItem, sidecars: String? = null): VideoEntry = VideoEntry(
+    fun entry(item: MediaItem, sidecars: String? = null, nameOf: (String) -> String? = { null }): VideoEntry = VideoEntry(
         uri = item.location,
         title = item.title.ifBlank { item.displayName.substringBeforeLast('.') },
-        subtitles = subtitlesFromSidecars(sidecars),
+        subtitles = subtitlesFromSidecars(sidecars, nameOf),
     )
 
     /** Daftar video yang dapat diputar pada urutan Koleksi saat ini, mulai dari item yang diketuk. */
@@ -384,23 +427,24 @@ object VideoPlayback {
         items: List<MediaItem>,
         startUri: String,
         sidecars: (MediaItem) -> String? = { null },
+        nameOf: (String) -> String? = { null },
     ): Pair<List<VideoEntry>, Int> {
         val playable = items.filter { it.kind == "VIDEO" && it.availability == "AVAILABLE" }
         val start = playable.indexOfFirst { it.uri == startUri || it.location == startUri }.coerceAtLeast(0)
-        return playable.map { entry(it, sidecars(it)) } to start
+        return playable.map { entry(it, sidecars(it), nameOf) } to start
     }
 
     /** Daftar video selesai pada urutan Riwayat saat ini, mulai dari job yang diketuk. */
-    fun videoEntries(jobs: List<DownloadJob>, startJobId: String): Pair<List<VideoEntry>, Int> {
-        val playable = jobs.mapNotNull { job -> entry(job)?.let { job to it } }
+    fun videoEntries(jobs: List<DownloadJob>, startJobId: String, nameOf: (String) -> String? = { null }): Pair<List<VideoEntry>, Int> {
+        val playable = jobs.mapNotNull { job -> entry(job, nameOf)?.let { job to it } }
         val start = playable.indexOfFirst { (job, _) -> job.id == startJobId }.coerceAtLeast(0)
         return playable.map { it.second } to start
     }
 
-    fun entry(job: DownloadJob): VideoEntry? {
+    fun entry(job: DownloadJob, nameOf: (String) -> String? = { null }): VideoEntry? {
         if (job.mode != MediaMode.VIDEO || job.state != JobState.COMPLETED) return null
         val uri = job.outputUri?.takeIf { it.isNotBlank() } ?: return null
-        return VideoEntry(uri, job.title, subtitlesFromSidecars(job.sidecarUris))
+        return VideoEntry(uri, job.title, subtitlesFromSidecars(job.sidecarUris, nameOf))
     }
 
     private fun extension(nameOrUri: String): String =

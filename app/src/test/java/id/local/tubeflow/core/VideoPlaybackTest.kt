@@ -112,6 +112,23 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun mediaStoreSidecarsUseResolvedDisplayNameForFormatAndLanguage() {
+        // URI MediaStore hanya berisi ID; tanpa nama tampilan ekstensi .srt tidak bisa ditebak.
+        val sidecars = "sub|content://media/external/downloads/197934"
+        val names = mapOf(
+            "content://media/external/downloads/197934" to "E01 - The Battle Begins (1).id.srt",
+        )
+
+        val subtitles = VideoPlayback.subtitlesFromSidecars(sidecars, nameOf = { names[it] })
+
+        assertTrue("sidecar MediaStore harus terbaca", VideoPlayback.subtitlesFromSidecars(sidecars).isEmpty())
+        assertEquals(1, subtitles.size)
+        assertEquals("application/x-subrip", subtitles.single().mime)
+        assertEquals("id", subtitles.single().language)
+        assertEquals("Indonesia", subtitles.single().label)
+    }
+
+    @Test
     fun languageTokensAreReadWithoutGuessingFromOrdinaryWords() {
         assertEquals("id", VideoPlayback.languageFrom("Film.id.srt"))
         assertEquals("en", VideoPlayback.languageFrom("Film.en-US.vtt"))
@@ -121,6 +138,32 @@ class VideoPlaybackTest {
         assertEquals("Indonesia", VideoPlayback.languageName("ind"))
         assertEquals("Inggris", VideoPlayback.languageName("ENG"))
         assertEquals("", VideoPlayback.languageName("xx"))
+    }
+
+    @Test
+    fun downloadedSubtitleMatchesDeviceLanguage() {
+        // Satu subtitle unduhan: langsung dipakai.
+        assertEquals(0, VideoPlayback.preferredSubtitleIndex(listOf("id"), listOf("id"), listOf("id-ID")))
+        // Dua subtitle unduhan: bahasa ponsel menang walau bukan track pertama.
+        assertEquals(1, VideoPlayback.preferredSubtitleIndex(listOf("en", "id"), listOf("en", "id"), listOf("id")))
+        // Tag ISO 639-2 dan tag berwilayah dianggap bahasa yang sama.
+        assertEquals(0, VideoPlayback.preferredSubtitleIndex(listOf("ind"), listOf("id"), listOf("id-ID")))
+    }
+
+    @Test
+    fun downloadedSubtitleWinsOverEmbeddedTrack() {
+        // Video MKV dengan track Inggris bawaan + subtitle Indonesia hasil unduhan:
+        // subtitle unduhan menang walau bahasa ponsel Inggris.
+        assertEquals(1, VideoPlayback.preferredSubtitleIndex(listOf("en", "id"), listOf("id"), listOf("en")))
+        // Tanpa unduhan, bahasa perangkat tetap dipilih dari track bawaan.
+        assertEquals(1, VideoPlayback.preferredSubtitleIndex(listOf("en", "id"), emptyList(), listOf("id")))
+        // Tidak ada yang cocok: track pertama, bukan nonaktif.
+        assertEquals(0, VideoPlayback.preferredSubtitleIndex(listOf("ja", "ko"), listOf("id"), listOf("id")))
+    }
+
+    @Test
+    fun noTextTrackMeansNoAutomaticSelection() {
+        assertEquals(-1, VideoPlayback.preferredSubtitleIndex(emptyList(), listOf("id"), listOf("id")))
     }
 
     @Test
@@ -153,9 +196,9 @@ class VideoPlaybackTest {
             location = "content://media/external/video/7",
         )
 
-        val (entries, start) = VideoPlayback.videoEntries(listOf(item), item.uri) {
+        val (entries, start) = VideoPlayback.videoEntries(listOf(item), item.uri, sidecars = {
             "sub|content://sub/Tujuh.id.srt"
-        }
+        })
 
         assertEquals(0, start)
         assertEquals("content://media/external/video/7", entries.single().uri)

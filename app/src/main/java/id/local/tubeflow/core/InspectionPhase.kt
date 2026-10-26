@@ -5,6 +5,7 @@ object InspectionPhase {
     const val FETCHING_METADATA = "mengambil_metadata"
     const val FETCHING_PLAYLIST = "mengambil_playlist"
     const val FETCHING_COLLECTION = "mengambil_koleksi"
+    const val FETCHING_SEASON = "mengambil_season"
     const val READING_ENTRIES = "membaca_entri"
     const val SEARCHING = "mencari_sumber"
 
@@ -13,7 +14,8 @@ object InspectionPhase {
         FETCHING_METADATA -> "Mengambil detail video…"
         FETCHING_PLAYLIST -> "Mengambil daftar playlist…"
         FETCHING_COLLECTION -> "Mengambil daftar lagu…"
-        READING_ENTRIES -> "Membaca pilihan playlist…"
+        FETCHING_SEASON -> "Mengambil daftar episode…"
+        READING_ENTRIES -> "Membaca pilihan episode…"
         SEARCHING -> "Mencari audio yang cocok di YouTube…"
         else -> "Membaca detail link…"
     }

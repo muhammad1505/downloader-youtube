@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
@@ -82,9 +83,9 @@ fun MediaLibraryScreen(
     } }
     // Video diputar di pemutar Media3 dalam aplikasi; audio tetap memakai PlayerViewModel.
     fun playVideo(item: MediaItem) {
-        val (entries, index) = VideoPlayback.videoEntries(media, item.uri) { entry ->
+        val (entries, index) = VideoPlayback.videoEntries(media, item.uri, sidecars = { entry ->
             entry.jobId?.let { completedJobs[it]?.sidecarUris }
-        }
+        }, nameOf = { raw -> displayName(context, raw.toUri()) })
         if (entries.isEmpty()) open(item) else onPlayVideo(entries, index)
     }
     LazyColumn(

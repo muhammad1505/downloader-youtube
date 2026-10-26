@@ -137,7 +137,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
       job = job.copy(durationSeconds = metadata.durationSeconds)
      }
     } else {
-     if (job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) {
+     if ((job.mode == MediaMode.AUDIO || job.autoFolder.isNotBlank()) && !BstationUrls.isSeriesEpisode(job.url)) {
       val initial = TitleSplit.identify(metadata.title, metadata.uploader, metadata.artist, metadata.track, metadata.creator)
       val resolved = runInterruptible(Dispatchers.IO) { Lyrics.resolveIdentity(initial, metadata.durationSeconds) }
       if (resolved.evidence == "provider_identity") metadata = metadata.copy(artist=resolved.artist.orEmpty(), track=resolved.title, artistEvidence=resolved.evidence)
@@ -163,7 +163,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     runBlocking { dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, notice) }
    }, processingNotice = { notice -> runBlocking { dao.processingNotice(jobId, generation, notice) } })
    // Inspect completed audio only. File tags can resolve identity when source credits were absent.
-   if (job.mode == MediaMode.AUDIO) {
+   if (job.mode == MediaMode.AUDIO && !BstationUrls.isSeriesEpisode(job.url)) {
     val reader = MediaMetadataRetriever()
     try {
      reader.setDataSource(result.absolutePath)
@@ -185,7 +185,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    val relativePath = "Download/${SettingsStore.storageFolder}" + (subfolder?.let { "/$it" } ?: "")
    // Lirik audio HANYA dari penyedia lirik (LRCLIB) — caption YouTube untuk musik sering berantakan/beda lagu.
    // Hasil terstruktur (tersimpan/tidak ditemukan/instrumental/jaringan) dicatat ke riwayat (BUG-014).
-   val lyricOutcome = if (job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty()) {
+   val lyricOutcome = if (job.mode == MediaMode.AUDIO && job.subtitles.isNotEmpty() && !BstationUrls.isSeriesEpisode(job.url)) {
     publish(DownloadProgress(DownloadPhase.LYRICS), force = true)
     runInterruptible(Dispatchers.IO) { Lyrics.fetch(job.songIdentity(), job.durationSeconds) }
    } else null

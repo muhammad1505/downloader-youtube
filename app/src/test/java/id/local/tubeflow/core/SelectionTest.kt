@@ -138,6 +138,30 @@ class SelectionTest {
    "https://clips.twitch.tv/ClipName",
   ).forEach { assertTrue(it, Selection.validUrl(it)) }
  }
+ @Test fun bstationEpisodesAreAllowedAndCanonicalForDuplicates() {
+  val episode = "https://www.bilibili.tv/id/play/2432940/31524599?bstar_from=bstar-web.pgc-video-detail.episode.all"
+  assertTrue(episode, Selection.validUrl(episode))
+  assertEquals("https://www.bilibili.tv/play/2432940/31524599", Selection.identity(episode))
+  assertEquals("https://www.bilibili.tv/play/2432940/31524599", Selection.identity("https://biliintl.com/en/play/2432940/31524599"))
+  assertEquals("https://www.bilibili.tv/video/2045730385", Selection.identity("https://www.bilibili.tv/en/video/2045730385"))
+  assertEquals("Bstation", Selection.platform(episode))
+ }
+ @Test fun bstationSeasonPageIsNotAcceptedAsAVideo() {
+  val season = "https://www.bilibili.tv/id/play/2432940"
+  assertTrue(BstationUrls.isSeasonOnly(season))
+  assertFalse(Selection.validUrl(season))
+  assertNull(Selection.identity(season))
+  assertFalse(Selection.validPlaylistUrl(season))
+ }
+ @Test fun bstationLookalikeAndUnsafeHostsStayRejected() {
+  listOf(
+   "https://www.bilibili.tv.evil.org/id/play/2432940/31524599",
+   "https://evilbilibili.tv/id/play/2432940/31524599",
+   "http://www.bilibili.tv/id/play/2432940/31524599",
+   "https://user@www.bilibili.tv/id/play/2432940/31524599",
+   "https://www.bilibili.tv:8443/id/play/2432940/31524599",
+  ).forEach { assertFalse(it, Selection.validUrl(it)) }
+ }
  @Test fun rejectsUnsafeOrUnknownForeignUrls() {
   listOf(
    "http://www.tiktok.com/@user/video/1", // wajib https
@@ -260,6 +284,22 @@ class SelectionTest {
   assertEquals("Lagu (2024)-baru_v2",Selection.safeFolder("Lagu (2024)-baru_v2"))
   listOf("","   ".trim(),".","../etc","my/folder","my%folder","a\\b","folder.","x".repeat(41)).forEach { assertNull(it,Selection.safeFolder(it)) }
  }
+ @Test fun bstationEpisodeMetadataKeepsEpisodeTitleAndCollectionFolder() {
+  val job = DownloadJob("id","https://www.bilibili.tv/play/2432940/31524599","Video",MediaMode.VIDEO,"mp4",0,0,
+   subfolder = "black-clover-season-2")
+  val updated = job.withMetadata(VideoMetadata("E1 - The Battle Begins","",0,"https://pic.example/e1.png",job.url,
+   platformId = BstationUrls.PLATFORM_ID, sourceId = "31524599"))
+  assertEquals("E01 - The Battle Begins", updated.title)
+  assertEquals("E01 - The Battle Begins", updated.rawTitle)
+  assertEquals("", updated.artist)
+  assertEquals("black-clover-season-2", updated.subfolder)
+  assertEquals(BstationUrls.PLATFORM_ID, updated.platformId)
+ }
+ @Test fun seriesFolderUsesSafeTitleAndSeasonFallback() {
+  assertEquals("black-clover-season-2", Selection.seriesFolder("Black Clover Season 2", "2432940"))
+  assertEquals("bstation-2432940", Selection.seriesFolder("!!!", "2432940"))
+  assertTrue(Selection.seriesFolder("x".repeat(100), "2432940").length <= 40)
+ }
  @Test fun acceptsShortAndEmbeddedPlaylistLinks() {
   listOf(
    "https://youtu.be/abc123?list=PLabc123",
@@ -301,8 +341,16 @@ class SelectionTest {
  }
  @Test fun extendedVideoSelectorPrefersCompatibleCodec() {
   assertTrue(Selection.selector(DownloadOptions("https://youtu.be/x",format="mov")).contains("[vcodec^=avc1]"))
-  assertEquals("bestvideo[height<=?720][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4][vcodec^=avc1]/bestvideo[height<=?720][ext=mp4]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4]/best",Selection.selector(DownloadOptions("https://youtu.be/x",format="avi",quality=720)))
+  assertEquals("bestvideo[height<=?720][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=?720][ext=mp4][vcodec^=avc1]/bestvideo[height<=?720][ext=mp4][vcodec^=avc1]+bestaudio/best[height<=?720][ext=mp4]/bestvideo[height<=?720]+bestaudio/best[height<=?720]/best",Selection.selector(DownloadOptions("https://youtu.be/x",format="avi",quality=720)))
   assertEquals("bestvideo[height<=?720]+bestaudio/best[height<=?720]/best",Selection.selector(DownloadOptions("https://youtu.be/x",format="auto",quality=720)))
+ }
+ @Test fun mp4SelectorAcceptsSourcesWhoseAudioIsNotM4a() {
+  // Bstation/BiliIntl menyediakan audio AAC ber-ext mp4, bukan m4a; rantai lama gagal total
+  // ("Requested format is not available") meski video dan audionya ada.
+  val selector = Selection.selector(DownloadOptions("https://www.bilibili.tv/id/play/2432940/31524599", format = "mp4"))
+  assertTrue(selector.contains("/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio/"))
+  assertTrue(selector.contains("/bestvideo+bestaudio/"))
+  assertTrue(selector.endsWith("/best"))
  }
  @Test fun audioManualBitrateKeepsCrossContainerWithFallback() {
   // Wadah sumber sengaja berbeda: yt-dlp me-remux (copy) bila codec cocok dan --audio-quality diabaikan —

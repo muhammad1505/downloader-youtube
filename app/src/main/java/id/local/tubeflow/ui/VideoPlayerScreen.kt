@@ -98,6 +98,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,6 +113,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,6 +169,13 @@ private sealed interface GestureFeedback {
     data class Brightness(val percent: Int) : GestureFeedback
 }
 
+/** Konfirmasi singkat setelah tombol pengaturan cepat mengubah sesuatu. */
+private data class PlayerNotice(
+    val icon: ImageVector,
+    val title: String,
+    val value: String,
+)
+
 /**
  * Pemutar video penuh di atas aplikasi, memakai Media3 ExoPlayer. Layar ini tidak menyentuh
  * pemutar audio: sebelum dibuka pemanggil mem-pause audio, dan setelah ditutup ExoPlayer dilepas.
@@ -190,6 +200,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     var inPip by remember { mutableStateOf(activity?.isInPictureInPictureMode == true) }
     var orientation by remember { mutableStateOf(VideoOrientation.AUTO) }
     var feedback by remember { mutableStateOf<GestureFeedback?>(null) }
+    var notice by remember { mutableStateOf<PlayerNotice?>(null) }
     var scrub by remember { mutableStateOf<Float?>(null) }
     var showResume by remember { mutableStateOf(false) }
     var controlsLocked by remember { mutableStateOf(false) }
@@ -198,6 +209,11 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     fun touch() {
         controlsVisible = true
         interaction++
+    }
+
+    fun notify(noticeValue: PlayerNotice) {
+        notice = noticeValue
+        touch()
     }
 
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -281,6 +297,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
             feedback = null
         }
     }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            delay(1_600)
+            notice = null
+        }
+    }
 
     // Sensor aktif selama pemutar terbuka: memutar perangkat langsung mengubah orientasi, tanpa
     // bergantung pada kunci rotasi sistem. Mode lanskap/potret mengunci arah secara eksplisit.
@@ -357,21 +379,25 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     val subtitlePosition = state.subtitlePosition
     val subtitleBackground = state.subtitleBackground
     Box(Modifier.fillMaxSize().background(PlayerBackground)) {
-        AndroidView(
-            factory = { viewContext ->
-                PlayerView(viewContext).apply {
-                    useController = false
-                    keepScreenOn = true
-                }.also { playerView = it }
-            },
-            update = { view ->
-                view.player = video.exoPlayer
-                applyVideoAspect(view, videoAspect)
-                applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
-            },
-            onRelease = { view -> if (playerView === view) playerView = null },
-            modifier = Modifier.fillMaxSize(),
-        )
+        // Setiap pergantian dekoder membuat ExoPlayer baru. Permukaan PlayerView ikut dibuat
+        // ulang agar video tidak tertinggal di surface milik player lama (audio tetap jalan).
+        key(state.playerVersion) {
+            AndroidView(
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        useController = false
+                        keepScreenOn = true
+                    }.also { playerView = it }
+                },
+                update = { view ->
+                    view.player = video.exoPlayer
+                    applyVideoAspect(view, videoAspect)
+                    applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
+                },
+                onRelease = { view -> if (playerView === view) playerView = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
         if (!inPip && !controlsLocked) {
             // Permukaan gestur berada di atas video tetapi di bawah kontrol, sehingga tombol tetap menang.
@@ -479,14 +505,77 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         )
                         QuickSettingsBar(
                             state = state,
-                            onSpeed = { video.cycleSpeed(); touch() },
-                            onSubtitles = { video.cycleSubtitle(); touch() },
-                            onEqualizer = { video.cycleEqualizer(); touch() },
-                            onAudioEffect = { video.cycleAudioEffect(); touch() },
-                            onEnhance = { video.cycleEnhance(); touch() },
-                            onDecoder = { video.cycleDecoderMode(); touch() },
+                            onSpeed = {
+                                video.cycleSpeed()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.Speed,
+                                        "Kecepatan putar",
+                                        VideoPlayback.speedLabel(video.state.value.speed),
+                                    ),
+                                )
+                            },
+                            onSubtitles = {
+                                video.cycleSubtitle()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.ClosedCaption,
+                                        "Subtitle",
+                                        subtitleChipDescription(video.state.value),
+                                    ),
+                                )
+                            },
+                            onEqualizer = {
+                                video.cycleEqualizer()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.GraphicEq,
+                                        "Equalizer",
+                                        video.state.value.equalizer.label,
+                                    ),
+                                )
+                            },
+                            onAudioEffect = {
+                                video.cycleAudioEffect()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.SurroundSound,
+                                        "Efek audio",
+                                        video.state.value.audioEffect.label,
+                                    ),
+                                )
+                            },
+                            onEnhance = {
+                                video.cycleEnhance()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.AutoAwesome,
+                                        "Smart Enhance",
+                                        video.state.value.enhance.label,
+                                    ),
+                                )
+                            },
+                            onDecoder = {
+                                video.cycleDecoderMode()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.Memory,
+                                        "Dekoder",
+                                        video.state.value.decoderMode.label,
+                                    ),
+                                )
+                            },
                             onScreenshot = ::takeScreenshot,
-                            onDisplay = { video.cycleAspect(); touch() },
+                            onDisplay = {
+                                video.cycleAspect()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.AspectRatio,
+                                        "Rasio layar",
+                                        video.state.value.aspect.label,
+                                    ),
+                                )
+                            },
                         )
                     }
                     if (!state.playing && !state.buffering && state.error == null) {
@@ -523,7 +612,11 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         supportsPip = supportsPip,
                         orientation = orientation,
                         onEnterPip = ::enterPip,
-                        onRotate = { orientation = orientation.next() },
+                        onRotate = {
+                            val next = orientation.next()
+                            orientation = next
+                            notify(PlayerNotice(next.icon, "Orientasi", next.label))
+                        },
                         onLock = { controlsLocked = true },
                         isLandscape = landscape,
                         modifier = Modifier.align(Alignment.BottomCenter),
@@ -533,6 +626,16 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
 
             feedback?.let { value ->
                 GestureOverlay(value, Modifier.align(Alignment.Center))
+            }
+
+            notice?.let { value ->
+                PlayerNoticeOverlay(
+                    value,
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = 130.dp, start = 16.dp, end = 16.dp),
+                )
             }
 
             AnimatedVisibility(
@@ -847,13 +950,13 @@ private fun PlayerBottomBar(
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.94f))))
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
             // Bar sistem disembunyikan saat memutar, jadi safeDrawing bawah = 0 dan kontrol sempat
-            // menempel ke tepi layar. Sisakan margin tetap agar bar tidak terasa mepet dan tetap
-            // terlihat saat bar sistem muncul sementara.
+            // menempel ke tepi layar. Sisakan margin tetap yang cukup untuk navigasi gestur maupun
+            // tombol sistem tiga tombol (sekitar 48 dp) yang muncul sekilas.
             .padding(
                 start = if (isLandscape) 18.dp else 12.dp,
                 end = if (isLandscape) 18.dp else 12.dp,
                 top = 4.dp,
-                bottom = if (isLandscape) 16.dp else 14.dp,
+                bottom = if (isLandscape) 28.dp else 48.dp,
             ),
     ) {
         // Waktu kiri/kanan mengapit track dengan lebar sama supaya progres tetap seimbang.
@@ -940,7 +1043,10 @@ private fun PlayerBottomBar(
     }
 }
 
-/** Deretan pengaturan cepat: ikon saja, tanpa caption, dipisah dari tombol navigasi putar. */
+/**
+ * Deretan pengaturan cepat. Setiap tombol punya label nilai saat ini di bawah ikon, sehingga
+ * pengguna bisa melihat kecepatan/efek/rasio yang aktif tanpa harus menebak dari warna ikon.
+ */
 @Composable
 private fun QuickSettingsBar(
     state: VideoPlayerViewModel.State,
@@ -964,48 +1070,56 @@ private fun QuickSettingsBar(
     ) {
         QuickIcon(
             icon = Icons.Outlined.Speed,
+            label = VideoPlayback.speedLabel(state.speed),
             description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
             active = abs(state.speed - 1f) > 0.001f,
             onClick = onSpeed,
         )
         QuickIcon(
             icon = Icons.Outlined.ClosedCaption,
+            label = subtitleChipLabel(state),
             description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
             active = subtitlesActive,
             onClick = onSubtitles,
         )
         QuickIcon(
             icon = Icons.Outlined.GraphicEq,
+            label = state.equalizer.shortLabel,
             description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
             active = state.equalizer != VideoEqualizer.OFF,
             onClick = onEqualizer,
         )
         QuickIcon(
             icon = Icons.Outlined.SurroundSound,
+            label = state.audioEffect.shortLabel,
             description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
             active = state.audioEffect != VideoAudioEffect.OFF,
             onClick = onAudioEffect,
         )
         QuickIcon(
             icon = Icons.Outlined.AutoAwesome,
+            label = state.enhance.shortLabel,
             description = "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
             active = state.enhance != VideoEnhance.OFF,
             onClick = onEnhance,
         )
         QuickIcon(
             icon = Icons.Outlined.Memory,
+            label = state.decoderMode.shortLabel,
             description = "Dekoder ${state.decoderMode.label}. Ketuk untuk berikutnya",
             active = state.decoderMode != VideoDecoderMode.AUTO,
             onClick = onDecoder,
         )
         QuickIcon(
             icon = Icons.Outlined.PhotoCamera,
+            label = "Foto",
             description = "Ambil screenshot video",
             active = false,
             onClick = onScreenshot,
         )
         QuickIcon(
             icon = Icons.Outlined.AspectRatio,
+            label = state.aspect.label,
             description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
             active = state.aspect != VideoAspect.FIT,
             onClick = onDisplay,
@@ -1016,27 +1130,90 @@ private fun QuickSettingsBar(
 @Composable
 private fun QuickIcon(
     icon: ImageVector,
+    label: String,
     description: String,
     active: Boolean,
     onClick: () -> Unit,
 ) {
     val accent = MaterialTheme.colorScheme.primary
-    Surface(
-        modifier = Modifier.size(40.dp).clickable(onClickLabel = description, onClick = onClick),
-        shape = CircleShape,
-        color = if (active) accent.copy(alpha = 0.24f) else Color.Black.copy(alpha = 0.42f),
-        contentColor = if (active) accent else PlayerContent,
+    Column(
+        modifier = Modifier
+            .widthIn(min = 40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClickLabel = description, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(horizontal = 2.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(icon, description, Modifier.size(20.dp))
+        Surface(
+            modifier = Modifier.size(34.dp),
+            shape = CircleShape,
+            color = if (active) accent.copy(alpha = 0.24f) else Color.Black.copy(alpha = 0.42f),
+            contentColor = if (active) accent else PlayerContent,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(18.dp))
+            }
         }
+        Spacer(Modifier.height(2.dp))
+        // Latar gelap kecil menjaga label tetap terbaca di atas adegan video yang terang.
+        Text(
+            label,
+            color = if (active) accent else PlayerContent,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .widthIn(max = 44.dp)
+                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .padding(horizontal = 3.dp),
+        )
     }
+}
+
+/** Label pendek di bawah ikon CC; detail lengkap tetap dibacakan lewat deskripsi aksesibilitas. */
+private fun subtitleChipLabel(state: VideoPlayerViewModel.State): String = when {
+    state.subtitlesDisabled -> "Off"
+    state.textTracks.isEmpty() -> "—"
+    else -> state.textTracks.firstOrNull { it.selected }
+        ?.let { track ->
+            // Kode bahasa ISO (id/en) lebih ringkas daripada nama track yang bisa panjang.
+            val code = track.language.trim()
+            if (code.isNotEmpty()) code.substringBefore('-').take(3) else track.label.trim().take(4)
+        }
+        ?.uppercase(Locale.getDefault())
+        ?.takeIf { it.isNotEmpty() }
+        ?: "Auto"
 }
 
 private fun subtitleChipDescription(state: VideoPlayerViewModel.State): String = when {
     state.subtitlesDisabled -> "nonaktif"
     state.textTracks.isEmpty() -> "belum tersedia"
     else -> state.textTracks.firstOrNull { it.selected }?.label ?: "otomatis"
+}
+
+@Composable
+private fun PlayerNoticeOverlay(notice: PlayerNotice, modifier: Modifier = Modifier) {
+    Surface(
+        modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Black.copy(alpha = 0.78f),
+        contentColor = PlayerContent,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(notice.icon, null, Modifier.size(22.dp), tint = AccentBlue)
+            Column {
+                Text(notice.title, color = PlayerMuted, style = MaterialTheme.typography.labelSmall)
+                Text(notice.value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }
 
 @Composable

@@ -220,6 +220,48 @@ class SourceMetadataTest {
         assertEquals(listOf(VideoResolution(1920, 1920)), meta.resolutions)
     }
 
+    @Test fun bstationEpisodeListsManualSubtitlesAndUsesFirstAsOriginal() {
+        // Bentuk `subtitles` dari BiliIntl/Bstation (ASS + SRT per bahasa) — baru muncul di JSON
+        // dump bila inspeksi meminta subtitle (--write-subs).
+        val json = JSONObject()
+            .put("subtitles", JSONObject()
+                .put("en", org.json.JSONArray().put(JSONObject().put("ext", "ass")))
+                .put("th", org.json.JSONArray().put(JSONObject().put("ext", "ass")))
+                .put("id", org.json.JSONArray().put(JSONObject().put("ext", "ass"))))
+        assertEquals(listOf("en", "id", "th"), SourceMetadata.subtitleLangs(json))
+        // Urutan kunci JSON tidak dijamin, jadi "asli" harus deterministik: bahasa perangkat bila ada
+        // (aplikasi berbahasa Indonesia), lalu en, lalu pilihan terurut.
+        assertEquals("id", SourceMetadata.originalSubtitleLang(json, preferred = "id"))
+        assertEquals("en", SourceMetadata.originalSubtitleLang(json))
+    }
+
+    @Test fun declaredLanguageWinsOverCaptionHeuristics() {
+        val json = JSONObject()
+            .put("language", "ja")
+            .put("subtitles", JSONObject()
+                .put("en", org.json.JSONArray()).put("ja", org.json.JSONArray()))
+            .put("automatic_captions", JSONObject().put("en-orig", org.json.JSONArray()))
+        assertEquals("ja", SourceMetadata.originalSubtitleLang(json, preferred = "id"))
+    }
+
+    @Test fun youtubeAutomationKeepsOnlyTheOriginalCaptionLanguage() {
+        val json = JSONObject()
+            .put("automatic_captions", JSONObject()
+                .put("en", org.json.JSONArray())
+                .put("id", org.json.JSONArray())
+                .put("en-orig", org.json.JSONArray()))
+            .put("subtitles", JSONObject()
+                .put("live_chat", org.json.JSONArray()))
+        assertEquals(listOf("en"), SourceMetadata.subtitleLangs(json))
+        assertEquals("en-orig", SourceMetadata.originalSubtitleLang(json))
+    }
+
+    @Test fun noSubtitleKeysMeansNoLanguages() {
+        val json = JSONObject().put("title", "E1 - The Battle Begins")
+        assertEquals(emptyList<String>(), SourceMetadata.subtitleLangs(json))
+        assertNull(SourceMetadata.originalSubtitleLang(json))
+    }
+
     @Test fun conflictingStructuredTrackDoesNotAcquireAnUnrelatedPerformer() {
         val meta=SourceMetadata.parse(JSONObject().put("title","Artist - Song - Other").put("track","Other")
             .put("description","Title: Song\nVoc: Artist"),"https://youtu.be/example")

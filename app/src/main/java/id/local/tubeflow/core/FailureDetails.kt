@@ -26,6 +26,9 @@ data class FailureDetails(val category: String, val phase: String, val message: 
         "dns" -> "Nama domain tidak dapat diterjemahkan. Periksa koneksi atau pengaturan DNS lalu coba lagi."
         "network" -> "Koneksi ke penyedia terputus. Coba lagi setelah koneksi pulih."
         "provider" -> "Penyedia sedang bermasalah. Coba lagi nanti."
+        "geo" -> "Konten ini tidak tersedia untuk wilayah/jaringan ini. Coba dari jaringan lain atau sumber resmi yang sesuai."
+        "premium" -> "Konten ini memerlukan login atau langganan akun. Untuk Bstation, masuk di Pengaturan → Akun Bstation dan pastikan akunmu berlangganan Premium; platform lain mungkin meminta akun yang berhak."
+        "empty" -> BstationUrls.SEASON_EMPTY
         else -> "Proses gagal. Coba lagi; buka Detail error untuk pemeriksaan lebih lanjut."
     }
 
@@ -66,6 +69,11 @@ data class FailureDetails(val category: String, val phase: String, val message: 
                 http == 429 -> "rate_limit"
                 http == 401 || http == 403 -> "access"
                 http != null && http >= 500 -> "provider"
+                // Katalog season kosong bukan kegagalan tautan; beri pesan yang menjelaskan.
+                "tidak memuat episode" in lower -> "empty"
+                // BiliIntl/Bstation: 10004001 = geo, kode login/VIP memakai pesan khas "registered users".
+                listOf("10004001", "geo restriction", "geo-restricted", "not available from your location", "地区受限", "版权地区受限").any { it in lower } -> "geo"
+                listOf("10004002", "10004003", "10004004", "10004005", "10023006", "registered users", "login required", "logged in", "log in", "sign in", "signin", "premium", "vip", "members only", "大会员").any { it in lower } -> "premium"
                 listOf("enospc", "no space left", "penyimpanan tidak cukup").any { it in lower } -> "storage"
                 listOf("securityexception", "permission denied", "access denied", "akses folder", "izin akses").any { it in lower } -> "permission"
                 listOf("unknownhost", "unable to resolve", "no address associated with hostname", "name or service not known").any { it in lower } -> "dns"

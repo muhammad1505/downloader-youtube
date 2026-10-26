@@ -15,6 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -60,6 +62,10 @@ fun SettingsScreen(
     clearingFiles: Boolean = false,
     onClearStorage: () -> Unit = {},
     engineUpdateBlockedReason: String? = null,
+    bstationSignedIn: Boolean = false,
+    bstationAccountId: String = "",
+    onBstationLogin: () -> Unit = {},
+    onBstationLogout: () -> Unit = {},
     section: String? = null,
     onSection: (String?) -> Unit = {},
 ) {
@@ -71,6 +77,14 @@ fun SettingsScreen(
     val partialSuffix = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_partial)
     val unavailableSize = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.size_unavailable)
     var confirmPartial by rememberSaveable { mutableStateOf(false) }
+    var confirmBstationLogout by rememberSaveable { mutableStateOf(false) }
+    if (confirmBstationLogout) AlertDialog(
+        onDismissRequest = { confirmBstationLogout = false },
+        title = { Text("Keluar dari Bstation?") },
+        text = { Text("Cookie login akan dihapus dari perangkat. Episode Premium tidak bisa dipilih lagi sampai kamu masuk kembali. Unduhan yang sudah selesai tidak terpengaruh.") },
+        confirmButton = { TextButton(onClick = { confirmBstationLogout = false; onBstationLogout() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Keluar") } },
+        dismissButton = { TextButton(onClick = { confirmBstationLogout = false }) { Text("Batal") } },
+    )
     if (confirmPartial) AlertDialog(onDismissRequest = { confirmPartial = false },
         title = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title)) },
         text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_warning)) },
@@ -187,6 +201,14 @@ fun SettingsScreen(
                 onClick = { onSection("media") },
             )
             SettingsCategoryCard(
+                title = "Akun Bstation",
+                summary = if (bstationSignedIn)
+                    "Masuk" + (bstationAccountId.takeIf { it.isNotBlank() }?.let { " · UID $it" } ?: "") + " · episode Premium dapat dipilih"
+                else "Belum masuk · episode Premium terkunci",
+                icon = Icons.Outlined.AccountCircle,
+                onClick = { onSection("accounts") },
+            )
+            SettingsCategoryCard(
                 title = "Tentang",
                 summary = "Versi ${BuildConfig.VERSION_NAME} · privasi dan ketentuan",
                 icon = Icons.Outlined.Info,
@@ -198,6 +220,61 @@ fun SettingsScreen(
         }
         if (section == "media") {
             MediaToolsSettings(karaoke, player)
+        }
+
+        if (section == "accounts") Panel(
+            description = "Login Bstation diperlukan untuk episode Premium. TubeFlow memakai halaman login resmi Bstation, bukan formulir kata sandi sendiri.",
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (bstationSignedIn) Icons.Outlined.AccountCircle else Icons.Outlined.Lock,
+                    null,
+                    Modifier.size(24.dp),
+                    tint = if (bstationSignedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (bstationSignedIn) "Akun Bstation aktif" else "Belum masuk ke Bstation",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        when {
+                            !bstationSignedIn -> "Episode Premium tetap terlihat di pemilih, tetapi terkunci sampai kamu masuk."
+                            bstationAccountId.isNotBlank() -> "UID $bstationAccountId · sesi tersimpan di perangkat ini."
+                            else -> "Sesi tersimpan di perangkat ini."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (bstationSignedIn) {
+                Text(
+                    "Akses Premium tetap mengikuti langganan akun. Bila episode tetap ditolak, periksa status langganan di Bstation lalu coba lagi.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ActionButton(
+                    "Keluar dari Bstation",
+                    { confirmBstationLogout = true },
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    destructive = true,
+                    fillWidth = true,
+                )
+            } else {
+                ActionButton(
+                    "Masuk ke Bstation",
+                    onBstationLogin,
+                    icon = Icons.AutoMirrored.Outlined.Login,
+                    emphasis = ActionEmphasis.Primary,
+                    fillWidth = true,
+                )
+            }
+            Text(
+                "Salinan sesi login disimpan terenkripsi oleh TubeFlow di penyimpanan aplikasi dan hanya dikirim ke Bstation saat membaca katalog atau mengunduh episode. TubeFlow tidak mengirim cookie ke server lain.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (section == "history") Panel(
@@ -492,6 +569,7 @@ private fun settingsSectionInfo(section: String): Pair<String, String> = when (s
     "playback" -> "Pemutaran" to "Perilaku saat pemutaran terputus dan sambungan Bluetooth."
     "history" -> "Riwayat" to "Batas umur catatan unduhan; file media tidak ikut dihapus."
     "media" -> "Media & alat" to "Karaoke, cadangan lirik, dan mesin media."
+    "accounts" -> "Akun Bstation" to "Login untuk episode Premium; cookie disimpan terenkripsi di perangkat."
     else -> "Tentang TubeFlow" to "Versi, privasi, dan ketentuan pemakaian."
 }
 

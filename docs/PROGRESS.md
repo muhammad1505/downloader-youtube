@@ -941,3 +941,118 @@ pada setiap kejadian lewat `scrubberPositionAt`, bukan `span` yang disalin saat
 `ScrubberGeometryTest` lulus melalui harness kotlinc/JUnit di luar Gradle;
 suite Gradle penuh dan uji rotasi di HP belum dijalankan pada sesi ini.
 [Detail](BUG_FINDINGS.md).
+
+## 25 Oktober 2026 — Episode Bstation
+
+Dukungan episode Bstation (`bilibili.tv`/`biliintl.com`) ditambahkan melalui
+`BstationUrls`: path `/play/<season>/<ep>` dan `/video/<id>` diterima, halaman
+season ditolak dengan pesan yang menjelaskan, dan identitas duplikat memakai
+bentuk kanonis tanpa locale/query. Error geo (`10004001`) dan login/premium
+kini punya kategori serta pesan pengguna sendiri. Regresi `BstationUrlsTest` (5),
+`SelectionTest` (45, termasuk Bstation), dan `FailureDetailsTest` (7, kategori
+geo/premium) lulus di harness kotlinc/JUnit dengan stub
+Android/Room. Suite Gradle dan uji perangkat Indonesia belum dijalankan.
+[Rincian](BSTATION_EPISODES_2026-10-25.md).
+
+## Pemilih episode season Bstation — 25 Oktober 2026
+
+Season Bstation (`/play/<season>`, `/media/<season>`) kini dibuka sebagai koleksi, bukan satu video. Katalog episode dibaca dari API Bstation yang sama dengan extractor BiliIntl (`season_info` + `episodes`), lalu dipetakan ke `PlaylistMetadata`/`PlaylistEntry`. Pemilih mengurutkan episode, memberi padding `E01`, menandai Premium dari `limit`/`limit_text`, dan memilih episode gratis bernomor secara otomatis; PV/spesial tidak dipilih dan Premium dinonaktifkan karena login belum didukung.
+
+Setiap episode tetap menjadi satu `DownloadJob` agar progress, retry, cancel, publikasi, dan deteksi duplikat bekerja seperti video biasa. Season memakai satu subfolder dari judul (`Selection.seriesFolder`), `autoFolder=""`, dan judul episode dipertahankan tanpa diproses sebagai lagu. Worker melewati pencarian lirik/identitas musik untuk episode season. URL episode memakai bentuk kanonis, sehingga locale dan query pelacakan tidak menghasilkan duplikat.
+
+Verifikasi: `BstationUrlsTest` 7, `BstationSeasonTest` 6, `SelectionTest` 47, dan `FailureDetailsTest` 8 lulus (total 68) dengan kotlinc + JUnit di luar Gradle. API dari VM US mengembalikan 4 episode + PV dan menandai E4 Premium. Gradle `:app:compileDebugKotlin` sukses, `:app:testDebugUnitTest` 504 tes lulus, `:app:lintDebug` sukses, dan `:app:assembleDebug` sukses dengan AAR FFmpeg stok sementara; uji perangkat dan build dengan AAR WebP proyek belum dijalankan.
+
+## Login/cookie Bstation untuk episode Premium — 25 Oktober 2026
+
+Pengguna dapat masuk ke Bstation lewat WebView halaman resmi dari Pengaturan → Akun Bstation atau tombol di pemilih season. Setelah cookie `SESSDATA` muncul, `BstationAuth` menyimpannya dengan AES-GCM dan kunci Android Keystore di `noBackupFilesDir`; kata sandi tidak pernah masuk ke TubeFlow. Episode Premium tetap terkunci sebelum login, lalu bisa dicentang dan diantrekan setelah login; `queuePlaylist` memeriksa ulang status sesi agar pilihan lama tidak lolos setelah logout.
+
+Katalog API dan engine memakai cookie hanya untuk host Bstation. Engine menerima file Netscape sementara (dua domain Bstation) lewat `--cookies`; file dihapus di `finally`. Logout menghapus file sesi dan cookie WebView. Akses Premium tetap mengikuti langganan akun dan tidak membuka konten ber-DRM.
+
+Verifikasi: `BstationUrlsTest` 7, `BstationSeasonTest` 7, `BstationCookiesTest` 6, `SelectionTest` 47, dan `FailureDetailsTest` 8 lulus (total 75); file Netscape juga diuji dengan `http.cookiejar.MozillaCookieJar`. Gradle `:app:compileDebugKotlin`, `:app:testDebugUnitTest` (511 tes), `:app:lintDebug`, dan `:app:assembleDebug` sukses; assemble memakai AAR FFmpeg stok sementara sehingga bukan build setara AAR WebP proyek. Login dengan akun nyata, decrypt Keystore di perangkat, dan unduhan Premium dari jaringan Indonesia belum diuji. [Rincian](BSTATION_EPISODES_2026-10-25.md).
+
+## Subtitle Bstation — 26 Oktober 2026
+
+Unduhan episode Bstation berhasil di perangkat (Realme, jaringan Indonesia):
+`E01 - The Battle Begins.mp4`, 102 MB, 23:50, tampil dan diputar di pemutar
+bawaan. Selector format diperbaiki lebih dulu karena rantai lama menuntut audio
+`m4a` sementara BiliIntl menyediakan audio AAC ber-ext `mp4`. Selector MP4 kini
+memakai `bestvideo[ext=mp4][vcodec^=avc1]+bestaudio` dan berakhir `/best`,
+sehingga sumber tanpa audio m4a tidak gagal dengan "Requested format is not
+available".
+
+Subtitle sempat tidak terdeteksi sama sekali. Penyebabnya `--dump-single-json`
+tanpa `--write-subs`: `extract_subtitles()` yt-dlp hanya membaca daftar subtitle
+bila subtitle diminta, jadi BiliIntl mengembalikan `subtitles` kosong. Setelah
+`--write-subs` ditambahkan ke inspeksi, preview menampilkan
+"Subtitle tersedia: en, id, th" di perangkat. Pilihan "asli" dibuat deterministik
+(bahasa video → `-orig` → bahasa perangkat → `en` → terurut) karena urutan kunci
+JSON tidak dijamin.Verifikasi: `:app:testDebugUnitTest` **516 tes, 0 gagal** (termasuk 3 regresi baru `SourceMetadataTest`), `:app:assembleDebug` sukses dengan AAR FFmpeg WebP proyek (`app/libs/ffmpeg-0.18.1-webp16k.aar`, audit 16 KB alignment tersedia). APK debug dipasang ke perangkat. [Rincian](BUG_FINDINGS.md).
+
+### Pemilih subtitle per sumber
+
+Daftar chip subtitle tidak lagi tetap ("Bahasa asli/Indonesia/Inggris/Semua"). `SubtitlePicker` membaca bahasa yang benar-benar dilaporkan sumber:
+
+- YouTube tetap memakai "Bahasa asli" (caption otomatis `-orig` membuat artinya
+  pasti), disusul bahasa yang tersedia dan "Semua bahasa".
+- Sumber non-YouTube (Bstation dan lainnya) hanya menampilkan bahasa yang ada,
+  mis. Inggris/Thai/Indonesia, tanpa "Bahasa asli" yang tidak punya arti di
+  sana. Pilihan awal mengikuti bahasa perangkat bila tersedia, lalu bahasa
+  pertama sumber.
+- `Selection.validSubtitleChoice` menerima tag ISO 639 (`th`, `pt-BR`, …) alih-alih
+  daftar tetap, sehingga bahasa yang tidak ada di daftar lama tetap bisa dipilih.
+
+Kartu pratinjau juga diperbaiki: durasi hanya ditampilkan bila sumber
+melaporkannya (BiliIntl tidak menyertakan `duration`), baris penulis
+menggunakan judul seri Bstation sebagai kredit sumber lewat
+`BstationSeason.seriesTitle`, dan baris yang kosong tidak lagi dirender sebagai
+0:00/kosong.
+
+Verifikasi: `:app:testDebugUnitTest` **522 tes, 0 gagal** (termasuk 6 regresi
+`SubtitlePickerTest`), `:app:lintDebug` sukses dengan 2 peringatan lama, dan
+`:app:assembleDebug` sukses. Uji perangkat untuk chip dan unduhan subtitle
+belum dijalankan pada sesi ini.
+
+## Uji perangkat 26 Oktober — unduhan subtitle Bstation + BUG-083
+
+Alur nyata di RMX1821 (Bstation, jaringan Indonesia): tempel tautan
+`bilibili.tv/play/2432940/31524599` → pratinjau "Black Clover Season 2",
+"Subtitle tersedia: Inggris, Indonesia, Thai" → buka Pengaturan lanjutan →
+aktifkan "Download subtitle" (default memilih **Indonesia** sesuai bahasa
+perangkat) → Download video.
+
+Hasil: `E01 - The Battle Begins (1).mp4` (102 MB) dan
+`E01 - The Battle Begins (1).id.srt` (23.761 byte, 318 cue, sampai 22:11)
+terbit di `Download/TubeFlow`; baris job `COMPLETED` dengan
+`subtitles=id`, `sidecarUris=sub|content://media/external/downloads/197934`.
+Artinya jalur unduh subtitle bekerja ujung ke ujung, termasuk penamaan
+`(1)` saat berkas sudah ada.
+
+Temuan lanjutan: pemutar menampilkan chip subtitle "—" karena URI MediaStore
+tidak memuat nama berkas, sehingga sidecar dibuang saat dibaca. Diperbaiki
+dengan membaca `DISPLAY_NAME` lewat resolver (BUG-083). Suite Gradle naik ke
+**523 tes, 0 gagal**; verifikasi visual chip di pemutar belum sempat dilakukan
+karena perangkat sedang dipakai.
+
+## Subtitle otomatis + perbaikan pemutar 26 Oktober
+
+Subtitle hasil unduhan sekarang dipilih otomatis saat video dibuka;
+`VideoPlayback.preferredSubtitleIndex` mengutamakan subtitle unduhan, lalu
+bahasa perangkat (mis. ponsel `id-ID` memilih `id` walau ada subtitle Inggris),
+lalu track pertama. Di RMX1821 episode Black Clover E01 menampilkan teks
+Indonesia tanpa menekan CC; panel opsi menampilkan "Subtitle · Indonesia".
+
+Dua masalah pemutar diperbaiki setelah uji yang sama:
+
+- Kontrol transport dinaikkan dari 14/16 dp menjadi 48/28 dp agar tidak
+  menutupi navigasi sistem (BUG-084). Diukur di HP: tombol putar berakhir di
+  y≈1433 px, di atas area navigasi y≈1450 px.
+- `PlayerView` kini dibuat ulang lewat `key(playerVersion)` setiap ExoPlayer
+  dibuat ulang, sehingga pergantian dekoder tidak memakai permukaan video milik
+  player lama (BUG-085). Pergantian Perangkat ↔ Software diuji pada episode
+  H.264; frame tetap berubah di kedua arah. Kasus audio-only yang dilaporkan
+  tidak berhasil direproduksi pada berkas ini.
+
+Verifikasi: `:app:testDebugUnitTest` **526 tes, 0 gagal**, `:app:lintDebug`
+0 error dan 2 peringatan lama, `:app:assembleDebug` sukses. Build uji memakai
+`applicationIdSuffix` sementara agar tidak menimpa aplikasi rilis; konfigurasi
+itu sudah dikembalikan dan APK final dibangun tanpa suffix.

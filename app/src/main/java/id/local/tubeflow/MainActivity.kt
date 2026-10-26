@@ -15,6 +15,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.mutableStateOf
+import id.local.tubeflow.core.BstationAuth
 import id.local.tubeflow.core.DownloadViewModel
 import id.local.tubeflow.core.SettingsStore
 import id.local.tubeflow.core.PlayerViewModel
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
             navigation.value = AppNavigationRequest(it)
         }
         SettingsStore.load(this)
+        BstationAuth.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
         player = PlayerViewModel.obtain(application)

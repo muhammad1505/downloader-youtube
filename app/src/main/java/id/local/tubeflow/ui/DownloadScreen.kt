@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FeaturedPlayList
+import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +31,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
+import id.local.tubeflow.core.BstationSeason
+import id.local.tubeflow.core.BstationUrls
 import id.local.tubeflow.core.DownloadOptions
 import id.local.tubeflow.core.Format
 import id.local.tubeflow.core.InspectionPhase
@@ -45,8 +48,10 @@ import id.local.tubeflow.core.SpotifyCollectionPreview
 import id.local.tubeflow.core.SpotifyKind
 import id.local.tubeflow.core.SpotifyPreview
 import id.local.tubeflow.core.SpotifyTrack
+import id.local.tubeflow.core.SubtitlePicker
 import id.local.tubeflow.core.VideoMetadata
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 private data class Preset(val label: String, val mode: MediaMode, val format: String, val quality: Int, val bitrate: Int)
 
@@ -64,8 +69,6 @@ private val audioPresets = listOf(
     Preset("FLAC lossless", MediaMode.AUDIO, "flac", 0, 0),
 )
 
-private val subtitleLabels = listOf("" to "Tanpa subtitle", "asli" to "Bahasa asli", "id" to "Bahasa Indonesia", "en" to "Bahasa Inggris", ".*" to "Semua bahasa")
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DownloadComposer(
@@ -78,6 +81,8 @@ internal fun DownloadComposer(
     inspectStartedAt: Long,
     inspectError: String?,
     inspectDetails: id.local.tubeflow.core.FailureDetails? = null,
+    bstationSignedIn: Boolean = false,
+    onBstationLogin: () -> Unit = {},
     inspect: () -> Unit,
     inspectPlaylist: () -> Unit,
     retryInspect: () -> Unit,
@@ -131,6 +136,9 @@ internal fun DownloadComposer(
     val isSpotifyTrackLink = Spotify.isTrackLink(trimmed)
     val isSpotifyCollectionLink = Spotify.isCollectionLink(trimmed)
     val isSpotifyLink = isSpotifyTrackLink || isSpotifyCollectionLink
+    val isBstationSeason = BstationUrls.isSeasonOnly(trimmed)
+    val isCollectionLink = isPlaylistLink || isBstationSeason
+    val shownSeason = shownPlaylist?.let { BstationUrls.isSeasonOnly(it.url) } == true
     val spotifyTrack = spotify.track?.takeIf { spotify.url == trimmed }
     val spotifyCollectionData = spotifyCollection.collection?.takeIf { spotifyCollection.url == trimmed }
     val spotifyBusy = if (isSpotifyCollectionLink) spotifyCollection.busy else spotify.busy
@@ -186,13 +194,13 @@ internal fun DownloadComposer(
         }
         if (spotify.url.isNotEmpty()) clearSpotify()
         if (spotifyCollection.url.isNotEmpty()) clearSpotifyCollection()
-        if (!isVideo && !isPlaylistLink) { inspectedUrl = ""; return@LaunchedEffect }
+        if (!isVideo && !isCollectionLink) { inspectedUrl = ""; return@LaunchedEffect }
         delay(700)
         if (shownVideo?.url == trimmed || shownPlaylist?.url == trimmed) { inspectedUrl = trimmed; return@LaunchedEffect }
         if (inspectedUrl == trimmed) return@LaunchedEffect
         inspectedUrl = trimmed
         // Tautan yang juga video (watch/shorts/youtu.be + list) tetap membuka video; buka playlist lewat tombol (BUG-007).
-        if (isPlaylistLink && !isVideo) inspectPlaylist() else inspect()
+        if (isCollectionLink && !isVideo) inspectPlaylist() else inspect()
     }
 
     fun availableTier(requestedTier: Int): Int =
@@ -241,10 +249,23 @@ internal fun DownloadComposer(
 
     val entries = shownPlaylist?.entries.orEmpty()
     val visibleEntries = if (playlistQuery.isBlank()) entries else entries.filter { it.title.contains(playlistQuery.trim(), ignoreCase = true) }
-    val allSelected = visibleEntries.isNotEmpty() && visibleEntries.all { it.id in selectedIds }
+    val selectableVisible = if (shownSeason) visibleEntries.filterNot { BstationSeason.premiumLocked(it, bstationSignedIn) } else visibleEntries
+    val allSelected = selectableVisible.isNotEmpty() && selectableVisible.all { it.id in selectedIds }
     val selectionCount = entries.count { it.id in selectedIds }
+    val seasonEpisodeCount = entries.count { it.episodeNumber != null }
+    val seasonSpecialCount = entries.count { it.episodeNumber == null }
+    val seasonPremiumCount = entries.count { it.premium == true }
 
-    LaunchedEffect(shownPlaylist?.url) { selectedIds = shownPlaylist?.entries?.map { it.id }?.toSet().orEmpty(); playlistQuery = "" }
+    // Status login ikut menjadi kunci: keluar akun membuang pilihan Premium yang sudah dicentang.
+    LaunchedEffect(shownPlaylist?.url, bstationSignedIn) {
+        val current = shownPlaylist
+        selectedIds = when {
+            current == null -> emptySet()
+            BstationUrls.isSeasonOnly(current.url) -> BstationSeason.initialSelection(current.entries)
+            else -> current.entries.map { it.id }.toSet()
+        }
+        playlistQuery = ""
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -255,10 +276,10 @@ internal fun DownloadComposer(
                 value = url,
                 onValueChange = { onUrl(it); if (shownPlaylist != null) clearPlaylist() },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Link video, playlist, atau lagu Spotify") },
-                placeholder = { Text("https://youtu.be/… , playlist?list=… , atau open.spotify.com/track/…") },
+                label = { Text("Link video, season, playlist, atau lagu Spotify") },
+                placeholder = { Text("https://youtu.be/… , bilibili.tv/play/… , playlist?list=… , atau open.spotify.com/track/…") },
                 singleLine = true,
-                isError = url.isNotBlank() && !isVideo && !isPlaylistLink && !isSpotifyLink,
+                isError = url.isNotBlank() && !isVideo && !isCollectionLink && !isSpotifyLink,
                 supportingText = {
                     when {
                         busy -> Text(inspectProgressText)
@@ -266,11 +287,12 @@ internal fun DownloadComposer(
                             (if (isSpotifyCollectionLink) spotifyCollection.phase else spotify.phase)
                                 ?.let(InspectionPhase::label) ?: "Membaca link Spotify…"
                         )
-                        url.isNotBlank() && !isVideo && !isPlaylistLink && !isSpotifyLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
+                        isBstationSeason -> Text(if (shownPlaylist != null) "Season Bstation · pilih episode di bawah." else BstationUrls.SEASON_LOADING)
+                        url.isNotBlank() && !isVideo && !isCollectionLink && !isSpotifyLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
                         isSpotifyLink -> Text("Terdeteksi link Spotify — audio diambil dari video YouTube yang cocok.")
                         hasList -> Text("Link ini bagian dari sebuah playlist.")
-                        else -> Text("Contoh: youtube.com, youtu.be, tiktok.com, soundcloud.com, open.spotify.com.")
+                        else -> Text("Contoh: youtube.com, bilibili.tv, tiktok.com, soundcloud.com, open.spotify.com.")
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -350,7 +372,7 @@ internal fun DownloadComposer(
                     emphasis = ActionEmphasis.Quiet,
                 )
             }
-            if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isPlaylistLink)) {
+            if (inspectError != null && !busy && trimmed.isNotBlank() && (isVideo || isCollectionLink)) {
                 AdaptivePair(leading = { available -> Row(available, verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
@@ -419,55 +441,109 @@ internal fun DownloadComposer(
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(shownPlaylist.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                                Text(if (Selection.isMix(shownPlaylist.url)) "${entries.size} video dalam antrean awal" else "${entries.size} video · mengikuti isi link (maks 500)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    when {
+                                        shownSeason -> buildList {
+                                            if (seasonEpisodeCount > 0) add("$seasonEpisodeCount episode")
+                                            if (seasonSpecialCount > 0) add("$seasonSpecialCount spesial")
+                                            if (seasonPremiumCount > 0) add("$seasonPremiumCount Premium")
+                                        }.ifEmpty { listOf("${entries.size} episode") }.joinToString(" · ")
+                                        Selection.isMix(shownPlaylist.url) -> "${entries.size} video dalam antrean awal"
+                                        else -> "${entries.size} video · mengikuti isi link (maks 500)"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         } }, trailing = {
                             ActionButton(
                                 if (allSelected) "Kosongkan" else "Pilih semua",
-                                { selectedIds = if (allSelected) emptySet() else selectedIds + visibleEntries.map { it.id } },
+                                { selectedIds = if (allSelected) emptySet() else selectedIds + selectableVisible.map { it.id } },
                                 emphasis = ActionEmphasis.Quiet,
                             )
                         })
-                        if (Selection.isMix(shownPlaylist.url)) {
+                        if (shownSeason) {
+                            Text(
+                                "Daftar mengikuti episode yang tersedia di wilayah ini." +
+                                    if (seasonPremiumCount > 0) " Episode Premium hanya bisa diunduh dengan akun yang berlangganan." else "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (seasonPremiumCount > 0) {
+                                Text(
+                                    if (bstationSignedIn) "Kamu sudah masuk. Pilih episode Premium yang ingin diantrekan — aksesnya tetap mengikuti langganan akun."
+                                    else "$seasonPremiumCount episode Premium terkunci. Masuk ke Bstation untuk membuka pilihannya.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (bstationSignedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                )
+                                if (!bstationSignedIn) ActionButton(
+                                    "Masuk Bstation untuk membuka Premium",
+                                    onBstationLogin,
+                                    icon = Icons.AutoMirrored.Outlined.Login,
+                                    fillWidth = true,
+                                    enabled = !busy,
+                                )
+                            }
+                        } else if (Selection.isMix(shownPlaylist.url)) {
                             Text(
                                 "Antrean awal Mix dari YouTube (± video terkait yang sedang diputar) — tanpa memuat halaman lanjutan. Daftar dapat berubah dan berbeda dari akun YouTube Anda.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        SearchField(playlistQuery, { playlistQuery = it }, label = "Cari video dalam playlist")
+                        SearchField(playlistQuery, { playlistQuery = it }, label = if (shownSeason) "Cari episode atau judul" else "Cari video dalam playlist")
                         if (entries.isEmpty()) {
-                            Text("Playlist kosong atau tidak bisa dibaca.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (shownSeason) BstationUrls.SEASON_EMPTY else "Playlist kosong atau tidak bisa dibaca.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
-                            Text("Pilih video yang mau diantrekan:", style = MaterialTheme.typography.labelLarge)
+                            Text(if (shownSeason) "Pilih episode yang mau diantrekan:" else "Pilih video yang mau diantrekan:", style = MaterialTheme.typography.labelLarge)
                             Column(
                                 Modifier.fillMaxWidth().heightIn(max = 340.dp).verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
                                 visibleEntries.forEach { entry ->
+                                    val premiumLocked = shownSeason && BstationSeason.premiumLocked(entry, bstationSignedIn)
                                     Row(
                                         Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Checkbox(
                                             checked = entry.id in selectedIds,
+                                            enabled = !premiumLocked,
                                             onCheckedChange = { checked ->
                                                 selectedIds = if (checked) selectedIds + entry.id else selectedIds - entry.id
                                             },
                                         )
                                         Column(Modifier.weight(1f)) {
                                             Text(entry.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-                                            if (entry.durationSeconds > 0) Text(Format.duration(entry.durationSeconds), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            if (shownSeason) {
+                                                val note = when {
+                                                    entry.premium == true && bstationSignedIn -> "Premium · hanya untuk akun berlangganan"
+                                                    entry.premium == true -> "Premium · masuk untuk memilih"
+                                                    entry.episodeNumber == null -> "Spesial"
+                                                    else -> null
+                                                }
+                                                if (note != null) Text(
+                                                    note,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (entry.premium == true && !bstationSignedIn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            } else if (entry.durationSeconds > 0) {
+                                                Text(Format.duration(entry.durationSeconds), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
                                         }
                                     }
                                 }
                             }
                             if (visibleEntries.isEmpty()) {
-                                Text("Tidak ada video yang cocok dengan \"$playlistQuery\".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Tidak ada ${if (shownSeason) "episode" else "video"} yang cocok dengan \"$playlistQuery\".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(
-                                if (playlistQuery.isBlank()) "$selectionCount / ${entries.size} terpilih"
-                                else "Menampilkan ${visibleEntries.size} dari ${entries.size} · $selectionCount terpilih",
+                                if (playlistQuery.isBlank()) {
+                                    if (shownSeason && seasonPremiumCount > 0) "$selectionCount / ${entries.size} terpilih · $seasonPremiumCount Premium " + if (bstationSignedIn) "dapat dipilih" else "terkunci"
+                                    else "$selectionCount / ${entries.size} terpilih"
+                                } else {
+                                    "Menampilkan ${visibleEntries.size} dari ${entries.size} · $selectionCount terpilih"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold,
@@ -479,8 +555,12 @@ internal fun DownloadComposer(
 
         if (shownVideo != null || shownPlaylist != null || spotifyTrack != null || spotifyCollectionData != null) {
             Panel(
-                title = if (shownPlaylist != null) "Opsi untuk semua video terpilih" else "Pilih download",
+                title = if (shownPlaylist != null) {
+                    if (shownSeason) "Opsi untuk semua episode terpilih" else "Opsi untuk semua video terpilih"
+                } else "Pilih download",
                 description = when {
+                    shownPlaylist != null && shownSeason -> "Semua episode masuk satu folder: ${shownPlaylist.folderName}. Nama file memakai judul episode. " +
+                        if (bstationSignedIn) "Episode Premium yang dipilih ikut diantrekan; keberhasilannya tergantung langganan akun." else "Episode Premium terkunci sampai kamu masuk ke Bstation."
                     shownPlaylist != null -> "Semua pilihan masuk satu folder: ${shownPlaylist.folderName}. Nama file tetap memakai judul dan artis/remixer masing-masing lagu."
                     spotifyCollectionData != null -> "Setiap lagu menjadi job terpisah dengan tag Spotify; audionya dari video YouTube hasil pencocokan. Semua file masuk satu folder koleksi."
                     spotifyTrack != null -> "Audio diunduh dari video YouTube yang dipilih; judul, artis, dan sampul di aplikasi memakai metadata Spotify."
@@ -549,7 +629,11 @@ internal fun DownloadComposer(
                                 checked = if (mode == MediaMode.VIDEO) subtitleLang.isNotEmpty() else lyrics,
                                 onCheckedChange = { enabled ->
                                     if (mode == MediaMode.VIDEO) {
-                                        subtitleLang = if (enabled) "asli" else ""
+                                        // Bstation & sumber non-YouTube tidak punya konsep "bahasa asli";
+                                        // mulai dari bahasa yang benar-benar tersedia (atau bahasa perangkat).
+                                        subtitleLang = if (enabled)
+                                            SubtitlePicker.defaultSelection(shownVideo, Locale.getDefault().language)
+                                        else ""
                                         if (!enabled) embedSubs = false
                                     } else {
                                         lyrics = enabled
@@ -561,7 +645,7 @@ internal fun DownloadComposer(
                                     // Bahasa subtitle hanya untuk video — lirik audio selalu dari LRCLIB, tanpa pilihan bahasa (BUG-009).
                                     if (mode == MediaMode.VIDEO) {
                                         ScrollRow {
-                                            subtitleLabels.drop(1).forEach { (value, label) ->
+                                            SubtitlePicker.options(shownVideo).forEach { (value, label) ->
                                                 FilterChip(selected = subtitleLang == value, onClick = { subtitleLang = value }, label = { Text(label) })
                                             }
                                         }
@@ -615,7 +699,7 @@ internal fun DownloadComposer(
                         Icon(Icons.Outlined.Tune, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         Spacer(Modifier.width(8.dp))
                         Text(summary, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        if (shownPlaylist != null) Text("$selectionCount video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        if (shownPlaylist != null) Text(if (shownSeason) "$selectionCount episode" else "$selectionCount video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         else if (spotifyCollectionData != null) Text("$spotifyMatchedSelected/${spotifySelectedTracks.size} cocok", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         else if (spotifyTrack != null) Text("Spotify · YouTube", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
@@ -623,7 +707,7 @@ internal fun DownloadComposer(
 
                 ActionButton(
                     text = when {
-                        shownPlaylist != null -> "Antrekan $selectionCount video"
+                        shownPlaylist != null -> if (shownSeason) "Antrekan $selectionCount episode" else "Antrekan $selectionCount video"
                         spotifyCollectionData != null -> "Antrekan $spotifyMatchedSelected lagu"
                         spotifyTrack != null -> "Download audio"
                         mode == MediaMode.VIDEO -> "Download video"
@@ -672,7 +756,8 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                     contentScale = ContentScale.Crop,
                 )
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Black.copy(alpha=0.6f)))))
-                Surface(
+                // Durasi hanya ditampilkan bila sumber melaporkannya; "0:00" menyesatkan.
+                if (meta.durationSeconds > 0) Surface(
                     color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.68f),
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
@@ -687,14 +772,17 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 }
             }
             Text(meta.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Person, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(meta.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            if (meta.uploader.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.Person, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(meta.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.CheckCircle, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.secondary)
                 Spacer(Modifier.width(6.dp))
-                Text("Siap diunduh · ${Format.duration(meta.durationSeconds)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
+                val ready = if (meta.durationSeconds > 0) "Siap diunduh · ${Format.duration(meta.durationSeconds)}" else "Siap diunduh"
+                Text(ready, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Outlined.Hd, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
@@ -710,7 +798,7 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Icons.Outlined.ClosedCaption, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
                     Text(
-                        "Subtitle tersedia: ${meta.subtitleLangs.take(6).joinToString(", ")}",
+                        "Subtitle tersedia: ${meta.subtitleLangs.take(6).joinToString(", ") { SubtitlePicker.label(it) }}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -719,9 +807,9 @@ private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
                 if (subtitleLang.isNotEmpty()) {
                     Text(
                         when {
-                            subtitleLang == ".*" -> "Semua bahasa diambil, termasuk hasil terjemahan mesin."
-                            subtitleLang == "asli" -> "Hanya bahasa asli video yang diambil — tanpa terjemahan mesin."
-                            else -> "Subtitle '$subtitleLang' diambil; bila tidak tersedia, hasilnya terjemahan mesin."
+                            subtitleLang == SubtitlePicker.ALL -> "Semua bahasa diambil, termasuk hasil terjemahan mesin bila ada."
+                            subtitleLang == SubtitlePicker.ORIGINAL -> "Hanya bahasa asli video yang diambil — tanpa terjemahan mesin."
+                            else -> "Subtitle ${SubtitlePicker.label(subtitleLang)} diambil bila disediakan sumber."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
@@ -961,9 +1049,8 @@ private fun buildSummary(mode: MediaMode, videoFormat: String, audioFormat: Stri
         if (subtitleLang.isNotEmpty()) {
             if (mode == MediaMode.AUDIO) add("Lirik") // lirik selalu dari penyedia lirik — tanpa pilihan bahasa (BUG-009)
             else {
-                val all = subtitleLang == ".*"
-                val lang = if (subtitleLang == "asli") "bahasa asli" else subtitleLang
-                add(if (all) "Semua CC" else "CC $lang")
+                val all = subtitleLang == SubtitlePicker.ALL
+                add(if (all) "Semua CC" else "CC ${SubtitlePicker.describe(subtitleLang)}")
             }
         }
         if (cover) add("Sampul")

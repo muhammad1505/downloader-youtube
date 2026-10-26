@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
  * Mesin pemutar video (Media3 ExoPlayer). Terpisah total dari [PlayerViewModel] yang tetap
  * menangani audio dengan MediaPlayer, sehingga kontrol, notifikasi, dan antrean lagu tidak berubah.
  *
- * ExoPlayer hidup selama layar video terbuka dan dilepas saat ditutup. Activity-scoped ViewModel
+ *            ExoPlayer hidup selama layar video terbuka dan dilepas saat ditutup. Activity-scoped ViewModel
  * membuat pemutaran bertahan saat rotasi tanpa memindahkan audio ke background service.
  */
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -71,6 +71,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val subtitleDelayMs: Int = 0,
         val decoderMode: VideoDecoderMode = VideoDecoderMode.AUTO,
         val enhance: VideoEnhance = VideoEnhance.OFF,
+        /** Naik setiap ExoPlayer dibuat ulang; dipakai layar untuk mengganti permukaan video. */
+        val playerVersion: Int = 0,
         val equalizer: VideoEqualizer = VideoEqualizer.OFF,
         val audioEffect: VideoAudioEffect = VideoAudioEffect.OFF,
         val videoWidth: Int = 0,
@@ -98,6 +100,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var fallbackJob: Job? = null
     private var softwareFallbackUsed = false
     private var pendingSubtitleLabel: String? = null
+
+    /** Bahasa subtitle unduhan pada video yang sedang dibuka, untuk pemilihan otomatis. */
+    private var pendingSubtitleLanguages: List<String> = emptyList()
+    private var pendingSubtitleSelection = false
+    private var playerVersion = 0
 
     /** Dibaca layar untuk dipasang ke PlayerView; null saat tidak ada video. */
     val exoPlayer: ExoPlayer? get() = player
@@ -175,6 +182,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 },
                 ended = false,
             )
+            _state.value.entries.getOrNull(index)?.let(::prepareSubtitleSelection)
             refreshTracks()
         }
 
@@ -251,6 +259,18 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         openInternal(entries.map(::withStoredSubtitles), start, startPosition, preferSoftware = false)
     }
 
+    /** Video dengan subtitle unduhan memilih track otomatis; video tanpa subtitle tetap nonaktif. */
+    private fun prepareSubtitleSelection(entry: VideoEntry) {
+        pendingSubtitleLanguages = entry.subtitles.map { it.language }.filter { it.isNotBlank() }
+        pendingSubtitleSelection = entry.subtitles.isNotEmpty()
+    }
+
+    /** Bahasa perangkat, termasuk bahasa aplikasi bila pengguna mengaturnya per aplikasi. */
+    private fun deviceLanguages(): List<String> {
+        val locales = getApplication<Application>().resources.configuration.locales
+        return (0 until locales.size()).map { locales[it].toLanguageTag() }
+    }
+
     /** Subtitle pilihan pengguna disimpan per video; gabungkan lagi setiap kali antrean dibuka. */
     private fun withStoredSubtitles(entry: VideoEntry): VideoEntry {
         val stored = VideoExternalSubtitleCodec.decode(preferences.getString(externalKey(entry.uri), null))
@@ -266,6 +286,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         preferSoftware: Boolean,
     ) {
         val preferences = preferencesState()
+        playerVersion += 1
         _state.value = preferences.copy(
             entries = entries,
             index = start,
@@ -273,10 +294,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             bufferedMs = 0,
             buffering = true,
             resumeFromMs = startPosition,
+            playerVersion = playerVersion,
         )
         currentUri = entries[start].uri
         lastPositionMs = startPosition
         lastDurationMs = 0
+        prepareSubtitleSelection(entries[start])
         try {
             // ON memakai dekoder perangkat lebih dulu dan FFmpeg/dav1d saat format tidak
             // didukung. PREFER memaksa jalur software setelah dekoder perangkat gagal init.
@@ -753,6 +776,19 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             subtitlesDisabled = player?.trackSelectionParameters?.disabledTrackTypes
                 ?.contains(C.TRACK_TYPE_TEXT) == true,
         )
+        if (pendingSubtitleSelection) {
+            if (text.isEmpty()) return
+            // Subtitle hasil unduhan langsung aktif; di antara pilihan yang ada, bahasa ponsel
+            // menang sehingga pengguna tidak perlu menekan CC setiap kali membuka video.
+            val pick = VideoPlayback.preferredSubtitleIndex(
+                languages = text.map { it.language },
+                downloadedLanguages = pendingSubtitleLanguages,
+                preferredLanguages = deviceLanguages(),
+            )
+            pendingSubtitleSelection = false
+            text.getOrNull(pick)?.let(::selectTrack)
+            return
+        }
         // Setelah subtitle eksternal ditambahkan, pilih track yang baru itu supaya pengguna
         // tidak perlu menekan CC lagi. Label berkas dipakai sebagai pembeda dari track tertanam.
         val wanted = pendingSubtitleLabel ?: return
