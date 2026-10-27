@@ -52,3 +52,20 @@ encode. Pratinjau memakai rentang yang sama.
 Verifikasi: `StatusClipTest` **9 tes** lulus dengan kotlinc/JUnit di luar Gradle
 (rentang eksplisit, penjepitan, batas 1/30 detik, video pendek, argumen FFmpeg).
 Build Gradle, lint, dan uji perangkat belum dijalankan pada sesi ini.
+
+## Pembaruan lanjutan — satu bilah rentang (1.1.47, code 62)
+
+Dua slider terpisah diganti satu bilah dengan dua pegangan (`ui/RangeScrubber.kt`). Menarik ujung
+kiri/kanan hanya mengubah batas itu dan berhenti 1 detik sebelum ujung lainnya; menarik bagian
+terpilih memindahkan seluruh klip tanpa mengubah panjangnya; ketukan di luar rentang menarik ujung
+terdekat. Garis tipis menandai `awal + 30 detik` supaya jelas kenapa ujung kanan berhenti, dan
+`StatusClip.range` tetap menjadi satu-satunya penjepit 1–30 detik yang dipakai dialog. Pratinjau
+memakai rentang yang sama; tidak ada perubahan pada `StatusClipper` atau perintah FFmpeg.
+
+Geometri geser dipisah menjadi fungsi murni (`rangeDragModeAt`, `rangeDragSelection`,
+`scrubberXFor`) dan diuji tanpa perangkat di `RangeScrubberGeometryTest`.
+
+Verifikasi: `./gradlew testDebugUnitTest` — **566 tes, 0 gagal** (10 tes baru di
+`RangeScrubberGeometryTest`). `lintDebug` tidak selesai dalam batas waktu sesi ini, jadi status
+lint untuk perubahan ini belum diklaim. Uji perangkat (memegang dua pegangan, geser bagian tengah,
+TalkBack, video vertikal) belum dijalankan.

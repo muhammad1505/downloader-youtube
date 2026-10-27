@@ -55,17 +55,10 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
     val selected = if (durationMs > 0) StatusClip.range(durationMs, startMs, endMs) else null
     val rangeStart = selected?.startMs ?: 0L
     val rangeEnd = selected?.endMs ?: 0L
-    val maxEndMs = minOf(durationMs, rangeStart + StatusClip.DURATION_MS)
     val editable = durationMs > StatusClip.MIN_DURATION_MS
 
-    fun setStart(valueMs: Float) {
-        val next = StatusClip.range(durationMs, valueMs.toSecondMs(), endMs)
-        startMs = next.startMs
-        endMs = next.endMs
-    }
-
-    fun setEnd(valueMs: Float) {
-        val next = StatusClip.range(durationMs, startMs, valueMs.toSecondMs())
+    fun setRange(nextStartMs: Float, nextEndMs: Float) {
+        val next = StatusClip.range(durationMs, nextStartMs.toSecondMs(), nextEndMs.toSecondMs())
         startMs = next.startMs
         endMs = next.endMs
     }
@@ -127,32 +120,22 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                     if (editable) {
-                        Text("Awal: ${clipTime(rangeStart)}", style = MaterialTheme.typography.labelSmall)
-                        Scrubber(
-                            value = rangeStart.toFloat(),
-                            duration = durationMs.toFloat(),
-                            onScrub = { setStart(it) },
-                            onScrubFinished = {},
+                        RangeScrubber(
+                            startMs = rangeStart.toFloat(),
+                            endMs = rangeEnd.toFloat(),
+                            durationMs = durationMs.toFloat(),
+                            onRangeChange = { start, end -> setRange(start, end) },
                             contentColor = MaterialTheme.colorScheme.primary,
-                            touchHeight = 48.dp,
+                            minimumSpanMs = StatusClip.MIN_DURATION_MS.toFloat(),
+                            limitSpanMs = StatusClip.DURATION_MS.toFloat(),
                             enabled = !busy,
-                            contentDescription = stringResource(R.string.clip_start_position),
-                            modifier = Modifier.fillMaxWidth(),
+                            contentDescription = stringResource(R.string.clip_range_position),
+                            stateDescription = "Awal ${clipTime(rangeStart)}, akhir ${clipTime(rangeEnd)}, panjang ${clipTime(rangeEnd - rangeStart)}",
                         )
                         Text(
-                            "Akhir: ${clipTime(rangeEnd)}  ·  maks ${clipTime(maxEndMs)}",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                        Scrubber(
-                            value = rangeEnd.toFloat(),
-                            duration = durationMs.toFloat(),
-                            onScrub = { setEnd(it) },
-                            onScrubFinished = {},
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            touchHeight = 48.dp,
-                            enabled = !busy,
-                            contentDescription = stringResource(R.string.clip_end_position),
-                            modifier = Modifier.fillMaxWidth(),
+                            "Geser kedua ujungnya, atau geser bagian tengah untuk memindahkan seluruh klip. Garis tipis menandai batas 30 detik dari titik awal.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(

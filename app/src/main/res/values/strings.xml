@@ -225,8 +225,7 @@
     <string name="clip_preview_error">Pratinjau tidak dapat diputar di perangkat ini. Pilih bagian berdasarkan waktu atau coba video lain.</string>
     <string name="power_saver_short">Hemat</string>
     <string name="power_saver_effects">Penghemat baterai aktif. Smart Enhance sementara tidak diterapkan; pilihan efek tetap disimpan.</string>
-    <string name="clip_start_position">Awal potongan Status</string>
-    <string name="clip_end_position">Akhir potongan Status</string>
+    <string name="clip_range_position">Titik awal dan akhir potongan Status</string>
     <string name="clip_preview_play">Putar pratinjau</string>
     <string name="clip_preview_pause">Jeda pratinjau</string>
     <string name="clip_preview_position">Posisi pratinjau potongan</string>

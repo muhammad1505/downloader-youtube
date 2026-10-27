@@ -4,7 +4,11 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
-Terbaru **1.1.46/code61** sudah terpasang: kontrol kecerahan dan penguat video.
+Terbaru **1.1.47/code62**: titik awal dan akhir klip Status memakai satu bilah rentang
+(`ui/RangeScrubber.kt`), bukan dua slider. 566 tes Kotlin lulus; uji perangkat dan lint belum.
+[Rincian](STATUS_CLIP_2026-10-23.md).
+
+Sebelumnya **1.1.46/code61** sudah terpasang: kontrol kecerahan dan penguat video.
 [Hasil build, uji HP dan konfirmasi dengar](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
 Catatan baseline 1.1.44 berikut mengacu pada awal pekerjaan player 1.1.45.
 
