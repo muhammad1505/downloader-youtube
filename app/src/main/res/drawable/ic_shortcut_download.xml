@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon shortcut launcher: warna aksen tema digambar apa adanya karena launcher tidak mewarnai
+     ikon shortcut statis. Bentuknya siluet agar tetap terbaca di latar terang maupun gelap. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF33D07C"
+        android:pathData="M11,3h2v8.2l2.9,-2.9 1.4,1.4 -5.3,5.3 -5.3,-5.3 1.4,-1.4 2.9,2.9z" />
+    <path
+        android:fillColor="#FF33D07C"
+        android:pathData="M5,17h14v4h-2v-2h-10v2h-2z" />
+</vector>

@@ -350,6 +350,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun playAll(items: List<MediaItem>, startAt: Int = 0, shuffle: Boolean? = null) =
         startQueue(items.mapNotNull(::trackOf), items.getOrNull(startAt)?.let(::trackOf), shuffle)
+
+    /** Antrean berkas luar (mis. dari "Buka dengan"): urutan folder yang sama, mulai dari indeks ini. */
+    fun playTracks(tracks: List<Track>, startAt: Int = 0) =
+        startQueue(tracks, tracks.getOrNull(startAt))
     fun playJobs(jobs: List<DownloadJob>, startAt: Int = 0) =
         startQueue(jobs.mapNotNull(::trackOf), jobs.getOrNull(startAt)?.let(::trackOf))
     private fun startQueue(tracks: List<Track>, start: Track?, shuffle: Boolean? = null) {

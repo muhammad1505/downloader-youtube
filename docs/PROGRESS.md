@@ -4,7 +4,13 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
-Terbaru **1.1.48/code63**: pegangan awal/akhir klip mulai di ujung bar dan batas 30 detik
+Terbaru (belum dirilis, code63): berkas yang dibuka lewat "Buka dengan" memutar **folder yang
+sama** sebagai antrean, ikon launcher punya empat pintasan (Unduh/Audio/Video/Riwayat), dan dialog
+Kelola playlist dirombak dengan jumlah lagu per playlist. 574 tes lulus, lint 0 error, APK/AAB
+code63 bertanda tangan; uji perangkat antrean dua berkas, pintasan, dan dialog playlist lulus.
+[Rincian](EXTERNAL_QUEUE_AND_SHORTCUTS.md).
+
+Sebelumnya **1.1.48/code63**: pegangan awal/akhir klip mulai di ujung bar dan batas 30 detik
 dihapus, jadi klip beberapa menit bisa dibagikan ke chat; batas waktu FFmpeg menyesuaikan
 panjang klip. 568 tes Kotlin lulus, lint 0 error/3 warning lama; APK/AAB code63 bertanda tangan
 kunci produksi lulus, audit native 262 ELF dan kelas ZIP reflektif 0 gagal; uji perangkat belum.

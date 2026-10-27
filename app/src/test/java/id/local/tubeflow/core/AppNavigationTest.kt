@@ -24,6 +24,13 @@ class AppNavigationTest {
         assertEquals(2, AppDestination.PLAYER.tab)
         assertEquals(2, AppDestination.KARAOKE.tab)
     }
+    @Test fun launcherShortcutsOpenTheCollectionWithTheirOwnMediaFilter() {
+        assertEquals(2, AppDestination.AUDIO_PLAYER.tab)
+        assertEquals(2, AppDestination.VIDEO_PLAYER.tab)
+        assertEquals(AppDestination.AUDIO_PLAYER, AppDestination.fromAction("id.local.tubeflow.action.OPEN_AUDIO"))
+        assertEquals(AppDestination.VIDEO_PLAYER, AppDestination.fromAction("id.local.tubeflow.action.OPEN_VIDEO"))
+    }
+
     @Test fun repeatedTapsOnTheSameNotificationRemainSeparateNavigationEvents() {
         val first = AppNavigationRequest(AppDestination.PLAYER)
         val second = AppNavigationRequest(AppDestination.PLAYER)

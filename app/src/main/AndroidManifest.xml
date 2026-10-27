@@ -23,6 +23,8 @@
   <!-- configChanges mencegah Activity dibangun ulang saat rotasi/PiP; ExoPlayer tetap di ViewModel. -->
   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" android:theme="@style/Theme.TubeFlow.Splash">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+   <!-- Tahan ikon launcher: Unduh, Pemutar audio, Pemutar video, Riwayat. -->
+   <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
    <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>
    <!-- Terdaftar sebagai pemutar di chooser "Buka dengan": audio masuk pemutar lagu, video masuk Media3. -->
    <intent-filter>

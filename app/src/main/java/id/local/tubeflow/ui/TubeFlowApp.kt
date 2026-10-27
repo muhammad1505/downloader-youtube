@@ -98,17 +98,26 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     }
 
     // Berkas dari "Buka dengan" aplikasi lain memakai pemutar yang sudah ada: audio ke pemutar lagu,
-    // video ke Media3. State dikosongkan setelah dibuka agar rotasi tidak memutar ulang berkas.
+    // video ke Media3. Media sejenis di folder yang sama ikut masuk antrean supaya tombol
+    // berikut/sebelumnya berguna untuk berkas di luar folder unduhan TubeFlow. State dikosongkan
+    // setelah dibuka agar rotasi tidak memutar ulang berkas.
     LaunchedEffect(incomingMedia) {
         val media = incomingMedia ?: return@LaunchedEffect
         fullPlayer = false
         karaoke.close()
+        val planned = MediaFolders(context).siblings(media.uri, media.kind)
+            ?.let { MediaFolderQueue.plan(it, FolderMedia(media.uri, media.title)) }
         when (media.kind) {
             IncomingMedia.Kind.AUDIO -> {
                 video.close()
-                player.play(PlayerViewModel.Track(media.uri, media.title))
+                if (planned == null) player.play(PlayerViewModel.Track(media.uri, media.title))
+                else player.playTracks(planned.first.map { PlayerViewModel.Track(it.uri, it.title) }, planned.second)
             }
-            IncomingMedia.Kind.VIDEO -> playVideo(listOf(VideoEntry(media.uri, media.title)), 0)
+            IncomingMedia.Kind.VIDEO -> {
+                val entries = planned?.first?.map { VideoEntry(it.uri, it.title) }
+                    ?: listOf(VideoEntry(media.uri, media.title))
+                playVideo(entries, planned?.second ?: 0)
+            }
         }
         onMediaHandled()
     }
@@ -137,6 +146,13 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 fullPlayer = player.state.value.track != null
             }
             AppDestination.KARAOKE -> karaoke.openCurrent()
+            // Shortcut launcher menyaring Koleksi; pemutar audio ikut membuka sesi yang terakhir.
+            AppDestination.AUDIO_PLAYER -> {
+                library.filter(MediaLibraryViewModel.Filter(kind = "AUDIO"))
+                player.restorePlaybackSession()
+                fullPlayer = player.state.value.track != null
+            }
+            AppDestination.VIDEO_PLAYER -> library.filter(MediaLibraryViewModel.Filter(kind = "VIDEO"))
             else -> Unit
         }
         onNavigationHandled(request.id)

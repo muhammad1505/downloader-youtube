@@ -1129,3 +1129,19 @@ Auto dan dekoderAuto.15path media tetap. AAB tidak dibangun ulang.
 [Bukti, batas dan file terdampak](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Sensor
 fallback/ruangan terkontrol, semua rute/codec/ABI, runtime16KB dan performa
 belum teruji menyeluruh; BUG087/092 tetap, tidak ada klaim produksi lengkap.
+
+## Antrean berkas luar, pintasan launcher, Kelola playlist — 27 Oktober 2026
+
+Membuka `Uji Satu` dari `Download/UjiLuar/` lewat `ACTION_VIEW` (content:// audio) memutar
+berkas itu dengan **Antrean putar "2 lagu"**: Uji Satu (Sedang diputar) dan Uji Dua; sebelum
+perbaikan ejaan volume URI, antrean berisi 3 entri dengan Uji Satu dua kali. `dumpsys shortcut`
+menampilkan empat pintasan (Unduh/Audio/Video/Riwayat) dan menjalankan `OPEN_VIDEO` membuka
+"Koleksi video". Dialog Kelola playlist berfungsi: buat, hitung "0 lagu", Ubah/Hapus 48dp,
+konfirmasi hapus. Tidak ada FATAL EXCEPTION milik `id.local.tubeflow`; berkas, baris MediaStore,
+dan playlist uji dihapus kembali.
+
+574 tes Kotlin lulus, lint debug/release 0 error/3 warning lama, APK/AAB code63 bertanda tangan.
+TalkBack pada dialog baru, tampilan long-press launcher, video luar folder, dan matriks
+tema/font belum diuji.
+
+[Bukti, batas dan file terdampak](EXTERNAL_QUEUE_AND_SHORTCUTS.md).

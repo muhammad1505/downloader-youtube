@@ -160,6 +160,17 @@
     <string name="karaoke_compare_play">Putar perbandingan</string>
     <string name="karaoke_compare_pause">Jeda perbandingan</string>
     <string name="library_save_playlist_name">Simpan nama</string>
+    <string name="shortcut_download_short">Unduh</string>
+    <string name="shortcut_download_long">Mulai unduhan baru</string>
+    <string name="shortcut_audio_short">Audio</string>
+    <string name="shortcut_audio_long">Pemutar audio</string>
+    <string name="shortcut_video_short">Video</string>
+    <string name="shortcut_video_long">Pemutar video</string>
+    <string name="shortcut_history_short">Riwayat</string>
+    <string name="shortcut_history_long">Riwayat unduhan</string>
+    <plurals name="playlist_song_count">
+        <item quantity="other">%d lagu</item>
+    </plurals>
     <string name="page_download">Download</string>
     <string name="download_section_help">Tempel link untuk mulai mengunduh. Antrean dan riwayat tampil di bawah saat ada aktivitas.</string>
     <string name="page_settings">Pengaturan</string>

@@ -28,6 +28,10 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     val items = filter.debounce(180).flatMapLatest { f -> dao.page(f.kind, f.folder, f.artist, f.album, SmartMedia.search(f.query), f.sort, f.limit, f.playlistId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val playlists = database.personal().observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    /** Jumlah lagu tiap playlist untuk daftar Kelola playlist; playlist kosong tidak muncul di peta. */
+    val playlistCounts = database.personal().observeCounts()
+        .map { counts -> counts.associate { it.playlistId to it.count } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
     val favorites = database.personal().references(PersonalLibrary.FAVORITES).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     fun createPlaylist(name: String, onResult: (String?) -> Unit = {}) = operation(onResult) {
         require(database.personal().all().count { it.id != PersonalLibrary.FAVORITES } < 200) { "Maksimum 200 playlist." }

@@ -13,9 +13,13 @@ data class PersonalPlaylist(@PrimaryKey val id: String, val name: String, val cr
     indices = [Index("mediaUri")])
 data class PlaylistMember(val playlistId: String, val mediaUri: String, val position: Long)
 
+/** Jumlah lagu per playlist untuk baris Kelola playlist; dihitung Room, bukan di UI. */
+data class PlaylistCount(val playlistId: String, val count: Int)
+
 @Dao
 interface PersonalLibraryDao {
     @Query("SELECT * FROM personal_playlists ORDER BY createdAt, id") fun observe(): Flow<List<PersonalPlaylist>>
+    @Query("SELECT playlistId, COUNT(*) AS count FROM playlist_members GROUP BY playlistId") fun observeCounts(): Flow<List<PlaylistCount>>
     @Query("SELECT * FROM personal_playlists ORDER BY createdAt, id") suspend fun all(): List<PersonalPlaylist>
     @Query("SELECT * FROM playlist_members ORDER BY position, mediaUri") suspend fun members(): List<PlaylistMember>
     @Query("SELECT mediaUri FROM playlist_members WHERE playlistId = :id ORDER BY position, mediaUri") fun references(id: String): Flow<List<String>>
