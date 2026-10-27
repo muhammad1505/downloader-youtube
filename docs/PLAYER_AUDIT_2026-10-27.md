@@ -130,6 +130,10 @@ yang sama (signer SHA-256 `ebe3b40e…`, non-debuggable, `id.local.tubeflow` 1.1
 - `apksigner verify --verbose --print-certs`: v2 verified, 1 penanda tangan, sertifikat produksi;
   `zipalign -c -P 16 -v 4`: OK pada tiap APK. AAB: `jarsigner -verify` → **"jar verified."**
   dengan sertifikat yang sama.
+- Dipasang sebagai update di HP uji (Realme RMX1821, Android 10, arm64, page 4 KB) dengan
+  `adb install -r` tanpa uninstall/clear data; versi terpasang 1.1.49/code64 dan `base.apk` yang
+  ditarik dari HP **identik byte-per-byte** dengan artefak ARM64 (76.419.310 byte, SHA-256
+  `16ef745d…`, sertifikat `ebe3b40e…`); aplikasi terbuka tanpa `FATAL EXCEPTION`.
 - Versi tidak dinaikkan: 1.1.49/code64 memang target rilis batch ini.
 - Bundletool tidak tersedia di host ini, jadi `bundletool validate` tidak dijalankan — sama seperti
   beberapa rilis sebelumnya.
