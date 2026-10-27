@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -75,6 +76,12 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val bstationSession = BstationAuth.session
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var releaseNotes by remember { mutableStateOf<ReleaseNotes?>(null) }
+    LaunchedEffect(Unit) {
+        if (AppChangelog.shouldOffer(ChangelogStore.lastSeen(context), BuildConfig.VERSION_CODE)) {
+            releaseNotes = AppChangelog.forVersion(BuildConfig.VERSION_CODE)
+        }
+    }
     val screenState = rememberSaveableStateHolder()
     // Dialog waktu lirik dari Riwayat dihost di sini karena butuh item katalog yang tertaut.
     var lyricTiming by remember { mutableStateOf<MediaItem?>(null) }
@@ -457,6 +464,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     },
                     section = settingsSection,
                     onSection = { settingsSection = it },
+                    onShowReleaseNotes = { releaseNotes = AppChangelog.latestAtOrBefore(BuildConfig.VERSION_CODE) },
                 )
             }
             }
@@ -466,5 +474,13 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     }
     }
     VideoPlayerScreen(video)
+    }
+    // "Apa yang baru" muncul sekali per versi: hanya bila versi berjalan lebih baru dari yang
+    // pernah ditutup pengguna, dan bisa dibuka ulang dari Pengaturan → Tentang.
+    releaseNotes?.let { notes ->
+        ReleaseNotesDialog(notes) {
+            ChangelogStore.markSeen(context, BuildConfig.VERSION_CODE)
+            releaseNotes = null
+        }
     }
 }

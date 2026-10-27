@@ -4,7 +4,12 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
-Terbaru (belum dirilis, code63): berkas yang dibuka lewat "Buka dengan" memutar **folder yang
+Terbaru (belum dirilis, **1.1.49/code64**): layar Ringkasan diringkas jadi empat blok dengan angka
+rinci di balik tombol **Lihat detail**, dan dialog **"Apa yang baru"** muncul sekali per versi
+(dapat dibuka ulang dari Pengaturan → Tentang). 578 tes lulus, lint 0 error/3 warning lama; uji
+perangkat Ringkasan baru dan dialog lulus. [Rincian](DASHBOARD_CHANGELOG_1_1_49.md).
+
+Sebelumnya code63 (ikut rilis 1.1.49): berkas yang dibuka lewat "Buka dengan" memutar **folder yang
 sama** sebagai antrean, ikon launcher punya empat pintasan (Unduh/Audio/Video/Riwayat), dan dialog
 Kelola playlist dirombak dengan jumlah lagu per playlist. 574 tes lulus, lint 0 error, APK/AAB
 code63 bertanda tangan; uji perangkat antrean dua berkas, pintasan, dan dialog playlist lulus.

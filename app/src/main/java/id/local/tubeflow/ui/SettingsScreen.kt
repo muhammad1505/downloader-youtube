@@ -68,6 +68,7 @@ fun SettingsScreen(
     onBstationLogout: () -> Unit = {},
     section: String? = null,
     onSection: (String?) -> Unit = {},
+    onShowReleaseNotes: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val smartScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -554,6 +555,8 @@ fun SettingsScreen(
         if (section == "about") Panel {
             Text("Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
             Text("Simpan momen. Putar kapan saja.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ActionButton(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.whats_new_open), onShowReleaseNotes,
+                icon = Icons.Outlined.NewReleases, emphasis = ActionEmphasis.Quiet, fillWidth = true)
         }
 
         if (section == null || section == "about") {
