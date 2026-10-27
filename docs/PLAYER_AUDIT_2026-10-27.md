@@ -109,6 +109,31 @@ sebagian di layar lanskap).
 | Rotasi sambil **dijeda** | Video penuh layar di kedua arah |
 | Berkas uji yang dibuat untuk audit | Dihapus kembali dari `Download/TubeFlow`; Koleksi video kembali kosong |
 
+## Build rilis 1.1.49/code64 — 28 Oktober 2026
+
+`bash scripts/build_release.sh --no-daemon --max-workers=2` atas revisi `48ba14d`: **BUILD SUCCESSFUL**
+(3m 31s; 9 task dijalankan, sisanya sudah mutakhir), APK×3 + AAB bertanda tangan kunci produksi
+yang sama (signer SHA-256 `ebe3b40e…`, non-debuggable, `id.local.tubeflow` 1.1.49/code64, targetSdk 37).
+
+| Artefak | Byte | SHA-256 |
+| --- | --- | --- |
+| app-arm64-v8a-release.apk | 76.419.310 | `16ef745d566f1d65e2d2696fb94f15f467e9e27236dbe879e67b553c80ab9f9a` |
+| app-armeabi-v7a-release.apk | 67.948.902 | `d69a541a322451572db4fc2b01b1031200580965b3ba7407ded00a1edce338bb` |
+| app-x86_64-release.apk | 81.690.904 | `90759249fb929846cd737064d7b0be327905f137b74482397a161b389711173b` |
+| app-release.aab | 273.369.701 | `9c086374e7b5a4890d34265a621606586cb8ac7d05c9c1a0fa95dab665e3ca37` |
+
+- Kotlin **582 tes lulus** (0 gagal/terlewat), Python **98 tes `OK`**, lint debug/release **0 error**, 3 warning
+  (SelectedPhotoAccess dan GradleDependency onnxruntime yang di-pin — keduanya lama — plus
+  AndroidGradlePluginVersion: Gradle 9.8.2 tersedia).
+- `audit_native.py`: 262/262/264 ELF per APK dan 1.058 ELF di AAB, **0 gagal** 16 KB PT_LOAD.
+- `audit_release_zip_fields.py`: **13 kelas ZIP reflektif, 0 gagal** pada tiap APK.
+- `apksigner verify --verbose --print-certs`: v2 verified, 1 penanda tangan, sertifikat produksi;
+  `zipalign -c -P 16 -v 4`: OK pada tiap APK. AAB: `jarsigner -verify` → **"jar verified."**
+  dengan sertifikat yang sama.
+- Versi tidak dinaikkan: 1.1.49/code64 memang target rilis batch ini.
+- Bundletool tidak tersedia di host ini, jadi `bundletool validate` tidak dijalankan — sama seperti
+  beberapa rilis sebelumnya.
+
 ## Catatan
 
 - Perintah pengaturan rotasi sistem ditolak untuk shell pada perangkat uji, sehingga tata letak

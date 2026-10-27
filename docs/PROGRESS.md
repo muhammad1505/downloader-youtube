@@ -9,9 +9,11 @@ mati setelah memutar video (perintah `pause()` yang tidak sah saat pemain berhen
 platform dengan error -38 dan diperlakukan sebagai kegagalan berkas), label pengaturan cepat video
 tidak lagi bertabrakan, scrim bilah atas lebih terbaca, antrean video menampilkan posisi dan
 "Sedang diputar", dan frame video mengikuti permukaan baru setelah rotasi saat dijeda/berakhir
-(rotate sambil berakhir sebelumnya menyisakan frame separuh layar). 582 tes lulus, lint 0 error,
-APK/AAB code64 bertanda tangan; uji perangkat lima temuan lulus (termasuk lagu yang tetap hidup
-setelah memutar video). [Rincian](PLAYER_AUDIT_2026-10-27.md).
+(rotate sambil berakhir sebelumnya menyisakan frame separuh layar). Build rilis sudah dijalankan:
+582 tes Kotlin dan 98 tes Python lulus, lint 0 error/3 warning lama, audit native 262/262/264 ELF
+per APK + 1.058 ELF di AAB dan refleksi ZIP 13 kelas 0 gagal, serta APK×3/AAB code64 bertanda
+tangan kunci produksi; ARM64 SHA-256 `16ef745d…`. Uji perangkat lima temuan lulus (termasuk lagu
+yang tetap hidup setelah memutar video). [Rincian dan hash](PLAYER_AUDIT_2026-10-27.md).
 
 Sebelumnya (belum dirilis, **1.1.49/code64**): layar Ringkasan diringkas jadi empat blok dengan angka
 rinci di balik tombol **Lihat detail**, dan dialog **"Apa yang baru"** muncul sekali per versi
