@@ -123,8 +123,9 @@ Penguat puncak lembut bukan normalisasi LUFS otomatis atau jaminan semua sumber
 setara. Normal mempertahankan jalur biasa; gain dapat menambah biaya decode
 ketika passthrough/offload sebelumnya tersedia. BUG-093 teratasi pada kasus uji
 pengguna lewat +6 dB; akar semua selisih antarpemutar belum dibuktikan.
-BUG-087/092 tidak diubah atau ditutup oleh pekerjaan ini. Tidak ada klaim
-produksi menyeluruh.
+BUG-087/092 tidak diubah atau ditutup oleh pekerjaan 1.1.46. Tindak lanjut
+27 Oktober menambahkan regresi penamaan sidecar dan retry MediaPlayer transien;
+keduanya tetap memerlukan uji perangkat baru. Tidak ada klaim produksi menyeluruh.
 
 API diperiksa terhadap AAR1.11.1 yang terpasang dan dokumentasi primer:
 [AudioProcessor chain](https://developer.android.com/reference/androidx/media3/exoplayer/audio/DefaultAudioSink.Builder),

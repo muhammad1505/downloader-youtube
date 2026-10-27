@@ -1179,3 +1179,43 @@ Auto dan dekoderAuto.15path media tetap. AAB tidak dibangun ulang.
 [Bukti, batas dan file terdampak](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Sensor
 fallback/ruangan terkontrol, semua rute/codec/ABI, runtime16KB dan performa
 belum teruji menyeluruh; BUG087/092 tetap, tidak ada klaim produksi lengkap.
+
+## Titik akhir klip Status — 27 Oktober 2026
+
+Dialog Potong Status sebelumnya hanya menggeser awal dan selalu memakai 30 detik
+berikutnya. Sekarang pengguna memilih **Awal** dan **Akhir** pada dua slider; rentang
+dijepit ke 1–30 detik dan tidak melewati durasi video. `StatusClip.ClipRange`
+menggantikan perhitungan `start + 30 detik`, dan `StatusClipper` meneruskan akhir
+pilihan ke FFmpeg (`-t` = akhir − awal) untuk stream-copy maupun encode ulang.
+Pratinjau mengikuti rentang yang sama.
+
+Verifikasi: 9 regresi `StatusClipTest` lulus dengan kotlinc/JUnit di luar Gradle.
+Gradle penuh, lint, build, dan uji perangkat belum dijalankan pada sesi ini; versi
+aplikasi belum dinaikkan.
+
+## Tindak lanjut bug terbuka — 27 Oktober 2026
+
+**BUG-092.** `AudioErrorPolicy` memberi satu muat ulang untuk error MediaPlayer
+transien (`UNKNOWN`, `SERVER_DIED`, `IO`, `TIMED_OUT`) pada posisi terakhir;
+codec/format rusak tidak diulang. `PlayerViewModel.load` menerima
+`retryOnError` sehingga percobaan kedua tidak dapat berulang tanpa batas, dan
+log hanya memuat `what`/`extra` tanpa URI/judul. Ini mitigasi gejala; akar
+pesan sesi lama setelah update belum dibuktikan dan belum ada uji perangkat baru.
+
+**BUG-087.** Penamaan sidecar dipusatkan di `SidecarPublication`. Suffix bahasa
+yang valid (`.id`, `.zh-Hant`) dipertahankan, nama sidecar yang tidak berasal
+dari stem media tidak lagi menempel ke judul, dan `requestedName` memakai stem
+media yang benar-benar diterbitkan. Media dan sidecar tetap memakai
+`relativePath`/`parentDoc` yang sama; tidak ada pemindahan file lama otomatis.
+Regresi `SidecarPublicationTest` (5 kasus) mengunci perilaku ini. Reproduksi
+unduhan perangkat baru tetap terbuka.
+
+**BUG-093.** Tidak ada perubahan gain default; penguat tetap opt-in
+Normal/+3/+6/+9 dB. Kasus uji +6 dB yang dikonfirmasi pengguna tetap menjadi
+bukti utama; akar seluruh selisih antarpemutar belum diklaim.
+
+Verifikasi host: **18 tes Kotlin murni lulus** (9 `StatusClipTest`, 4
+`AudioErrorPolicyTest`, 5 `SidecarPublicationTest`) dengan kotlinc/JUnit di luar
+Gradle, serta **98 tes Python OK (1 skip)** setelah FFmpeg statis lokal
+disediakan. `git diff --check` bersih. Gradle penuh, lint, build APK/AAB, dan uji
+perangkat belum dijalankan pada sesi ini.

@@ -221,11 +221,12 @@
     <string name="subtitles_absent">Belum ada subtitle</string>
     <plurals name="subtitles_available"><item quantity="other">%d subtitle tersedia</item></plurals>
     <string name="clip_preview">Pratinjau bagian terpilih</string>
-    <string name="clip_preview_help">Putar untuk melihat rentang yang akan dipotong. Menggeser awal klip menjeda pratinjau; file asli tetap utuh.</string>
+    <string name="clip_preview_help">Putar untuk melihat rentang yang akan dipotong. Menggeser awal atau akhir klip menjeda pratinjau; file asli tetap utuh.</string>
     <string name="clip_preview_error">Pratinjau tidak dapat diputar di perangkat ini. Pilih bagian berdasarkan waktu atau coba video lain.</string>
     <string name="power_saver_short">Hemat</string>
     <string name="power_saver_effects">Penghemat baterai aktif. Smart Enhance sementara tidak diterapkan; pilihan efek tetap disimpan.</string>
     <string name="clip_start_position">Awal potongan Status</string>
+    <string name="clip_end_position">Akhir potongan Status</string>
     <string name="clip_preview_play">Putar pratinjau</string>
     <string name="clip_preview_pause">Jeda pratinjau</string>
     <string name="clip_preview_position">Posisi pratinjau potongan</string>

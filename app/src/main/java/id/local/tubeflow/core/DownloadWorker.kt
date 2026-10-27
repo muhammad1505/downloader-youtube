@@ -339,7 +339,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    if (lyric && content == null) continue
    val outExt = if (lyric) "lrc" else extension
    val tempStem = main.nameWithoutExtension
-   val suffix = file.nameWithoutExtension.removePrefix(tempStem).ifBlank { "" }
+   val suffix = SidecarPublication.suffix(tempStem, file.name)
    var created: Uri? = null
    suspend fun stillOwned(): Boolean = dao.get(job.id)?.let { it.generation == job.generation && it.state == JobState.RUNNING } == true
    try {
@@ -351,13 +351,13 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     }
     val uri = if (parentDoc != null) {
      // BUG-015: provider SAF kadang menyisipkan ekstensi mime ("X.lrc" → "X.lrc.txt") — paksa kembali nama yang diminta.
-     val requested="$publishedStem$suffix.$outExt"
+     val requested=SidecarPublication.requestedName(publishedStem, suffix, outExt)
      val made=DocumentsContract.createDocument(resolver, parentDoc, mime, requested) ?: error("Tidak dapat membuat file pendukung di folder pilihan.")
      val actual=displayNameOf(resolver, made)
      if(actual != null && actual != requested) runCatching { DocumentsContract.renameDocument(resolver, made, requested) }.getOrNull() ?: made else made
     } else {
      val values = ContentValues().apply {
-      put(MediaStore.Downloads.DISPLAY_NAME,"$publishedStem$suffix.$outExt")
+      put(MediaStore.Downloads.DISPLAY_NAME,SidecarPublication.requestedName(publishedStem, suffix, outExt))
       put(MediaStore.Downloads.MIME_TYPE,mime)
       put(MediaStore.Downloads.RELATIVE_PATH,relativePath)
       put(MediaStore.Downloads.IS_PENDING,1)

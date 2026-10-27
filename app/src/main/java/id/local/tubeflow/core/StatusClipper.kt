@@ -38,10 +38,18 @@ class StatusClipper(private val context: Context) {
     }
 
     /**
+     * @param requestedStartMs titik awal pilihan pengguna; dijepit ulang setelah durasi asli
+     *   dibaca karena metadata katalog bisa berbeda dari file.
+     * @param requestedEndMs titik akhir pilihan pengguna, dibatasi 1–30 detik dari awal.
      * @param onProgress persentase 0..100 saat menyalin, `null` saat FFmpeg bekerja tanpa progres
      * pasti; callback dipanggil dari thread IO.
      */
-    suspend fun clip(item: MediaItem, startMs: Long, onProgress: (Int?, String) -> Unit = { _, _ -> }): File =
+    suspend fun clip(
+        item: MediaItem,
+        requestedStartMs: Long,
+        requestedEndMs: Long,
+        onProgress: (Int?, String) -> Unit = { _, _ -> },
+    ): File =
         withContext(Dispatchers.IO) {
             gate.withLock {
                 require(item.kind == "VIDEO") { "Pemotong Status hanya untuk video." }
@@ -55,14 +63,14 @@ class StatusClipper(private val context: Context) {
                     copySource(sourceUri, input, item.sizeBytes, onProgress)
                     val durationMs = item.durationMs?.takeIf { it > 0 } ?: probe(input)?.durationMs
                         ?: error("Durasi video belum diketahui.")
-                    val start = StatusClip.startMs(durationMs, startMs)
-                    val expected = StatusClip.expectedDurationMs(durationMs, start)
+                    val range = StatusClip.range(durationMs, requestedStartMs, requestedEndMs)
+                    val expected = range.durationMs
                     onProgress(null, "Memotong video…")
-                    val copied = streamCopyWorks(sourceUri, input, output, start, durationMs, expected)
+                    val copied = streamCopyWorks(sourceUri, input, output, range, expected)
                     if (!copied) {
                         output.delete()
                         onProgress(null, "Mengenkode ulang agar kompatibel…")
-                        runFfmpeg(StatusClip.encodeArguments(input, output, start, durationMs), directory, ENCODE_TIMEOUT_SECONDS)
+                        runFfmpeg(StatusClip.encodeArguments(input, output, range), directory, ENCODE_TIMEOUT_SECONDS)
                         val encoded = probe(output)
                         require(encoded != null && encoded.hasVideo && encoded.durationMs > 0) {
                             "Hasil klip tidak dapat dibaca."
@@ -83,13 +91,12 @@ class StatusClipper(private val context: Context) {
         source: Uri,
         input: File,
         output: File,
-        startMs: Long,
-        durationMs: Long,
+        range: StatusClip.ClipRange,
         expectedMs: Long,
     ): Boolean {
         if (!canStreamCopy(source)) return false
         return runCatching {
-            runFfmpeg(StatusClip.copyArguments(input, output, startMs, durationMs), output.parentFile!!, COPY_TIMEOUT_SECONDS)
+            runFfmpeg(StatusClip.copyArguments(input, output, range), output.parentFile!!, COPY_TIMEOUT_SECONDS)
             val result = probe(output) ?: return@runCatching false
             result.hasVideo && result.durationMs in
                 (expectedMs - StatusClip.COPY_SLOP_MS).coerceAtLeast(1)..(expectedMs + StatusClip.COPY_SLOP_MS)

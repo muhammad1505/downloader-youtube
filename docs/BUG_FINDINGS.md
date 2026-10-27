@@ -22,10 +22,10 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-081 | Geometri Scrubber diperbaiki setelah 1.1.42; regresi host tercatat. Risiko ini bukan lagi kode yang belum disentuh. |
 | BUG-082–085 | Perbaikan Bstation/subtitle tersedia; batas setiap skenario tetap berlaku. |
 | BUG-086 | Login email nyata berhasil pada 1.1.44; login sosial popup dan Premium belum terbukti. |
-| BUG-087 | Terbuka untuk reproduksi publikasi baru. Snapshot awal dan query terbaru menunjukkan SRT/MP4 di folder season yang sama; dugaan penolakan suffix bahasa belum terbukti. |
+| BUG-087 | Sebagian: worker memakai `parentDoc`/`relativePath` yang sama untuk media dan subtitle, dan suffix bahasa kini dikunci regresi `SidecarPublicationTest`. Satu unduhan baru bertanda waktu masih diperlukan untuk menutup temuan. |
 | BUG-088 | Judul URI ber-encoding diperbaiki pada pekerjaan 1.1.45; hasil tes di [laporan](MEDIA_POLISH_1_1_45.md). |
 | BUG-089/090/091 | Rasio video, ketukan Riwayat dan info lampiran diperbaiki pada 1.1.45; bukti serta batas uji ada di [laporan](MEDIA_POLISH_1_1_45.md). |
-| BUG-092 | Pengamatan terbuka: sesi audio lama sempat galat sesudah update/uji video; memilih lagu ulang dan kembali dari video normal. Akar penyebab belum terbukti. |
+| BUG-092 | Mitigasi 27 Okt: error MediaPlayer transien (IO/timeout/unknown/server mati) dimuat ulang sekali pada posisi yang sama; error codec/format tidak diulang. Reproduksi perangkat dan kode `what`/`extra` belum terbukti. |
 | BUG-093 | Kasus uji teratasi: pengguna mengonfirmasi +6 dB jelas/bersih pada volume HP terlapor50%. Penguat PCM1.1.46 teruji; tidak mengklaim semua sumber/rute sama dengan pemutar lain. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
@@ -1001,6 +1001,13 @@ bahasa, dan memakai `relativePath`/`parentDoc` yang sama dengan media. Jadi
 klaim awal bahwa `<nama>.<lang>.srt` ditolak pencocokan basename tidak didukung
 kode terkini.
 
+**Tindak lanjut kode 27 Oktober 2026:** penamaan sidecar dipusatkan di
+`SidecarPublication`; `suffix()` hanya menerima suffix bahasa yang valid
+(`.id`, `.zh-Hant`) dan `requestedName()` memakai stem media yang benar-benar
+terbit. Dengan `parentDoc`/`relativePath` yang sama, media dan subtitle tetap
+satu folder. Regresi `SidecarPublicationTest` mengunci lima kasus ini. Ini
+tidak memindahkan subtitle lama dan tidak membuktikan publikasi perangkat baru.
+
 **Tetap terbuka:** ulangi satu unduhan dengan subtitle dipilih secara eksplisit;
 catat waktu, folder aktual media/sidecar dan `sidecarUris` dari job yang sama.
 Jangan memindahkan subtitle lama ke subfolder lain otomatis berdasarkan nama
@@ -1058,6 +1065,14 @@ Memilih Sigar lagi dari Koleksi berhasil memutar sampai 0:34 lalu dijeda.
 Membuka video dan kembali ke audio mempertahankan 0:34/jeda tanpa galat.
 Belum ada reproduksi konsisten; jangan menutup temuan hanya karena retry normal.
 
+**Mitigasi 27 Oktober 2026:** `PlayerViewModel` kini memberi satu kesempatan
+muat ulang untuk error MediaPlayer yang transien (`MEDIA_ERROR_UNKNOWN`,
+`SERVER_DIED`, `IO`, `TIMED_OUT`) pada posisi terakhir; error codec/format
+tetap langsung ditampilkan. `AudioErrorPolicy` mencegah retry berulang dan log
+hanya mencatat `what`/`extra` tanpa URI/judul. Bila pemuatan kedua gagal, pesan
+lama tetap muncul. Ini mitigasi untuk gejala, bukan bukti akar; pengamatan
+perangkat dengan kode error masih diperlukan.
+
 Titik investigasi berikutnya: `PlayerViewModel.load`/`setOnErrorListener`,
 pemulihan `PlaybackSessionStore` dan pelepasan audio focus. Catat kode
 `what`/`extra`, state prepared/loading, token sesi dan urutan interupsi tanpa
@@ -1089,3 +1104,21 @@ flush; pengujian perangkat dan dengar pengguna dicatat di
 [laporan1.1.46](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Pengguna mengonfirmasi
 +6 dB jelas/bersih pada volume HP terlapor50%; kasus uji ditangani. Penguat
 opsional bukan bukti akar seluruh perbedaan antarpemutar sudah tertutup.
+
+**Tindak lanjut 27 Oktober 2026:** tidak ada perubahan gain default; penguat
+tetap opt-in. Regresi `VideoVolumeProcessorTest`/`VideoVolumePolicy` tidak
+diubah. Kasus uji pengguna tetap menjadi bukti utama.
+
+## BUG-094 — P2: Klip Status tidak bisa menentukan titik akhir
+
+Dilaporkan 27 Oktober 2026: dialog Potong Status hanya menyediakan slider awal,
+sedangkan akhir selalu dihitung `awal + 30 detik`. Pengguna tidak bisa memilih
+potongan yang lebih pendek atau menggeser akhir tanpa mengubah awal.
+
+Perbaikan: `StatusClip.range` menerima awal dan akhir, menjepitnya ke dalam video
+dan rentang 1–30 detik. Dialog memakai dua slider pada timeline yang sama;
+`StatusClipper` memakai durasi hasil selisih untuk `-ss`/`-t`, termasuk fallback
+encode. Pratinjau sudah menerima `startMs`/`endMs` sehingga ikut berubah.
+
+Regresi `StatusClipTest` 9 kasus lulus di harness kotlinc/JUnit. Build Gradle,
+lint, dan uji perangkat belum dijalankan pada sesi ini.

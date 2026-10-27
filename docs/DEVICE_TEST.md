@@ -17,8 +17,8 @@ menggantikan batas login yang tertulis pada laporan 1.1.43.
   historis, bukan prosedur upgrade. Update berikutnya memakai signing release
   yang sama, tanpa uninstall/reset.
 - Lokasi subtitle season (BUG-087) masih perlu reproduksi terkontrol. Kode
-  worker saat ini tidak menolak akhiran bahasa; jangan memakai dugaan lama
-  sebagai akar yang sudah terbukti.
+  worker saat ini memakai folder media dan suffix bahasa; regresi
+  `SidecarPublicationTest` menambah bukti, tetapi belum ada unduhan baru.
 - Pekerjaan 1.1.45/code60: [laporan player dan lampiran](MEDIA_POLISH_1_1_45.md)
   mencatat rasio saat jeda, preview Status, lampiran dan penghemat baterai.
   Bukti historis di bawah tidak otomatis menjadi tes build terbaru.

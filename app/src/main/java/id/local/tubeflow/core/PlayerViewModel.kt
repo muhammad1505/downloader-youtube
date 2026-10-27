@@ -428,7 +428,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             shuffle = current.shuffled, repeat = current.repeat) }
         checkpoint(force = true)
     }
-    private fun load(planned: PlaybackQueue<Track>, playWhenReady: Boolean = true, startPositionMs: Long = 0) {
+    private fun load(planned: PlaybackQueue<Track>, playWhenReady: Boolean = true, startPositionMs: Long = 0, retryOnError: Boolean = true) {
         queue = planned
         val track = planned.current
         rememberLast(track)
@@ -491,8 +491,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         else -> { updateEngine { it.copy(playing=false, positionMs=it.durationMs) }; checkpoint(force = true); abandon() }
                     }
                 }
-                current.setOnErrorListener { failed, _, _ ->
-                    if (media === failed && token.get() == id) fail("Audio tidak dapat diputar. Periksa file atau codec perangkat.")
+                var retried = !retryOnError
+                var retryScheduled = false
+                current.setOnErrorListener { failed, what, extra ->
+                    // Satu MediaPlayer dapat memanggil error lagi sebelum pemuatan ulang berjalan.
+                    if (retryScheduled) return@setOnErrorListener true
+                    if (media === failed && token.get() == id) {
+                        val position = runCatching { failed.currentPosition.toLong() }
+                            .getOrDefault(_state.value.positionMs.coerceAtLeast(0))
+                        val planned = queue
+                        if (planned != null && AudioErrorPolicy.shouldRetry(what, retried)) {
+                            retried = true
+                            retryScheduled = true
+                            android.util.Log.w("TubeFlow-audio",
+                                "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; memuat ulang sekali")
+                            handler.post {
+                                if (token.get() == id) {
+                                    load(planned, playWhenReady = autoplay, startPositionMs = position, retryOnError = false)
+                                }
+                            }
+                        } else {
+                            android.util.Log.w("TubeFlow-audio",
+                                "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; berhenti")
+                            fail("Audio tidak dapat diputar. Periksa file atau codec perangkat.")
+                        }
+                    }
                     true
                 }
                 current.setOnSeekCompleteListener { sought ->

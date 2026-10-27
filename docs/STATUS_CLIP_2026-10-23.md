@@ -2,8 +2,8 @@
 
 ## Perilaku
 
-- Aksi **Potong Status (30 dtk)** ada di menu titik tiga kartu **video** pada Koleksi.
-- Dialog memilih titik awal; panjang klip 30 detik atau sisa video bila lebih pendek.
+- Aksi **Potong Status (maks 30 dtk)** ada di menu titik tiga kartu **video** pada Koleksi.
+- Dialog memilih titik awal dan akhir; panjang klip 1–30 detik (video lebih pendek dipakai seluruhnya).
 - Sumber H.264/AAC dipotong dengan **stream copy** (`-c copy`), tanpa encode ulang.
 - Format lain (mis. WebM/VP9/Opus) dienkode ulang ke **H.264/AAC MP4** agar kompatibel WhatsApp.
 - Setelah selesai, pemilih bagikan WhatsApp langsung dibuka; bila WhatsApp tidak terpasang,
@@ -14,7 +14,7 @@
 - `core/StatusClip.kt` — penjepitan titik awal, durasi, dan argumen FFmpeg yang dapat diuji.
 - `core/StatusClipper.kt` — menyalin `content://` ke cache, menjalankan `libffmpeg.so`,
   memeriksa hasil dengan `MediaMetadataRetriever`, dan berbagi lewat `FileProvider`.
-- `ui/StatusClipDialog.kt` — slider awal, progres, pembatalan, dan pemanggilan berbagi.
+- `ui/StatusClipDialog.kt` — slider awal dan akhir, progres, pembatalan, dan pemanggilan berbagi.
 - `res/xml/status_clip_paths.xml` hanya membuka `cache/status-clips/`.
 - Klip sementara disimpan maksimal 6 file/24 jam; tidak masuk galeri atau Koleksi.
 
@@ -22,7 +22,7 @@
 
 - Stream copy memakai keyframe terdekat; awal bisa bergeser sedikit. Fallback encode dipakai
   bila durasi hasil di luar toleransi 1,75 detik.
-- Belum ada crop 9:16, pilihan durasi 15/60 detik, atau aksi yang sama di Riwayat.
+- Belum ada crop 9:16, preset durasi 15/60 detik, atau aksi yang sama di Riwayat.
 - Klip tidak disimpan permanen; fitur ini berfokus pada bagikan cepat ke Status.
 
 ## Bukti
@@ -36,3 +36,19 @@
   - MP4 H.264/AAC 45 detik, mulai 0:05 → pemilih bagikan WhatsApp terbuka.
   - WebM VP9/Opus 40 detik → fallback encode selesai dan pemilih WhatsApp terbuka.
   - File uji dihapus kembali dari Downloads dan katalog.
+
+## Pembaruan 27 Oktober 2026 — titik awal dan akhir
+
+Sebelumnya akhir klip selalu `awal + 30 detik`, sehingga pengguna hanya bisa menggeser
+awal. Dialog kini memiliki dua slider pada timeline yang sama: **Awal** dan **Akhir**.
+`StatusClip.range` menjepit keduanya ke dalam video, berurutan, dan berdurasi 1–30 detik.
+Menggeser awal ke kiri saat klip sudah 30 detik ikut menggeser akhir agar batas tetap
+dipenuhi; menggeser akhir melewati batas berhenti pada 30 detik dari awal.
+
+`StatusClipper.clip` menerima kedua titik, menjepit ulang setelah durasi asli dibaca,
+lalu meneruskan `-ss` dan `-t` (durasi = akhir − awal) ke stream-copy maupun fallback
+encode. Pratinjau memakai rentang yang sama.
+
+Verifikasi: `StatusClipTest` **9 tes** lulus dengan kotlinc/JUnit di luar Gradle
+(rentang eksplisit, penjepitan, batas 1/30 detik, video pendek, argumen FFmpeg).
+Build Gradle, lint, dan uji perangkat belum dijalankan pada sesi ini.
