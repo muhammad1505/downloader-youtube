@@ -7,6 +7,7 @@ local.properties
 *.p12
 *.pfx
 release-signing.env
+/.release/
 keystore.properties
 .idea/
 *.iml
