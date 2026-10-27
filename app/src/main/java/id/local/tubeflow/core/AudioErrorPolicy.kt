@@ -16,6 +16,12 @@ object AudioErrorPolicy {
     private const val ERROR_TIMED_OUT = -110
 
     /**
+     * Kode platform untuk perintah yang tidak sah pada state saat itu. Bukan kode publik
+     * MediaPlayer, tetapi dilaporkan apa adanya lewat `onErrorListener`.
+     */
+    const val ERROR_INVALID_OPERATION = -38
+
+    /**
      * @param alreadyRetried true bila track ini sudah pernah dimuat ulang setelah error.
      */
     fun shouldRetry(what: Int, alreadyRetried: Boolean): Boolean {
@@ -25,6 +31,12 @@ object AudioErrorPolicy {
             what == ERROR_IO ||
             what == ERROR_TIMED_OUT
     }
+
+    /**
+     * Error yang tidak boleh menghentikan sesi. Perintah tidak sah saat pemutar berhenti hanya
+     * berarti perintah itu diabaikan platform; file tetap siap diputar kembali.
+     */
+    fun benignWhilePaused(what: Int): Boolean = what == ERROR_INVALID_OPERATION
 
     /** Label diagnostik aman: tidak memuat URI, judul, atau data akun. */
     fun label(what: Int, extra: Int): String = "what=$what extra=$extra"

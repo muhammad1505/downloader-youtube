@@ -272,7 +272,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val saved = resume.position(entries[start].uri)
         val startPosition = if (VideoPlayback.shouldResume(saved, 0)) saved ?: 0 else 0
         softwareFallbackUsed = false
-        openInternal(entries.map(::withStoredSubtitles), start, startPosition, preferSoftware = false)
+        openInternal(
+            entries.map(::withStoredSubtitles),
+            start,
+            startPosition,
+            preferSoftware = false,
+            // Mengembalikan posisi tersimpan berarti benar-benar lanjut tonton: chip muncul.
+            resumeFromMs = startPosition,
+        )
     }
 
     private fun discoverCurrentSubtitles() {
@@ -321,6 +328,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         startPosition: Long,
         preferSoftware: Boolean,
         startPlaying: Boolean = true,
+        /**
+         * Nilai chip "Dilanjutkan dari". Hanya pembukaan yang benar-benar memulihkan posisi
+         * tersimpan (atau pindah video) yang mengisinya; buka ulang internal seperti retry, ganti
+         * dekoder, atau penyesuaian ukuran permukaan tidak boleh mengaku "dilanjutkan".
+         */
+        resumeFromMs: Long = 0,
     ) {
         val preferences = preferencesState()
         playerVersion += 1
@@ -330,7 +343,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             positionMs = startPosition,
             bufferedMs = 0,
             buffering = true,
-            resumeFromMs = startPosition,
+            resumeFromMs = resumeFromMs,
             playerVersion = playerVersion,
         )
         currentUri = entries[start].uri
@@ -546,6 +559,32 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewportWidth = width
         viewportHeight = height
         refreshPowerPolicy()
+        // Permukaan SurfaceView berukuran baru, tetapi hanya terisi ketika pemutar menggambar
+        // frame berikutnya. Pemutar yang sedang berjalan melakukannya sendiri; pemutar yang
+        // berhenti tidak, sehingga frame lama tetap tampil dengan geometri lama (video menempel
+        // di satu sisi layar). Sebab itu pemutar yang berhenti dibuka ulang:
+        // - diakhiri: seek tidak menggambar apa pun, jadi buka ulang 1 ms sebelum akhir tanpa
+        //   memulai pemutaran agar frame terakhir muncul di permukaan baru;
+        // - sesi software yang dijeda: refreshPowerPolicy() sengaja tidak membuka ulang, jadi
+        //   pemutar dibuka ulang di posisi yang sama.
+        val state = _state.value
+        val exo = player ?: return
+        if (exo.isPlaying || exo.playbackState == Player.STATE_BUFFERING) return
+        val softwareSession = state.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed
+        when {
+            exo.playbackState == Player.STATE_ENDED && state.entries.isNotEmpty() -> {
+                val start = state.index.coerceIn(state.entries.indices)
+                releasePlayer()
+                openInternal(
+                    entries = state.entries,
+                    start = start,
+                    startPosition = (state.durationMs - 1).coerceAtLeast(0),
+                    preferSoftware = softwareSession,
+                    startPlaying = false,
+                )
+            }
+            softwareSession -> reopenAtCurrent(forceSoftware = false)
+        }
     }
 
     fun refreshPowerPolicy() {

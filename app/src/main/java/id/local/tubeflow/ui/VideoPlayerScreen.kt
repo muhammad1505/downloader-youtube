@@ -25,7 +25,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -524,7 +523,20 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 Box(Modifier.fillMaxSize()) {
                     // Kontrol atas hanya berisi navigasi keluar/antrean/opsi; pengaturan cepat
                     // menjadi deretan ikon tanpa label tepat di bawahnya, terpisah dari tombol putar.
-                    Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+                    Column(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            // Gradien menutupi bilah atas DAN deretan pengaturan cepat sekaligus:
+                            // judul serta label nilainya tetap terbaca di atas adegan video terang.
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.80f),
+                                    0.55f to Color.Black.copy(alpha = 0.42f),
+                                    1f to Color.Transparent,
+                                ),
+                            ),
+                    ) {
                         PlayerTopBar(
                             state = state,
                             onClose = video::close,
@@ -580,16 +592,6 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                         Icons.Outlined.AutoAwesome,
                                         "Smart Enhance",
                                         video.state.value.enhance.label,
-                                    ),
-                                )
-                            },
-                            onDecoder = {
-                                video.cycleDecoderMode()
-                                notify(
-                                    PlayerNotice(
-                                        Icons.Outlined.Memory,
-                                        "Dekoder",
-                                        video.state.value.decoderMode.label,
                                     ),
                                 )
                             },
@@ -890,7 +892,8 @@ private fun PlayerTopBar(
     Row(
         modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.82f), Color.Transparent)))
+            // Scrim gelap disediakan oleh kolom pembungkus di layar; bilah ini cukup transparan
+            // agar judul tidak dobel-gelap.
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1075,16 +1078,16 @@ private fun QuickSettingsBar(
     onEqualizer: () -> Unit,
     onAudioEffect: () -> Unit,
     onEnhance: () -> Unit,
-    onDecoder: () -> Unit,
     onScreenshot: () -> Unit,
     onDisplay: () -> Unit,
 ) {
     val subtitlesActive = state.textTracks.isNotEmpty() && !state.subtitlesDisabled
+    // Lebar tiap tombol dibagi rata (weight) alih-alih mengikuti lebar label: label yang panjang
+    // tidak lagi menabrak ikon sebelahnya. Semua tombol tetap muat tanpa perlu digeser.
     Row(
         Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 4.dp),
+            .padding(PaddingValues(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1094,6 +1097,7 @@ private fun QuickSettingsBar(
             description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
             active = abs(state.speed - 1f) > 0.001f,
             onClick = onSpeed,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.ClosedCaption,
@@ -1101,6 +1105,7 @@ private fun QuickSettingsBar(
             description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
             active = subtitlesActive,
             onClick = onSubtitles,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.GraphicEq,
@@ -1108,6 +1113,7 @@ private fun QuickSettingsBar(
             description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
             active = state.equalizer != VideoEqualizer.OFF,
             onClick = onEqualizer,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.SurroundSound,
@@ -1115,6 +1121,7 @@ private fun QuickSettingsBar(
             description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
             active = state.audioEffect != VideoAudioEffect.OFF,
             onClick = onAudioEffect,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.AutoAwesome,
@@ -1122,13 +1129,7 @@ private fun QuickSettingsBar(
             description = if (id.local.tubeflow.core.PlaybackPower.saving) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects) else "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
             active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
             onClick = onEnhance,
-        )
-        QuickIcon(
-            icon = Icons.Outlined.Memory,
-            label = state.decoderMode.shortLabel,
-            description = "Dekoder ${state.decoderMode.label}. Ketuk untuk berikutnya",
-            active = state.decoderMode != VideoDecoderMode.AUTO,
-            onClick = onDecoder,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.PhotoCamera,
@@ -1136,6 +1137,7 @@ private fun QuickSettingsBar(
             description = "Ambil screenshot video",
             active = false,
             onClick = onScreenshot,
+            modifier = Modifier.weight(1f),
         )
         QuickIcon(
             icon = Icons.Outlined.AspectRatio,
@@ -1143,6 +1145,7 @@ private fun QuickSettingsBar(
             description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
             active = state.aspect != VideoAspect.FIT,
             onClick = onDisplay,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -1154,15 +1157,15 @@ private fun QuickIcon(
     description: String,
     active: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
     Column(
-        modifier = Modifier
-            .widthIn(min = 40.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClickLabel = description, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = description }
-            .padding(horizontal = 2.dp, vertical = 3.dp),
+            .padding(vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
@@ -1176,7 +1179,8 @@ private fun QuickIcon(
             }
         }
         Spacer(Modifier.height(2.dp))
-        // Latar gelap kecil menjaga label tetap terbaca di atas adegan video yang terang.
+        // Label selebar tombol: teks panjang dipangkas dengan elipsis alih-alih menabrak ikon
+        // tetangga, dan latar gelap kecil menjaga keterbacaan di atas adegan video yang terang.
         Text(
             label,
             color = if (active) accent else PlayerContent,
@@ -1186,9 +1190,10 @@ private fun QuickIcon(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .widthIn(max = 44.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp)
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 3.dp),
+                .padding(horizontal = 2.dp, vertical = 1.dp),
         )
     }
 }
@@ -1443,7 +1448,13 @@ private fun VideoOptionsSheet(
                         VideoSheet.DISPLAY -> "Tampilan"
                         VideoSheet.EFFECTS -> "Suara & gambar"
                         VideoSheet.DECODER -> "Dekoder video"
-                        VideoSheet.QUEUE -> "Antrean video"
+                        // Bilah atas sudah menyebut posisi; lembar ini mengulanginya agar pengguna
+                        // tidak perlu menutup sheet untuk tahu sedang di video ke berapa.
+                        VideoSheet.QUEUE -> if (state.entries.size > 1) {
+                            "Antrean video · ${state.index + 1} dari ${state.entries.size}"
+                        } else {
+                            "Antrean video"
+                        }
                         VideoSheet.MORE -> "Opsi pemutar"
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -1727,6 +1738,13 @@ private fun VideoOptionsSheet(
                                     video.jumpTo(index)
                                     onDismiss()
                                 },
+                            )
+                            if (index == state.index) Text(
+                                "Sedang diputar",
+                                Modifier.padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentBlue,
                             )
                             AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
                             }

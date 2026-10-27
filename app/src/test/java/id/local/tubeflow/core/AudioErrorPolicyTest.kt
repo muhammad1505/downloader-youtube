@@ -28,6 +28,14 @@ class AudioErrorPolicyTest {
     }
 
     @Test
+    fun invalidOperationWhilePausedIsNotTreatedAsFailure() {
+        // pause() saat pemutar belum berjalan: platform menjawab -38 tanpa merusak sesi.
+        assertTrue(AudioErrorPolicy.benignWhilePaused(AudioErrorPolicy.ERROR_INVALID_OPERATION))
+        assertFalse(AudioErrorPolicy.benignWhilePaused(-1004))
+        assertFalse(AudioErrorPolicy.benignWhilePaused(1))
+    }
+
+    @Test
     fun diagnosticLabelCarriesOnlyPlatformCodes() {
         val label = AudioErrorPolicy.label(what = -1004, extra = -100)
         assertTrue(label.contains("what=-1004"))

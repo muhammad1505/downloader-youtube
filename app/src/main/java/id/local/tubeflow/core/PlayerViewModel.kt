@@ -501,6 +501,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     // Satu MediaPlayer dapat memanggil error lagi sebelum pemuatan ulang berjalan.
                     if (retryScheduled) return@setOnErrorListener true
                     if (media === failed && token.get() == id) {
+                        // Perintah tidak sah saat pemutar dijeda (mis. pause() ganda) hanya diabaikan
+                        // platform: pemutar masih siap, jadi sesi tidak boleh dihentikan.
+                        if (!autoplay && !_state.value.playing && AudioErrorPolicy.benignWhilePaused(what)) {
+                            android.util.Log.w("TubeFlow-audio",
+                                "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; perintah diabaikan saat jeda")
+                            return@setOnErrorListener true
+                        }
                         val position = runCatching { failed.currentPosition.toLong() }
                             .getOrDefault(_state.value.positionMs.coerceAtLeast(0))
                         val planned = queue
@@ -664,7 +671,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun pause() { handler.post { pauseInternal(true) } }
     private fun pauseInternal(relinquish: Boolean) {
         autoplay=false
-        if (prepared) try { media?.pause() } catch (_: IllegalStateException) { }
+        // Hanya perintah saat pemutar benar-benar berjalan yang sah; state lain dilaporkan
+        // platform sebagai error -38 (lihat AudioPausePolicy).
+        if (AudioPausePolicy.shouldPause(prepared, runCatching { media?.isPlaying }.getOrNull())) {
+            runCatching { media?.pause() }
+        }
         handler.removeCallbacks(tick); updateEngine { it.copy(playing=false) }; checkpoint(force = true)
         if (relinquish) { cancelInterruption(); abandon() }
     }

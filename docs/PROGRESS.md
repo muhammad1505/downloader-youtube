@@ -4,7 +4,16 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
-Terbaru (belum dirilis, **1.1.49/code64**): layar Ringkasan diringkas jadi empat blok dengan angka
+Terbaru (belum dirilis, **1.1.49/code64**): audit pemutar audio & video. Pemutar lagu tidak lagi
+mati setelah memutar video (perintah `pause()` yang tidak sah saat pemain berhenti dijawab
+platform dengan error -38 dan diperlakukan sebagai kegagalan berkas), label pengaturan cepat video
+tidak lagi bertabrakan, scrim bilah atas lebih terbaca, antrean video menampilkan posisi dan
+"Sedang diputar", dan frame video mengikuti permukaan baru setelah rotasi saat dijeda/berakhir
+(rotate sambil berakhir sebelumnya menyisakan frame separuh layar). 582 tes lulus, lint 0 error,
+APK/AAB code64 bertanda tangan; uji perangkat lima temuan lulus (termasuk lagu yang tetap hidup
+setelah memutar video). [Rincian](PLAYER_AUDIT_2026-10-27.md).
+
+Sebelumnya (belum dirilis, **1.1.49/code64**): layar Ringkasan diringkas jadi empat blok dengan angka
 rinci di balik tombol **Lihat detail**, dan dialog **"Apa yang baru"** muncul sekali per versi
 (dapat dibuka ulang dari Pengaturan → Tentang). 578 tes lulus, lint 0 error/3 warning lama; uji
 perangkat Ringkasan baru dan dialog lulus. [Rincian](DASHBOARD_CHANGELOG_1_1_49.md).

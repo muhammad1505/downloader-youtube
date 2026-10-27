@@ -1,0 +1,117 @@
+# Audit pemutar audio & video — 27 Oktober 2026
+
+Audit UX, performa, dan kestabilan dua pemutar (lagu dan video) beserta antrean video.
+Semua temuan di bawah berasal dari pengujian di perangkat nyata (Realme RMX1821, Android 10),
+bukan hanya pembacaan kode.
+
+## Temuan
+
+### 1. Pemutar lagu mati setelah memutar video (kestabilan, berat)
+
+**Gejala.** Putar satu lagu, lalu buka video apa pun dari Koleksi dan tutup lagi. Mini player
+menampilkan "Audio tidak dapat diputar. Periksa file atau codec perangkat." dan lagu itu tidak
+bisa dilanjutkan tanpa dipilih ulang dari Koleksi.
+
+**Bukti (logcat).**
+
+```
+pause called in state 8, mPlayer(0x7602f609c0)
+MediaPlayerNative: error (-38, 0)
+TubeFlow-audio: MediaPlayer what=-38 extra=0; berhenti
+```
+
+**Sebab.** Membuka video memanggil `PlayerViewModel.pause()`. Saat itu pemutar lagu sudah berhenti
+dalam keadaan *prepared* (bukan *started*), dan `MediaPlayer.pause()` hanya sah pada keadaan
+started. Platform menjawab `error (-38, 0)` lewat `onErrorListener`, lalu aplikasi memperlakukannya
+sebagai kegagalan berkas: engine dilepas dan pesan error ditampilkan.
+
+**Perbaikan.** `core/AudioPausePolicy.kt` baru memutuskan kapan `pause()` boleh dikirim
+(`prepared && isPlaying == true`), dan `AudioErrorPolicy.benignWhilePaused()` membuat error
+(-38) saat pemutar berhenti tidak lagi menghentikan sesi — hanya dicatat sebagai perintah yang
+diabaikan.
+
+### 2. Label pengaturan cepat pemutar video saling menabrak (UX)
+
+Tujuh–delapan tombol pengaturan cepat memakai lebar mengikuti isi, sehingga label seperti "Bass",
+"Ruang", atau "Penuh" menimpa ikon tombol sebelahnya dan teksnya tidak lagi terbaca utuh.
+
+**Perbaikan.** Deretan memakai `Modifier.weight(1f)` (lebar dibagi rata, semua tombol muat tanpa
+digeser) dengan label satu baris yang dipangkas elipsis. Tombol dekoder dilepas dari deretan cepat
+karena sudah ada di lembar "Opsi pemutar" — pengaturan lain tetap satu ketuk.
+
+### 3. Keterbacaan kontrol di atas video terang (UX)
+
+Gradien gelap bilah atas berhenti tepat di tinggi bilah itu, sehingga judul video dan "2 dari 3"
+berada di bagian gradien yang hampir transparan; pada adegan terang teks nyaris tak terbaca.
+
+**Perbaikan.** Gradien dipindah ke kolom pembungkus yang menutupi bilah atas **dan** deretan
+pengaturan cepat (0,80 → 0,42 → transparan), sehingga judul, "x dari y", dan label nilai tetap
+terbaca.
+
+### 4. Antrean video kurang informatif (UX)
+
+Lembar "Antrean video" hanya menampilkan judul dan tanda centang, tanpa posisi sekarang, dan bilah
+atas adalah satu-satunya tempat melihat "3 dari 3".
+
+**Perbaikan.** Judul lembar menjadi "Antrean video · 3 dari 3" (bila lebih dari satu video) dan
+video yang sedang diputar diberi label "Sedang diputar", sama seperti antrean lagu.
+
+### 5. Frame video tertinggal di sisi layar setelah rotasi saat dijeda (UX)
+
+Memutar layar ketika video sedang **dijeda atau sudah berakhir** menyisakan frame lama dengan
+geometri lama: video menempel di kiri layar dan separuh layar hitam, sampai pemutaran dilanjutkan.
+Sebabnya permukaan `SurfaceView` berukuran baru hanya akan terisi ketika pemutar menggambar frame
+berikutnya — dan pemutar yang dijeda tidak menggambar apa pun.
+
+**Perbaikan.** `VideoPlayerViewModel.setViewport()` sekarang membuka ulang pemutar yang sedang
+berhenti saat ukuran permukaan berubah: video yang sudah berakhir dibuka ulang 1 ms sebelum akhir
+tanpa mulai memutar (seek saja tidak menggambar apa pun pada state berakhir), sedangkan sesi
+dekoder software yang dijeda dibuka ulang di posisi yang sama. Pemutar yang sedang berjalan tidak
+diganggu karena ia menggambar frame berikutnya sendiri.
+
+**Catatan percobaan (agar tidak diulang).** Tiga percobaan sebelum ini gagal di perangkat dan
+sudah dibuang: (1) membiarkan permukaan menyesuaikan sendiri — frame menempel di separuh layar;
+(2) seek langsung dari `onSizeChanged` — terlalu dini, permukaan belum berukuran baru;
+(3) seek yang ditunda 300 ms — pemutar yang dijeda/berakhir tidak menggambar ulang saat di-seek,
+sehingga hasilnya kadang benar kadang tidak (terbukti: satu frame terakhir tetap tampil hanya
+sebagian di layar lanskap).
+
+## Yang sudah bagus dan tidak diubah
+
+- **Performa.** Pemutaran video 720p: 68 frame UI/12 detik, **1 frame janky (1,47 %)**, p50 7 ms,
+  p95 13 ms; MediaCodec melaporkan `mRenderFrameCnt = 30 fps` tanpa frame jatuh. Pemutar lagu
+  saat memutar lagu + lirik: 169 frame/14 detik, **1 frame janky (0,59 %)**, p50 9 ms, p95 12 ms.
+  Hanya fling sintetis cepat di halaman lirik yang menaikkan jank (11,4 %, p95 17 ms — masih di
+  batas 16,7 ms untuk mayoritas frame); gesekan tangan biasa tidak sesering itu.
+- **Kestabilan.** Tidak ada `FATAL EXCEPTION`/ANR selama seluruh sesi audit (±1 jam, puluhan kali
+  buka/tutup pemutar, rotasi, ganti video).
+- **Antrean video berfungsi.** Dibuka dari Koleksi berisi semua video yang dapat diputar pada urutan
+  daftar, mulai dari yang diketuk ("2 dari 3"); tombol berikut/sebelumnya bekerja, video berakhir
+  otomatis lanjut ke video berikutnya, dan "sebelumnya" memulai ulang bila sudah lewat 5 detik.
+- Antrean lagu (cari, acak/ulangi, bersihkan, ubah urutan), mini player, lirik, sleep timer, dan
+  equalizer berjalan seperti sebelumnya.
+
+## Verifikasi
+
+- `./gradlew testDebugUnitTest`: **582 tes, 0 gagal** (4 tes baru: `AudioPausePolicyTest` 3,
+  `AudioErrorPolicyTest` 1).
+- `bash scripts/build_release.sh --max-workers=2`: **BUILD SUCCESSFUL** (10–11 menit), lint 0 error,
+  APK + AAB bertanda tangan kunci produksi, dipasang ulang di perangkat tiap iterasi.
+- Uji perangkat Realme RMX1821, Android 10 (1.1.49/code64):
+
+| Uji | Hasil |
+| --- | --- |
+| Lagu diputar, video dibuka 9 detik, video ditutup | Mini player **tanpa pesan error**, lagu lanjut dengan satu ketukan; logcat bersih (tidak ada lagi `pause called in state 8` / `error (-38, 0)`) |
+| Deretan pengaturan cepat video | 7 tombol sejajar, label `1× · — · Bass · Ruang · Mati · Foto · Penuh` tidak menabrak ikon tetangga |
+| Scrim bilah atas | Latar judul 40 % lebih gelap (terukur: bar SMPTE 191 → 114); sebelumnya tidak tergelapkan sama sekali |
+| Lembar antrean video | Judul "Antrean video · 3 dari 3" dan label "Sedang diputar" pada entri aktif |
+| Rotasi sambil **berakhir** (potret → lanskap, lanskap → potret) | Video penuh layar di kedua arah (terukur 1519/1520 px dan baris 44–1472/1520), tanpa chip "Dilanjutkan dari" palsu |
+| Rotasi sambil **dijeda** | Video penuh layar di kedua arah |
+| Berkas uji yang dibuat untuk audit | Dihapus kembali dari `Download/TubeFlow`; Koleksi video kembali kosong |
+
+## Catatan
+
+- Perintah pengaturan rotasi sistem ditolak untuk shell pada perangkat uji, sehingga tata letak
+  pemutar lagu dalam mode lanskap tidak bisa diverifikasi di perangkat; jalur itu tidak berubah
+  pada audit ini.
+- Berkas uji `Uji Video Satu/Dua/Tiga.mp4` dibuat untuk audit dan dihapus kembali setelahnya.
