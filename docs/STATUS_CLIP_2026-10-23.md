@@ -66,6 +66,7 @@ Geometri geser dipisah menjadi fungsi murni (`rangeDragModeAt`, `rangeDragSelect
 `scrubberXFor`) dan diuji tanpa perangkat di `RangeScrubberGeometryTest`.
 
 Verifikasi: `./gradlew testDebugUnitTest` — **566 tes, 0 gagal** (10 tes baru di
-`RangeScrubberGeometryTest`). `lintDebug` tidak selesai dalam batas waktu sesi ini, jadi status
-lint untuk perubahan ini belum diklaim. Uji perangkat (memegang dua pegangan, geser bagian tengah,
-TalkBack, video vertikal) belum dijalankan.
+`RangeScrubberGeometryTest`); `lintDebug` **0 error, 2 warning lama** (SelectedPhotoAccess, versi
+AGP). `assembleRelease` code62 bertanda tangan kunci produksi lulus; sertifikat, ABI `arm64-v8a`,
+dan zipalign 16 KB diperiksa pada APK hasil build. Uji perangkat (memegang dua pegangan, geser
+bagian tengah, TalkBack, video vertikal) belum dijalankan.
