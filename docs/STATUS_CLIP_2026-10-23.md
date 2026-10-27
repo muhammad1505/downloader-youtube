@@ -83,6 +83,10 @@ Konsekuensinya waktu FFmpeg ikut menyesuaikan: `StatusClip.copyTimeoutSeconds` d
 240 dtk + 4x durasi, masing-masing dibatasi 900/3600 dtk) supaya pemotongan beberapa menit tidak
 mati oleh batas tetap lama. Penanda 30 detik pada bilah dihapus karena tidak ada lagi batas itu.
 
-Verifikasi: **568 tes Kotlin, 0 gagal**; `lintDebug` **0 error, 2 warning lama**; `assembleRelease`
-code63 bertanda tangan kunci produksi, sertifikat/ABI/zipalign diperiksa pada APK hasil build. Uji
+Verifikasi: **568 tes Kotlin, 0 gagal**; `lintDebug`/`lintRelease` **0 error, 3 warning lama**
+(akses foto parsial, versi Gradle, pin ONNX); `assembleRelease` + `bundleRelease` code63 bertanda
+tangan kunci produksi (APK `versionCode='63'`/`versionName='1.1.48'`, AAB bersegel
+`META-INF/TUBEFLOW.SF/.RSA`), sertifikat/ABI/zipalign 16 KB diperiksa pada APK hasil build.
+Audit `scripts/audit_native.py` **262 ELF, 0 gagal alignment 16 KB** dan
+`scripts/audit_release_zip_fields.py` **13 kelas ZIP reflektif, 0 gagal** pada APK `arm64-v8a`. Uji
 perangkat (klip 2 menit ke chat, geser kedua ujung, TalkBack) belum dijalankan.
