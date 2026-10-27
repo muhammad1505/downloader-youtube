@@ -19,7 +19,7 @@ class StatusClipTest {
     @Test
     fun rangeClampsBothEndsToTheVideo() {
         assertEquals(
-            StatusClip.ClipRange(0, 30_000),
+            StatusClip.ClipRange(0, 60_000),
             StatusClip.range(60_000, -5_000, 90_000),
         )
         assertEquals(
@@ -29,11 +29,29 @@ class StatusClipTest {
     }
 
     @Test
-    fun rangeCapsTheClipAtThirtySeconds() {
+    fun rangeAllowsClipsLongerThanThirtySeconds() {
         assertEquals(
-            StatusClip.ClipRange(10_000, 40_000),
+            StatusClip.ClipRange(10_000, 80_000),
             StatusClip.range(120_000, 10_000, 80_000),
         )
+    }
+
+    @Test
+    fun wholeVideoCanBeSelectedForChat() {
+        assertEquals(
+            StatusClip.ClipRange(0, 180_000),
+            StatusClip.range(180_000, 0, 180_000),
+        )
+    }
+
+    @Test
+    fun timeoutsGrowWithLongerClipsAndStayBounded() {
+        assertEquals(150L, StatusClip.copyTimeoutSeconds(30_000))
+        assertEquals(240L, StatusClip.copyTimeoutSeconds(120_000))
+        assertEquals(900L, StatusClip.copyTimeoutSeconds(3_600_000))
+        assertEquals(360L, StatusClip.encodeTimeoutSeconds(30_000))
+        assertEquals(720L, StatusClip.encodeTimeoutSeconds(120_000))
+        assertEquals(3_600L, StatusClip.encodeTimeoutSeconds(3_600_000))
     }
 
     @Test

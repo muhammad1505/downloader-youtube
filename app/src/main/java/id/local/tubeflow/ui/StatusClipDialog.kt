@@ -45,7 +45,8 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val durationMs = item.durationMs?.takeIf { it > 0 } ?: 0L
     var startMs by remember(item.uri) { mutableLongStateOf(0L) }
-    var endMs by remember(item.uri) { mutableLongStateOf(minOf(durationMs, StatusClip.DURATION_MS)) }
+    // Kedua pegangan mulai di ujung bar: seluruh video terpilih, tanpa batas 30 detik.
+    var endMs by remember(item.uri) { mutableLongStateOf(durationMs) }
     var busy by remember(item.uri) { mutableStateOf(false) }
     var percent by remember(item.uri) { mutableStateOf<Int?>(null) }
     var phase by remember(item.uri) { mutableStateOf("") }
@@ -87,7 +88,7 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                error = failure.message ?: "Klip Status gagal dibuat."
+                error = failure.message ?: "Klip gagal dibuat."
             } finally {
                 busy = false
                 task = null
@@ -97,7 +98,7 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Potong Status · maks 30 detik") },
+        title = { Text("Potong video & bagikan") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -112,7 +113,7 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
                 } else {
                     if (!busy) StatusClipPreview(item.location, rangeStart, rangeEnd)
                     Text(
-                        "Tentukan titik awal dan akhir. Panjang klip 1–30 detik; video yang lebih pendek dipakai seluruhnya.",
+                        "Seluruh video sudah terpilih. Geser ujungnya untuk memilih bagian lain; panjang klip bebas (minimal 1 detik), jadi bisa juga untuk chat.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
@@ -127,13 +128,12 @@ fun StatusClipDialog(item: MediaItem, onDismiss: () -> Unit) {
                             onRangeChange = { start, end -> setRange(start, end) },
                             contentColor = MaterialTheme.colorScheme.primary,
                             minimumSpanMs = StatusClip.MIN_DURATION_MS.toFloat(),
-                            limitSpanMs = StatusClip.DURATION_MS.toFloat(),
                             enabled = !busy,
                             contentDescription = stringResource(R.string.clip_range_position),
                             stateDescription = "Awal ${clipTime(rangeStart)}, akhir ${clipTime(rangeEnd)}, panjang ${clipTime(rangeEnd - rangeStart)}",
                         )
                         Text(
-                            "Geser kedua ujungnya, atau geser bagian tengah untuk memindahkan seluruh klip. Garis tipis menandai batas 30 detik dari titik awal.",
+                            "Geser kedua ujungnya, atau geser bagian tengah untuk memindahkan seluruh klip.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

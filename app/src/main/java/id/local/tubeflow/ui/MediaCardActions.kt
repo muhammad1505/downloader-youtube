@@ -201,7 +201,7 @@ object MediaCardPlan {
         MediaActionKind.DETAIL -> "Detail"
         MediaActionKind.RENAME -> "Ubah nama"
         MediaActionKind.REDOWNLOAD -> "Unduh lagi"
-        MediaActionKind.CLIP_STATUS -> "Potong Status (maks 30 dtk)"
+        MediaActionKind.CLIP_STATUS -> "Potong & bagikan video"
         MediaActionKind.OPEN_THUMBNAIL -> "Buka thumbnail"
         MediaActionKind.OPEN_SUBTITLE -> "Buka subtitle (CC)"
         MediaActionKind.DELETE -> "Hapus file"

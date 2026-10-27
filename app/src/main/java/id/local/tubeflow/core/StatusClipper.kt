@@ -23,15 +23,14 @@ import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 /**
- * Pemotong klip 30 detik untuk WhatsApp Status. Sumber dibaca lewat ContentResolver karena
- * FFmpeg tidak bisa membuka `content://`; hasil sementara berada di cache privat dan dibagikan
- * lewat FileProvider. Satu proses FFmpeg berjalan pada satu waktu.
+ * Pemotong klip video untuk dibagikan lewat WhatsApp, baik ke Status maupun ke chat. Sumber dibaca
+ * lewat ContentResolver karena FFmpeg tidak bisa membuka `content://`; hasil sementara berada di
+ * cache privat dan dibagikan lewat FileProvider. Satu proses FFmpeg berjalan pada satu waktu.
+ * Panjang klip tidak dibatasi 30 detik; batas waktunya menyesuaikan durasi pilihan.
  */
 class StatusClipper(private val context: Context) {
     private companion object {
         val gate = Mutex()
-        const val COPY_TIMEOUT_SECONDS = 120L
-        const val ENCODE_TIMEOUT_SECONDS = 240L
         const val KEEP_CLIPS = 6
         const val MAX_AGE_MS = 24L * 60 * 60 * 1000
         const val COPY_READY_PERCENT = 45
@@ -40,7 +39,7 @@ class StatusClipper(private val context: Context) {
     /**
      * @param requestedStartMs titik awal pilihan pengguna; dijepit ulang setelah durasi asli
      *   dibaca karena metadata katalog bisa berbeda dari file.
-     * @param requestedEndMs titik akhir pilihan pengguna, dibatasi 1–30 detik dari awal.
+     * @param requestedEndMs titik akhir pilihan pengguna, minimal 1 detik setelah awal.
      * @param onProgress persentase 0..100 saat menyalin, `null` saat FFmpeg bekerja tanpa progres
      * pasti; callback dipanggil dari thread IO.
      */
@@ -52,7 +51,7 @@ class StatusClipper(private val context: Context) {
     ): File =
         withContext(Dispatchers.IO) {
             gate.withLock {
-                require(item.kind == "VIDEO") { "Pemotong Status hanya untuk video." }
+                require(item.kind == "VIDEO") { "Pemotong klip hanya untuk video." }
                 require(item.availability == "AVAILABLE") { "File video tidak dapat diakses." }
                 val directory = File(context.cacheDir, "status-clips").apply { mkdirs() }
                 prune(directory)
@@ -70,7 +69,11 @@ class StatusClipper(private val context: Context) {
                     if (!copied) {
                         output.delete()
                         onProgress(null, "Mengenkode ulang agar kompatibel…")
-                        runFfmpeg(StatusClip.encodeArguments(input, output, range), directory, ENCODE_TIMEOUT_SECONDS)
+                        runFfmpeg(
+                            StatusClip.encodeArguments(input, output, range),
+                            directory,
+                            StatusClip.encodeTimeoutSeconds(range.durationMs),
+                        )
                         val encoded = probe(output)
                         require(encoded != null && encoded.hasVideo && encoded.durationMs > 0) {
                             "Hasil klip tidak dapat dibaca."
@@ -96,7 +99,11 @@ class StatusClipper(private val context: Context) {
     ): Boolean {
         if (!canStreamCopy(source)) return false
         return runCatching {
-            runFfmpeg(StatusClip.copyArguments(input, output, range), output.parentFile!!, COPY_TIMEOUT_SECONDS)
+            runFfmpeg(
+                StatusClip.copyArguments(input, output, range),
+                output.parentFile!!,
+                StatusClip.copyTimeoutSeconds(range.durationMs),
+            )
             val result = probe(output) ?: return@runCatching false
             result.hasVideo && result.durationMs in
                 (expectedMs - StatusClip.COPY_SLOP_MS).coerceAtLeast(1)..(expectedMs + StatusClip.COPY_SLOP_MS)
@@ -235,7 +242,7 @@ fun shareStatusClip(context: Context, file: File): Boolean {
     for (packageName in listOf("com.whatsapp", "com.whatsapp.w4b")) {
         if (launch(context, Intent(send).setPackage(packageName))) return true
     }
-    return launch(context, Intent.createChooser(send, "Bagikan status ke WhatsApp"))
+    return launch(context, Intent.createChooser(send, "Bagikan video ke WhatsApp"))
 }
 
 private fun launch(context: Context, intent: Intent): Boolean {

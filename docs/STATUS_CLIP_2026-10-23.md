@@ -70,3 +70,19 @@ Verifikasi: `./gradlew testDebugUnitTest` — **566 tes, 0 gagal** (10 tes baru 
 AGP). `assembleRelease` code62 bertanda tangan kunci produksi lulus; sertifikat, ABI `arm64-v8a`,
 dan zipalign 16 KB diperiksa pada APK hasil build. Uji perangkat (memegang dua pegangan, geser
 bagian tengah, TalkBack, video vertikal) belum dijalankan.
+
+## Pembaruan 1.1.48 (code 63) — tanpa batas 30 detik
+
+Pegangan awal dan akhir kini mulai di **ujung bar**, sehingga seluruh video terpilih saat dialog
+dibuka. Batas 30 detik dihapus dari `StatusClip.range`: klip boleh beberapa menit untuk dikirim ke
+chat, sedangkan batas minimum satu detik dan penjepitan ke durasi video tetap. Aksi di Koleksi dan
+judul dialog tidak lagi menyebut Status/30 detik.
+
+Konsekuensinya waktu FFmpeg ikut menyesuaikan: `StatusClip.copyTimeoutSeconds` dan
+`encodeTimeoutSeconds` menambah batas sesuai panjang klip (stream copy 120 dtk + durasi, encode
+240 dtk + 4x durasi, masing-masing dibatasi 900/3600 dtk) supaya pemotongan beberapa menit tidak
+mati oleh batas tetap lama. Penanda 30 detik pada bilah dihapus karena tidak ada lagi batas itu.
+
+Verifikasi: **568 tes Kotlin, 0 gagal**; `lintDebug` **0 error, 2 warning lama**; `assembleRelease`
+code63 bertanda tangan kunci produksi, sertifikat/ABI/zipalign diperiksa pada APK hasil build. Uji
+perangkat (klip 2 menit ke chat, geser kedua ujung, TalkBack) belum dijalankan.

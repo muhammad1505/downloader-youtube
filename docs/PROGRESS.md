@@ -4,9 +4,13 @@ Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melen
 
 ## Titik mulai terbaru — 27 Oktober 2026
 
-Terbaru **1.1.47/code62**: titik awal dan akhir klip Status memakai satu bilah rentang
-(`ui/RangeScrubber.kt`), bukan dua slider. 566 tes Kotlin lulus, lint 0 error/2 warning lama;
-uji perangkat belum.
+Terbaru **1.1.48/code63**: pegangan awal/akhir klip mulai di ujung bar dan batas 30 detik
+dihapus, jadi klip beberapa menit bisa dibagikan ke chat; batas waktu FFmpeg menyesuaikan
+panjang klip. 568 tes Kotlin lulus, lint 0 error/2 warning lama; uji perangkat belum.
+[Rincian](STATUS_CLIP_2026-10-23.md).
+
+Sebelumnya **1.1.47/code62**: titik awal dan akhir klip Status memakai satu bilah rentang
+(`ui/RangeScrubber.kt`), bukan dua slider.
 [Rincian](STATUS_CLIP_2026-10-23.md).
 
 Sebelumnya **1.1.46/code61** sudah terpasang: kontrol kecerahan dan penguat video.

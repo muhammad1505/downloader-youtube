@@ -15,7 +15,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -35,9 +34,7 @@ import kotlin.math.abs
  * terdekat ke posisi ketukan.
  *
  * Semua nilai dalam milidetik. [onRangeChange] sudah dijepit ke dalam [durationMs] dan
- * [minimumSpanMs], tetapi pemanggil tetap perlu menerapkan batas durasi klipnya sendiri.
- * [limitSpanMs] hanya menggambar penanda tipis di posisi `awal + batas` agar pengguna tahu kenapa
- * ujung kanan berhenti.
+ * [minimumSpanMs]; pemanggil tetap perlu menyimpan hasilnya karena komponen ini tanpa state.
  */
 @Composable
 fun RangeScrubber(
@@ -48,7 +45,6 @@ fun RangeScrubber(
     contentColor: Color,
     modifier: Modifier = Modifier,
     minimumSpanMs: Float = 0f,
-    limitSpanMs: Float? = null,
     enabled: Boolean = true,
     trackColor: Color = contentColor.copy(alpha = 0.26f),
     selectionColor: Color = contentColor.copy(alpha = 0.30f),
@@ -185,19 +181,6 @@ fun RangeScrubber(
             val endPos = position(endMs)
             segment(startX, endX, trackColor)
             segment(startPos, endPos, selectionColor)
-
-            limitSpanMs?.takeIf { it > 0f }?.let { limit ->
-                if (startMs + limit < durationMs) {
-                    val limitX = position(startMs + limit)
-                    drawLine(
-                        color = contentColor.copy(alpha = 0.45f),
-                        start = Offset(limitX, centerY - 6.dp.toPx()),
-                        end = Offset(limitX, centerY + 6.dp.toPx()),
-                        strokeWidth = 1.5.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
 
             drawCircle(color = contentColor, radius = knobRadius, center = Offset(startPos, centerY))
             drawCircle(color = contentColor, radius = knobRadius, center = Offset(endPos, centerY))

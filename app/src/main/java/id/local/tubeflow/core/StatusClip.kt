@@ -8,7 +8,6 @@ import java.util.Locale
  * [StatusClipper]; kelas ini hanya memilih rentang potong dan menyusun argumen.
  */
 object StatusClip {
-    const val DURATION_MS = 30_000L
     const val MIN_DURATION_MS = 1_000L
 
     /** Toleransi durasi hasil stream-copy sebelum dianggap gagal dan dienkode ulang. */
@@ -19,18 +18,27 @@ object StatusClip {
     }
 
     /**
-     * Menjepit titik awal dan akhir pilihan pengguna agar tetap di dalam video, berurutan,
-     * serta berdurasi 1–30 detik. Video yang lebih pendek dari satu detik memakai seluruh
-     * durasinya karena batas minimum tidak mungkin dipenuhi.
+     * Menjepit titik awal dan akhir pilihan pengguna agar tetap di dalam video dan berurutan.
+     * Panjang klip tidak dibatasi 30 detik: selain Status, hasilnya dipakai untuk kirim ke chat
+     * sehingga pengguna boleh memilih beberapa menit. Batas minimum tetap satu detik; video yang
+     * lebih pendek memakai seluruh durasinya karena batas minimum tidak mungkin dipenuhi.
      */
     fun range(durationMs: Long, requestedStartMs: Long, requestedEndMs: Long): ClipRange {
         require(durationMs > 0) { "Durasi video belum diketahui." }
         val start = requestedStartMs.coerceIn(0, (durationMs - MIN_DURATION_MS).coerceAtLeast(0))
         val minEnd = (start + MIN_DURATION_MS).coerceAtMost(durationMs)
-        val maxEnd = (start + DURATION_MS).coerceAtMost(durationMs)
-        val end = requestedEndMs.coerceIn(minEnd, maxEnd)
+        val end = requestedEndMs.coerceIn(minEnd, durationMs)
         return ClipRange(start, end)
     }
+
+    /**
+     * Batas waktu FFmpeg tumbuh mengikuti panjang klip. Tanpa batas 30 detik, klip beberapa menit
+     * butuh waktu lebih lama daripada nilai tetap lama, tetapi proses yang macet tetap dihentikan.
+     */
+    fun copyTimeoutSeconds(durationMs: Long): Long = (120L + durationMs / 1_000L).coerceAtMost(900L)
+
+    fun encodeTimeoutSeconds(durationMs: Long): Long =
+        (240L + durationMs / 1_000L * 4L).coerceAtMost(3_600L)
 
     /**
      * Stream-copy: cepat dan tidak mengubah kualitas. `-ss` sebelum `-i` memakai keyframe
