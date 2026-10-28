@@ -1,6 +1,23 @@
 # Signing produksi TubeFlow
 
-Terbaru **1.1.46/code61**, 27 Oktober 2026: signed/minified/non-debuggable
+Terbaru **1.1.50/code65**, 28 Oktober 2026: APK ARM64 signed/minified
+**76.425.021 byte**, SHA256
+`ee453d9122528544f8a2cdfa32c409b4239f10ff51aef0b68303ac98f5a2a84a`.
+Dibangun dari revisi `9657702`; sertifikat produksi tetap (signer SHA-256
+`ebe3b40e…`), signature v2, zipalign 16 KB, 262 ELF dan 13 kelas ZIP lulus.
+**584 tes Kotlin lulus, 0 gagal/terlewat; lint debug/release 0 error/3 warning lama.**
+Hanya APK ARM64 yang diunggah untuk HP; AAB dan APK ABI lain tidak dipublikasikan.
+Tautan publik: <https://files.catbox.moe/ty6ys1.apk> (Catbox, bukan GitHub Release).
+Unduhan ulang dari tautan tersebut identik byte-per-byte. **Belum dipasang/diuji di
+perangkat**: VM build tidak memiliki ADB atau HP terhubung. [Status terbaru](PROGRESS.md).
+
+Historis **1.1.49/code64**, 28 Oktober 2026: ARM64 **76.419.310 byte**, SHA256
+`16ef745d566f1d65e2d2696fb94f15f467e9e27236dbe879e67b553c80ab9f9a`; sertifikat
+produksi sama, signature/zipalign 16 KB/262 ELF/13 kelas ZIP lulus; terpasang sebagai
+update di Realme Android 10 dan hash `base.apk` identik. APK×3/AAB dibangun.
+[Rincian](PLAYER_AUDIT_2026-10-27.md).
+
+Sebelumnya **1.1.46/code61**, 27 Oktober 2026: signed/minified/non-debuggable
 ARM64 **76.376.658byte**, SHA256
 `e80bd42ce9251941e0971727df63cd134d4fc1eb9b88227142fa6efcff06a4ca`.
 Signature produksi sama, zipalign16KB/262ELF/13ZIP lulus. Update-r di Realme

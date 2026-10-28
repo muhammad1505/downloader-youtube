@@ -1,6 +1,18 @@
 # Bukti verifikasi komputer
 
-## Status terbaru — 1.1.46/code61 — 27 Oktober 2026
+## Status terbaru — 1.1.50/code65 — 28 Oktober 2026
+
+Build release ARM64 dari revisi `9657702` berhasil. **584 tes Kotlin** lulus
+(0 gagal/error/terlewat); lint debug/release **0 error/3 warning** lama.
+APK ARM64 **76.425.021 byte**, SHA256
+`ee453d9122528544f8a2cdfa32c409b4239f10ff51aef0b68303ac98f5a2a84a`.
+Signature v2, zipalign 16 KB, audit 262 ELF dan 13 kelas ZIP reflektif lulus.
+Hanya APK ARM64 yang diunggah untuk HP; AAB tidak dibangun dan APK ABI lain
+tidak dipublikasikan. Tautan publik: <https://files.catbox.moe/ty6ys1.apk>;
+unduhan ulang identik hash. **Uji perangkat belum dilakukan** karena VM build
+tidak memiliki ADB/HP. [Rincian build](PRODUCTION_SIGNING.md).
+
+## Status sebelumnya — 1.1.46/code61 — 27 Oktober 2026
 
 543 tes Kotlin/98 Python lulus, lint debug/release0error/3warning lama;
 build debug/release signed lulus11m57s. ARM64 76.376.658byte, SHA256

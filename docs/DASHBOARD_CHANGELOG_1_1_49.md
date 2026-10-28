@@ -66,6 +66,7 @@ diperbarui.
   build code64 sebelumnya; pengguna yang sudah menutup dialog versi 64 baru melihat sorotan
   tambahan setelah `versionCode` berikutnya dinaikkan.
 - Sesi 28 Oktober 2026 memindahkan sumber changelog dari daftar Kotlin ke
-  `app/src/main/assets/changelog.json`. `AppChangelogTest` membaca aset itu dan memvalidasi format;
-  pemeriksaan `testDebugUnitTest`/lint/build belum dijalankan karena VM sesi ini tidak memiliki JDK
-  dan Android SDK.
+  `app/src/main/assets/changelog.json`. `AppChangelogTest` membaca aset itu dan memvalidasi format.
+- Tindak lanjut 28 Oktober 2026: build **1.1.50/code65** berhasil dengan **584 tes Kotlin lulus**,
+  lint 0 error/3 warning lama, APK ARM64 bertanda tangan dan tautan publik terverifikasi.
+  [Rincian build dan tautan](PRODUCTION_SIGNING.md).

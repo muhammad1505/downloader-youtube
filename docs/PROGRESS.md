@@ -1,10 +1,18 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 27 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 28 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
-## Titik mulai terbaru — 27 Oktober 2026
+## Titik mulai terbaru — 28 Oktober 2026
 
-Terbaru (belum dirilis, **1.1.49/code64**): audit pemutar audio & video. Pemutar lagu tidak lagi
+Terbaru (rilis publik, **1.1.50/code65**): kontrol cepat pemutar video menjadi ikon ringkas
+dengan status lewat ketukan, mode Penuh memotong tepi tanpa distorsi dan Zoom memperbesar 1,25×,
+shortcut Unduh memfokuskan kolom tautan/Riwayat membuka daftar khusus, dan changelog dibaca dari
+`assets/changelog.json`. Build ARM64 **76.425.021 byte**, SHA256
+`ee453d9122528544f8a2cdfa32c409b4239f10ff51aef0b68303ac98f5a2a84a`; **584 tes Kotlin lulus**,
+lint 0 error/3 warning lama, signature/zipalign 16 KB/262 ELF/13 ZIP lulus. Publik di
+<https://files.catbox.moe/ty6ys1.apk>; belum dipasang/diuji di perangkat. [Rincian build](PRODUCTION_SIGNING.md).
+
+Sebelumnya **1.1.49/code64**: audit pemutar audio & video. Pemutar lagu tidak lagi
 mati setelah memutar video (perintah `pause()` yang tidak sah saat pemain berhenti dijawab
 platform dengan error -38 dan diperlakukan sebagai kegagalan berkas), label pengaturan cepat video
 tidak lagi bertabrakan, scrim bilah atas lebih terbaca, antrean video menampilkan posisi dan
