@@ -359,8 +359,9 @@ Dialog potong Status menambah preview 16:9 sumber lokal pada rentang pilihan,
 dijeda saat awal potongan digeser dan dilepas saat dialog ditutup/diproses.
 
 Rasio Pas memakai seluruh gambar tanpa distorsi; Penuh mengisi layar dengan
-peregangan; Zoom mempertahankan rasio lalu memotong tepi. Ukuran permukaan
-mengikuti ruang aktual serta rasio piksel, dihitung ulang setelah rotasi.
+memotong tepi (tanpa regangan); Zoom mempertahankan rasio, memotong tepi, lalu
+memperbesar 1,25×. Ukuran permukaan mengikuti ruang aktual serta rasio piksel,
+dihitung ulang setelah rotasi.
 Kecerahan video mengikuti adaptif Android atau sensor cahaya selama layar
 video aktif, tanpa menulis pengaturan brightness global.
 

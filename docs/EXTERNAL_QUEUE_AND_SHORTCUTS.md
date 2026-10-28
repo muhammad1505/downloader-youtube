@@ -13,7 +13,9 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   karena membebani HP kelas menengah dan mengaburkan arti layar itu.
 - **Shortcut tahan-ikon launcher.** Empat pintasan statis: **Unduh**, **Audio** (pemutar audio),
   **Video** (pemutar video), dan **Riwayat**. Audio/Video membuka Koleksi dengan filter Musik/Video
-  (audio juga memulihkan sesi putar terakhir); Unduh membuka tab Download; Riwayat membuka Riwayat.
+  (audio juga memulihkan sesi putar terakhir); **Unduh** membuka tab Download, menggulir ke kolom
+  tautan, dan langsung memfokuskan kolom itu; **Riwayat** membuka tampilan riwayat khusus dengan
+  tombol **Kembali ke unduhan**, sehingga tidak tertutup antrean atau pembuat tautan.
 - **Kelola playlist.** Satu baris pembuat di atas (nama + tombol Buat), daftar playlist dengan
   **jumlah lagu per playlist**, pencarian baru muncul saat playlist lebih dari empat, dan baris
   memakai kartu tenang (ikon tonal, nama, jumlah lagu, aksi Ubah/Hapus 48dp) — bukan lagi satu
@@ -33,7 +35,10 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   menyambungkan berkas masuk ke jalur ini (audio) atau `video.open()` (video).
 - `core/AppNavigation.kt` menambah `AUDIO_PLAYER`/`VIDEO_PLAYER` (tab Koleksi) yang dibaca dari
   `AppDestination.fromAction`; `res/xml/shortcuts.xml` + `android.app.shortcuts` di manifest +
-  empat ikon `ic_shortcut_*` menyediakan pintasan launcher tanpa Activity kedua.
+  empat ikon `ic_shortcut_*` menyediakan pintasan launcher tanpa Activity kedua. `AppDestination`
+  kini juga membawa `DownloadTarget` (`COMPOSER`/`HISTORY`): `ui/DownloadHubScreen.kt` memilih
+  tampilan riwayat khusus, sedangkan `ui/DownloadScreen.kt` memfokuskan kolom tautan lewat
+  `FocusRequester`; `BackHandler` mengembalikan riwayat ke layar Unduh.
 - `PersonalLibraryDao.observeCounts()` (COUNT per playlist, tanpa perubahan skema) mengalir ke
   `MediaLibraryViewModel.playlistCounts`; `ui/PersonalPlaylistDialog.kt` dirombak memakai
   `AdaptivePair(minInlineWidth = 240.dp)` agar nama dan aksi tetap sebaris di layar 360dp.
@@ -59,6 +64,12 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   dari Room, aksi Ubah/Hapus 48dp, dan konfirmasi hapus mengembalikan hitungan ke 0.
 - Tidak ada `FATAL EXCEPTION` milik `id.local.tubeflow` di logcat sesi uji; berkas uji, baris
   MediaStore, dan playlist uji dihapus kembali setelah pengujian.
+
+## Verifikasi sesi 28 Oktober 2026
+
+- Target shortcut Unduh/Riwayat ditambahkan ke `AppNavigationTest`; pemeriksaan Gradle, fokus
+  keyboard, dan tombol kembali belum dijalankan di sesi ini karena lingkungan VM tidak memiliki
+  JDK/Android SDK. Uji perangkat masih diperlukan sebelum menyatakan perilaku baru selesai.
 
 ## Batasan dan sisa
 

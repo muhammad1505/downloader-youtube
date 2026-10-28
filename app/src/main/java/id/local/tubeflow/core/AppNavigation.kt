@@ -1,9 +1,16 @@
 package id.local.tubeflow.core
 
-enum class AppDestination(val action: String, val tab: Int) {
-    DOWNLOAD("id.local.tubeflow.action.OPEN_DOWNLOAD", 1),
+/** Bagian tab Download yang harus dibuka setelah navigasi dari shortcut atau notifikasi. */
+enum class DownloadTarget { COMPOSER, HISTORY }
+
+enum class AppDestination(
+    val action: String,
+    val tab: Int,
+    val downloadTarget: DownloadTarget? = null,
+) {
+    DOWNLOAD("id.local.tubeflow.action.OPEN_DOWNLOAD", 1, DownloadTarget.COMPOSER),
     PLAYER("id.local.tubeflow.action.OPEN_PLAYER", 2),
-    HISTORY("id.local.tubeflow.action.OPEN_HISTORY", 1),
+    HISTORY("id.local.tubeflow.action.OPEN_HISTORY", 1, DownloadTarget.HISTORY),
     QUEUE("id.local.tubeflow.action.OPEN_QUEUE", 1),
     KARAOKE("id.local.tubeflow.action.OPEN_KARAOKE", 2),
     // Shortcut launcher: membuka Koleksi dengan filter Musik atau Video, bukan layar terpisah.

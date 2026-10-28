@@ -1,12 +1,24 @@
 package id.local.tubeflow.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -15,10 +27,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import id.local.tubeflow.R
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.DownloadOptions
 import id.local.tubeflow.core.DownloadSections
+import id.local.tubeflow.core.DownloadTarget
 import id.local.tubeflow.core.FailureDetails
 import id.local.tubeflow.core.JobState
 import id.local.tubeflow.core.PlaylistEntry
@@ -89,6 +103,8 @@ fun DownloadScreen(
     downloadSpotifyCollection: (DownloadOptions, List<SpotifyTrack>) -> Unit = { _, _ -> },
     queueActions: QueueActions,
     historyActions: HistoryActions,
+    downloadTarget: DownloadTarget? = null,
+    onDownloadTargetHandled: () -> Unit = {},
 ) {
     var historyQuery by rememberSaveable { mutableStateOf("") }
     var historyMode by rememberSaveable { mutableIntStateOf(-1) }
@@ -100,6 +116,37 @@ fun DownloadScreen(
     val listState = rememberLazyListState()
     val hasQueue = DownloadSections.queue(jobs).isNotEmpty()
     val hasHistory = DownloadSections.history(jobs).isNotEmpty()
+    val historyOnly = downloadTarget == DownloadTarget.HISTORY
+    var previousHistoryOnly by remember { mutableStateOf(false) }
+    LaunchedEffect(historyOnly, downloadTarget) {
+        val wasHistoryOnly = previousHistoryOnly
+        previousHistoryOnly = historyOnly
+        when {
+            downloadTarget == DownloadTarget.COMPOSER -> listState.animateScrollToItem(1)
+            historyOnly != wasHistoryOnly -> listState.scrollToItem(0)
+        }
+    }
+    BackHandler(enabled = historyOnly) { onDownloadTargetHandled() }
+    val historyContent: LazyListScope.() -> Unit = {
+        historySection(
+            jobs = jobs,
+            query = historyQuery,
+            modeFilter = historyMode,
+            platformFilter = historyPlatform,
+            onQueryChange = { historyQuery = it },
+            onModeFilterChange = { historyMode = it },
+            onPlatformFilterChange = { historyPlatform = it },
+            onClearRequest = { confirmClearHistory = true },
+            onDeleteRequest = { pendingDelete = it },
+            onRedownloadRequest = { pendingRedownload = it },
+            onRefetchLyrics = historyActions.refetchLyrics,
+            onSearchLyrics = historyActions.searchLyrics,
+            onPlay = historyActions.play,
+            onEnqueue = historyActions.enqueue,
+            onPlayNext = historyActions.playNext,
+            onEditLyricTiming = historyActions.editLyricTiming,
+        )
+    }
 
     if (confirmCancelAll) {
         val active = DownloadSections.queue(jobs)
@@ -154,14 +201,32 @@ fun DownloadScreen(
         contentPadding = PaddingValues(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
-        item(key = "download-heading") {
+        if (historyOnly) {
+            item(key = "history-heading") {
+                PageHeading(
+                    "Riwayat unduhan",
+                    "Unduhan yang selesai. File tetap tersimpan di perangkat.",
+                )
+            }
+            item(key = "history-back") {
+                TextButton(
+                    onClick = onDownloadTargetHandled,
+                    contentPadding = PaddingValues(horizontal = 0.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Kembali ke unduhan")
+                }
+            }
+        }
+        if (!historyOnly) item(key = "download-heading") {
             PageHeading(
                 stringResource(R.string.page_download),
                 stringResource(R.string.download_section_help),
             )
         }
 
-        item(key = "download-composer") {
+        if (!historyOnly) item(key = "download-composer") {
             DownloadComposer(
                 url = url,
                 onUrl = onUrl,
@@ -191,10 +256,12 @@ fun DownloadScreen(
                 matchSpotifyTracks = matchSpotifyTracks,
                 cancelSpotifyMatch = cancelSpotifyMatch,
                 downloadSpotifyCollection = downloadSpotifyCollection,
+                focusComposer = downloadTarget == DownloadTarget.COMPOSER,
+                onFocusHandled = onDownloadTargetHandled,
             )
         }
 
-        if (hasQueue) {
+        if (!historyOnly && hasQueue) {
             queueSection(
                 jobs = jobs,
                 highlightedJobId = highlightedJobId,
@@ -211,29 +278,20 @@ fun DownloadScreen(
             )
         }
 
-        if (hasQueue && hasHistory) {
+        if (!historyOnly && hasQueue && hasHistory) {
             item(key = "download-divider") { HorizontalDivider() }
         }
 
         if (hasHistory) {
-            historySection(
-                jobs = jobs,
-                query = historyQuery,
-                modeFilter = historyMode,
-                platformFilter = historyPlatform,
-                onQueryChange = { historyQuery = it },
-                onModeFilterChange = { historyMode = it },
-                onPlatformFilterChange = { historyPlatform = it },
-                onClearRequest = { confirmClearHistory = true },
-                onDeleteRequest = { pendingDelete = it },
-                onRedownloadRequest = { pendingRedownload = it },
-                onRefetchLyrics = historyActions.refetchLyrics,
-                onSearchLyrics = historyActions.searchLyrics,
-                onPlay = historyActions.play,
-                onEnqueue = historyActions.enqueue,
-                onPlayNext = historyActions.playNext,
-                onEditLyricTiming = historyActions.editLyricTiming,
-            )
+            historyContent()
+        } else if (historyOnly) {
+            item(key = "history-empty") {
+                Text(
+                    "Belum ada unduhan yang selesai.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

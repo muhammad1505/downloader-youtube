@@ -31,6 +31,12 @@ class AppNavigationTest {
         assertEquals(AppDestination.VIDEO_PLAYER, AppDestination.fromAction("id.local.tubeflow.action.OPEN_VIDEO"))
     }
 
+    @Test fun launcherShortcutsTargetTheirDownloadSection() {
+        assertEquals(DownloadTarget.COMPOSER, AppDestination.DOWNLOAD.downloadTarget)
+        assertEquals(DownloadTarget.HISTORY, AppDestination.HISTORY.downloadTarget)
+        assertNull(AppDestination.QUEUE.downloadTarget)
+    }
+
     @Test fun repeatedTapsOnTheSameNotificationRemainSeparateNavigationEvents() {
         val first = AppNavigationRequest(AppDestination.PLAYER)
         val second = AppNavigationRequest(AppDestination.PLAYER)

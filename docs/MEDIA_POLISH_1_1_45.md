@@ -1,5 +1,9 @@
 # Pemutar, lampiran dan preview Status — 1.1.45
 
+> **Catatan 28 Oktober 2026:** mode **Penuh** kini memotong tepi tanpa regangan,
+sedangkan **Zoom** memotong dengan pembesaran 1,25×. Angka pengujian di bawah
+adalah riwayat implementasi 1.1.45 dan tidak mengukur perilaku baru ini.
+
 ## Cakupan
 
 Pengerjaan 26–27 Oktober 2026 dari baseline **1.1.44/code58 (`08a893b`)**.

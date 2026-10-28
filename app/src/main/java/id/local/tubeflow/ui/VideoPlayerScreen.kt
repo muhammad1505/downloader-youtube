@@ -163,7 +163,6 @@ import id.local.tubeflow.core.VideoSubtitleBackground
 import id.local.tubeflow.core.VideoSubtitlePosition
 import id.local.tubeflow.core.VideoSubtitleSize
 import id.local.tubeflow.core.VideoSubtitleStyle
-import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -1067,8 +1066,8 @@ private fun PlayerBottomBar(
 }
 
 /**
- * Deretan pengaturan cepat. Setiap tombol punya label nilai saat ini di bawah ikon, sehingga
- * pengguna bisa melihat kecepatan/efek/rasio yang aktif tanpa harus menebak dari warna ikon.
+ * Deretan pengaturan cepat berbentuk ikon saja. Nilai/status yang sedang aktif tetap ditandai
+ * lewat warna aksen, dan setelah diketuk muncul ringkasan singkat di [PlayerNoticeOverlay].
  */
 @Composable
 private fun QuickSettingsBar(
@@ -1082,135 +1081,102 @@ private fun QuickSettingsBar(
     onDisplay: () -> Unit,
 ) {
     val subtitlesActive = state.textTracks.isNotEmpty() && !state.subtitlesDisabled
-    // Lebar tiap tombol dibagi rata (weight) alih-alih mengikuti lebar label: label yang panjang
-    // tidak lagi menabrak ikon sebelahnya. Semua tombol tetap muat tanpa perlu digeser.
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(PaddingValues(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        QuickIcon(
-            icon = Icons.Outlined.Speed,
-            label = VideoPlayback.speedLabel(state.speed),
-            description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
-            active = abs(state.speed - 1f) > 0.001f,
-            onClick = onSpeed,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.ClosedCaption,
-            label = subtitleChipLabel(state),
-            description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
-            active = subtitlesActive,
-            onClick = onSubtitles,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.GraphicEq,
-            label = state.equalizer.shortLabel,
-            description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
-            active = state.equalizer != VideoEqualizer.OFF,
-            onClick = onEqualizer,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.SurroundSound,
-            label = state.audioEffect.shortLabel,
-            description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
-            active = state.audioEffect != VideoAudioEffect.OFF,
-            onClick = onAudioEffect,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.AutoAwesome,
-            label = if (id.local.tubeflow.core.PlaybackPower.saving) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_short) else state.enhance.shortLabel,
-            description = if (id.local.tubeflow.core.PlaybackPower.saving) androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects) else "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya",
-            active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
-            onClick = onEnhance,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.PhotoCamera,
-            label = "Foto",
-            description = "Ambil screenshot video",
-            active = false,
-            onClick = onScreenshot,
-            modifier = Modifier.weight(1f),
-        )
-        QuickIcon(
-            icon = Icons.Outlined.AspectRatio,
-            label = state.aspect.label,
-            description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
-            active = state.aspect != VideoAspect.FIT,
-            onClick = onDisplay,
-            modifier = Modifier.weight(1f),
-        )
+    // Lebar tiap tombol dibagi rata agar tujuh ikon selalu muat dalam satu baris tanpa digeser.
+    // Di layar lebar, bar dibatasi dan ditengahkan supaya ikon tidak menyebar terlalu jauh.
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier
+                .widthIn(max = 460.dp)
+                .fillMaxWidth()
+                .padding(PaddingValues(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            QuickIcon(
+                icon = Icons.Outlined.Speed,
+                description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
+                active = abs(state.speed - 1f) > 0.001f,
+                onClick = onSpeed,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.ClosedCaption,
+                description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
+                active = subtitlesActive,
+                onClick = onSubtitles,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.GraphicEq,
+                description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
+                active = state.equalizer != VideoEqualizer.OFF,
+                onClick = onEqualizer,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.SurroundSound,
+                description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
+                active = state.audioEffect != VideoAudioEffect.OFF,
+                onClick = onAudioEffect,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.AutoAwesome,
+                description = if (id.local.tubeflow.core.PlaybackPower.saving) {
+                    androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects)
+                } else {
+                    "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya"
+                },
+                active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
+                onClick = onEnhance,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.PhotoCamera,
+                description = "Ambil screenshot video",
+                active = false,
+                onClick = onScreenshot,
+                modifier = Modifier.weight(1f),
+            )
+            QuickIcon(
+                icon = Icons.Outlined.AspectRatio,
+                description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
+                active = state.aspect != VideoAspect.FIT,
+                onClick = onDisplay,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
 @Composable
 private fun QuickIcon(
     icon: ImageVector,
-    label: String,
     description: String,
     active: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
-    Column(
+    Box(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClickLabel = description, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = description }
-            .padding(vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(40.dp),
             shape = CircleShape,
             color = if (active) accent.copy(alpha = 0.24f) else Color.Black.copy(alpha = 0.42f),
             contentColor = if (active) accent else PlayerContent,
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(18.dp))
+                Icon(icon, null, Modifier.size(20.dp))
             }
         }
-        Spacer(Modifier.height(2.dp))
-        // Label selebar tombol: teks panjang dipangkas dengan elipsis alih-alih menabrak ikon
-        // tetangga, dan latar gelap kecil menjaga keterbacaan di atas adegan video yang terang.
-        Text(
-            label,
-            color = if (active) accent else PlayerContent,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 2.dp, vertical = 1.dp),
-        )
     }
-}
-
-/** Label pendek di bawah ikon CC; detail lengkap tetap dibacakan lewat deskripsi aksesibilitas. */
-private fun subtitleChipLabel(state: VideoPlayerViewModel.State): String = when {
-    state.subtitlesDisabled -> "Off"
-    state.textTracks.isEmpty() -> "—"
-    else -> state.textTracks.firstOrNull { it.selected }
-        ?.let { track ->
-            // Kode bahasa ISO (id/en) lebih ringkas daripada nama track yang bisa panjang.
-            val code = track.language.trim()
-            if (code.isNotEmpty()) code.substringBefore('-').take(3) else track.label.trim().take(4)
-        }
-        ?.uppercase(Locale.getDefault())
-        ?.takeIf { it.isNotEmpty() }
-        ?: "Auto"
 }
 
 private fun subtitleChipDescription(state: VideoPlayerViewModel.State): String = when {

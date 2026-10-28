@@ -68,6 +68,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     // Antrean dan riwayat kini satu tab Download; Pengaturan tetap di luar bilah bawah.
     val settingsTab = 3
     var tab by rememberSaveable { mutableIntStateOf(1) }
+    // Target bagian Download dari shortcut/notifikasi; dikosongkan setelah aksi selesai.
+    var downloadTarget by rememberSaveable { mutableStateOf<DownloadTarget?>(null) }
     // Kategori Pengaturan adalah layar terpisah; null berarti daftar kategori.
     var settingsSection by rememberSaveable { mutableStateOf<String?>(null) }
     var highlightedJobId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -78,8 +80,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val context = LocalContext.current
     var releaseNotes by remember { mutableStateOf<ReleaseNotes?>(null) }
     LaunchedEffect(Unit) {
-        if (AppChangelog.shouldOffer(ChangelogStore.lastSeen(context), BuildConfig.VERSION_CODE)) {
-            releaseNotes = AppChangelog.forVersion(BuildConfig.VERSION_CODE)
+        val changelog = AppChangelog.load(context)
+        if (AppChangelog.shouldOffer(ChangelogStore.lastSeen(context), BuildConfig.VERSION_CODE, changelog)) {
+            releaseNotes = AppChangelog.forVersion(changelog, BuildConfig.VERSION_CODE)
         }
     }
     val screenState = rememberSaveableStateHolder()
@@ -136,6 +139,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             if (url != incomingUrl) model.clearPlaylist()
             url = incomingUrl
             tab = 1
+            downloadTarget = null
             // Inspeksi diserahkan ke efek DownloadScreen (video vs playlist) — memanggil inspect langsung di sini
             // membuat tautan playlist murni memunculkan "tautan tidak valid" sesaat dan video diperiksa dua kali (BUG-022).
         }
@@ -147,6 +151,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         karaoke.close()
         library.closeLyrics()
         tab = request.destination.tab
+        downloadTarget = request.destination.downloadTarget
         when (request.destination) {
             AppDestination.PLAYER -> {
                 player.restorePlaybackSession()
@@ -266,7 +271,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
-                        onClick = { tab = index },
+                        onClick = { tab = index; downloadTarget = null },
                         icon = {
                             if (index == 1 && activeCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (activeCount > 99) "99+" else "$activeCount") } }) {
@@ -296,7 +301,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         if (useRail) NavigationRail(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()), containerColor=MaterialTheme.colorScheme.surface) {
             tabs.forEachIndexed { index, title ->
                 NavigationRailItem(
-                    selected=tab==index, onClick={ tab=index },
+                    selected=tab==index, onClick={ tab=index; downloadTarget = null },
                     icon={ if (index==1 && activeCount>0) {
                         BadgedBox(badge={ Badge { Text(if (activeCount>99) "99+" else "$activeCount") } }) {
                             Icon(icons[index],if (showLabels) null else title)
@@ -428,6 +433,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                             }
                         },
                     ),
+                    downloadTarget = downloadTarget,
+                    onDownloadTargetHandled = { downloadTarget = null },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 2 }, downloads = { tab = 1 })
                 2 -> MediaLibraryScreen(
@@ -464,7 +471,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     },
                     section = settingsSection,
                     onSection = { settingsSection = it },
-                    onShowReleaseNotes = { releaseNotes = AppChangelog.latestAtOrBefore(BuildConfig.VERSION_CODE) },
+                    onShowReleaseNotes = {
+                        releaseNotes = AppChangelog.latestAtOrBefore(AppChangelog.load(context), BuildConfig.VERSION_CODE)
+                    },
                 )
             }
             }

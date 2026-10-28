@@ -20,6 +20,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import java.net.URLEncoder
@@ -211,10 +212,19 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             if (syncVideoGeometry()) return
+            // Fallback saat videoFormat belum tersedia. Jangan pakai width/height mentah:
+            // rekaman portrait sering membawa rotasi 90/270 derajat, sehingga sumbu dan
+            // rasio pikselnya harus dinormalisasi sama seperti jalur format di atas.
+            val geometry = VideoViewport.sourceSize(
+                videoSize.width,
+                videoSize.height,
+                videoSize.unappliedRotationDegrees,
+                videoSize.pixelWidthHeightRatio,
+            ) ?: return
             _state.value = _state.value.copy(
-                videoWidth = videoSize.width,
-                videoHeight = videoSize.height,
-                pixelRatio = videoSize.pixelWidthHeightRatio,
+                videoWidth = geometry.first,
+                videoHeight = geometry.second,
+                pixelRatio = geometry.third,
             )
         }
 
@@ -848,15 +858,22 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
         // Efek GL tidak didukung semua kombinasi dekoder/GPU; kegagalan efek tidak boleh
         // menghentikan pemutaran video.
-        val layout = when (_state.value.aspect) {
+        val aspect = _state.value.aspect
+        val layout = when (aspect) {
             VideoAspect.FIT -> Presentation.LAYOUT_SCALE_TO_FIT
-            VideoAspect.FILL -> Presentation.LAYOUT_STRETCH_TO_FIT
-            VideoAspect.ZOOM -> Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+            // FILL and ZOOM keep the source aspect ratio while covering the viewport; FILL no
+            // longer stretches the frame. ZOOM adds magnification before the crop.
+            VideoAspect.FILL, VideoAspect.ZOOM -> Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
         }
+        val zoom = if (aspect == VideoAspect.ZOOM) {
+            ScaleAndRotateTransformation.Builder()
+                .setScale(VideoViewport.ZOOM_FACTOR, VideoViewport.ZOOM_FACTOR)
+                .build()
+        } else null
         // The GL pipeline letterboxes independently of PlayerView.resizeMode.
         val presentation = if (viewportWidth > 0 && viewportHeight > 0)
             Presentation.createForWidthAndHeight(viewportWidth, viewportHeight, layout) else null
-        val applied = runCatching { exo.setVideoEffects(effects + listOfNotNull(presentation)) }.isSuccess
+        val applied = runCatching { exo.setVideoEffects(effects + listOfNotNull(zoom, presentation)) }.isSuccess
         _state.value = _state.value.copy(effectPresentation = applied)
     }
 

@@ -23,6 +23,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -100,8 +102,17 @@ internal fun DownloadComposer(
     matchSpotifyTracks: (List<SpotifyTrack>) -> Unit = {},
     cancelSpotifyMatch: () -> Unit = {},
     downloadSpotifyCollection: (DownloadOptions, List<SpotifyTrack>) -> Unit = { _, _ -> },
+    focusComposer: Boolean = false,
+    onFocusHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val composerFocus = remember { FocusRequester() }
+    LaunchedEffect(focusComposer) {
+        if (focusComposer) {
+            runCatching { composerFocus.requestFocus() }
+            onFocusHandled()
+        }
+    }
     var mode by rememberSaveable { mutableStateOf(MediaMode.VIDEO) }
     var advanced by rememberSaveable { mutableStateOf(false) }
     var videoFormat by rememberSaveable { mutableStateOf("mp4") }
@@ -275,7 +286,7 @@ internal fun DownloadComposer(
             OutlinedTextField(
                 value = url,
                 onValueChange = { onUrl(it); if (shownPlaylist != null) clearPlaylist() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(composerFocus),
                 label = { Text("Link video, season, playlist, atau lagu Spotify") },
                 placeholder = { Text("https://youtu.be/… , bilibili.tv/play/… , playlist?list=… , atau open.spotify.com/track/…") },
                 singleLine = true,

@@ -8,7 +8,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Mode tampilan video di dalam PlayerView; urutannya adalah urutan tombol. */
+/**
+ * Mode tampilan video di dalam PlayerView; urutannya adalah urutan tombol.
+ * FIT memuat seluruh frame, FILL memotong tepi agar memenuhi layar tanpa distorsi,
+ * dan ZOOM melakukan hal yang sama dengan pembesaran tambahan.
+ */
 enum class VideoAspect(val label: String) {
     FIT("Pas"),
     FILL("Penuh"),

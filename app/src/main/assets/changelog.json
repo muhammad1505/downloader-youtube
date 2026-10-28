@@ -1,0 +1,29 @@
+[
+  {
+    "versionCode": 64,
+    "versionName": "1.1.49",
+    "highlights": [
+      "Berkas yang dibuka dari aplikasi lain diputar bersama media sejenis di folder yang sama, jadi tombol berikut/sebelumnya tetap berguna.",
+      "Tahan ikon launcher untuk pintasan Unduh, Audio, Video, dan Riwayat.",
+      "Kelola playlist lebih rapi dan menampilkan jumlah lagu tiap playlist.",
+      "Layar Ringkasan diringkas jadi empat blok; angka rinci dan penjelasannya ada di tombol Lihat detail.",
+      "Mode Penuh video memotong tepi layar tanpa distorsi; Zoom tetap memperbesar 1,25×.",
+      "Pintasan launcher Unduh langsung memfokuskan kolom tautan, dan Riwayat membuka daftar riwayat khusus."
+    ]
+  },
+  {
+    "versionCode": 63,
+    "versionName": "1.1.48",
+    "highlights": [
+      "Klip Status tidak lagi dibatasi 30 detik: geser awal dan akhir sendiri, berguna juga untuk dikirim ke chat.",
+      "Batas waktu FFmpeg kini mengikuti panjang klip yang dipilih."
+    ]
+  },
+  {
+    "versionCode": 62,
+    "versionName": "1.1.47",
+    "highlights": [
+      "Pemilihan klip Status memakai satu bilah rentang: geser tiap ujung atau geser bagian tengah untuk memindahkan seluruh klip."
+    ]
+  }
+]

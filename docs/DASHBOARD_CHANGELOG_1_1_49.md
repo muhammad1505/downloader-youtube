@@ -25,18 +25,21 @@ diperbarui.
 
 ## Teknis
 
-- `core/AppChangelog.kt` — daftar `ReleaseNotes(versionCode, versionName, highlights)` ditulis
-  manual (tanpa jaringan), terbaru di atas. `forVersion()` mencocokkan versi persis,
-  `latestAtOrBefore()` menyalakan tombol di Tentang, dan `shouldOffer()` hanya membuka dialog bila
-  versi berjalan lebih baru dari yang sudah ditutup **dan** versi itu punya catatan sendiri.
+- `app/src/main/assets/changelog.json` — satu sumber data changelog, berisi
+  `versionCode`, `versionName`, dan daftar `highlights`; terbaru di atas. Menambah rilis cukup
+  mengedit JSON ini, tanpa menyentuh daftar Kotlin. `core/AppChangelog.kt` memuat dan mem-parse
+  aset sekali per proses; `forVersion()` mencocokkan versi persis, `latestAtOrBefore()` menyalakan
+  tombol di Tentang, dan `shouldOffer()` hanya membuka dialog bila versi berjalan lebih baru dari
+  yang sudah ditutup **dan** versi itu punya catatan sendiri.
 - `ChangelogStore` menyimpan `last_seen_version` di SharedPreferences berkas `changelog`; ditulis
   hanya saat dialog ditutup.
 - `ui/ReleaseNotesDialog.kt` memakai `AlertDialog` dengan daftar sorotan yang bisa digulir; dipanggil
   dari `ui/TubeFlowApp.kt` (efek sekali per proses) dan dari `ui/SettingsScreen.kt` bagian Tentang.
 - `ui/MediaDashboardScreen.kt` dirombak memakai `AnimatedVisibility` untuk dua panel rincian
   (`collectionDetail`, `healthDetail`) dan `Metric` yang otomatis menumpuk saat `fontScale > 1.3`.
-- **Saat menaikkan versi, tambahkan `ReleaseNotes` untuk versi itu** — `AppChangelogTest`
-  `runningVersionAlwaysHasItsOwnNotes` gagal bila `versionCode` berjalan tidak punya sorotan.
+- **Saat menaikkan versi, tambahkan entri JSON untuk versi itu** — `AppChangelogTest` membaca
+  aset dan `runningVersionAlwaysHasItsOwnNotes` gagal bila `versionCode` berjalan tidak punya
+  sorotan. Tes juga memeriksa urutan terbaru-di-atas, kode unik, dan panjang sorotan.
 
 ## Verifikasi host
 
@@ -58,3 +61,11 @@ diperbarui.
   membuka ulang aplikasi tidak menampilkan lagi (sekali per versi).
 - Pengaturan → Tentang menampilkan "Versi 1.1.49 (64)" beserta tombol "Apa yang baru di versi ini"
   yang membuka dialog yang sama.
+- Catatan 28 Oktober 2026: aset 1.1.49 kini memuat enam sorotan (tambahan crop mode Penuh dan
+  fokus kolom tautan dari shortcut Unduh). Uji perangkat di atas masih mencatat empat sorotan dari
+  build code64 sebelumnya; pengguna yang sudah menutup dialog versi 64 baru melihat sorotan
+  tambahan setelah `versionCode` berikutnya dinaikkan.
+- Sesi 28 Oktober 2026 memindahkan sumber changelog dari daftar Kotlin ke
+  `app/src/main/assets/changelog.json`. `AppChangelogTest` membaca aset itu dan memvalidasi format;
+  pemeriksaan `testDebugUnitTest`/lint/build belum dijalankan karena VM sesi ini tidak memiliki JDK
+  dan Android SDK.
