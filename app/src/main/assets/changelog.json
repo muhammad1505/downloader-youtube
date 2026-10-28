@@ -1,5 +1,15 @@
 [
   {
+    "versionCode": 65,
+    "versionName": "1.1.50",
+    "highlights": [
+      "Kontrol pemutar video kini berupa ikon ringkas; ketuk untuk melihat status dan mengganti opsi.",
+      "Mode Penuh memotong tepi layar tanpa distorsi, sedangkan Zoom memperbesar 1,25×.",
+      "Pintasan Unduh langsung memfokuskan kolom tautan dan Riwayat membuka daftar riwayat khusus.",
+      "Catatan rilis kini dibaca dari aset JSON sehingga sorotan versi baru lebih mudah ditambahkan."
+    ]
+  },
+  {
     "versionCode": 64,
     "versionName": "1.1.49",
     "highlights": [
