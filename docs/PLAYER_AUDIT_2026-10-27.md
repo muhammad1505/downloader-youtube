@@ -39,6 +39,11 @@ Tujuh–delapan tombol pengaturan cepat memakai lebar mengikuti isi, sehingga la
 digeser) dengan label satu baris yang dipangkas elipsis. Tombol dekoder dilepas dari deretan cepat
 karena sudah ada di lembar "Opsi pemutar" — pengaturan lain tetap satu ketuk.
 
+**Tindak lanjut 28 Oktober 2026 (1.1.51).** Dekoder dikembalikan sebagai ikon di panel pengaturan;
+ketukannya membuka pilihan Otomatis/Perangkat/Software. Panel kini dapat dibuka-tutup dari top bar
+dan membungkus ikon ke beberapa baris, sehingga semua aksi tetap terjangkau tanpa memadatkan satu
+baris.
+
 ### 3. Keterbacaan kontrol di atas video terang (UX)
 
 Gradien gelap bilah atas berhenti tepat di tinggi bilah itu, sehingga judul video dan "2 dari 3"
@@ -75,6 +80,27 @@ sudah dibuang: (1) membiarkan permukaan menyesuaikan sendiri — frame menempel 
 (3) seek yang ditunda 300 ms — pemutar yang dijeda/berakhir tidak menggambar ulang saat di-seek,
 sehingga hasilnya kadang benar kadang tidak (terbukti: satu frame terakhir tetap tampil hanya
 sebagian di layar lanskap).
+
+### 6. Pemulihan decoder dan posisi setelah error (tindak lanjut 28 Oktober 2026)
+
+Beberapa kegagalan putar berasal dari decoder yang direbut sistem dan dari tombol
+**Coba lagi** yang mengulang renderer yang baru saja gagal. Perubahannya:
+
+- `ERROR_CODE_DECODING_RESOURCES_RECLAIMED` sekarang dianggap kegagalan codec, jadi video yang
+dekodernya direbut aplikasi lain otomatis dibuka ulang dengan FFmpeg/dav1d.
+- Fallback otomatis mempertahankan niat pengguna: video yang sedang diputar tetap diputar,
+sedangkan video yang dijeda tetap dijeda setelah pemutar dibangun ulang.
+- Setelah fallback software gagal, **Coba lagi** membuat pemutar baru dengan jalur Otomatis
+(hardware lebih dulu), bukan mengulang renderer software yang sama. Mode sesi software juga tidak
+lagi direset saat pindah item karena ExoPlayer belum mengganti renderer.
+- Posisi UI yang terakhir diketahui tidak lagi hilang ketika ExoPlayer melaporkan posisi 0 setelah
+error; fallback, ganti decoder, dan simpan lanjut-tonton memakai posisi yang aman.
+- Dari layar error mode **Software** tersedia tombol **Coba dekoder otomatis**, sehingga pengguna
+tidak terkunci pada software yang tidak mendukung berkas tersebut.
+- Pemilih subtitle tidak lagi memicu PiP di Android 10–11 saat `onUserLeaveHint` ikut terpanggil.
+
+Verifikasi host: `:app:testDebugUnitTest` **587 tes, 0 gagal/error/skip**. Ini belum diuji pada
+perangkat; keberhasilan decoder tetap bergantung pada codec dan dukungan GPU/MediaCodec tiap HP.
 
 ## Yang sudah bagus dan tidak diubah
 

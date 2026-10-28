@@ -86,6 +86,7 @@ import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.SurroundSound
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -109,6 +110,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -220,6 +222,8 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     var scrub by remember { mutableStateOf<Float?>(null) }
     var showResume by remember { mutableStateOf(false) }
     var controlsLocked by remember { mutableStateOf(false) }
+    var quickSettingsVisible by rememberSaveable { mutableStateOf(true) }
+    var pickingSubtitle by remember { mutableStateOf(false) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
 
     fun touch() {
@@ -232,7 +236,13 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         touch()
     }
 
+    fun finishSubtitlePick() {
+        pickingSubtitle = false
+        VideoPip.resumeAutoEnter()
+    }
+
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        finishSubtitlePick()
         if (uri != null) {
             val picked = externalSubtitle(context, uri)
             if (picked == null) {
@@ -332,16 +342,19 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     }
 
     // Rasio, aksi play/pause, dan izin auto-PiP (Android 12+) selalu diperbarui bersama status putar.
-    LaunchedEffect(activity, state.playing, state.videoWidth, state.videoHeight, supportsPip, inPip) {
+    LaunchedEffect(activity, state.playing, state.videoWidth, state.videoHeight, supportsPip, inPip, pickingSubtitle) {
         val host = activity ?: return@LaunchedEffect
         if (!supportsPip) return@LaunchedEffect
-        VideoPip.apply(host, video.state.value, autoEnter = state.playing && !inPip)
+        VideoPip.apply(host, video.state.value, autoEnter = state.playing && !inPip && !pickingSubtitle)
     }
 
     // Aksi play/pause PiP diteruskan receiver manifest ke ViewModel yang sedang aktif.
     DisposableEffect(video) {
         VideoPip.attachToggle { video.togglePlay() }
-        onDispose { VideoPip.detachToggle() }
+        onDispose {
+            VideoPip.detachToggle()
+            VideoPip.resumeAutoEnter()
+        }
     }
 
     DisposableEffect(activity) {
@@ -538,12 +551,18 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     ) {
                         PlayerTopBar(
                             state = state,
+                            quickSettingsVisible = quickSettingsVisible,
+                            onToggleQuickSettings = {
+                                quickSettingsVisible = !quickSettingsVisible
+                                touch()
+                            },
                             onClose = video::close,
                             onQueue = { sheet = VideoSheet.QUEUE },
                             onMore = { sheet = VideoSheet.MORE },
                         )
                         QuickSettingsBar(
                             state = state,
+                            visible = quickSettingsVisible,
                             onSpeed = {
                                 video.cycleSpeed()
                                 notify(
@@ -594,6 +613,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                     ),
                                 )
                             },
+                            onDecoder = { sheet = VideoSheet.DECODER },
                             onScreenshot = ::takeScreenshot,
                             onDisplay = {
                                 video.cycleAspect()
@@ -707,8 +727,10 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     message = message,
                     hasNext = state.hasNext,
                     showSoftwareFallback = state.decoderMode == VideoDecoderMode.HARDWARE,
+                    showAutomaticFallback = state.decoderMode == VideoDecoderMode.SOFTWARE,
                     onRetry = video::retry,
                     onUseSoftware = video::useSoftwareDecoder,
+                    onUseAutomatic = video::useAutomaticDecoder,
                     onNext = video::next,
                     onClose = video::close,
                     onOpenExternal = { openExternalPlayer(context, state.entry?.uri) },
@@ -763,18 +785,25 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         sheet = null
                     },
                     onPickSubtitle = {
-                        subtitlePicker.launch(
-                            arrayOf(
-                                "text/*",
-                                "application/x-subrip",
-                                "application/x-srt",
-                                "text/vtt",
-                                "text/x-ssa",
-                                "text/x-ass",
-                                "application/ttml+xml",
-                                "application/octet-stream",
-                            ),
-                        )
+                        pickingSubtitle = true
+                        VideoPip.suspendAutoEnter(activity, video.state.value)
+                        runCatching {
+                            subtitlePicker.launch(
+                                arrayOf(
+                                    "text/*",
+                                    "application/x-subrip",
+                                    "application/x-srt",
+                                    "text/vtt",
+                                    "text/x-ssa",
+                                    "text/x-ass",
+                                    "application/ttml+xml",
+                                    "application/octet-stream",
+                                ),
+                            )
+                        }.onFailure {
+                            finishSubtitlePick()
+                            Toast.makeText(context, "Tidak dapat membuka pemilih subtitle.", Toast.LENGTH_LONG).show()
+                        }
                     },
                     onOpen = { sheet = it },
                     onOrientation = {
@@ -883,6 +912,8 @@ private fun externalSubtitle(context: Context, uri: Uri): VideoSubtitle? {
 @Composable
 private fun PlayerTopBar(
     state: VideoPlayerViewModel.State,
+    quickSettingsVisible: Boolean,
+    onToggleQuickSettings: () -> Unit,
     onClose: () -> Unit,
     onQueue: () -> Unit,
     onMore: () -> Unit,
@@ -920,6 +951,18 @@ private fun PlayerTopBar(
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
+        }
+        IconButton(
+            onClick = onToggleQuickSettings,
+            modifier = Modifier.size(44.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                contentColor = if (quickSettingsVisible) AccentBlue else PlayerContent,
+            ),
+        ) {
+            Icon(
+                Icons.Outlined.Tune,
+                if (quickSettingsVisible) "Sembunyikan pengaturan cepat" else "Tampilkan pengaturan cepat",
+            )
         }
         IconButton(
             onClick = onQueue,
@@ -1066,85 +1109,99 @@ private fun PlayerBottomBar(
 }
 
 /**
- * Deretan pengaturan cepat berbentuk ikon saja. Nilai/status yang sedang aktif tetap ditandai
- * lewat warna aksen, dan setelah diketuk muncul ringkasan singkat di [PlayerNoticeOverlay].
+ * Panel pengaturan cepat berbentuk ikon. Nilai/status aktif ditandai warna aksen; setelah
+ * diketuk muncul ringkasan singkat di [PlayerNoticeOverlay]. Panel bisa disembunyikan dari
+ * bilah atas dan membungkus ikon ke beberapa baris agar semua aksi tetap terjangkau.
  */
 @Composable
 private fun QuickSettingsBar(
     state: VideoPlayerViewModel.State,
+    visible: Boolean,
     onSpeed: () -> Unit,
     onSubtitles: () -> Unit,
     onEqualizer: () -> Unit,
     onAudioEffect: () -> Unit,
     onEnhance: () -> Unit,
+    onDecoder: () -> Unit,
     onScreenshot: () -> Unit,
     onDisplay: () -> Unit,
 ) {
     val subtitlesActive = state.textTracks.isNotEmpty() && !state.subtitlesDisabled
-    // Lebar tiap tombol dibagi rata agar tujuh ikon selalu muat dalam satu baris tanpa digeser.
-    // Di layar lebar, bar dibatasi dan ditengahkan supaya ikon tidak menyebar terlalu jauh.
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Row(
-            Modifier
-                .widthIn(max = 460.dp)
-                .fillMaxWidth()
-                .padding(PaddingValues(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            QuickIcon(
-                icon = Icons.Outlined.Speed,
-                description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
-                active = abs(state.speed - 1f) > 0.001f,
-                onClick = onSpeed,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.ClosedCaption,
-                description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
-                active = subtitlesActive,
-                onClick = onSubtitles,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.GraphicEq,
-                description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
-                active = state.equalizer != VideoEqualizer.OFF,
-                onClick = onEqualizer,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.SurroundSound,
-                description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
-                active = state.audioEffect != VideoAudioEffect.OFF,
-                onClick = onAudioEffect,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.AutoAwesome,
-                description = if (id.local.tubeflow.core.PlaybackPower.saving) {
-                    androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects)
-                } else {
-                    "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya"
-                },
-                active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
-                onClick = onEnhance,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.PhotoCamera,
-                description = "Ambil screenshot video",
-                active = false,
-                onClick = onScreenshot,
-                modifier = Modifier.weight(1f),
-            )
-            QuickIcon(
-                icon = Icons.Outlined.AspectRatio,
-                description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
-                active = state.aspect != VideoAspect.FIT,
-                onClick = onDisplay,
-                modifier = Modifier.weight(1f),
-            )
+    AnimatedVisibility(visible = visible) {
+        BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // HP: empat ikon per baris (dua baris). Layar lebar: delapan ikon satu baris.
+            val columns = if (maxWidth >= 420.dp) 8 else 4
+            val itemWidth = if (columns == 8) 48.dp else 56.dp
+            FlowRow(
+                Modifier
+                    .widthIn(max = 460.dp)
+                    .fillMaxWidth()
+                    .padding(PaddingValues(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                maxItemsInEachRow = columns,
+            ) {
+                QuickIcon(
+                    icon = Icons.Outlined.Speed,
+                    description = "Kecepatan ${VideoPlayback.speedLabel(state.speed)}. Ketuk untuk berikutnya",
+                    active = abs(state.speed - 1f) > 0.001f,
+                    onClick = onSpeed,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.ClosedCaption,
+                    description = "Subtitle ${subtitleChipDescription(state)}. Ketuk untuk berikutnya",
+                    active = subtitlesActive,
+                    onClick = onSubtitles,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.GraphicEq,
+                    description = "Equalizer ${state.equalizer.label}. Ketuk untuk berikutnya",
+                    active = state.equalizer != VideoEqualizer.OFF,
+                    onClick = onEqualizer,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.SurroundSound,
+                    description = "Efek audio ${state.audioEffect.label}. Ketuk untuk berikutnya",
+                    active = state.audioEffect != VideoAudioEffect.OFF,
+                    onClick = onAudioEffect,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.AutoAwesome,
+                    description = if (id.local.tubeflow.core.PlaybackPower.saving) {
+                        androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.power_saver_effects)
+                    } else {
+                        "Smart Enhance ${state.enhance.label}. Ketuk untuk berikutnya"
+                    },
+                    active = !id.local.tubeflow.core.PlaybackPower.saving && state.enhance != VideoEnhance.OFF,
+                    onClick = onEnhance,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.Memory,
+                    description = "Dekoder ${state.decoderMode.label}. Buka pilihan dekoder",
+                    active = state.decoderMode != VideoDecoderMode.AUTO,
+                    onClick = onDecoder,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.PhotoCamera,
+                    description = "Ambil screenshot video",
+                    active = false,
+                    onClick = onScreenshot,
+                    modifier = Modifier.width(itemWidth),
+                )
+                QuickIcon(
+                    icon = Icons.Outlined.AspectRatio,
+                    description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
+                    active = state.aspect != VideoAspect.FIT,
+                    onClick = onDisplay,
+                    modifier = Modifier.width(itemWidth),
+                )
+            }
         }
     }
 }
@@ -1311,8 +1368,10 @@ private fun PlayerErrorOverlay(
     message: String,
     hasNext: Boolean,
     showSoftwareFallback: Boolean,
+    showAutomaticFallback: Boolean,
     onRetry: () -> Unit,
     onUseSoftware: () -> Unit,
+    onUseAutomatic: () -> Unit,
     onNext: () -> Unit,
     onClose: () -> Unit,
     onOpenExternal: () -> Unit,
@@ -1354,6 +1413,11 @@ private fun PlayerErrorOverlay(
                 if (showSoftwareFallback) {
                     TextButton(onClick = onUseSoftware) {
                         Text("Coba dekoder software", color = PlayerContent)
+                    }
+                }
+                if (showAutomaticFallback) {
+                    TextButton(onClick = onUseAutomatic) {
+                        Text("Coba dekoder otomatis", color = PlayerContent)
                     }
                 }
                 TextButton(onClick = onOpenExternal) {

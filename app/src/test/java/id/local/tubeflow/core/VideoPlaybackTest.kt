@@ -71,6 +71,28 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun reopenPositionKeepsLastKnownPositionAfterDecoderError() {
+        assertEquals("Posisi pemutar 0 setelah error tidak boleh menghapus posisi UI", 120_000, VideoPlayback.reopenPosition(120_000, 0))
+        assertEquals("Posisi pemutar yang lebih maju tetap dipakai", 120_500, VideoPlayback.reopenPosition(120_000, 120_500))
+        assertEquals(0, VideoPlayback.reopenPosition(-1_000, 0))
+    }
+
+    @Test
+    fun retryRestartsPlayerAfterAutomaticSoftwareFallback() {
+        assertTrue(VideoPlayback.needsDecoderRestart(hasPlayer = false, softwareFallbackUsed = false))
+        assertTrue(VideoPlayback.needsDecoderRestart(hasPlayer = true, softwareFallbackUsed = true))
+        assertFalse(VideoPlayback.needsDecoderRestart(hasPlayer = true, softwareFallbackUsed = false))
+    }
+
+    @Test
+    fun pipOnLeaveNeedsPlayingVideoAndNoPicker() {
+        assertTrue(VideoPlayback.shouldEnterPipOnLeave(active = true, playing = true, suppressed = false))
+        assertFalse(VideoPlayback.shouldEnterPipOnLeave(active = true, playing = false, suppressed = false))
+        assertFalse("Video tidak aktif tidak boleh masuk PiP", VideoPlayback.shouldEnterPipOnLeave(active = false, playing = true, suppressed = false))
+        assertFalse("Picker subtitle tidak boleh memicu PiP", VideoPlayback.shouldEnterPipOnLeave(active = true, playing = true, suppressed = true))
+    }
+
+    @Test
     fun resumeOnlyForMeaningfulMiddlePositions() {
         assertFalse(VideoPlayback.shouldResume(null, 600_000))
         assertFalse("Terlalu dekat awal", VideoPlayback.shouldResume(9_000, 600_000))
@@ -304,6 +326,7 @@ class VideoPlaybackTest {
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_INIT_FAILED))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES))
+        assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED))
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_DECODING_FAILED))
         // Renderer MediaCodec yang macet pada berkas lokal memakai TIMEOUT; coba software.
         assertTrue(VideoPlayback.isCodecFailure(PlaybackException.ERROR_CODE_TIMEOUT))

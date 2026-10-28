@@ -13,6 +13,9 @@ class VideoResumeStore(context: Context) {
 
     fun position(uri: String): Long? = entries()[uri]?.positionMs
 
+    /** URI video yang paling terakhir ditonton; cadangan untuk shortcut sebelum ada sesi baru. */
+    fun latestUri(): String? = entries().maxByOrNull { it.value.updatedAt }?.key
+
     fun save(uri: String, positionMs: Long, durationMs: Long) {
         if (uri.isBlank()) return
         val now = System.currentTimeMillis()

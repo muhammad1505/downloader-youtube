@@ -1,5 +1,15 @@
 [
   {
+    "versionCode": 66,
+    "versionName": "1.1.51",
+    "highlights": [
+      "Shortcut Pemutar audio langsung membuka pemutar dan memulihkan lagu terakhir; Pemutar video langsung membuka video terakhir.",
+      "Pemulihan decoder video lebih andal: decoder yang direbut sistem, posisi tonton setelah error, dan Coba lagi yang kembali ke jalur perangkat.",
+      "Ikon dekoder kembali tersedia di panel pengaturan video yang bisa dibuka-tutup.",
+      "Pemilih subtitle tidak lagi memicu jendela Picture-in-Picture saat video sedang diputar."
+    ]
+  },
+  {
     "versionCode": 65,
     "versionName": "1.1.50",
     "highlights": [

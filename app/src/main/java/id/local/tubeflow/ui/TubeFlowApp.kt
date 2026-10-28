@@ -147,7 +147,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(navigation?.id) {
         val request = navigation ?: return@LaunchedEffect
         fullPlayer = false
-        video.close()
+        // Shortcut video harus mempertahankan pemutar video yang sedang aktif; shortcut lain
+        // menutupnya agar audio/shortcut tujuan tidak bertumpuk dengan layar video.
+        if (request.destination != AppDestination.VIDEO_PLAYER) video.close()
         karaoke.close()
         library.closeLyrics()
         tab = request.destination.tab
@@ -158,13 +160,20 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 fullPlayer = player.state.value.track != null
             }
             AppDestination.KARAOKE -> karaoke.openCurrent()
-            // Shortcut launcher menyaring Koleksi; pemutar audio ikut membuka sesi yang terakhir.
+            // Shortcut launcher langsung membuka pemutar, bukan sekadar filter Koleksi.
             AppDestination.AUDIO_PLAYER -> {
                 library.filter(MediaLibraryViewModel.Filter(kind = "AUDIO"))
-                player.restorePlaybackSession()
+                player.restorePlaybackSession(allowLastTrack = true)
                 fullPlayer = player.state.value.track != null
             }
-            AppDestination.VIDEO_PLAYER -> library.filter(MediaLibraryViewModel.Filter(kind = "VIDEO"))
+            AppDestination.VIDEO_PLAYER -> {
+                library.filter(MediaLibraryViewModel.Filter(kind = "VIDEO"))
+                if (video.state.value.active) {
+                    player.pause()
+                } else if (video.openLastVideo()) {
+                    player.pause()
+                }
+            }
             else -> Unit
         }
         onNavigationHandled(request.id)

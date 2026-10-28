@@ -12,10 +12,12 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   berkas luar masuk lewat antrean pemutar, bukan ke katalog. Memindai seluruh perangkat ditolak
   karena membebani HP kelas menengah dan mengaburkan arti layar itu.
 - **Shortcut tahan-ikon launcher.** Empat pintasan statis: **Unduh**, **Audio** (pemutar audio),
-  **Video** (pemutar video), dan **Riwayat**. Audio/Video membuka Koleksi dengan filter Musik/Video
-  (audio juga memulihkan sesi putar terakhir); **Unduh** membuka tab Download, menggulir ke kolom
-  tautan, dan langsung memfokuskan kolom itu; **Riwayat** membuka tampilan riwayat khusus dengan
-  tombol **Kembali ke unduhan**, sehingga tidak tertutup antrean atau pembuat tautan.
+  **Video** (pemutar video), dan **Riwayat**. **Audio** memulihkan sesi putar terakhir ke pemutar
+  penuh (termasuk lagu terakhir bila sesi sudah tidak aktif); **Video** langsung membuka video
+  terakhir yang ditonton, dan baru jatuh ke Koleksi video bila belum ada riwayat. **Unduh** membuka
+  tab Download, menggulir ke kolom tautan, dan langsung memfokuskan kolom itu; **Riwayat** membuka
+  tampilan riwayat khusus dengan tombol **Kembali ke unduhan**, sehingga tidak tertutup antrean
+  atau pembuat tautan.
 - **Kelola playlist.** Satu baris pembuat di atas (nama + tombol Buat), daftar playlist dengan
   **jumlah lagu per playlist**, pencarian baru muncul saat playlist lebih dari empat, dan baris
   memakai kartu tenang (ikon tonal, nama, jumlah lagu, aksi Ubah/Hapus 48dp) — bukan lagi satu
@@ -33,9 +35,12 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   berbeda, sehingga berkas yang dibuka muncul dua kali di antrean (ditemukan saat uji perangkat).
 - `PlayerViewModel.playTracks(tracks, startAt)` membuka antrean daftar trek; `ui/TubeFlowApp.kt`
   menyambungkan berkas masuk ke jalur ini (audio) atau `video.open()` (video).
-- `core/AppNavigation.kt` menambah `AUDIO_PLAYER`/`VIDEO_PLAYER` (tab Koleksi) yang dibaca dari
-  `AppDestination.fromAction`; `res/xml/shortcuts.xml` + `android.app.shortcuts` di manifest +
-  empat ikon `ic_shortcut_*` menyediakan pintasan launcher tanpa Activity kedua. `AppDestination`
+- `core/AppNavigation.kt` menambah `AUDIO_PLAYER`/`VIDEO_PLAYER` yang dibaca dari
+  `AppDestination.fromAction`; `TubeFlowApp` memulihkan sesi audio atau membuka video terakhir,
+  bukan sekadar memfilter Koleksi. `VideoPlayerViewModel` menyimpan `video-last` dan
+  `VideoResumeStore.latestUri()` menjadi cadangan untuk pengguna lama. `res/xml/shortcuts.xml` +
+  `android.app.shortcuts` di manifest + empat ikon `ic_shortcut_*` menyediakan pintasan launcher
+  tanpa Activity kedua. `AppDestination`
   kini juga membawa `DownloadTarget` (`COMPOSER`/`HISTORY`): `ui/DownloadHubScreen.kt` memilih
   tampilan riwayat khusus, sedangkan `ui/DownloadScreen.kt` memfokuskan kolom tautan lewat
   `FocusRequester`; `BackHandler` mengembalikan riwayat ke layar Unduh.
@@ -59,7 +64,8 @@ satu lagu, ikon launcher tidak punya pintasan, dan dialog Kelola playlist terasa
   ejaan volume di atas.
 - `dumpsys shortcut` menampilkan empat pintasan dengan label "Unduh/Audio/Video/Riwayat", ikon
   `drawable/ic_shortcut_*`, dan intent `id.local.tubeflow.action.OPEN_*` ke `MainActivity`.
-  Menjalankan `OPEN_VIDEO` membuka **"Koleksi video"** dengan filter Video aktif.
+  Menjalankan `OPEN_VIDEO` setelah ada riwayat video membuka pemutar Media3 langsung; tanpa
+  riwayat, aplikasi jatuh ke **"Koleksi video"** agar pengguna dapat memilih berkas.
 - Dialog Kelola playlist: pembuat playlist berfungsi (0 → 1 playlist), baris menampilkan "0 lagu"
   dari Room, aksi Ubah/Hapus 48dp, dan konfirmasi hapus mengembalikan hitungan ke 0.
 - Tidak ada `FATAL EXCEPTION` milik `id.local.tubeflow` di logcat sesi uji; berkas uji, baris

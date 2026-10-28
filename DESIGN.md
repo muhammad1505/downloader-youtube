@@ -282,10 +282,13 @@ sampul/lirik dan indikator mengambang.
 
 Pemutar video memakai tiga lapis kontrol yang tidak saling menumpuk:
 
-- **Top bar:** back, judul/posisi antrean, ikon antrean, dan ⋮ Opsi pemutar.
-- **Pengaturan cepat:** satu baris ikon bulat tanpa caption di bawah top bar
+- **Top bar:** back, judul/posisi antrean, tombol buka/tutup panel pengaturan,
+  ikon antrean, dan ⋮ Opsi pemutar.
+- **Pengaturan cepat:** panel ikon bulat tanpa caption di bawah top bar
   (kecepatan, subtitle, EQ, efek audio, Smart Enhance, dekoder, screenshot,
-  rasio). Status aktif ditandai warna aksen, bukan teks.
+  rasio). Panel dapat disembunyikan dari top bar; di HP ikon tersusun empat per
+  baris (dua baris), sedangkan di layar lebar delapan ikon muat satu baris.
+  Status aktif ditandai warna aksen, bukan teks.
 - **Bar bawah:** waktu kiri/kanan dengan lebar sama, track progres tipis dan
   thumb titik; kunci di kiri, previous/play/next di tengah, PiP dan orientasi di
   kanan. Pengaturan detail (termasuk Ulangi dan antrean) tetap di lembar Opsi.

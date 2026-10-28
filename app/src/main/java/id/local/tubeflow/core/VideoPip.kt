@@ -35,8 +35,22 @@ object VideoPip {
     /** Android 12+ memakai setAutoEnterEnabled; Android 10–11 masuk PiP saat pengguna menekan Home. */
     fun enterOnLeave(activity: Activity, state: VideoPlayerViewModel.State) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
-        if (!state.active || !state.playing) return
+        if (!VideoPlayback.shouldEnterPipOnLeave(state.active, state.playing, autoEnterSuspended)) return
         enter(activity, state)
+    }
+
+    /**
+     * Tahan auto-PiP saat layar membuka picker/dokumen lain. `onUserLeaveHint` juga terpanggil
+     * untuk ActivityResult, bukan hanya Home; tanpa ini video bisa mengecil ke PiP ketika pengguna
+     * baru hendak memilih subtitle.
+     */
+    fun suspendAutoEnter(activity: Activity?, state: VideoPlayerViewModel.State) {
+        autoEnterSuspended = true
+        if (activity != null) apply(activity, state, autoEnter = false)
+    }
+
+    fun resumeAutoEnter() {
+        autoEnterSuspended = false
     }
 
     fun apply(activity: Activity, state: VideoPlayerViewModel.State, autoEnter: Boolean) {
@@ -65,6 +79,9 @@ object VideoPip {
     @Volatile
     private var toggleHandler: (() -> Unit)? = null
 
+    @Volatile
+    private var autoEnterSuspended = false
+
     private fun params(
         activity: Activity,
         state: VideoPlayerViewModel.State,
@@ -79,7 +96,7 @@ object VideoPip {
         }
         builder.setActions(listOf(toggleAction(activity, state.playing)))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(autoEnter)
+            builder.setAutoEnterEnabled(autoEnter && !autoEnterSuspended)
         }
         return builder.build()
     }

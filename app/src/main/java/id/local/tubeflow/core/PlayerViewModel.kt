@@ -243,21 +243,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /** Rebuild a process-death snapshot paused. Only an explicit connection event may auto-play. */
-    internal suspend fun restorePlaybackSession() {
-        if (_state.value.track != null || !hasRestorableSession(getApplication())) return
+    /**
+     * Rebuild a process-death snapshot paused. Only an explicit connection event may auto-play.
+     * [allowLastTrack] dipakai shortcut "Pemutar audio": bila sesi sudah tidak aktif, lagu terakhir
+     * tetap dibuka di pemutar penuh alih-alih hanya menampilkan Koleksi.
+     */
+    internal suspend fun restorePlaybackSession(allowLastTrack: Boolean = false) {
+        if (_state.value.track != null) return
+        if (!allowLastTrack && !hasRestorableSession(getApplication())) return
         val expected = token.get()
         val restored = withContext(Dispatchers.IO) {
             fun readable(track: Track) = runCatching {
                 getApplication<Application>().contentResolver.openFileDescriptor(track.uri.toUri(), "r")?.use { true } == true
             }.getOrDefault(false)
             val saved = sessionStore.read()
-            if (saved != null) {
-                PlaybackQueue.restore(saved.queue, ::readable)?.let { planned ->
-                    val same = planned.snapshot().entries[planned.index].first == saved.queue.entries[saved.queue.index].first
-                    planned to if (same) saved.positionMs else 0L
+            val savedPlan = saved?.let { session ->
+                PlaybackQueue.restore(session.queue, ::readable)?.let { planned ->
+                    val same = planned.snapshot().entries[planned.index].first == session.queue.entries[session.queue.index].first
+                    planned to if (same) session.positionMs else 0L
                 }
-            } else lastTrack()?.takeIf(::readable)?.let {
+            }
+            // Snapshot bisa rusak karena berkas sudah dipindah. Jatuh ke lagu terakhir yang masih
+            // terbaca, terutama saat shortcut "Pemutar audio" meminta pemulihan eksplisit.
+            savedPlan ?: lastTrack()?.takeIf(::readable)?.let {
                 PlaybackQueue(listOf(it)).withPreferences(shufflePref, repeatPref) to 0L
             }
         }

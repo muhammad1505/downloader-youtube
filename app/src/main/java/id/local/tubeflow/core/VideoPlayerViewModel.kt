@@ -93,6 +93,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private val preferences = application.getSharedPreferences("video-fx", Context.MODE_PRIVATE)
+    private val lastSession = application.getSharedPreferences("video-last", Context.MODE_PRIVATE)
     private val resume = VideoResumeStore(application)
     private val audioFx = VideoAudioFx()
 
@@ -153,11 +154,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-            // Video berikutnya berhak mencoba dekoder perangkat lagi; reopen software memakai
-            // PLAYLIST_CHANGED sehingga status fallback tidak ikut direset.
-            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
-                softwareFallbackUsed = false
-            }
+            // Renderer tidak bisa diganti di tengah antrean. Selama ExoPlayer ini masih memakai
+            // jalur software hasil fallback, statusnya harus tetap true agar efek GL tidak
+            // dipasang ke sesi software dan "Coba lagi" tahu kapan harus membuat pemutar baru.
             val nextUri = mediaItem?.localConfiguration?.uri?.toString()
             if (nextUri != null) {
                 if (currentUri != null && currentUri != nextUri) {
@@ -194,7 +193,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 },
                 ended = false,
             )
-            _state.value.entries.getOrNull(index)?.let(::prepareSubtitleSelection)
+            _state.value.entries.getOrNull(index)?.let {
+                rememberLast(it)
+                prepareSubtitleSelection(it)
+            }
             refreshTracks()
             discoverCurrentSubtitles()
         }
@@ -229,10 +231,16 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            saveNow()
-            val entries = _state.value.entries
-            val index = player?.currentMediaItemIndex ?: _state.value.index
-            val position = player?.currentPosition?.coerceAtLeast(0) ?: _state.value.positionMs
+            val current = _state.value
+            // Jangan memakai currentPosition mentah: ExoPlayer dapat melaporkan 0 setelah
+            // dekoder gagal, sehingga fallback/retry akan memutar ulang dari awal.
+            val position = VideoPlayback.reopenPosition(current.positionMs, player?.currentPosition ?: 0)
+            if (currentUri != null) {
+                val duration = player?.duration?.takeIf { it > 0 && it != C.TIME_UNSET } ?: lastDurationMs
+                resume.save(currentUri!!, position, duration)
+            }
+            val entries = current.entries
+            val index = if (entries.isEmpty()) 0 else current.index.coerceIn(entries.indices)
             // Codec yang tidak didukung GPU dicoba sekali lagi dengan FFmpeg/dav1d sebagai
             // dekoder utama. Bila build software juga gagal, error akhir tetap ditampilkan.
             // Mode Perangkat adalah pilihan manual: jangan diam-diam menggantinya; pengguna
@@ -245,10 +253,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             ) {
                 softwareFallbackUsed = true
                 fallbackJob?.cancel()
+                // Error tidak boleh mengubah niat pengguna: video yang dijeda tetap dijeda
+                // setelah fallback, sedangkan video yang berjalan tetap diputar.
+                val startPlaying = player?.playWhenReady ?: current.playing
                 _state.value = _state.value.copy(
                     playing = false,
                     buffering = true,
                     ready = false,
+                    positionMs = position,
                     error = null,
                 )
                 fallbackJob = viewModelScope.launch {
@@ -260,6 +272,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         start = index.coerceIn(entries.indices),
                         startPosition = position,
                         preferSoftware = true,
+                        startPlaying = startPlaying,
                     )
                 }
                 return
@@ -268,6 +281,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 playing = false,
                 buffering = false,
                 ready = false,
+                positionMs = position,
                 error = playbackError(error),
             )
         }
@@ -290,6 +304,25 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             // Mengembalikan posisi tersimpan berarti benar-benar lanjut tonton: chip muncul.
             resumeFromMs = startPosition,
         )
+    }
+
+    /**
+     * Membuka video terakhir dari shortcut launcher. Preferensi video-last ditulis saat video
+     * dibuka; bila belum ada (pengguna lama), VideoResumeStore menjadi cadangan.
+     */
+    fun openLastVideo(): Boolean {
+        val savedUri = lastSession.getString(KEY_LAST_URI, null)?.takeIf { it.isNotBlank() }
+        val uri = savedUri ?: resume.latestUri() ?: return false
+        val title = lastSession.getString(KEY_LAST_TITLE, null).orEmpty()
+        open(listOf(VideoEntry(uri, title)), 0)
+        return true
+    }
+
+    private fun rememberLast(entry: VideoEntry) {
+        lastSession.edit {
+            putString(KEY_LAST_URI, entry.uri)
+            putString(KEY_LAST_TITLE, entry.title)
+        }
     }
 
     private fun discoverCurrentSubtitles() {
@@ -357,6 +390,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             playerVersion = playerVersion,
         )
         currentUri = entries[start].uri
+        rememberLast(entries[start])
         lastPositionMs = startPosition
         lastDurationMs = 0
         prepareSubtitleSelection(entries[start])
@@ -474,26 +508,37 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun retry() {
         val current = _state.value
+        if (current.entries.isEmpty()) return
         val exo = player
-        if (exo == null) {
-            if (current.entries.isEmpty()) return
-            // Player bisa sudah dilepas setelah kegagalan pembukaan; membuat ulang adalah satu-
-            // satunya cara "Coba lagi" benar-benar mencoba lagi.
+        val target = VideoPlayback.reopenPosition(current.positionMs, exo?.currentPosition ?: 0)
+        // Jika fallback software otomatis sudah gagal, mengulang renderer yang sama hanya akan
+        // menghasilkan error yang sama. Buat pemutar baru dengan jalur AUTO (hardware dulu).
+        if (VideoPlayback.needsDecoderRestart(hasPlayer = exo != null, softwareFallbackUsed = softwareFallbackUsed)) {
+            fallbackJob?.cancel()
+            fallbackJob = null
+            releasePlayer()
+            softwareFallbackUsed = false
             openInternal(
                 entries = current.entries,
                 start = current.index.coerceIn(current.entries.indices),
-                startPosition = current.positionMs.coerceAtLeast(0),
-                preferSoftware = current.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed,
+                startPosition = target,
+                preferSoftware = current.decoderMode == VideoDecoderMode.SOFTWARE,
             )
             return
         }
-        _state.value = current.copy(error = null, buffering = true)
-        exo.prepare()
+        _state.value = current.copy(error = null, buffering = true, positionMs = target)
+        exo!!.prepare()
+        exo.seekTo(target)
         exo.play()
     }
 
     fun useSoftwareDecoder() {
         setDecoderMode(VideoDecoderMode.SOFTWARE, forceReopen = true)
+    }
+
+    /** Pemulihan dari mode Software yang gagal: coba lagi lewat jalur Otomatis/perangkat. */
+    fun useAutomaticDecoder() {
+        setDecoderMode(VideoDecoderMode.AUTO, forceReopen = true)
     }
 
     fun setSpeed(value: Float) {
@@ -825,7 +870,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val current = _state.value
         if (current.entries.isEmpty()) return
         val index = (player?.currentMediaItemIndex ?: current.index).coerceIn(current.entries.indices)
-        val position = player?.currentPosition ?: current.positionMs
+        val position = VideoPlayback.reopenPosition(current.positionMs, player?.currentPosition ?: 0)
         val startPlaying = player?.playWhenReady ?: current.playing
         releasePlayer()
         openInternal(
@@ -881,7 +926,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val exo = player ?: return
         val uri = currentUri ?: return
         val duration = exo.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: lastDurationMs
-        resume.save(uri, exo.currentPosition.coerceAtLeast(0), duration)
+        val position = VideoPlayback.reopenPosition(_state.value.positionMs, exo.currentPosition)
+        resume.save(uri, position, duration)
     }
 
     private fun startTicker() {
@@ -1086,6 +1132,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private companion object {
+        const val KEY_LAST_URI = "last_uri"
+        const val KEY_LAST_TITLE = "last_title"
         const val KEY_VOLUME_BOOST = "video_volume_boost_db"
         const val KEY_BRIGHTNESS_MODE = "brightness_mode"
         const val KEY_BRIGHTNESS_LEVEL = "brightness_level"

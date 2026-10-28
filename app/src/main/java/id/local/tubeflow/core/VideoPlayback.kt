@@ -248,6 +248,23 @@ object VideoPlayback {
         return capped.coerceAtLeast(0)
     }
 
+    /**
+     * Posisi yang aman untuk membuka ulang sesi. Setelah error dekoder, ExoPlayer dapat
+     * melaporkan posisi 0 walaupun UI masih menyimpan posisi terakhir; jangan sampai retry atau
+     * fallback software memulai video dari awal. Posisi pemutar yang lebih maju tetap dipakai
+     * agar lompatan kecil dari ticker tidak hilang.
+     */
+    fun reopenPosition(stateMs: Long, playerMs: Long): Long =
+        maxOf(stateMs.coerceAtLeast(0), playerMs.coerceAtLeast(0))
+
+    /** Home hanya boleh masuk PiP saat video aktif diputar, bukan saat aplikasi membuka picker. */
+    fun shouldEnterPipOnLeave(active: Boolean, playing: Boolean, suppressed: Boolean): Boolean =
+        active && playing && !suppressed
+
+    /** Setelah fallback software gagal, pemutar harus dibuat ulang agar percobaan berikutnya bisa hardware. */
+    fun needsDecoderRestart(hasPlayer: Boolean, softwareFallbackUsed: Boolean): Boolean =
+        !hasPlayer || softwareFallbackUsed
+
     /** Delay subtitle positif menampilkan teks lebih lambat; batasnya menjaga hasil tetap masuk akal. */
     fun adjustSubtitleDelay(currentMs: Int, deltaMs: Int): Int =
         (currentMs + deltaMs).coerceIn(-SUBTITLE_DELAY_LIMIT_MS, SUBTITLE_DELAY_LIMIT_MS)
@@ -269,6 +286,7 @@ object VideoPlayback {
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
         PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
         PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
         PlaybackException.ERROR_CODE_DECODING_FAILED,
         PlaybackException.ERROR_CODE_TIMEOUT -> true
         else -> false
