@@ -1271,3 +1271,31 @@ Verifikasi host: **18 tes Kotlin murni lulus** (9 `StatusClipTest`, 4
 Gradle, serta **98 tes Python OK (1 skip)** setelah FFmpeg statis lokal
 disediakan. `git diff --check` bersih. Gradle penuh, lint, build APK/AAB, dan uji
 perangkat belum dijalankan pada sesi ini.
+
+## Menu Alat 1.1.56 — 29 Oktober 2026
+
+Tab keempat **Alat** ditambahkan: ubah nama massal (`RenamePlan`), tag
+otomatis katalog (`TagSuggestion` + `MediaRepository.applyCatalogTag`), dan sinkron lirik
+(offset memakai `LyricTimingDialog` yang ada; ketuk-waktu memakai `TapSync` +
+`MediaLibraryViewModel.publishLyricsText`). Pekerjaan massal berjalan berurutan pada
+`ToolsViewModel` dengan progres per berkas, daftar kegagalan, dan Hentikan; penerapan tetap
+melewati `MediaRepository.rename` sehingga jurnal rollback dan pemeriksaan konflik tidak
+diduplikasi. Tag tidak menulis byte audio dan tidak menimpa artis yang sudah terbukti.
+
+Karaoke ikut masuk tab Alat: satu lagu membuka `KaraokeDialog`, banyak lagu masuk antrean
+`KaraokeWorker` + `KaraokePublication` yang sama dengan jalur pemutar.
+
+Uji perangkat pertama menemukan force close saat dialog ubah nama dibuka: pola regex di
+`RenamePlan` ditolak parser regex Android (JVM tes lolos). Pola dihapus dan diganti pemindaian
+token manual; `TapSync` dibersihkan dari pola serupa. Sesudah perbaikan, pratinjau dan penerapan
+ubah nama berjalan di HP (audio + LRC berganti nama berpasangan), dan sinkron lirik dikonfirmasi
+pengelola. Tag katalog, ketuk-waktu, dan karaoke dari Alat belum diuji tuntas.
+
+Verifikasi host: **608 tes Kotlin lulus** (21 regresi baru di `RenamePlanTest`, `TagSuggestionTest`,
+`TapSyncTest`), lint debug 0 error/3 warning lama, `assembleDebug` lulus; APK arm64 153.675.244
+byte, SHA256 `0b2099a3151e6cbf1c31479339aea9aad791dbeaed38b4aeaa8de757c18acdb6`. Versi dinaikkan ke
+**1.1.56/code71** dengan entri `changelog.json`; `bash scripts/build_release.sh` lulus
+(`lintRelease`, `assembleRelease`, `bundleRelease`), audit ELF dan ZIP reflektif 0 gagal, APK
+arm64 SHA256 `304a275e…fee88` dipasang di Realme Android 10 dan dialog "Apa yang baru" muncul.
+Belum dibuktikan: penerapan tag katalog, penyimpanan hasil ketuk-waktu, dan pemrosesan karaoke
+dari Alat. [Rincian, batas dan tindak lanjut](TOOLS_HUB_2026-10-29.md).

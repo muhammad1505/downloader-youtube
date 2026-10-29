@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 71,
+    "versionName": "1.1.56",
+    "highlights": [
+      "Tab keempat Alat menyatukan ubah nama massal, tag katalog, sinkron lirik, dan karaoke dalam satu layar.",
+      "Karaoke dapat diproses satu lagu atau massal langsung dari tab Alat tanpa membuka pemutar lebih dulu.",
+      "Force close saat membuka ubah nama massal dan ketuk waktu lirik diperbaiki."
+    ]
+  },
+  {
     "versionCode": 70,
     "versionName": "1.1.55",
     "highlights": [

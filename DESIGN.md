@@ -285,6 +285,37 @@ status kosong dan galat. Catat cakupan yang benar-benar diuji pada laporan
 perbaikan; jangan menyimpulkan aksesibilitas atau kesiapan rilis dari build saja.
 
 
+## Menu Alat (1.1.56, 29 Oktober 2026)
+
+Navigasi bawah menjadi empat tab: Ringkasan, Download, Koleksi, Alat. Alat adalah hub operasi
+pada file yang sudah ada, bukan pengganti aksi kartu: putar/bagikan/ubah nama/cari lirik tetap
+milik `MediaCardPlan` di Koleksi dan Riwayat. Pengaturan tetap di luar bilah bawah dan berisi
+Alat media (model karaoke, cadangan, pembaruan engine) yang berbeda peran.
+
+Setiap alat memakai rangka yang sama supaya tidak menjadi enam dialog yang berbeda:
+
+```text
+Panel alat        judul · deskripsi satu baris · satu aksi
+Dialog alat       [ cari …………… ]  [ Pilih semua ] [ Kosongkan ]
+                  [ ] lagu 1        ← daftar 240dp, satu baris per lagu
+                  [x] lagu 2
+                  pola / pratinjau / keterangan
+                  [ Batal ]            [ Terapkan ]
+Pekerjaan         progres n/total · berkas aktif · [ Hentikan ]
+```
+
+- Aksi destruktif atau massal (terapkan nama, simpan tag) tetap memakai `ConfirmDialog` dan
+  warna galat; aksi tenang memakai `ActionEmphasis.Quiet`.
+- Daftar pilihan memakai `Checkbox`/`RadioButton` dengan tinggi minimum 48dp dan satu baris judul
+  (elipsis) diikuti artis `bodySmall`; pencarian memakai `SearchField` bersama.
+- Pratinjau selalu terlihat sebelum tombol aktif: jumlah yang berubah, jumlah yang tetap, dan
+  maksimal empat contoh `sebelum → sesudah`. Tidak ada penerapan tanpa pratinjau.
+- Hasil dilaporkan per berkas (berhasil/gagal), bukan klaim "semua berhasil".
+- Keterangan status memakai `bodySmall` redup; angka memakai string plural agar lint bersih.
+- Panel **Karaoke** tidak membuat dialog baru: satu lagu membuka `KaraokeDialog` yang sudah
+  dipakai pemutar, banyak lagu masuk antrean `ToolsViewModel` di belakang `KaraokeWorker` yang
+  sama. Alat tidak pernah menimpa audio asli.
+
 ## Pemutar dua kolom (1.1.31)
 
 Layar landscape lebar (lebar > tinggi dan minimal 560dp) membagi pemutar penuh

@@ -264,4 +264,101 @@
     <string name="video_volume_boost_active">Penguat aktif hanya untuk video, dengan pembatas puncak suara. Kurangi penguat jika suara terasa pecah.</string>
     <string name="video_volume_boost_pending">Penguat akan diterapkan setelah track audio siap.</string>
     <string name="video_volume_boost_unavailable">Format audio ini belum mendukung penguat. Audio tetap diputar pada level normal.</string>
+    <string name="tools_title">Alat</string>
+    <string name="tools_subtitle">Operasi pada file yang sudah ada di perangkat. File asli tidak diubah tanpa konfirmasi.</string>
+    <string name="tools_empty">Koleksi masih kosong</string>
+    <string name="tools_empty_help">Alat bekerja pada file yang sudah ada di Koleksi. Selesaikan unduhan atau segarkan katalog lebih dulu.</string>
+    <string name="tools_refresh">Segarkan katalog</string>
+    <string name="tools_lyrics_title">Sinkronkan lirik</string>
+    <string name="tools_lyrics_description">Perbaiki offset atau ketuk ulang waktu baris lirik yang sudah tersimpan. Lagu tanpa lirik belum bisa disinkronkan di sini.</string>
+    <string name="tools_lyrics_action">Pilih lagu</string>
+    <string name="tools_lyrics_empty">Belum ada lagu dengan lirik tersimpan. Cari lirik dari kartu lagu lebih dulu.</string>
+    <string name="tools_lyrics_mode_help">Pilih cara menyelaraskan lirik lagu ini.</string>
+    <string name="tools_lyrics_offset">Koreksi offset</string>
+    <string name="tools_lyrics_offset_help">Geser seluruh lirik beberapa detik dari waktu aslinya. Cadangan lirik lama tetap tersedia.</string>
+    <string name="tools_lyrics_tap">Ketuk ulang waktu</string>
+    <string name="tools_lyrics_tap_help">Putar lagu lalu ketuk setiap baris saat mulai dinyanyikan.</string>
+    <string name="tools_rename_title">Ubah nama massal</string>
+    <string name="tools_rename_description">Susun nama dari judul, artis, album, atau nomor trek. Pratinjau menunjukkan nama akhir sebelum diterapkan; berkas yang gagal dipulihkan ke nama semula.</string>
+    <string name="tools_rename_action">Atur nama</string>
+    <string name="tools_rename_pattern">Pola nama</string>
+    <string name="tools_rename_pattern_help">Token: {judul}, {artis}, {album}, {track}, {nama}. Bagian kosong dan pemisah berlebih dibersihkan otomatis. Kosongkan pola untuk memakai cari-ganti pada nama asli.</string>
+    <string name="tools_rename_find">Cari</string>
+    <string name="tools_rename_replace">Ganti dengan</string>
+    <plurals name="tools_rename_preview">
+        <item quantity="one">%1$d nama akan berubah · %2$d tetap</item>
+        <item quantity="other">%1$d nama akan berubah · %2$d tetap</item>
+    </plurals>
+    <string name="tools_rename_apply">Terapkan</string>
+    <string name="tools_rename_confirm_title">Terapkan nama baru?</string>
+    <plurals name="tools_rename_confirm_text">
+        <item quantity="one">%1$d berkas akan diubah namanya. Lirik yang berpasangan ikut berganti nama. Bila satu berkas gagal, nama sebelumnya dipulihkan.</item>
+        <item quantity="other">%1$d berkas akan diubah namanya. Lirik yang berpasangan ikut berganti nama. Bila satu berkas gagal, nama sebelumnya dipulihkan.</item>
+    </plurals>
+    <string name="tools_karaoke_title">Buat instrumental (hapus vokal)</string>
+    <string name="tools_karaoke_description">Pisahkan vokal dari audio pilihan. Satu lagu membuka pratinjau; beberapa lagu diproses berurutan dan hasilnya langsung masuk Koleksi. Audio asli tidak diubah dan model UVR diunduh sekali.</string>
+    <string name="tools_karaoke_action">Pilih lagu</string>
+    <string name="tools_karaoke_single">Pratinjau satu</string>
+    <string name="tools_karaoke_batch">Proses massal</string>
+    <string name="tools_karaoke_confirm_title">Proses instrumental?</string>
+    <plurals name="tools_karaoke_confirm_text">
+        <item quantity="one">%1$d lagu diproses satu per satu. Hasil disimpan sebagai FLAC di folder unduhan dan masuk Koleksi. Proses dapat dihentikan dari panel pekerjaan.</item>
+        <item quantity="other">%1$d lagu diproses satu per satu. Hasil disimpan sebagai FLAC di folder unduhan dan masuk Koleksi. Proses dapat dihentikan dari panel pekerjaan.</item>
+    </plurals>
+    <string name="tools_karaoke_note">Satu lagu maksimal 10 menit dan membutuhkan RAM serta ruang kosong. Jangan memilih Buang pratinjau karaoke saat antrean berjalan.</string>
+    <string name="tools_kind_karaoke">Instrumental</string>
+    <string name="tools_tag_title">Tag otomatis</string>
+    <string name="tools_tag_description">Isi judul dan artis di katalog dari nama file. Tag di dalam audio tidak ditulis, dan artis yang sudah terbukti tidak ditimpa.</string>
+    <string name="tools_tag_action">Lihat usulan</string>
+    <string name="tools_tag_fill_title">Perbarui judul</string>
+    <string name="tools_tag_fill_artist">Isi artis yang masih kosong</string>
+    <plurals name="tools_tag_preview">
+        <item quantity="one">%1$d lagu akan diperbarui</item>
+        <item quantity="other">%1$d lagu akan diperbarui</item>
+    </plurals>
+    <string name="tools_tag_apply">Simpan ke katalog</string>
+    <string name="tools_tag_note">Tag katalog dapat tertimpa bila file diubah di luar aplikasi lalu dipindai ulang.</string>
+    <string name="tools_picker_search">Cari judul, artis, atau nama file</string>
+    <string name="tools_picker_empty">Tidak ada lagu yang cocok.</string>
+    <plurals name="tools_picker_selected">
+        <item quantity="one">%1$d dipilih</item>
+        <item quantity="other">%1$d dipilih</item>
+    </plurals>
+    <string name="tools_picker_all">Pilih semua</string>
+    <string name="tools_picker_none">Kosongkan</string>
+    <string name="tools_tap_title">Ketuk waktu lirik</string>
+    <string name="tools_tap_play">Putar lagu ini</string>
+    <plurals name="tools_tap_line">
+        <item quantity="one">%1$d dari %2$d</item>
+        <item quantity="other">%1$d dari %2$d</item>
+    </plurals>
+    <string name="tools_tap_next">Baris berikutnya</string>
+    <string name="tools_tap_button">Ketuk</string>
+    <string name="tools_tap_undo">Batalkan ketukan</string>
+    <string name="tools_tap_reset">Ulangi</string>
+    <string name="tools_tap_save">Simpan waktu</string>
+    <string name="tools_tap_done">Semua baris sudah diketuk. Periksa hasilnya lalu simpan.</string>
+    <string name="tools_tap_wait">Putar lagu, lalu ketuk setiap baris saat mulai dinyanyikan.</string>
+    <string name="tools_tap_position">Posisi %1$s</string>
+    <string name="tools_progress_title">Pekerjaan alat</string>
+    <plurals name="tools_progress_running">
+        <item quantity="one">%1$d dari %2$d</item>
+        <item quantity="other">%1$d dari %2$d</item>
+    </plurals>
+    <plurals name="tools_progress_failed">
+        <item quantity="one">%1$d gagal</item>
+        <item quantity="other">%1$d gagal</item>
+    </plurals>
+    <string name="tools_progress_cancel">Hentikan</string>
+    <string name="tools_progress_close">Tutup</string>
+    <plurals name="tools_progress_cancelled">
+        <item quantity="one">Dihentikan setelah %1$d dari %2$d.</item>
+        <item quantity="other">Dihentikan setelah %1$d dari %2$d.</item>
+    </plurals>
+    <string name="tools_kind_rename">Ubah nama</string>
+    <string name="tools_kind_tag">Tag otomatis</string>
+    <plurals name="tools_progress_done">
+        <item quantity="one">Selesai: %1$d berhasil, %2$d gagal.</item>
+        <item quantity="other">Selesai: %1$d berhasil, %2$d gagal.</item>
+    </plurals>
 </resources>

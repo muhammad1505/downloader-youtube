@@ -347,6 +347,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val lyric = job.sidecarUris?.lines()?.firstOrNull { it.startsWith("sub|") && job.lyricStatus == LyricStatus.SAVED }?.substringAfter('|')
         return Track(job.outputUri, Format.musicLabel(song), song.artist.orEmpty().ifBlank { song.remixer }, job.coverPath, lyric)
     }
+    /** Track identik dengan pemutaran normal; dipakai alat karaoke agar judul/artis tidak berbeda. */
+    fun trackFor(item: MediaItem): Track? = trackOf(item)
+
     private fun trackOf(item: MediaItem): Track? =
         if (item.kind == "AUDIO" && item.availability == "AVAILABLE") Track(item.location, Format.musicLabel(TitleSplit.identify(item.title,metadataArtist=item.artist,recognizeCollaboration=false)), item.artist, item.coverPath, item.lyricUri) else null
 

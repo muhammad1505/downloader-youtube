@@ -26,6 +26,9 @@ import java.security.MessageDigest
 /** Ringkasan pindai: diperiksa, gagal dibaca, dan baris yang benar-benar terlihat dari semua sumber. */
 data class ScanSummary(val checked: Int, val failed: Int, val discovered: Int)
 
+/** Tag katalog yang diminta pengguna; nama tampilan diverifikasi ulang sebelum ditulis. */
+data class TagUpdate(val uri: String, val displayName: String, val title: String, val artist: String)
+
 class MediaRepository(private val context: Context) {
     private val resolver = context.contentResolver
     private val database = DownloadDatabase.get(context)
@@ -375,6 +378,20 @@ class MediaRepository(private val context: Context) {
             database.withTransaction { dao.put(changed); if (changed.uri != item.uri) { database.personal().relink(item.uri, changed.uri); database.personal().removeMedia(item.uri); dao.remove(item.uri) }; item.jobId?.let { database.downloads().renamedOutput(it, renamed) } }
             changed
         } else error("Provider ini belum mendukung rename aman, terutama pasangan media dan lirik. File tetap tersedia.")
+    } }
+
+    /**
+     * Tag katalog saja: byte audio tidak disentuh. Baris diverifikasi ulang supaya rename/hapus yang
+     * terjadi setelah pratinjau tidak tertimpa nilai lama. Pemindaian berikutnya mempertahankan nilai
+     * ini selama file tidak berubah (lihat jalur "modified sama" pada [index]).
+     */
+    suspend fun applyCatalogTag(update: TagUpdate): Boolean = withContext(Dispatchers.IO) { operations.withLock {
+        val item = dao.get(update.uri) ?: return@withLock false
+        if (item.availability != "AVAILABLE" || item.displayName != update.displayName) return@withLock false
+        if (item.title == update.title && item.artist == update.artist) return@withLock false
+        dao.put(item.copy(title = update.title, artist = update.artist, checkedAt = System.currentTimeMillis()))
+        dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "TAGGED", kind = item.kind, platformId = item.platformId, at = System.currentTimeMillis()))
+        true
     } }
 
     suspend fun delete(item: MediaItem) = withContext(Dispatchers.IO) { operations.withLock {

@@ -70,8 +70,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val temporaryUsage by model.temporaryUsage.collectAsStateWithLifecycle()
     val cleaningPartial by model.cleaningPartial.collectAsStateWithLifecycle()
     val libraryMessage by library.message.collectAsStateWithLifecycle()
-    // Antrean dan riwayat kini satu tab Download; Pengaturan tetap di luar bilah bawah.
-    val settingsTab = 3
+    // Antrean dan riwayat kini satu tab Download; Alat adalah tab keempat, Pengaturan tetap di luar bilah bawah.
+    val toolsTab = 3
+    val settingsTab = 4
     var tab by rememberSaveable { mutableIntStateOf(1) }
     // Target bagian Download dari shortcut/notifikasi; dikosongkan setelah aksi selesai.
     var downloadTarget by rememberSaveable { mutableStateOf<DownloadTarget?>(null) }
@@ -244,8 +245,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         },
     )
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
-    val tabs = listOf("Ringkasan", "Download", "Koleksi")
-    val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.LibraryMusic)
+    val tabs = listOf("Ringkasan", "Download", "Koleksi", "Alat")
+    val icons = listOf(Icons.Outlined.Dashboard, Icons.Outlined.Download, Icons.Outlined.LibraryMusic, Icons.Outlined.Build)
     val showLabels=androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val useRail = maxWidth >= 840.dp
@@ -466,6 +467,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     // Konfirmasi sudah dilakukan di kartu: Unduh lagi mengganti file lama (BUG-026).
                     onRedownload = { model.retry(it) },
                 )
+                // Alat memakai dialog waktu lirik yang sama dengan Koleksi/player, bukan salinannya.
+                toolsTab -> ToolsScreen(library, player, karaoke, onEditTiming = { item -> lyricTiming = item })
                 else -> SettingsScreen(
                     karaoke = karaoke,
                     player = player,

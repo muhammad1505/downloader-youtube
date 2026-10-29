@@ -71,6 +71,8 @@ interface MediaDao {
     @Query("SELECT * FROM media_items ORDER BY checkedAt ASC LIMIT :limit") suspend fun oldest(limit: Int): List<MediaItem>
     // Koleksi utuh untuk antrean auto-play: lagu tersedia dalam urutan koleksi (terbaru lebih dulu).
     @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY addedAt DESC, title COLLATE NOCASE ASC") suspend fun availableAudio(): List<MediaItem>
+    // Alat massal bekerja pada seleksi eksplisit; batasnya sama dengan daftar putar eksplisit.
+    @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY title COLLATE NOCASE ASC LIMIT 3000") fun audioItems(): Flow<List<MediaItem>>
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name AND uri != :exceptUri AND availability = 'AVAILABLE' LIMIT 1") suspend fun collision(folder: String, name: String, exceptUri: String): MediaItem?
     @Query("SELECT DISTINCT folder FROM media_items ORDER BY folder LIMIT 250") fun folders(): Flow<List<String>>
     @Query("SELECT DISTINCT artist FROM media_items WHERE kind = 'AUDIO' AND artist != '' ORDER BY artist LIMIT 250") fun artists(): Flow<List<String>>

@@ -226,6 +226,40 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         "Nama file diperbarui."
     }
     fun delete(item: MediaItem) = operation { repository.delete(item); "File dihapus." }
+
+    /** Teks lirik tersimpan untuk alat ketuk-waktu; batasnya sama dengan editor lirik. */
+    suspend fun lyricText(item: MediaItem): String = withContext(Dispatchers.IO) {
+        val raw = item.lyricUri ?: error("Lagu ini belum punya lirik tersimpan. Cari lirik dulu.")
+        val input = getApplication<Application>().contentResolver.openInputStream(raw.toUri()) ?: error("Lirik tidak dapat dibaca.")
+        input.use { stream ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            while (true) {
+                val read = stream.read(buffer)
+                if (read < 0) break
+                require(out.size() + read <= 512 * 1024) { "LRC terlalu besar." }
+                out.write(buffer, 0, read)
+            }
+            out.toByteArray().toString(Charsets.UTF_8)
+        }
+    }
+
+    /** Simpan LRC hasil ketuk-waktu lewat jalur publikasi lirik bersama (backup + verifikasi). */
+    fun publishLyricsText(item: MediaItem, raw: String, onResult: (String?) -> Unit = {}) = operation(onResult) {
+        val text = Lyrics.manualText(raw, item.durationMs)
+        withContext(Dispatchers.IO) { MediaFileOperations.mutex.withLock {
+            val current = dao.get(item.uri) ?: error("Media telah dihapus.")
+            require(current.location == item.location && current.displayName == item.displayName && current.lyricUri == item.lyricUri) {
+                "Media/lirik berubah; buka ulang alat lirik."
+            }
+            val expected = current.lyricUri?.let { mapOf(it to lyricEditor.captureForRefetch(it)) }.orEmpty()
+            val uri = LyricPublisher(getApplication()).publish(current, text, expected)
+            dao.put(current.copy(lyricUri = uri, lyricStatus = LyricStatus.SAVED))
+            current.jobId?.let { database.downloads().lyricStatus(it, LyricStatus.SAVED) }
+            dao.event(MediaEvent(jobId = current.jobId.orEmpty(), action = "LYRICS_TAP_SYNC", kind = "AUDIO", platformId = current.platformId, at = System.currentTimeMillis()))
+        } }
+        "Waktu lirik disimpan. Dengarkan beberapa bagian lagu; koreksi offset tersedia di editor waktu."
+    }
     fun correct(item: MediaItem, preview: LyricEditor.Preview, offset: Long) = operation {
         lyricEditor.apply(item, preview, offset)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "LYRIC_TIMING", kind = "AUDIO", platformId = item.platformId, at = System.currentTimeMillis()))
