@@ -1,4 +1,12 @@
-[{
+[
+  {
+    "versionCode": 70,
+    "versionName": "1.1.55",
+    "highlights": [
+      "Tombol dekoder di kontrol cepat kini langsung berganti mode tanpa membuka panel pilihan."
+    ]
+  },
+  {
     "versionCode": 69,
     "versionName": "1.1.54",
     "highlights": [

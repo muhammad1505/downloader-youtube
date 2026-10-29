@@ -8,6 +8,12 @@ Perubahan visual 1.1.53 diselaraskan di atas basis upstream 1.1.51: palet charco
 
 `./gradlew assembleRelease --no-daemon --max-workers=2` berhasil pada source hasil integrasi; `lintVitalRelease` lulus. Unit test tidak dijalankan pada integrasi ini. APK ARM64 1.1.54/code69 bertanda tangan terpasang di Realme RMX1821 Android 10. Cold launch menampilkan splash baru, MainActivity aktif, dan log tidak menunjukkan fatal exception. SHA-256 APK: `c7745e6cc758f7ab469d8bdd9c0ba8aae3d0e3549f18c326faaf576e14e79742`.
 
+## Dekoder video langsung — 1.1.55/code70
+
+Tombol dekoder pada kontrol cepat mengembalikan perilaku lokal yang sebelumnya diterapkan: satu ketukan menjalankan Auto → Perangkat → Software dan memberi notifikasi mode aktif. Tombol tidak lagi membuka panel pilihan; pilihan rinci tetap dapat diakses dari panel Opsi.
+
+`./gradlew assembleRelease --no-daemon --max-workers=2` berhasil dan `lintVitalRelease` lulus. APK ARM64 bertanda tangan terpasang di Realme RMX1821 Android 10; versi terpasang code70. SHA-256 APK: `8073551e444d272614a77dfd98103218d8eb79f650a999b1854fcb002e0d5002`. Uji ketukan dekoder belum selesai: navigasi uji perangkat berpindah ke aplikasi lain, lalu dihentikan. Jangan menganggap siklus mode sudah diverifikasi lewat interaksi fisik.
+
 ## Titik mulai terbaru — 28 Oktober 2026
 
 Terbaru (rilis publik, **1.1.50/code65**): kontrol cepat pemutar video menjadi ikon ringkas

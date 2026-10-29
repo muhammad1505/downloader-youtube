@@ -613,7 +613,16 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                     ),
                                 )
                             },
-                            onDecoder = { sheet = VideoSheet.DECODER },
+                            onDecoder = {
+                                video.cycleDecoderMode()
+                                notify(
+                                    PlayerNotice(
+                                        Icons.Outlined.Memory,
+                                        "Dekoder video",
+                                        video.state.value.decoderMode.label,
+                                    ),
+                                )
+                            },
                             onScreenshot = ::takeScreenshot,
                             onDisplay = {
                                 video.cycleAspect()
@@ -1182,7 +1191,10 @@ private fun QuickSettingsBar(
                 )
                 QuickIcon(
                     icon = Icons.Outlined.Memory,
-                    description = "Dekoder ${state.decoderMode.label}. Buka pilihan dekoder",
+                    description = androidx.compose.ui.res.stringResource(
+                        id.local.tubeflow.R.string.video_decoder_quick_description,
+                        state.decoderMode.label,
+                    ),
                     active = state.decoderMode != VideoDecoderMode.AUTO,
                     onClick = onDecoder,
                     modifier = Modifier.width(itemWidth),
