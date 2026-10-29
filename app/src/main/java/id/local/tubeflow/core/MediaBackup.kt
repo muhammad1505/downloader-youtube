@@ -195,7 +195,7 @@ class MediaBackup(private val context: Context) {
         "Pemulihan selesai: ${matched.size} media cocok; $restored lirik dipulihkan, $skipped dilewati, $failed gagal. ${plan.missing + plan.conflicts + plan.matches.size - matched.size} media hilang/ambigu/berubah dilewati. File audio/video tidak diubah."
     } }
     private fun applySettings(data: JSONObject) {
-        data.optString("theme").takeIf { it in setOf("system", "light", "dark") }?.let { SettingsStore.setThemeMode(context, it) }
+        data.optString("theme").takeIf { it in setOf("system", "light", "dark", "cyberpunk") }?.let { SettingsStore.setThemeMode(context, it) }
         for (key in listOf("rename", "tag", "artwork", "lyrics", "library")) if (data.opt(key) is Boolean) SettingsStore.setSmart(context, key, data.getBoolean(key))
         if (data.opt("dynamic") is Boolean) SettingsStore.setDynamicColor(context, data.getBoolean("dynamic"))
         if (data.opt("artwork_accent") is Boolean) SettingsStore.setArtworkAccent(context, data.getBoolean("artwork_accent"))

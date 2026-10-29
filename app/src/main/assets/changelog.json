@@ -1,5 +1,13 @@
 [
   {
+    "versionCode": 72,
+    "versionName": "1.1.57",
+    "highlights": [
+      "Tema Cyberpunk baru menghadirkan palet neon turquoise, cyan, dan magenta di atas latar navy.",
+      "Kartu alat, koleksi, mini player, navigasi, dan header dirapikan agar panel penting lebih mudah dipindai."
+    ]
+  },
+  {
     "versionCode": 71,
     "versionName": "1.1.56",
     "highlights": [

@@ -29,7 +29,18 @@ lama yang hanya berisi segitiga ungu dihapus dari tampilan dengan menggantinya
 dengan simbol yang sama; layar pembuka tetap system splash agar tidak menambah
 waktu tunggu sebelum aplikasi siap.
 
-## Token
+## Tema Cyberpunk (1.1.57)
+
+Cyberpunk adalah pilihan tema eksplisit di Pengaturan → Tampilan, tidak bergantung pada wallpaper
+atau sampul. Gunakan latar navy hampir hitam dengan permukaan biru berlapis; turquoise untuk aksi,
+cyan untuk outline/navigasi, dan magenta hanya sebagai aksen sekunder. Teks utama/sekunder tetap
+berkontras tinggi. Aksen dinamis dan artwork tidak mengganti palet saat Cyberpunk dipilih; preferensi
+pengguna tetap tersimpan dan berlaku kembali saat memilih tema lain.
+
+Polesan khusus tema dibatasi pada outline kartu, header halaman, ikon kartu Alat, mini player, dan
+pemisah navigasi. Konten, hierarki tindakan, bentuk kontrol, dan navigasi tetap komponen Material 3
+yang sama; tidak memakai glow animasi atau hiasan yang mengganggu pemindaian daftar. Palet Cyberpunk
+diuji kontrasnya bersama palet gelap/terang di `ThemeContrastTest`.
 
 ### Ukuran kontekstual dan ruang tersedia (1.1.25)
 

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.*
+import id.local.tubeflow.ui.theme.LocalCyberpunkTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -230,7 +231,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     LaunchedEffect(playback.track) { if (playback.track == null) fullPlayer=false else requestNotifications() }
     val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
         ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
-    AccentTheme(accentCover, SettingsStore.artworkAccent) {
+    val cyberpunkMode = SettingsStore.themeMode == SettingsStore.MODE_CYBERPUNK
+    AccentTheme(accentCover, SettingsStore.artworkAccent && !cyberpunkMode) {
     // Saat pemutar penuh terbuka, dialog lirik dihost di dalam jendela pemutar (z-order dialog).
     if (!fullPlayer) LyricsSearchDialog(library)
     lyricTiming?.let { LyricTimingDialog(it, library) { lyricTiming = null } }
@@ -252,6 +254,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val useRail = maxWidth >= 840.dp
     Scaffold(
         topBar = {
+            val cyberpunk = LocalCyberpunkTheme.current
             TopAppBar(
                 title = {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -279,7 +282,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     if (tab != settingsTab) IconButton(onClick={ previousTab=tab; settingsSection=null; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    containerColor = if (cyberpunk) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLowest,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
@@ -287,12 +290,17 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
+            val cyberpunk = LocalCyberpunkTheme.current
             Column {
+            if (cyberpunk) HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
             if (playback.track != null) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) {
                 Box(Modifier.widthIn(max=840.dp)) { MiniPlayer(playback,player) { fullPlayer=true } }
             }
             if (!useRail) {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                windowInsets = if (cyberpunk) WindowInsets.navigationBars else NavigationBarDefaults.windowInsets,
+            ) {
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
@@ -312,7 +320,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                             selectedTextColor = MaterialTheme.colorScheme.primary,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            indicatorColor = if (cyberpunk) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
                         ),
                     )
                 }
@@ -322,7 +330,10 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         },
     ) { padding ->
         Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-        if (useRail) NavigationRail(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()), containerColor=MaterialTheme.colorScheme.surface) {
+        if (useRail) NavigationRail(
+            Modifier.fillMaxHeight().verticalScroll(rememberScrollState()),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
             tabs.forEachIndexed { index, title ->
                 NavigationRailItem(
                     selected=tab==index, onClick={ tab=index; downloadTarget = null },
@@ -337,7 +348,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         selectedTextColor=MaterialTheme.colorScheme.primary,
                         unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant,
-                        indicatorColor=MaterialTheme.colorScheme.primaryContainer,
+                        indicatorColor=if (LocalCyberpunkTheme.current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
                     ),
                 )
             }

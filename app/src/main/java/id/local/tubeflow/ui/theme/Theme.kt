@@ -12,7 +12,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -61,6 +63,25 @@ internal val LightPalette = lightColorScheme(
     errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF410002),
 )
 
+internal val CyberpunkPalette = darkColorScheme(
+    primary = Color(0xFF00F5C8), onPrimary = Color(0xFF00211B),
+    primaryContainer = Color(0xFF07594C), onPrimaryContainer = Color(0xFF9CFFE9),
+    secondary = Color(0xFF70E8FF), onSecondary = Color(0xFF00212A),
+    secondaryContainer = Color(0xFF123F50), onSecondaryContainer = Color(0xFFB7F1FF),
+    tertiary = Color(0xFFFF73D2), onTertiary = Color(0xFF3F0030),
+    tertiaryContainer = Color(0xFF5A1748), onTertiaryContainer = Color(0xFFFFD7F2),
+    background = Color(0xFF030A12), onBackground = Color(0xFFE5F7FA),
+    surface = Color(0xFF07131D), onSurface = Color(0xFFE5F7FA),
+    surfaceVariant = Color(0xFF142531), onSurfaceVariant = Color(0xFFB7CDD5),
+    surfaceContainerLowest = Color(0xFF02070D), surfaceContainerLow = Color(0xFF08131C),
+    surfaceContainer = Color(0xFF0D1C27), surfaceContainerHigh = Color(0xFF122634), surfaceContainerHighest = Color(0xFF1A3242),
+    outline = Color(0xFF7895A2), outlineVariant = Color(0xFF294754),
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+)
+
+val LocalCyberpunkTheme = staticCompositionLocalOf { false }
+
 private val AppTypography = Typography(
     headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 38.sp),
     headlineMedium = TextStyle(fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 34.sp, letterSpacing = 0.sp),
@@ -85,7 +106,12 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun TubeFlowTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boolean = false, content: @Composable () -> Unit) {
+fun TubeFlowTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
+    cyberpunk: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val view = LocalView.current
     val context = LocalContext.current
     if (!view.isInEditMode) SideEffect {
@@ -94,18 +120,26 @@ fun TubeFlowTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Bool
             isAppearanceLightStatusBars = !darkTheme
             isAppearanceLightNavigationBars = !darkTheme
         }
+        if (Build.VERSION.SDK_INT >= 29) {
+            window.isNavigationBarContrastEnforced = !cyberpunk
+            window.isStatusBarContrastEnforced = !cyberpunk
+        }
     }
     val supportsDynamic = Build.VERSION.SDK_INT >= 31
+    val useDynamicColor = dynamicColor && !cyberpunk
     val colorScheme = when {
-        dynamicColor && supportsDynamic && darkTheme -> dynamicDarkColorScheme(context)
-        dynamicColor && supportsDynamic -> dynamicLightColorScheme(context)
+        useDynamicColor && supportsDynamic && darkTheme -> dynamicDarkColorScheme(context)
+        useDynamicColor && supportsDynamic -> dynamicLightColorScheme(context)
+        cyberpunk -> CyberpunkPalette
         darkTheme -> DarkPalette
         else -> LightPalette
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        shapes = AppShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalCyberpunkTheme provides cyberpunk) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content,
+        )
+    }
 }

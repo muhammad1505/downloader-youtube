@@ -70,7 +70,7 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
     // aksen sampul) supaya mini player terbaca sebagai bagian dari daftar, bukan panel terpisah.
     val accent=rememberCoverAccent(track.cover)
     Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)) {
-        Card(colors=mediaCardColors(accent)) {
+        Card(colors=mediaCardColors(accent), border=cyberpunkCardBorder()) {
             Column {
                 AdaptivePair(Modifier.padding(start=10.dp,end=2.dp,top=6.dp,bottom=6.dp), minInlineWidth=360.dp,
                     leading = { available -> Row(available.clickable(onClickLabel="Buka pemutar",onClick=expand).padding(end=6.dp), verticalAlignment=Alignment.CenterVertically) {

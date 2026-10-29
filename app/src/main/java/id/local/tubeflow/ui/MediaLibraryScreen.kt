@@ -144,7 +144,7 @@ fun MediaLibraryScreen(
             Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
                 // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
                 if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
-            },colors=mediaCardColors(accent)) {
+            },colors=mediaCardColors(accent),border=cyberpunkCardBorder()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))

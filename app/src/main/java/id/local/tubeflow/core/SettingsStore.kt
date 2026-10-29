@@ -14,7 +14,8 @@ object SettingsStore {
     const val MODE_SYSTEM = "system"
     const val MODE_LIGHT = "light"
     const val MODE_DARK = "dark"
-    private val supported = setOf(MODE_SYSTEM, MODE_LIGHT, MODE_DARK)
+    const val MODE_CYBERPUNK = "cyberpunk"
+    private val supported = setOf(MODE_SYSTEM, MODE_LIGHT, MODE_DARK, MODE_CYBERPUNK)
 
     var themeMode by mutableStateOf(MODE_SYSTEM)
         private set
@@ -148,7 +149,7 @@ object SettingsStore {
 
     fun isDark(systemDark: Boolean): Boolean = when (themeMode) {
         MODE_LIGHT -> false
-        MODE_DARK -> true
+        MODE_DARK, MODE_CYBERPUNK -> true
         else -> systemDark
     }
 }

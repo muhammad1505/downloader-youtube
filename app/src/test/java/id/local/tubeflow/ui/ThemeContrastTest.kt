@@ -12,7 +12,7 @@ import org.junit.Test
  */
 class ThemeContrastTest {
     @Test fun sharedPanelsAndPausedStateKeepReadableTextInBothThemes() {
-        for (palette in listOf(DarkPalette,LightPalette)) {
+        for (palette in listOf(DarkPalette, LightPalette, CyberpunkPalette)) {
             assertRatio("panel text",palette.onSurface,palette.surfaceContainer,4.5f)
             assertRatio("panel secondary text",palette.onSurfaceVariant,palette.surfaceContainer,4.5f)
             assertRatio("paused state",palette.onTertiaryContainer,palette.tertiaryContainer,4.5f)
@@ -31,6 +31,18 @@ class ThemeContrastTest {
         assertRatio("teks aksen di latar gelap", p.primary, p.background, 4.5f)
         assertRatio("ikon di tombol hijau gelap", p.onPrimary, p.primary, 4.5f)
         assertRatio("teks wadah aksen gelap", p.onPrimaryContainer, p.primaryContainer, 4.5f)
+    }
+
+    @Test fun cyberpunkPaletteKeepsNeonAccentsAndTextReadable() {
+        val p = CyberpunkPalette
+        assertRatio("teks cyberpunk di latar", p.onBackground, p.background, 4.5f)
+        assertRatio("teks cyberpunk di kartu", p.onSurface, p.surfaceContainer, 4.5f)
+        assertRatio("teks sekunder cyberpunk di kartu", p.onSurfaceVariant, p.surfaceContainer, 4.5f)
+        assertRatio("aksen turquoise di latar", p.primary, p.background, 4.5f)
+        assertRatio("aksen cyan di latar", p.secondary, p.background, 4.5f)
+        assertRatio("ikon di tombol turquoise", p.onPrimary, p.primary, 4.5f)
+        assertRatio("teks kontainer aksen", p.onPrimaryContainer, p.primaryContainer, 4.5f)
+        assertRatio("teks status magenta", p.onTertiaryContainer, p.tertiaryContainer, 4.5f)
     }
 
     @Test fun lightPaletteKeepsReadableTextAndControls() {

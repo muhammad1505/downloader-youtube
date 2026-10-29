@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import id.local.tubeflow.ui.theme.LocalCyberpunkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +62,10 @@ fun mediaCardColors(accent: Color): CardColors = CardDefaults.cardColors(
     containerColor = MaterialTheme.colorScheme.surfaceContainer,
 )
 
+@Composable
+fun cyberpunkCardBorder(): BorderStroke? =
+    if (LocalCyberpunkTheme.current) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)) else null
+
 object UiSpacing {
     val screen = 16.dp
     val panel = 16.dp
@@ -74,10 +79,15 @@ enum class ActionEmphasis { Primary, Secondary, Quiet }
 
 @Composable
 fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    val cyberpunk = LocalCyberpunkTheme.current
+    Card(
+        modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)),
-        content = content)
+        border = if (cyberpunk) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
+            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)),
+        content = content,
+    )
 }
 
 /** Panel isi bersama: padding 16dp, judul `titleMedium`, deskripsi `bodySmall` redup. */
@@ -374,9 +384,30 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
 
 @Composable
 fun PageHeading(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val cyberpunk = LocalCyberpunkTheme.current
+    if (cyberpunk) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = MaterialTheme.shapes.large,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f)),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.width(3.dp).height(42.dp).background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

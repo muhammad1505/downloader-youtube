@@ -178,7 +178,11 @@ fun SettingsScreen(
             )
             SettingsCategoryCard(
                 title = "Tampilan",
-                summary = "${themeModeLabel(themeMode)} · ${if (SettingsStore.artworkAccent) "aksen dari sampul" else "aksen tema"}",
+                summary = "${themeModeLabel(themeMode)} · " + when {
+                    themeMode == SettingsStore.MODE_CYBERPUNK -> "palet neon"
+                    SettingsStore.artworkAccent -> "aksen dari sampul"
+                    else -> "aksen tema"
+                },
                 icon = Icons.Outlined.Palette,
                 onClick = { onSection("display") },
             )
@@ -330,15 +334,20 @@ fun SettingsScreen(
                     SettingsStore.MODE_SYSTEM to "Ikut sistem",
                     SettingsStore.MODE_LIGHT to "Terang",
                     SettingsStore.MODE_DARK to "Gelap",
+                    SettingsStore.MODE_CYBERPUNK to "Cyberpunk",
                 ),
                 selected = themeMode,
                 onSelect = onThemeMode,
             )
+            if (themeMode == SettingsStore.MODE_CYBERPUNK) {
+                Text("Neon turquoise, cyan, dan magenta di atas latar navy gelap. Tema Cyberpunk tetap memakai paletnya sendiri meski aksen sampul atau warna dinamis diaktifkan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             ToggleRow(
                 title = "Aksen dari sampul",
                 description = "Ikuti sampul lagu yang diputar atau unduhan terbaru.",
                 checked = SettingsStore.artworkAccent,
                 onCheckedChange = { SettingsStore.setArtworkAccent(context, it) },
+                enabled = themeMode != SettingsStore.MODE_CYBERPUNK,
             )
             if (Build.VERSION.SDK_INT >= 31) {
                 ToggleRow(
@@ -346,6 +355,7 @@ fun SettingsScreen(
                     description = "Ikuti warna wallpaper (Material You).",
                     checked = dynamicColor,
                     onCheckedChange = onDynamicColor,
+                    enabled = themeMode != SettingsStore.MODE_CYBERPUNK,
                 )
             }
         }
@@ -574,6 +584,7 @@ fun SettingsScreen(
 private fun themeModeLabel(mode: String): String = when (mode) {
     SettingsStore.MODE_LIGHT -> "Mode terang"
     SettingsStore.MODE_DARK -> "Mode gelap"
+    SettingsStore.MODE_CYBERPUNK -> "Cyberpunk"
     else -> "Ikut sistem"
 }
 

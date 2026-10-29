@@ -1,5 +1,7 @@
 package id.local.tubeflow.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Lyrics
@@ -17,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,9 +60,10 @@ fun ToolsScreen(
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         PageHeading(stringResource(R.string.tools_title), stringResource(R.string.tools_subtitle))
-        Panel(
+        ToolHubCard(
             title = stringResource(R.string.tools_lyrics_title),
             description = stringResource(R.string.tools_lyrics_description),
+            icon = Icons.Outlined.Lyrics,
         ) {
             ActionButton(
                 stringResource(R.string.tools_lyrics_action),
@@ -67,9 +73,10 @@ fun ToolsScreen(
                 fillWidth = true,
             )
         }
-        Panel(
+        ToolHubCard(
             title = stringResource(R.string.tools_rename_title),
             description = stringResource(R.string.tools_rename_description),
+            icon = Icons.Outlined.DriveFileRenameOutline,
         ) {
             ActionButton(
                 stringResource(R.string.tools_rename_action),
@@ -79,9 +86,10 @@ fun ToolsScreen(
                 fillWidth = true,
             )
         }
-        Panel(
+        ToolHubCard(
             title = stringResource(R.string.tools_karaoke_title),
             description = stringResource(R.string.tools_karaoke_description),
+            icon = Icons.Outlined.MicOff,
         ) {
             ActionButton(
                 stringResource(R.string.tools_karaoke_action),
@@ -91,9 +99,10 @@ fun ToolsScreen(
                 fillWidth = true,
             )
         }
-        Panel(
+        ToolHubCard(
             title = stringResource(R.string.tools_tag_title),
             description = stringResource(R.string.tools_tag_description),
+            icon = Icons.Outlined.Sell,
         ) {
             ActionButton(
                 stringResource(R.string.tools_tag_action),
@@ -151,6 +160,37 @@ fun ToolsScreen(
     }
     tapItem?.let { item ->
         TapSyncDialog(item, library, player, onDismiss = { tapItem = null })
+    }
+}
+
+@Composable
+private fun ToolHubCard(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    action: @Composable ColumnScope.() -> Unit,
+) {
+    val cyberpunk = id.local.tubeflow.ui.theme.LocalCyberpunkTheme.current
+    SectionCard {
+        Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(48.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .then(if (cyberpunk) Modifier.border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), MaterialTheme.shapes.small) else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.secondary)
+            }
+            action()
+        }
     }
 }
 
