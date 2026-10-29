@@ -1,6 +1,8 @@
 name: Android checks
 on:
   push:
+    # Tag rilis ditangani release-apk.yml agar job pemeriksaan tidak berjalan ganda.
+    branches: ['**']
   pull_request:
 permissions:
   contents: read

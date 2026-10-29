@@ -1,0 +1,126 @@
+name: Release APK arm64
+
+# Build satu APK release bertanda tangan untuk HP (arm64-v8a) lalu lampirkan ke GitHub Release.
+# Hanya APK ARM64 yang dipublikasikan; APK ABI lain dan AAB tidak diunggah.
+#
+# Rahasia yang dibutuhkan (Settings -> Secrets and variables -> Actions):
+#   TUBEFLOW_KEYSTORE_BASE64   isi berkas TubeFlow-release.p12 yang di-encode base64 (satu baris)
+#   TUBEFLOW_KEYSTORE_PASSWORD
+#   TUBEFLOW_KEY_ALIAS
+#   TUBEFLOW_KEY_PASSWORD
+#
+# Menjalankan: push tag (mis. v1.1.57) untuk membuat Release, atau tombol "Run workflow"
+# untuk sekadar menghasilkan artifact tanpa membuat Release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  arm64:
+    name: Signed APK arm64-v8a
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
+
+      - name: Install Android and native build tools
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - name: Rebuild compatible FFmpeg payload
+        run: bash scripts/rebuild_ffmpeg_webp.sh
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Keystore produksi tidak pernah masuk repositori: hanya ditulis ke RUNNER_TEMP
+      # dengan mode 600 dan dihapus bersama runner setelah job selesai.
+      - name: Restore production signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TUBEFLOW_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo '::error::Secret TUBEFLOW_KEYSTORE_BASE64 kosong; APK tidak bisa ditandatangani.'
+            exit 1
+          fi
+          signing="$RUNNER_TEMP/tubeflow-signing"
+          install -d -m 700 "$signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$signing/TubeFlow-release.p12"
+          chmod 600 "$signing/TubeFlow-release.p12"
+          test -s "$signing/TubeFlow-release.p12"
+
+      - name: Unit tests and signed release build
+        env:
+          TUBEFLOW_KEYSTORE_PATH: ${{ runner.temp }}/tubeflow-signing/TubeFlow-release.p12
+          TUBEFLOW_KEYSTORE_PASSWORD: ${{ secrets.TUBEFLOW_KEYSTORE_PASSWORD }}
+          TUBEFLOW_KEY_ALIAS: ${{ secrets.TUBEFLOW_KEY_ALIAS }}
+          TUBEFLOW_KEY_PASSWORD: ${{ secrets.TUBEFLOW_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Verify and collect the ARM64 APK
+        id: collect
+        run: |
+          set -euo pipefail
+          bt="$ANDROID_HOME/build-tools/36.0.0"
+          src=app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          test -f "$src"
+          "$bt/zipalign" -c -P 16 4 "$src"
+          "$bt/apksigner" verify --verbose --print-certs "$src" | tee "$RUNNER_TEMP/apksigner.txt"
+          if grep -qi 'CN=Android Debug' "$RUNNER_TEMP/apksigner.txt"; then
+            echo '::error::APK ditandatangani sertifikat debug, bukan kunci produksi.'
+            exit 1
+          fi
+          version="$("$bt/aapt2" dump badging "$src" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")"
+          out="TubeFlow-${version:-unknown}-arm64-v8a-release.apk"
+          cp "$src" "$out"
+          python3 scripts/audit_native.py "$out"
+          python3 scripts/audit_release_zip_fields.py "$out"
+          sha256sum "$out" | tee "$out.sha256"
+          {
+            echo "apk=$out"
+            echo "sha=$(cut -d' ' -f1 "$out.sha256")"
+          } >> "$GITHUB_OUTPUT"
+
+      # Artifact berisi satu APK ARM64 saja, tanpa AAB dan tanpa ABI lain.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tubeflow-arm64-release
+          retention-days: 14
+          path: |
+            TubeFlow-*-arm64-v8a-release.apk
+            TubeFlow-*-arm64-v8a-release.apk.sha256
+
+      - name: Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          apk="${{ steps.collect.outputs.apk }}"
+          sha="${{ steps.collect.outputs.sha }}"
+          files=("$apk" "$apk.sha256")
+          notes="APK release arm64-v8a untuk HP. Hanya satu ABI yang dipublikasikan; AAB dan APK ABI lain tidak dibangun untuk rilis ini. SHA-256: \`$sha\`."
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" --title "TubeFlow $tag" --notes "$notes"
+          fi
