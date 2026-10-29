@@ -10,8 +10,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -23,6 +26,8 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
@@ -248,13 +253,23 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("TubeFlow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        if (activeCount > 0) Text(
-                            "$activeCount unduhan sedang berjalan",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id.local.tubeflow.R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            modifier = Modifier.size(34.dp).background(
+                                colorResource(id.local.tubeflow.R.color.launcher_background),
+                                RoundedCornerShape(10.dp),
+                            ),
                         )
+                        Column {
+                            Text("TubeFlow", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
+                            if (activeCount > 0) Text(
+                                "$activeCount unduhan sedang berjalan",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 navigationIcon = { if (tab == settingsTab) IconButton(onClick={ if (settingsSection != null) settingsSection = null else tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, if (settingsSection != null) "Kembali ke daftar pengaturan" else "Kembali") } },
@@ -263,7 +278,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     if (tab != settingsTab) IconButton(onClick={ previousTab=tab; settingsSection=null; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
@@ -291,13 +306,12 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                             }
                         },
                         label = if (showLabels) ({ Text(title, maxLines=1, overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis) }) else null,
-                        // Tab aktif disorot putih tanpa pil indikator — bahasa navigasi pemutar musik modern.
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                         ),
                     )
                 }
@@ -318,11 +332,11 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     } else Icon(icons[index],if (showLabels) null else title) },
                     label=if (showLabels) ({ Text(title) }) else null,
                     colors=NavigationRailItemDefaults.colors(
-                        selectedIconColor=MaterialTheme.colorScheme.onSurface,
-                        selectedTextColor=MaterialTheme.colorScheme.onSurface,
+                        selectedIconColor=MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedTextColor=MaterialTheme.colorScheme.primary,
                         unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant,
-                        indicatorColor=androidx.compose.ui.graphics.Color.Transparent,
+                        indicatorColor=MaterialTheme.colorScheme.primaryContainer,
                     ),
                 )
             }

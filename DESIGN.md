@@ -11,6 +11,24 @@ Mode Impeccable: Operate. Anti Slop: during untuk sesi perbaikan ini berdasarkan
 arahan pengelola untuk melanjutkan. ENERGY 2, RHYTHM 1, MOTION 1: identitas sampul
 cukup kuat, daftar mudah dipindai, gerak hanya untuk perubahan status.
 
+### Penyelarasan permukaan 1.1.53
+
+Charcoal kehijauan `#101411` menjadi latar malam; panel berjenjang `#141A15`,
+`#1B221D`, `#242D26`, dengan outline tipis `#3B473F`. Aksen utama hijau
+`#58D994`; champagne `#E0C681` hanya menandai status sekunder. Mode terang
+memakai latar `#F4F7F3` dan aksen hijau tua `#0B7A42`. Sampul tidak mewarnai
+latar setiap kartu lagi: warna album tetap hidup di artwork dan player, sementara
+daftar yang memuat banyak sampul memakai panel netral. Ikon splash, launcher,
+dan monokrom memakai satu tanda gelombang/play TubeFlow.
+
+### Splash 1.1.54
+
+Splash terang/gelap memakai simbol gelombang-play yang sama dengan identitas
+launcher, di atas latar ikon hijau hutan yang sesuai tema. Resource `drawable-night`
+lama yang hanya berisi segitiga ungu dihapus dari tampilan dengan menggantinya
+dengan simbol yang sama; layar pembuka tetap system splash agar tidak menambah
+waktu tunggu sebelum aplikasi siap.
+
 ## Token
 
 ### Ukuran kontekstual dan ruang tersedia (1.1.25)
@@ -152,7 +170,7 @@ tetap semantik. Tidak menambahkan hiasan gradien pada panel pengaturan atau empt
 - Tipografi: skala Material, judul halaman `headlineSmall`, judul bagian
   `titleMedium`, isi `bodyMedium`, keterangan `bodySmall`. Font mengikuti sistem.
 - Margin halaman/panel 16dp; antar elemen 8/12dp; antar kelompok 24dp.
-- Radius 12dp untuk elemen kecil, 20dp panel media, 24/28dp untuk sheet/dialog.
+- Radius 10dp untuk kontrol kecil, 16dp panel, 22/28dp untuk sheet/dialog.
 - Target sentuh minimal 48dp; isi memanjang dan font besar boleh membungkus.
 - Navigasi mempertahankan Ringkasan, Download, Koleksi; Pengaturan lewat top
   bar, lalu daftar kategori dan subhalaman. Mini player tetap di atas navigasi.

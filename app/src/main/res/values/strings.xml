@@ -17,6 +17,7 @@
     <string name="player_page_show_cover">Tampilkan sampul</string>
     <string name="player_page_show_lyrics">Tampilkan lirik</string>
     <string name="player_speed_description">Kecepatan putar %1$s kali</string>
+    <string name="video_decoder_quick_description">Dekoder video: %1$s. Ketuk untuk mode berikutnya.</string>
     <string name="player_stop">Tutup pemutar</string>
     <string name="player_now_playing">Sedang diputar</string>
     <string name="player_shuffle">Acak</string>
@@ -162,10 +163,10 @@
     <string name="library_save_playlist_name">Simpan nama</string>
     <string name="shortcut_download_short">Unduh</string>
     <string name="shortcut_download_long">Mulai unduhan baru</string>
-    <string name="shortcut_audio_short">Audio</string>
-    <string name="shortcut_audio_long">Pemutar audio</string>
+    <string name="shortcut_audio_short">Musik</string>
+    <string name="shortcut_audio_long">Koleksi musik</string>
     <string name="shortcut_video_short">Video</string>
-    <string name="shortcut_video_long">Pemutar video</string>
+    <string name="shortcut_video_long">Koleksi video</string>
     <string name="shortcut_history_short">Riwayat</string>
     <string name="shortcut_history_long">Riwayat unduhan</string>
     <plurals name="playlist_song_count">
@@ -245,7 +246,6 @@
     <string name="clip_preview">Pratinjau bagian terpilih</string>
     <string name="clip_preview_help">Putar untuk melihat rentang yang akan dipotong. Menggeser awal atau akhir klip menjeda pratinjau; file asli tetap utuh.</string>
     <string name="clip_preview_error">Pratinjau tidak dapat diputar di perangkat ini. Pilih bagian berdasarkan waktu atau coba video lain.</string>
-    <string name="power_saver_short">Hemat</string>
     <string name="power_saver_effects">Penghemat baterai aktif. Smart Enhance sementara tidak diterapkan; pilihan efek tetap disimpan.</string>
     <string name="clip_range_position">Titik awal dan akhir potongan Status</string>
     <string name="clip_preview_play">Putar pratinjau</string>

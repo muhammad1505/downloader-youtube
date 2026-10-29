@@ -13,7 +13,6 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
-import androidx.compose.ui.graphics.compositeOver
 import id.local.tubeflow.core.songIdentity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -55,13 +54,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Bahasa kartu media (gaya pemutar musik modern): latar datar dengan nuansa aksen tipis dari sampul,
- * tanpa garis tepi — dipakai kartu unduhan, kartu koleksi, dan mini player agar konsisten.
- */
+/** Sampul membawa warna; permukaan daftar tetap netral agar koleksi terlihat satu kesatuan. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun mediaCardColors(accent: Color): CardColors = CardDefaults.cardColors(
-    containerColor = accent.copy(alpha = 0.07f).compositeOver(MaterialTheme.colorScheme.surfaceContainer),
+    containerColor = MaterialTheme.colorScheme.surfaceContainer,
 )
 
 object UiSpacing {
@@ -78,7 +75,9 @@ enum class ActionEmphasis { Primary, Secondary, Quiet }
 @Composable
 fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = MaterialTheme.shapes.medium, content = content)
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)),
+        content = content)
 }
 
 /** Panel isi bersama: padding 16dp, judul `titleMedium`, deskripsi `bodySmall` redup. */
@@ -375,8 +374,8 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
 
 @Composable
 fun PageHeading(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.semantics { heading() })
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -417,7 +416,12 @@ fun EmptyState(
 
 @Composable
 fun StatPill(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
-    SectionCard(modifier) {
+    Surface(
+        modifier,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(icon, null, Modifier.size(20.dp), tint = tint)
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

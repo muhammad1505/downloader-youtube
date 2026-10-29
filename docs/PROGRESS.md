@@ -1,6 +1,12 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 28 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 29 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Penyelarasan UI dan splash — 1.1.54/code69, 29 Oktober 2026
+
+Perubahan visual 1.1.53 diselaraskan di atas basis upstream 1.1.51: palet charcoal-hijau, permukaan kartu netral, header dan indikator tab aktif, serta ikon launcher adaptif/monokrom. Perbaikan splash mode gelap menghapus segitiga ungu lama di `drawable-night/ic_splash.xml` dan memakai simbol gelombang/play yang sama dalam lencana hijau hutan. Changelog tetap memakai aset JSON.
+
+`./gradlew assembleRelease --no-daemon --max-workers=2` berhasil pada source hasil integrasi; `lintVitalRelease` lulus. Unit test tidak dijalankan pada integrasi ini. APK ARM64 1.1.54/code69 bertanda tangan terpasang di Realme RMX1821 Android 10. Cold launch menampilkan splash baru, MainActivity aktif, dan log tidak menunjukkan fatal exception. SHA-256 APK: `c7745e6cc758f7ab469d8bdd9c0ba8aae3d0e3549f18c326faaf576e14e79742`.
 
 ## Titik mulai terbaru — 28 Oktober 2026
 

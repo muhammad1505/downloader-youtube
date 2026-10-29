@@ -1,4 +1,18 @@
-[
+[{
+    "versionCode": 69,
+    "versionName": "1.1.54",
+    "highlights": [
+      "Layar pembuka mengikuti identitas TubeFlow pada tema terang dan gelap."
+    ]
+  },
+  {
+    "versionCode": 68,
+    "versionName": "1.1.53",
+    "highlights": [
+      "Tampilan TubeFlow dirapikan dengan warna, permukaan, dan kontrol yang lebih konsisten.",
+      "Ikon aplikasi dan layar pembuka kini memakai identitas visual TubeFlow."
+    ]
+  },
   {
     "versionCode": 66,
     "versionName": "1.1.51",
