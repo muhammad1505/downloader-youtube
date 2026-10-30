@@ -385,28 +385,26 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
 @Composable
 fun PageHeading(title: String, subtitle: String) {
     val cyberpunk = LocalCyberpunkTheme.current
-    if (cyberpunk) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = MaterialTheme.shapes.large,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f)),
+    val scheme = MaterialTheme.colorScheme
+    val accent = if (cyberpunk) scheme.secondary else scheme.primary
+    val outline = if (cyberpunk) scheme.secondary.copy(alpha = 0.65f) else scheme.outlineVariant.copy(alpha = 0.45f)
+    Surface(
+        color = scheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, outline),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.fillMaxWidth().padding(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.width(3.dp).height(42.dp).background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Box(
+                Modifier.width(3.dp).heightIn(min = 42.dp).background(accent, MaterialTheme.shapes.small),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             }
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
