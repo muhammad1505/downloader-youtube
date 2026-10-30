@@ -131,6 +131,9 @@ class SelectionTest {
    "https://www.tiktok.com/@user/video/7123456789",
    "https://vm.tiktok.com/ZMabcdef/",
    "https://www.instagram.com/reel/ABC123/",
+   "https://www.threads.com/@user/post/ABC123",
+   "https://www.threads.com/t/ABC123",
+   "https://threads.net/share/ABC123/",
    "https://soundcloud.com/artist/track",
    "https://x.com/user/status/12345",
    "https://vimeo.com/123456",
@@ -161,6 +164,19 @@ class SelectionTest {
    "https://user@www.bilibili.tv/id/play/2432940/31524599",
    "https://www.bilibili.tv:8443/id/play/2432940/31524599",
   ).forEach { assertFalse(it, Selection.validUrl(it)) }
+ }
+ @Test fun threadsUrlsAreRestrictedToRecognizedPublicPostShapes() {
+  listOf(
+   "http://www.threads.com/@user/post/ABC123",
+   "https://threads.com/",
+   "https://www.threads.com/@user",
+   "https://www.threads.com/@user/post/",
+   "https://threads.com.evil.org/@user/post/ABC123",
+   "https://user@threads.com/@user/post/ABC123",
+   "https://threads.com:8443/@user/post/ABC123",
+  ).forEach { assertFalse(it, Selection.validUrl(it)) }
+  assertEquals("Threads", Selection.platform("https://www.threads.com/@user/post/ABC123"))
+  assertEquals("Threads", Selection.platform("https://www.threads.net/@user/post/ABC123"))
  }
  @Test fun rejectsUnsafeOrUnknownForeignUrls() {
   listOf(

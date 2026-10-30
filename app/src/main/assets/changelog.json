@@ -1,5 +1,13 @@
 [
   {
+    "versionCode": 73,
+    "versionName": "1.1.58",
+    "highlights": [
+      "Tautan post video publik Threads dari threads.com dan threads.net kini bisa diperiksa dan diunduh.",
+      "Extractor Threads terbatas pada URL post/share yang didukung; post privat dan post tanpa video tidak didukung."
+    ]
+  },
+  {
     "versionCode": 72,
     "versionName": "1.1.57",
     "highlights": [

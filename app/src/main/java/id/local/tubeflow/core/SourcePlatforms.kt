@@ -19,7 +19,7 @@ object SourcePlatforms {
         SourcePlatform("twitch", "Twitch", setOf("twitch.tv"), "game"),
         SourcePlatform("reddit", "Reddit", setOf("reddit.com", "redd.it")),
         SourcePlatform("pinterest", "Pinterest", setOf("pinterest.com", "pin.it")),
-        SourcePlatform("threads", "Threads", setOf("threads.net")),
+        SourcePlatform("threads", "Threads", setOf("threads.com", "threads.net")),
         SourcePlatform("bandcamp", "Bandcamp", setOf("bandcamp.com"), "wave"),
         SourcePlatform("bilibili", "Bilibili", setOf("bilibili.com", "b23.tv"), "video"),
         // Bstation/Bilibili TV: episode dan halaman season (katalog episode lewat pemilih).

@@ -446,7 +446,7 @@ object Selection {
  * Platform non-YouTube yang didukung yt-dlp; subdomain ikut diterima (mis. vm.tiktok.com).
  * Allowlist ketat — tautan asing tetap ditolak sebelum menyentuh engine.
  */
- private val otherPlatforms = SourcePlatforms.known.filter { it.id !in setOf("youtube", "youtube_music") }.flatMap { it.domains }.toSet()
+ private val otherPlatforms = SourcePlatforms.known.filter { it.id !in setOf("youtube", "youtube_music", "threads") }.flatMap { it.domains }.toSet()
 
  fun validate(options: DownloadOptions) {
   require(validUrl(options.url)) { "Gunakan tautan video dari platform yang didukung." }
@@ -462,6 +462,8 @@ object Selection {
   if (host in hosts) return (if (host == "youtu.be") uri.path.length > 1 else uri.path == "/watch" && uri.rawQuery?.split('&')?.any { it.startsWith("v=") && it.length > 2 } == true || uri.path.startsWith("/shorts/") || uri.path.startsWith("/live/"))
   // Bstation hanya episode (/play/<season>/<ep>, /video/<id>); halaman season sengaja ditolak.
   if (BstationUrls.isHost(host)) return BstationUrls.canonical(raw) != null
+  // Threads memakai extractor tambahan, karena yt-dlp upstream belum mendukung tautan Threads.
+  if (ThreadsUrls.isHost(host)) return ThreadsUrls.hasSupportedPostPath(uri.rawPath ?: "")
   // Platform lain: cukup https + host di allowlist + ada path — validasi isi biar engine (yt-dlp).
   val path = uri.path ?: return false
   otherPlatforms.any { host == it || host.endsWith(".$it") } && path.isNotBlank() && path != "/"

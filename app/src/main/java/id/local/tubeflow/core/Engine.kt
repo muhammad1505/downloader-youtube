@@ -43,6 +43,7 @@ object Engine {
   if(assetInstalled) return
   installEngineFile(context, force = false)
   installBootstrap(context)
+  installThreadsPlugin(context)
   extractorCache=File(context.cacheDir, "extractor-cache").apply { mkdirs() }
   processDirectory=File(context.noBackupFilesDir,"engine-processes").apply { mkdirs() }
   processDirectory.listFiles()?.forEach { record ->
@@ -68,6 +69,26 @@ object Engine {
     EngineUpdater.atomicReplace(temporary,target)
    } finally { temporary.delete() }
   }
+ }
+ private fun installThreadsPlugin(context: Context) {
+  val root = File(engineTarget(context).parentFile, "plugins/threads-plugin")
+  val entry = File(root, "yt_dlp_plugins/extractor/threads.py")
+  if (entry.isFile && EngineUpdater.sha256(entry) == THREADS_PLUGIN_SHA256) return
+  entry.parentFile!!.mkdirs()
+  val temporary = File(entry.parentFile, "threads.py.tmp")
+  try {
+   context.assets.open("yt_dlp_plugins/extractor/threads.py").use { input ->
+    java.io.FileOutputStream(temporary).use { output -> input.copyTo(output); output.fd.sync() }
+   }
+   require(EngineUpdater.sha256(temporary) == THREADS_PLUGIN_SHA256) { "Verifikasi extractor Threads gagal." }
+   EngineUpdater.atomicReplace(temporary, entry)
+  } finally { temporary.delete() }
+ }
+ private const val THREADS_PLUGIN_SHA256 = "c28e410b69a0c2377c8530b36f6dca4b973484855b42e281846b97b3305b28ba"
+ private fun addThreadsPlugin(context: Context, url: String, request: YoutubeDLRequest) {
+  if (!ThreadsUrls.isSupportedUrl(url)) return
+  val pluginContainer = File(engineTarget(context).parentFile, "plugins")
+  request.addOption("--plugin-dirs", pluginContainer.absolutePath)
  }
  private fun installBootstrap(context: Context) {
   val entry=File(engineTarget(context).parentFile,"yt-dlp")
@@ -145,6 +166,7 @@ object Engine {
   // subtitle lewat extract_subtitles() — BiliIntl/Bstation, antara lain — hanya mengisi daftar subtitle
   // di JSON dump bila subtitle diminta. Tanpa flag ini Bstation selalu tampak "tanpa subtitle".
   val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--write-subs").addOption("--socket-timeout", 20)
+  addThreadsPlugin(context, url, request)
   return JSONObject(execute(request,id,cookieFile(context,url)))
  }
  suspend fun inspect(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): VideoMetadata {
@@ -214,7 +236,8 @@ object Engine {
   val options = DownloadOptions(job.url,job.mode,job.format,job.quality,job.bitrate,job.subtitles,job.embedSubs,job.thumbnail,job.embedThumb)
   Selection.validate(options)
  val request = YoutubeDLRequest(job.url).addOption("--ignore-config").addOption("--no-colors").addOption("--no-playlist") // retries mengikuti default yt-dlp (10) — nilai 3 lama membuat jaringan sedikit goyang langsung menggagalkan job (P1 resume).
- .addOption("--newline").addOption("--socket-timeout",30).addOption("--retries",10).addOption("--fragment-retries",10).addOption("-f",Selection.selector(options)).addOption("-o",File(directory,"media.%(ext)s").absolutePath)
+ addThreadsPlugin(context, job.url, request)
+ request.addOption("--newline").addOption("--socket-timeout",30).addOption("--retries",10).addOption("--fragment-retries",10).addOption("-f",Selection.selector(options)).addOption("-o",File(directory,"media.%(ext)s").absolutePath)
  request.addOption("--progress")
  request.addCommands(listOf("--progress-template", DownloadProgress.DOWNLOAD_TEMPLATE, "--progress-template", DownloadProgress.PROCESS_TEMPLATE))
  // Explicit meta_* also suppresses yt-dlp's uploader fallback and original track-title precedence.
