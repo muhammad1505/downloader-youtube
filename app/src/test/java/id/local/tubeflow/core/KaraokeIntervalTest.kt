@@ -20,6 +20,16 @@ class KaraokeIntervalTest {
         assertEquals(KaraokeInterval.Segment(393000, 1008), KaraokeInterval.select(394008, 393000, true))
         assertEquals(KaraokeInterval.Segment(90000, 30000), KaraokeInterval.select(394008, 90000, true))
     }
+    @Test fun explicitEndKeepsRequestedRangeAndClipsToSongEnd() {
+        assertEquals(KaraokeInterval.Segment(90000, 45000), KaraokeInterval.select(394008, 90000, 135000, true))
+        assertEquals(KaraokeInterval.Segment(390000, 4008), KaraokeInterval.select(394008, 390000, 450000, true))
+        assertEquals(KaraokeInterval.Segment(0, 30000), KaraokeInterval.select(394008, 0, 30000, true))
+    }
+    @Test fun emptyEndFallsBackToThirtySecondsAndReversedRangeFails() {
+        assertEquals(KaraokeInterval.Segment(90000, 30000), KaraokeInterval.select(394008, 90000, null, true))
+        assertThrows(IllegalArgumentException::class.java) { KaraokeInterval.select(394008, 90000, 90000, true) }
+        assertThrows(IllegalArgumentException::class.java) { KaraokeInterval.select(394008, 90000, 30000, true) }
+    }
     @Test fun outOfRangePositionFailsAndFullSongStartsAtZero() {
         assertThrows(IllegalArgumentException::class.java) { KaraokeInterval.select(394008, 394008, true) }
         assertThrows(IllegalArgumentException::class.java) { KaraokeInterval.select(394008, -1, true) }

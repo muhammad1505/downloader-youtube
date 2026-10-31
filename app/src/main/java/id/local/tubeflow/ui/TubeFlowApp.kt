@@ -92,6 +92,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             releaseNotes = AppChangelog.forVersion(changelog, BuildConfig.VERSION_CODE)
         }
     }
+    // Pemeriksaan rilis yt-dlp paling sering sekali sehari, bukan setiap kali aplikasi dibuka.
+    LaunchedEffect(Unit) { EngineUpdater.checkIfDue(context) }
     val screenState = rememberSaveableStateHolder()
     // Dialog waktu lirik dari Riwayat dihost di sini karena butuh item katalog yang tertaut.
     var lyricTiming by remember { mutableStateOf<MediaItem?>(null) }
@@ -470,6 +472,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     ),
                     downloadTarget = downloadTarget,
                     onDownloadTargetHandled = { downloadTarget = null },
+                    onEngineUpdate = { previousTab = tab; settingsSection = "media"; tab = settingsTab },
                 )
                 0 -> MediaDashboardScreen(library, jobs, collection = { kind -> library.filter(MediaLibraryViewModel.Filter(kind = kind)); tab = 2 }, downloads = { tab = 1 })
                 2 -> MediaLibraryScreen(

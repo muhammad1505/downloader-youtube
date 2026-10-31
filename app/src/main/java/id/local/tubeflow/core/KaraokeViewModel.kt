@@ -31,9 +31,20 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
     private val _open = MutableStateFlow(false); val dialogOpen = _open.asStateFlow()
     private val _sample = MutableStateFlow(true); val sample = _sample.asStateFlow()
     private val _startText = MutableStateFlow("0:00"); val startText = _startText.asStateFlow()
+    private val _endText = MutableStateFlow(KaraokeInterval.formatStart(KaraokeInterval.DEFAULT_SAMPLE_MS)); val endText = _endText.asStateFlow()
+    // Waktu akhir mengikuti 30 detik setelah awal sampai pengguna menyuntingnya sendiri.
+    private var endEdited = false
     private var lastStartMs = 0L
+    private var lastEndMs = KaraokeInterval.DEFAULT_SAMPLE_MS
     private val _cleanupPending = MutableStateFlow(false); val cleanupPending = _cleanupPending.asStateFlow()
-    fun startText(value: String) { _startText.value = value.take(16) }
+    fun startText(value: String) {
+        val next = value.take(16)
+        _startText.value = next
+        if (!endEdited) KaraokeInterval.parseStart(next)?.let { start ->
+            _endText.value = KaraokeInterval.formatStart(start + KaraokeInterval.DEFAULT_SAMPLE_MS)
+        }
+    }
+    fun endText(value: String) { endEdited = true; _endText.value = value.take(16) }
     fun sample(enabled: Boolean) { if (!_busy.value) _sample.value = enabled }
     private val _busy = MutableStateFlow(true); val busy = _busy.asStateFlow()
     private val _stopping = MutableStateFlow(false); val stopping = _stopping.asStateFlow()
@@ -66,8 +77,11 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
                         PlayerViewModel.Track(d.getString("uri"), d.getString("title"), d.optString("artist"), d.optString("cover"), d.optString("lyrics").takeIf { it.isNotBlank() })
                     }
                     lastStartMs = data.optLong("startMs", 0)
+                    lastEndMs = data.optLong("endMs", lastStartMs + KaraokeInterval.DEFAULT_SAMPLE_MS)
+                    endEdited = data.optBoolean("endEdited", false)
                     _sample.value = data.optBoolean("sample", true)
                     _startText.value = KaraokeInterval.formatStart(lastStartMs)
+                    _endText.value = KaraokeInterval.formatStart(lastEndMs)
                 } catch (failure: Exception) { _message.value = "Status karaoke lama tidak dapat dibaca. Audio tetap tersedia." }
                 if (discardRequested) withContext(NonCancellable) {
                     work.cancelUniqueWork(KaraokeWorker.UNIQUE).result.get()
@@ -137,6 +151,7 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
         currentOpening?.cancel()
         if (_selected.value?.uri != track.uri) {
             _sample.value = true; _startText.value = KaraokeInterval.formatStart(positionMs)
+            endEdited = false; _endText.value = KaraokeInterval.formatStart(positionMs + KaraokeInterval.DEFAULT_SAMPLE_MS)
         }
         // Opening another song never silently discards an unsaved preview or a running request.
         _selected.value = track; _open.value = true; _message.value = null
@@ -149,7 +164,9 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
             currentInfo()?.let { current ->
                 val data = if (current.state.isFinished) current.outputData else current.progress
                 _sample.value = data.getBoolean("sample", _sample.value)
-                _startText.value = KaraokeInterval.formatStart(data.getLong("startMs", lastStartMs))
+                val start = data.getLong("startMs", lastStartMs)
+                _startText.value = KaraokeInterval.formatStart(start)
+                _endText.value = KaraokeInterval.formatStart(start + (data.getLong("durationMs", 0).takeIf { it > 0 } ?: KaraokeInterval.DEFAULT_SAMPLE_MS))
             }
             _open.value = true; _message.value = null
         }
@@ -167,6 +184,10 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
         val sampling = _sample.value
         val position = if (sampling) KaraokeInterval.parseStart(_startText.value) else 0L
         if (position == null) { _message.value = "Isi posisi mulai sebagai 01:30 atau 90 detik (maksimal 10 menit)."; return }
+        val finish = if (sampling) KaraokeInterval.parseStart(_endText.value) else null
+        if (sampling && (finish == null || finish <= position)) {
+            _message.value = "Isi waktu akhir setelah waktu mulai, misalnya 01:30 sampai 02:00."; return
+        }
         _busy.value = true
         viewModelScope.launch {
             try {
@@ -181,20 +202,23 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
                         val request = OneTimeWorkRequestBuilder<KaraokeWorker>().setInputData(workDataOf(
                             "uri" to track.uri, "title" to track.title.take(500), "artist" to track.artist.take(300),
                             "cover" to track.cover.take(2000), "lyrics" to track.lyricUri.orEmpty().take(2000),
-                            "createdAt" to System.currentTimeMillis(), "sample" to sampling, "startMs" to position))
+                            "createdAt" to System.currentTimeMillis(), "sample" to sampling, "startMs" to position,
+                            "endMs" to (finish ?: 0L)))
                             .addTag(KaraokeWorker.TAG).build()
                         val previous = if (requestFile.baseFile.exists()) requestFile.openRead().use { it.readBytes() } else null
                         val data = JSONObject().put("uri", track.uri).put("title", track.title).put("artist", track.artist)
                             .put("cover", track.cover).put("lyrics", track.lyricUri.orEmpty())
                         writeRequest(JSONObject().put("workId", request.id.toString()).put("source", data)
-                            .put("startMs", position).put("sample", sampling).toString().toByteArray())
+                            .put("startMs", position).put("endMs", finish ?: 0L).put("endEdited", endEdited)
+                            .put("sample", sampling).toString().toByteArray())
                         try { work.enqueueUniqueWork(KaraokeWorker.UNIQUE, ExistingWorkPolicy.KEEP, request).result.get() }
                         catch (failure: Exception) {
                             if (previous == null) requestFile.delete() else writeRequest(previous)
                             throw failure
                         }
                         withContext(Dispatchers.Main) {
-                            lastStartMs = position; _source.value = track; _saved.value = null; id.value = request.id
+                            lastStartMs = position; lastEndMs = finish ?: 0L
+                            _source.value = track; _saved.value = null; id.value = request.id
                         }
                     }
                 } }
@@ -258,7 +282,8 @@ class KaraokeViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun recordDiscard(current: UUID) {
         val record = JSONObject().put("workId", current.toString()).put("discardRequested", true)
-            .put("startMs", lastStartMs).put("sample", _sample.value)
+            .put("startMs", lastStartMs).put("endMs", lastEndMs).put("endEdited", endEdited)
+            .put("sample", _sample.value)
         _source.value?.let { track -> record.put("source", JSONObject().put("uri", track.uri)
             .put("title", track.title).put("artist", track.artist).put("cover", track.cover)
             .put("lyrics", track.lyricUri.orEmpty())) }

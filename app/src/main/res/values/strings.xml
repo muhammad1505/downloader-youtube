@@ -85,10 +85,13 @@
     <string name="karaoke_cancelled">Proses dibatalkan. Audio asli tetap tersedia.</string>
     <string name="karaoke_status_missing">Status proses tidak tersedia. Bersihkan pratinjau atau pilih lagu untuk memulai lagi.</string>
     <string name="karaoke_limits">Audio maksimal 10 menit, aplikasi 64-bit, RAM kosong ≥512 MB. Tunggu unduhan selesai. Proses baru mengganti pratinjau privat lama.</string>
-    <string name="karaoke_sample_mode">Uji cuplikan (maksimal 30 detik)</string>
+    <string name="karaoke_sample_mode">Uji cuplikan (pilih awal dan akhir)</string>
     <string name="karaoke_start_label">Mulai dari (menit:detik atau detik)</string>
-    <string name="karaoke_start_help">Contoh 01:30 atau 90. Dekat akhir lagu, cuplikan memakai sisa durasi.</string>
+    <string name="karaoke_start_help">Contoh 01:30 atau 90. Waktu akhir terisi otomatis 30 detik setelah awal.</string>
     <string name="karaoke_start_invalid">Gunakan 01:30 atau 90; rentang 0–10 menit.</string>
+    <string name="karaoke_end_label">Sampai (menit:detik atau detik)</string>
+    <string name="karaoke_end_help">Ubah bila cuplikan perlu lebih panjang. Melewati durasi lagu dipotong otomatis.</string>
+    <string name="karaoke_end_invalid">Gunakan 01:30 atau 90; rentang 0–10 menit.</string>
     <string name="karaoke_full_warning">Seluruh lagu diproses. Proses lokal bisa memerlukan puluhan menit, bergantung pada HP.</string>
     <string name="karaoke_process_sample">Proses cuplikan</string>
     <string name="karaoke_close_help">Tutup hanya menyembunyikan dialog. Untuk berhenti dan menghapus data sementara, gunakan Batalkan atau Buang pratinjau.</string>
@@ -231,6 +234,9 @@
     <string name="engine_rollback_confirm">Kembalikan</string>
     <string name="engine_security_note">Pembaruan tidak otomatis. Hanya rilis stabil resmi dari host GitHub yang diterima; batas ukuran, versi di dalam zipapp, dan checksum diperiksa sebelum dipasang.</string>
     <string name="engine_cancel">Batalkan unduhan</string>
+    <string name="engine_update_banner_title">Pembaruan mesin media tersedia</string>
+    <string name="engine_update_banner_text">Rilis resmi yt-dlp %1$s siap dipasang.</string>
+    <string name="engine_update_banner_open">Buka</string>
     <string name="power_saver_title">Penghemat baterai</string>
     <string name="power_saver_system">Ikuti sistem</string>
     <string name="power_saver_on">Aktif</string>

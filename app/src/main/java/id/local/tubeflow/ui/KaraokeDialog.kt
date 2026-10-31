@@ -46,7 +46,10 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
     val actionsEnabled = !busy && !cleanupPending
     val sample by model.sample.collectAsStateWithLifecycle()
     val startText by model.startText.collectAsStateWithLifecycle()
+    val endText by model.endText.collectAsStateWithLifecycle()
     val position = KaraokeInterval.parseStart(startText)
+    val finish = KaraokeInterval.parseStart(endText)
+    val rangeValid = position != null && finish != null && finish > position
     val message by model.message.collectAsStateWithLifecycle()
     val saved by model.saved.collectAsStateWithLifecycle()
     val active = work?.state?.isFinished == false
@@ -54,7 +57,7 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
     val resultSample = work?.outputData?.getBoolean("sample", false) ?: false
     val beginning = work?.outputData?.getLong("startMs", 0) ?: 0
     val length = work?.outputData?.getLong("durationMs", 0) ?: 0
-    val matches = ready && KaraokeProcessPolicy.matchesSelection(source?.uri, track?.uri, resultSample, sample, beginning, position)
+    val matches = ready && KaraokeProcessPolicy.matchesSelection(source?.uri, track?.uri, resultSample, sample, beginning, position, beginning + length, finish)
     var format by remember(requestId) { mutableStateOf(KaraokeOutput.FLAC) }
     var confirmSampleSave by remember(requestId, track?.uri) { mutableStateOf(false) }
     var confirmDiscard by remember(requestId, track?.uri) { mutableStateOf(false) }
@@ -147,18 +150,25 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                     Checkbox(checked = sample, onCheckedChange = null, enabled = actionsEnabled)
                     Text(stringResource(R.string.karaoke_sample_mode), Modifier.weight(1f))
                 }
-                if (sample) OutlinedTextField(value = startText, onValueChange = model::startText,
-                    label = { Text(stringResource(R.string.karaoke_start_label)) },
-                    supportingText = { Text(stringResource(if (position != null) R.string.karaoke_start_help else R.string.karaoke_start_invalid)) },
-                    isError = position == null, singleLine = true, enabled = actionsEnabled,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done), modifier = Modifier.fillMaxWidth())
+                if (sample) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = startText, onValueChange = model::startText,
+                        label = { Text(stringResource(R.string.karaoke_start_label)) },
+                        supportingText = { Text(stringResource(if (position != null) R.string.karaoke_start_help else R.string.karaoke_start_invalid)) },
+                        isError = position == null, singleLine = true, enabled = actionsEnabled,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next), modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = endText, onValueChange = model::endText,
+                        label = { Text(stringResource(R.string.karaoke_end_label)) },
+                        supportingText = { Text(stringResource(if (finish == null) R.string.karaoke_end_invalid else R.string.karaoke_end_help)) },
+                        isError = finish == null || (position != null && finish <= position), singleLine = true, enabled = actionsEnabled,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done), modifier = Modifier.weight(1f))
+                }
                 if (!sample) Text(stringResource(R.string.karaoke_full_warning), style = MaterialTheme.typography.bodySmall)
                 if (!matches) ActionButton(
                     stringResource(if (sample) R.string.karaoke_process_sample else R.string.karaoke_make_full),
                     startProcessing,
                     icon = Icons.Outlined.Mic,
                     emphasis = ActionEmphasis.Primary,
-                    enabled = actionsEnabled && (!sample || position != null),
+                    enabled = actionsEnabled && (!sample || rangeValid),
                     fillWidth = true,
                 )
             }

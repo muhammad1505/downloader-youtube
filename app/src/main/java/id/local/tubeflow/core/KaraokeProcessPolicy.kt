@@ -5,9 +5,9 @@ object KaraokeProcessPolicy {
     fun startBlocked(trackedUnfinished: Boolean, uniqueUnfinished: Boolean): Boolean =
         trackedUnfinished || uniqueUnfinished
 
-    /** A ready result belongs to one exact song, mode and clip position. */
+    /** A ready result belongs to one exact song, mode and clip range. */
     fun matchesSelection(sourceUri: String?, selectedUri: String?, sample: Boolean, requestedSample: Boolean,
-        startMs: Long, requestedStartMs: Long?): Boolean =
+        startMs: Long, requestedStartMs: Long?, endMs: Long, requestedEndMs: Long?): Boolean =
         !sourceUri.isNullOrBlank() && sourceUri == selectedUri && sample == requestedSample &&
-            (!sample || requestedStartMs == startMs)
+            (!sample || (requestedStartMs == startMs && requestedEndMs == endMs))
 }

@@ -571,7 +571,7 @@ fun SettingsScreen(
 
         if (section == null || section == "about") {
             Text(
-                "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan.",
+                "Semua proses berjalan di perangkat ini. Hormati hak cipta dan ketentuan platform sumber.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),

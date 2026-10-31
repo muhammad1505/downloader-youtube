@@ -28,11 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.R
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.DownloadOptions
 import id.local.tubeflow.core.DownloadSections
 import id.local.tubeflow.core.DownloadTarget
+import id.local.tubeflow.core.EngineUpdateState
+import id.local.tubeflow.core.EngineUpdater
 import id.local.tubeflow.core.FailureDetails
 import id.local.tubeflow.core.JobState
 import id.local.tubeflow.core.PlaylistEntry
@@ -105,6 +108,7 @@ fun DownloadScreen(
     historyActions: HistoryActions,
     downloadTarget: DownloadTarget? = null,
     onDownloadTargetHandled: () -> Unit = {},
+    onEngineUpdate: () -> Unit = {},
 ) {
     var historyQuery by rememberSaveable { mutableStateOf("") }
     var historyMode by rememberSaveable { mutableIntStateOf(-1) }
@@ -117,6 +121,7 @@ fun DownloadScreen(
     val hasQueue = DownloadSections.queue(jobs).isNotEmpty()
     val hasHistory = DownloadSections.history(jobs).isNotEmpty()
     val historyOnly = downloadTarget == DownloadTarget.HISTORY
+    val engineState by EngineUpdater.state.collectAsStateWithLifecycle()
     var previousHistoryOnly by remember { mutableStateOf(false) }
     LaunchedEffect(historyOnly, downloadTarget) {
         val wasHistoryOnly = previousHistoryOnly
@@ -224,6 +229,10 @@ fun DownloadScreen(
                 stringResource(R.string.page_download),
                 stringResource(R.string.download_section_help),
             )
+        }
+
+        if (!historyOnly && engineState is EngineUpdateState.Available) item(key = "engine-update") {
+            EngineUpdateBanner(onEngineUpdate)
         }
 
         if (!historyOnly) item(key = "download-composer") {

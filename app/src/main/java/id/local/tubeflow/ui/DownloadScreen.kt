@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,9 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -43,6 +47,8 @@ import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.SourcePlatform
+import id.local.tubeflow.core.SourcePlatforms
 import id.local.tubeflow.core.Spotify
 import id.local.tubeflow.core.SpotifyCandidate
 import id.local.tubeflow.core.SpotifyCollection
@@ -106,7 +112,10 @@ internal fun DownloadComposer(
     onFocusHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val composerFocus = remember { FocusRequester() }
+    var linkFocused by remember { mutableStateOf(false) }
+    var showAllPlatforms by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(focusComposer) {
         if (focusComposer) {
             runCatching { composerFocus.requestFocus() }
@@ -279,14 +288,15 @@ internal fun DownloadComposer(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        // Ketuk di luar kolom isian melepas fokus kursor, termasuk saat keyboard masih terbuka.
+        modifier = Modifier.fillMaxWidth().pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedTextField(
                 value = url,
                 onValueChange = { onUrl(it); if (shownPlaylist != null) clearPlaylist() },
-                modifier = Modifier.fillMaxWidth().focusRequester(composerFocus),
+                modifier = Modifier.fillMaxWidth().focusRequester(composerFocus).onFocusChanged { linkFocused = it.isFocused },
                 label = { Text("Link video, season, playlist, atau lagu Spotify") },
                 placeholder = { Text("https://youtu.be/… , bilibili.tv/play/… , playlist?list=… , atau open.spotify.com/track/…") },
                 singleLine = true,
@@ -303,7 +313,7 @@ internal fun DownloadComposer(
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
                         isSpotifyLink -> Text("Terdeteksi link Spotify — audio diambil dari video YouTube yang cocok.")
                         hasList -> Text("Link ini bagian dari sebuah playlist.")
-                        else -> Text("Contoh: youtube.com, bilibili.tv, tiktok.com, soundcloud.com, open.spotify.com.")
+                        else -> Text("Tempel tautan video, playlist, season, atau lagu. Ketuk × untuk membatalkan isian.")
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -320,12 +330,19 @@ internal fun DownloadComposer(
                                 clearPlaylist()
                             }) { Icon(Icons.Outlined.ContentPaste, "Tempel link dari papan klip") }
                         }
-                        if (url.isNotEmpty()) {
-                            IconButton(onClick = { onUrl(""); clearPlaylist() }) { Icon(Icons.Outlined.Close, "Hapus link") }
+                        // Selama fokus, × tetap tersedia walau kolom kosong supaya input bisa dibatalkan.
+                        if (url.isNotEmpty() || linkFocused) {
+                            IconButton(onClick = {
+                                onUrl("")
+                                clearPlaylist()
+                                linkFocused = false
+                                focusManager.clearFocus()
+                            }) { Icon(Icons.Outlined.Close, if (url.isEmpty()) "Batalkan input link" else "Hapus link") }
                         }
                     }
                 },
             )
+            SupportedPlatforms(expanded = showAllPlatforms, onToggle = { showAllPlatforms = !showAllPlatforms })
             if (busy || spotifyBusy) {
                 TextButton(onClick = {
                     when {
@@ -746,12 +763,44 @@ internal fun DownloadComposer(
         }
 
         Text(
-            "Download hanya konten yang kamu miliki atau diizinkan untuk disimpan. Tautan Spotify memakai metadata resmi Spotify; audionya tetap dari video YouTube yang kamu pilih. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
+            "Tautan Spotify memakai metadata resmi Spotify; audionya tetap dari video YouTube yang kamu pilih. Hasil tersimpan di Downloads/${SettingsStore.storageFolder}.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** Domain yang didukung, dengan logo platform; daftar penuh bisa dilipat agar formulir tetap ringkas. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SupportedPlatforms(expanded: Boolean, onToggle: () -> Unit) {
+    val platforms = remember { SourcePlatforms.known.filter { it.domains.isNotEmpty() } }
+    val collapsed = 6
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            (if (expanded) platforms else platforms.take(collapsed)).forEach { platform ->
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.small) {
+                    Row(
+                        Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlatformBrandLogo(platform, Modifier.size(16.dp))
+                        Text(platform.domains.first(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        if (platforms.size > collapsed) TextButton(
+            onClick = onToggle,
+            contentPadding = PaddingValues(horizontal = 4.dp),
+        ) {
+            Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (expanded) "Ringkas daftar" else "Lihat semua ${platforms.size} platform")
+        }
     }
 }
 

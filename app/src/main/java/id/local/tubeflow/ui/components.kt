@@ -10,6 +10,8 @@ import android.os.Looper
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -44,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import id.local.tubeflow.R
+import id.local.tubeflow.core.BstationUrls
 import id.local.tubeflow.core.DownloadPhase
 import id.local.tubeflow.core.sourcePlatform
 import id.local.tubeflow.core.DownloadJob
@@ -495,6 +500,49 @@ fun PlatformIcon(platform: id.local.tubeflow.core.SourcePlatform, modifier: Modi
     Icon(icon, platform.label, modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+/** Logo merek resmi (Simple Icons, CC0) per platform; null = pakai ikon generik lama. */
+@DrawableRes
+private fun brandLogoRes(platformId: String): Int? = when (platformId) {
+    "youtube_music" -> R.drawable.ic_brand_youtube_music
+    "youtube" -> R.drawable.ic_brand_youtube
+    "tiktok" -> R.drawable.ic_brand_tiktok
+    "soundcloud" -> R.drawable.ic_brand_soundcloud
+    "facebook" -> R.drawable.ic_brand_facebook
+    "instagram" -> R.drawable.ic_brand_instagram
+    "x" -> R.drawable.ic_brand_x
+    "vimeo" -> R.drawable.ic_brand_vimeo
+    "dailymotion" -> R.drawable.ic_brand_dailymotion
+    "twitch" -> R.drawable.ic_brand_twitch
+    "reddit" -> R.drawable.ic_brand_reddit
+    "pinterest" -> R.drawable.ic_brand_pinterest
+    "threads" -> R.drawable.ic_brand_threads
+    "bandcamp" -> R.drawable.ic_brand_bandcamp
+    "bilibili", BstationUrls.PLATFORM_ID -> R.drawable.ic_brand_bilibili
+    "snapchat" -> R.drawable.ic_brand_snapchat
+    else -> null
+}
+
+/**
+ * Logo merek untuk chip domain. Warna asli dipakai apa adanya; merek yang resminya hitam atau
+ * kuning terang (TikTok, X, Threads, Dailymotion, Snapchat) ditint mengikuti tema agar tidak hilang
+ * di salah satu tema. Likee belum punya aset sehingga memakai ikon generik.
+ */
+@Composable
+fun PlatformBrandLogo(platform: id.local.tubeflow.core.SourcePlatform, modifier: Modifier = Modifier) {
+    val logo = brandLogoRes(platform.id)
+    if (logo == null) {
+        PlatformIcon(platform, modifier)
+        return
+    }
+    if (platform.id in monochromeBrands) {
+        Icon(painterResource(logo), null, modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Image(painterResource(logo), null, modifier)
+    }
+}
+
+private val monochromeBrands = setOf("tiktok", "x", "threads", "dailymotion", "snapchat")
+
 /**
  * Sampul hasil cache (P2): decode file covers/<id>.jpg di IO. Tanpa sampul/gagal decode = ikon mode
  * di atas gradien (fallback lama) — item tidak pernah gagal tampil karena gambar.
@@ -554,7 +602,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     }
                     // Platform asal tautan (mis. SoundCloud, TikTok) + ikonnya — dikirim oleh Antrean & Riwayat (P2).
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PlatformIcon(job.sourcePlatform, Modifier.size(13.dp))
+                        PlatformBrandLogo(job.sourcePlatform, Modifier.size(14.dp))
                         Text(
                             formatMeta(job) + " · ${job.sourcePlatform.label}",
                             style = MaterialTheme.typography.labelSmall,

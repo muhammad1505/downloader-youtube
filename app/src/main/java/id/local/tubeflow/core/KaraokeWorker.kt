@@ -74,7 +74,8 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
                 finally { reader.release() }
             require(duration != null && duration in 1..600000) { "Pilih audio berdurasi paling lama 10 menit." }
             val sample = inputData.getBoolean("sample", false)
-            val segment = KaraokeInterval.select(duration, inputData.getLong("startMs", 0), sample)
+            val requestedEnd = if (inputData.hasKeyWithValueOfType<Long>("endMs")) inputData.getLong("endMs", 0) else null
+            val segment = KaraokeInterval.select(duration, inputData.getLong("startMs", 0), requestedEnd, sample)
             val startMs = segment.startMs
             val budget = duration * 44100 / 1000 * 20 + KaraokeModel.BYTES + 256L * 1024 * 1024
             require(android.os.StatFs(directory.path).availableBytes >= budget) { "Ruang kosong belum cukup untuk pemrosesan karaoke." }

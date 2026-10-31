@@ -3,8 +3,9 @@ package id.local.tubeflow.core
 import java.math.BigDecimal
 import java.util.Locale
 
-/** Explicit clip position; a request near the end becomes shorter, never silently starts earlier. */
+/** Explicit clip range; a request near the end becomes shorter, never silently starts earlier. */
 object KaraokeInterval {
+    const val DEFAULT_SAMPLE_MS = 30_000L
     data class Segment(val startMs: Long, val durationMs: Long)
     fun parseStart(value: String): Long? {
         val text = value.trim().replace(',', '.')
@@ -28,10 +29,16 @@ object KaraokeInterval {
         val fraction = if (safe % 1000 == 0L) "" else ".%03d".format(Locale.ROOT, safe % 1000).trimEnd('0')
         return clock + fraction
     }
-    fun select(durationMs: Long, startMs: Long, sample: Boolean): Segment {
+    /** Permintaan lama tanpa waktu akhir memakai 30 detik, sama seperti isian otomatis di dialog. */
+    fun select(durationMs: Long, startMs: Long, sample: Boolean): Segment =
+        select(durationMs, startMs, endMs = null, sample = sample)
+
+    fun select(durationMs: Long, startMs: Long, endMs: Long?, sample: Boolean): Segment {
         require(durationMs in 1..600000) { "Pilih audio berdurasi paling lama 10 menit." }
         if (!sample) return Segment(0, durationMs)
         require(startMs in 0 until durationMs) { "Posisi mulai melewati akhir lagu. Pilih menit/detik yang lebih awal." }
-        return Segment(startMs, minOf(30000, durationMs - startMs))
+        val end = (endMs ?: (startMs + DEFAULT_SAMPLE_MS)).coerceAtMost(durationMs)
+        require(end > startMs) { "Posisi akhir harus setelah posisi mulai." }
+        return Segment(startMs, end - startMs)
     }
 }

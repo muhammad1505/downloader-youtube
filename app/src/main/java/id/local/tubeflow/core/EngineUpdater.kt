@@ -66,6 +66,7 @@ object EngineUpdater {
     private const val MAX_SUMS_BYTES = 256L * 1024
     private const val MAX_ENGINE_BYTES = 20L * 1024 * 1024
     private const val MAX_REDIRECTS = 5
+    private const val CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
     private val VERSION = Regex("""\d{4}\.\d{2}\.\d{2}""")
     private val SHA256 = Regex("""[a-f0-9]{64}""")
     private val ALLOWED_HOSTS = setOf(
@@ -83,6 +84,17 @@ object EngineUpdater {
     @Volatile private var job: Job? = null
     private var installedKey: String? = null
     private var installedCache: InstalledEngine? = null
+
+    /** One check per day at app start; manual checks in Settings always run. */
+    fun checkIfDue(context: Context) {
+        if (running.get()) return
+        val prefs = context.getSharedPreferences("engine-update", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val last = prefs.getLong("lastCheck", 0L)
+        if (last > 0 && now - last < CHECK_INTERVAL_MS) return
+        prefs.edit().putLong("lastCheck", now).apply()
+        check(context)
+    }
 
     fun check(context: Context) = start(context) { app ->
         _state.value = EngineUpdateState.Checking
