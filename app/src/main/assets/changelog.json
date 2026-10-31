@@ -1,5 +1,16 @@
 [
   {
+    "versionCode": 74,
+    "versionName": "1.1.59",
+    "highlights": [
+      "Kolom tautan kini punya tombol × dan melepas fokus saat diketuk di luar, jadi kursor tidak tertinggal di isian.",
+      "Contoh domain menjadi chip logo merek yang bisa dilipat; logo yang sama tampil di Antrean, Riwayat, dan Pustaka.",
+      "Banner pemberitahuan muncul saat rilis yt-dlp terbaru tersedia, diperiksa paling sering sekali sehari.",
+      "Pisah vokal memakai dua kolom waktu: mulai dan akhir, dengan akhir terisi otomatis 30 detik dan bisa diubah.",
+      "Teks hak cipta diperjelas dan disclaimer lama dihapus."
+    ]
+  },
+  {
     "versionCode": 73,
     "versionName": "1.1.58",
     "highlights": [
