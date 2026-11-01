@@ -73,10 +73,16 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    return Result.success()
   }
  }
- private suspend fun recordFailure(jobId: String, generation: Int, error: Exception): String = withContext(Dispatchers.IO) {
-  val current = dao.get(jobId)
+ private suspend fun recordFailure(jobId: String, generation: Int, error: Exception, skipUnavailableCollection: Boolean = false): String? = withContext(Dispatchers.IO) {
+  val current = dao.get(jobId) ?: return@withContext null
   val store = FailureDetailsStore(applicationContext)
-  val details = store.capture(error, current?.phase ?: DownloadPhase.PREPARING)
+  val details = store.capture(error, current.phase)
+  // Video playlist yang sudah hilang di sumber bukan kegagalan unduhan pengguna: hapus barisnya
+  // supaya tidak muncul sebagai "Gagal" dan tidak mengotori antrean playlist lainnya.
+  if (skipUnavailableCollection && CollectionSkip.shouldSkip(current, details.category)) {
+   dao.skipOwned(jobId, generation)
+   return@withContext null
+  }
   if (dao.failOwned(jobId, generation, details.userMessage) > 0) runCatching { store.put(jobId,generation,details) }
   details.userMessage
  }
@@ -279,8 +285,9 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    if (takenOver || state == JobState.PAUSED || state == JobState.CANCELLED || isStopped) {
     if (!takenOver) withContext(NonCancellable) { handleStop(jobId, generation) }
    } else {
-    val message = recordFailure(jobId, generation, error)
-    notifyResult(job, null, message)
+    val message = recordFailure(jobId, generation, error, skipUnavailableCollection = true)
+    // Entri playlist yang dilewati tidak punya baris maupun notifikasi gagal.
+    if (message != null) notifyResult(job, null, message)
    }
    Result.success()
   } finally {
@@ -294,14 +301,19 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     if (!completed) ownSidecars.forEach { uri -> runCatching { StalePublicationCleanup.delete(applicationContext, uri.toString()) } }
     val pendingDeleted=pending?.let { uri -> runCatching { StalePublicationCleanup.delete(applicationContext, uri.toString()) }.getOrDefault(false) } ?: true
     val current = dao.get(jobId)
-    if (!takenOver && current != null && current.generation == generation) {
+    // Baris null berarti entri playlist yang videonya hilang sudah dilewati; berkas kerjanya tetap dibersihkan.
+    if (!takenOver && (current == null || current.generation == generation)) {
      if (pendingDeleted) dao.clearPendingOwned(jobId, generation)
-     dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, dao.get(jobId)?.resumeNotice.orEmpty())
+     if (current != null) dao.resumeInfo(jobId, generation, directory.walkTopDown().filter { it.isFile && it.name.endsWith(".part") }.sumOf { it.length() }, current.resumeNotice)
     // Jeda (PAUSED), putus koneksi (kembali QUEUED), maupun Gagal (FAILED) menyimpan parsial —
     // "Lanjutkan"/"Coba lagi" lanjut dari file .part, bukan dari nol (BUG-004/BUG-025/P1 resume).
     // yt-dlp memvalidasi sendiri keaslian parsial (Range/ukuran; -c default) saat lanjut. Batal tetap dibersihkan.
-    val keepPartial = current.state == JobState.PAUSED || current.state == JobState.QUEUED || current.state == JobState.FAILED
-     if (!Engine.isRunning(jobId) && !keepPartial && !takenOverByOther()) directory.deleteRecursively()
+    val keepPartial = current?.state == JobState.PAUSED || current?.state == JobState.QUEUED || current?.state == JobState.FAILED
+     if (!Engine.isRunning(jobId) && !keepPartial && !takenOverByOther()) {
+      directory.deleteRecursively()
+      // Baris hilang otomatis (entri playlist dilewati) — sampul cache-nya ikut dibuang.
+      if (current == null) job.coverPath.takeIf { it.isNotBlank() }?.let { path -> CoverCache.deleteIfUnused(applicationContext, jobId, path) }
+     }
     }
    }
   }

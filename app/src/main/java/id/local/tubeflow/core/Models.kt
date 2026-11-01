@@ -203,6 +203,8 @@ class Converters {
  /** Versi milik worker untuk handleStop; lihat [failOwned]. */
  @Query("UPDATE downloads SET state = 'CANCELLED' WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING','PAUSED')") suspend fun cancelOwned(id: String, gen: Int): Int
  @Query("DELETE FROM downloads WHERE id = :id AND state IN ('COMPLETED','FAILED','CANCELLED')") suspend fun remove(id: String): Int
+ /** Entri playlist yang videonya sudah tidak tersedia dihapus tanpa dicatat sebagai kegagalan antrean. */
+ @Query("DELETE FROM downloads WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING')") suspend fun skipOwned(id: String, gen: Int): Int
  @Query("DELETE FROM downloads WHERE state = 'COMPLETED'") suspend fun clearCompleted(): Int
  /** Retensi riwayat: baris lama memakai createdAt bila completedAt masih 0 (BUG-023). */
  @Query("DELETE FROM downloads WHERE state = 'COMPLETED' AND COALESCE(NULLIF(completedAt, 0), createdAt) < :cutoff") suspend fun clearCompletedBefore(cutoff: Long): Int

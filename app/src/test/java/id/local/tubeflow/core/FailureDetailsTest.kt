@@ -56,6 +56,13 @@ class FailureDetailsTest {
         assertEquals("empty", empty.category)
         assertTrue(empty.userMessage.contains("episode"))
     }
+    @Test fun removedPlaylistVideoGetsUnavailableCategory() {
+        val removed = report("YoutubeDLException: ERROR: [youtube] SIXBqhLD0js: Video unavailable. This video is not available")
+        assertEquals("unavailable", removed.category)
+        assertTrue(removed.userMessage.contains("tidak tersedia"))
+        assertEquals("unavailable", report("ERROR: [youtube] x: Private video. Sign in if you have permission").category)
+        assertEquals("unavailable", report("ERROR: [youtube] x: [Deleted video]").category)
+    }
     @Test fun geoAndPremiumRestrictionsGetActionableMessages() {
         val geo = report("ERROR: [BiliIntl] This video is not available from your location due to geo restriction")
         assertEquals("geo", geo.category)
