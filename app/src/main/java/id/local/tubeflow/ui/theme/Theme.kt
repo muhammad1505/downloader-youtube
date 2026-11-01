@@ -120,10 +120,8 @@ fun TubeFlowTheme(
             isAppearanceLightStatusBars = !darkTheme
             isAppearanceLightNavigationBars = !darkTheme
         }
-        if (Build.VERSION.SDK_INT >= 29) {
-            window.isNavigationBarContrastEnforced = !cyberpunk
-            window.isStatusBarContrastEnforced = !cyberpunk
-        }
+        window.isNavigationBarContrastEnforced = !cyberpunk
+        window.isStatusBarContrastEnforced = !cyberpunk
     }
     val supportsDynamic = Build.VERSION.SDK_INT >= 31
     val useDynamicColor = dynamicColor && !cyberpunk
