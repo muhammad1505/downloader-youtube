@@ -1,12 +1,13 @@
 [
   {
-    "versionCode": 74,
-    "versionName": "1.1.59",
+    "versionCode": 75,
+    "versionName": "1.1.60",
     "highlights": [
       "Kolom tautan kini punya tombol × dan melepas fokus saat diketuk di luar, jadi kursor tidak tertinggal di isian.",
       "Contoh domain menjadi chip logo merek yang bisa dilipat; logo yang sama tampil di Antrean, Riwayat, dan Pustaka.",
       "Banner pemberitahuan muncul saat rilis yt-dlp terbaru tersedia, diperiksa paling sering sekali sehari.",
       "Pisah vokal memakai dua kolom waktu: mulai dan akhir, dengan akhir terisi otomatis 30 detik dan bisa diubah.",
+      "Entri playlist yang videonya sudah dihapus atau privat dilewati otomatis tanpa muncul sebagai kegagalan antrean; inspeksi playlist juga tidak lagi memuat video mati.",
       "Teks hak cipta diperjelas dan disclaimer lama dihapus."
     ]
   },
