@@ -1,10 +1,14 @@
 package id.local.tubeflow.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,6 +76,20 @@ data class HistoryActions(
     val editLyricTiming: (String) -> Unit,
 )
 
+@Composable
+private fun DownloadSearchHeader(query: String, onQueryChange: (String) -> Unit) {
+    SearchField(
+        value = query,
+        onValueChange = onQueryChange,
+        label = "Cari judul",
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(vertical = 4.dp),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DownloadScreen(
     jobs: List<DownloadJob>,
@@ -224,6 +242,11 @@ fun DownloadScreen(
                 }
             }
         }
+        if (historyOnly && hasHistory) {
+            stickyHeader(key = "history-search") {
+                DownloadSearchHeader(historyQuery) { historyQuery = it }
+            }
+        }
         if (!historyOnly) item(key = "download-heading") {
             PageHeading(
                 stringResource(R.string.page_download),
@@ -270,9 +293,16 @@ fun DownloadScreen(
             )
         }
 
+        if (!historyOnly && (hasQueue || hasHistory)) {
+            stickyHeader(key = "download-search") {
+                DownloadSearchHeader(historyQuery) { historyQuery = it }
+            }
+        }
+
         if (!historyOnly && hasQueue) {
             queueSection(
                 jobs = jobs,
+                query = historyQuery,
                 highlightedJobId = highlightedJobId,
                 onCancel = queueActions.cancel,
                 onRetry = queueActions.retry,

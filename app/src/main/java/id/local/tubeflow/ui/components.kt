@@ -528,16 +528,20 @@ private fun brandLogoRes(platformId: String): Int? = when (platformId) {
  * di salah satu tema. Likee belum punya aset sehingga memakai ikon generik.
  */
 @Composable
-fun PlatformBrandLogo(platform: id.local.tubeflow.core.SourcePlatform, modifier: Modifier = Modifier) {
+fun PlatformBrandLogo(
+    platform: id.local.tubeflow.core.SourcePlatform,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
     val logo = brandLogoRes(platform.id)
     if (logo == null) {
         PlatformIcon(platform, modifier)
         return
     }
     if (platform.id in monochromeBrands) {
-        Icon(painterResource(logo), null, modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(painterResource(logo), contentDescription, modifier, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     } else {
-        Image(painterResource(logo), null, modifier)
+        Image(painterResource(logo), contentDescription, modifier)
     }
 }
 

@@ -11,7 +11,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -115,7 +118,6 @@ internal fun DownloadComposer(
     val focusManager = LocalFocusManager.current
     val composerFocus = remember { FocusRequester() }
     var linkFocused by remember { mutableStateOf(false) }
-    var showAllPlatforms by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(focusComposer) {
         if (focusComposer) {
             runCatching { composerFocus.requestFocus() }
@@ -342,7 +344,7 @@ internal fun DownloadComposer(
                     }
                 },
             )
-            SupportedPlatforms(expanded = showAllPlatforms, onToggle = { showAllPlatforms = !showAllPlatforms })
+            SupportedPlatforms()
             if (busy || spotifyBusy) {
                 TextButton(onClick = {
                     when {
@@ -772,34 +774,20 @@ internal fun DownloadComposer(
     }
 }
 
-/** Domain yang didukung, dengan logo platform; daftar penuh bisa dilipat agar formulir tetap ringkas. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Domain yang didukung: satu baris ikon tanpa caption; sisanya tersembunyi agar formulir ringkas. */
 @Composable
-private fun SupportedPlatforms(expanded: Boolean, onToggle: () -> Unit) {
+private fun SupportedPlatforms() {
     val platforms = remember { SourcePlatforms.known.filter { it.domains.isNotEmpty() } }
-    val collapsed = 6
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            (if (expanded) platforms else platforms.take(collapsed)).forEach { platform ->
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.small) {
-                    Row(
-                        Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PlatformBrandLogo(platform, Modifier.size(16.dp))
-                        Text(platform.domains.first(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(end = 4.dp),
+    ) {
+        items(platforms, key = { it.id }) { platform ->
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
+                Box(Modifier.padding(7.dp)) {
+                    PlatformBrandLogo(platform, Modifier.size(18.dp), platform.label)
                 }
             }
-        }
-        if (platforms.size > collapsed) TextButton(
-            onClick = onToggle,
-            contentPadding = PaddingValues(horizontal = 4.dp),
-        ) {
-            Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (expanded) "Ringkas daftar" else "Lihat semua ${platforms.size} platform")
         }
     }
 }

@@ -43,13 +43,15 @@ fun LazyListScope.queueSection(
     onResumeAll: () -> Unit,
     onCancelAllRequest: () -> Unit,
     onClearUnsuccessful: () -> Unit,
+    query: String = "",
 ) {
-    val active = DownloadSections.queue(jobs)
-    val running = active.count { it.state == JobState.RUNNING }
-    val queued = active.count { it.state == JobState.QUEUED }
-    val paused = active.count { it.state == JobState.PAUSED }
-    val failed = active.count { it.state == JobState.FAILED }
-    val cancelled = active.count { it.state == JobState.CANCELLED }
+    val all = DownloadSections.queue(jobs)
+    val active = if (query.isBlank()) all else all.filter { it.title.contains(query.trim(), ignoreCase = true) }
+    val running = all.count { it.state == JobState.RUNNING }
+    val queued = all.count { it.state == JobState.QUEUED }
+    val paused = all.count { it.state == JobState.PAUSED }
+    val failed = all.count { it.state == JobState.FAILED }
+    val cancelled = all.count { it.state == JobState.CANCELLED }
     val pausable = running + queued
     val summary = buildList {
         if (running > 0) add("$running berjalan")
@@ -63,7 +65,7 @@ fun LazyListScope.queueSection(
                 summary = "Antrean · $summary",
                 pausable = pausable,
                 paused = paused,
-                showBulkActions = active.size > 1,
+                showBulkActions = all.size > 1,
                 onPauseAll = onPauseAll,
                 onResumeAll = onResumeAll,
                 onCancelAllRequest = onCancelAllRequest,
@@ -94,6 +96,16 @@ fun LazyListScope.queueSection(
             modifier = Modifier.animateItem(),
             highlighted = job.id == highlightedJobId,
         )
+    }
+    if (query.isNotBlank() && active.isEmpty() && all.isNotEmpty()) {
+        item(key = "queue-no-match") {
+            Text(
+                "Tidak ada antrean yang cocok dengan pencarian.",
+                Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
     item(key = "queue-spacer") { Spacer(Modifier.height(4.dp)) }
 }

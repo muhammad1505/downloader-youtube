@@ -53,8 +53,7 @@ fun LazyListScope.historySection(
     val platforms = completed.map { it.sourcePlatform.label }.distinct().sorted()
     val filtered = completed.filter { job ->
         val matchesQuery = query.isBlank() ||
-            job.title.contains(query, ignoreCase = true) ||
-            job.url.contains(query, ignoreCase = true)
+            job.title.contains(query.trim(), ignoreCase = true)
         val matchesMode = when (modeFilter) {
             0 -> job.mode == MediaMode.VIDEO
             1 -> job.mode == MediaMode.AUDIO
@@ -73,9 +72,6 @@ fun LazyListScope.historySection(
         )
     }
     if (showTools) {
-        item(key = "history-search") {
-            SearchField(query, onQueryChange, label = "Cari judul atau link")
-        }
         item(key = "history-filters") {
             ScrollRow {
                 FilterChip(selected = modeFilter == -1, onClick = { onModeFilterChange(-1) }, label = { Text("Semua") })

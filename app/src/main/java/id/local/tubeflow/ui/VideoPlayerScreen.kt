@@ -301,7 +301,14 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
             controlsVisible = false
         }
     }
-    LaunchedEffect(state.playing) { if (!state.playing) controlsVisible = true }
+    // Jeda sesaat saat buffering tidak boleh memunculkan kontrol tanpa sentuhan pengguna.
+    LaunchedEffect(state.playing, state.buffering) {
+        if (!state.playing && !state.buffering) {
+            delay(400)
+            val latest = video.state.value
+            if (!latest.playing && !latest.buffering) controlsVisible = true
+        }
+    }
     LaunchedEffect(state.error) { if (state.error != null) controlsLocked = false }
     LaunchedEffect(state.entry?.uri, state.resumeFromMs) {
         showResume = state.resumeFromMs > 0

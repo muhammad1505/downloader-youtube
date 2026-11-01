@@ -150,17 +150,30 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
                     Checkbox(checked = sample, onCheckedChange = null, enabled = actionsEnabled)
                     Text(stringResource(R.string.karaoke_sample_mode), Modifier.weight(1f))
                 }
-                if (sample) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = startText, onValueChange = model::startText,
-                        label = { Text(stringResource(R.string.karaoke_start_label)) },
-                        supportingText = { Text(stringResource(if (position != null) R.string.karaoke_start_help else R.string.karaoke_start_invalid)) },
-                        isError = position == null, singleLine = true, enabled = actionsEnabled,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next), modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = endText, onValueChange = model::endText,
-                        label = { Text(stringResource(R.string.karaoke_end_label)) },
-                        supportingText = { Text(stringResource(if (finish == null) R.string.karaoke_end_invalid else R.string.karaoke_end_help)) },
-                        isError = finish == null || (position != null && finish <= position), singleLine = true, enabled = actionsEnabled,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done), modifier = Modifier.weight(1f))
+                if (sample) {
+                    val rangeInvalid = position == null || finish == null || finish <= position
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                        OutlinedTextField(value = startText, onValueChange = model::startText,
+                            label = { Text(stringResource(R.string.karaoke_start_label)) },
+                            isError = position == null, singleLine = true, enabled = actionsEnabled,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next), modifier = Modifier.weight(1f))
+                        OutlinedTextField(value = endText, onValueChange = model::endText,
+                            label = { Text(stringResource(R.string.karaoke_end_label)) },
+                            isError = finish == null || (position != null && finish <= position), singleLine = true, enabled = actionsEnabled,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done), modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        stringResource(
+                            when {
+                                position == null -> R.string.karaoke_start_invalid
+                                finish == null -> R.string.karaoke_end_invalid
+                                finish <= position -> R.string.karaoke_end_order
+                                else -> R.string.karaoke_start_help
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (rangeInvalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (!sample) Text(stringResource(R.string.karaoke_full_warning), style = MaterialTheme.typography.bodySmall)
                 if (!matches) ActionButton(

@@ -86,12 +86,12 @@
     <string name="karaoke_status_missing">Status proses tidak tersedia. Bersihkan pratinjau atau pilih lagu untuk memulai lagi.</string>
     <string name="karaoke_limits">Audio maksimal 10 menit, aplikasi 64-bit, RAM kosong ≥512 MB. Tunggu unduhan selesai. Proses baru mengganti pratinjau privat lama.</string>
     <string name="karaoke_sample_mode">Uji cuplikan (pilih awal dan akhir)</string>
-    <string name="karaoke_start_label">Mulai dari (menit:detik atau detik)</string>
+    <string name="karaoke_start_label">Awal</string>
     <string name="karaoke_start_help">Contoh 01:30 atau 90. Waktu akhir terisi otomatis 30 detik setelah awal.</string>
     <string name="karaoke_start_invalid">Gunakan 01:30 atau 90; rentang 0–10 menit.</string>
-    <string name="karaoke_end_label">Sampai (menit:detik atau detik)</string>
-    <string name="karaoke_end_help">Ubah bila cuplikan perlu lebih panjang. Melewati durasi lagu dipotong otomatis.</string>
+    <string name="karaoke_end_label">Akhir</string>
     <string name="karaoke_end_invalid">Gunakan 01:30 atau 90; rentang 0–10 menit.</string>
+    <string name="karaoke_end_order">Waktu akhir harus setelah waktu awal.</string>
     <string name="karaoke_full_warning">Seluruh lagu diproses. Proses lokal bisa memerlukan puluhan menit, bergantung pada HP.</string>
     <string name="karaoke_process_sample">Proses cuplikan</string>
     <string name="karaoke_close_help">Tutup hanya menyembunyikan dialog. Untuk berhenti dan menghapus data sementara, gunakan Batalkan atau Buang pratinjau.</string>
