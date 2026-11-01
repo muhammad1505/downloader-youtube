@@ -4,10 +4,14 @@
     "versionName": "1.1.60",
     "highlights": [
       "Kolom tautan kini punya tombol × dan melepas fokus saat diketuk di luar, jadi kursor tidak tertinggal di isian.",
-      "Contoh domain menjadi chip logo merek yang bisa dilipat; logo yang sama tampil di Antrean, Riwayat, dan Pustaka.",
+      "Contoh domain menjadi baris logo merek yang bisa digeser; logo yang sama tampil di Antrean, Riwayat, dan Pustaka.",
       "Banner pemberitahuan muncul saat rilis yt-dlp terbaru tersedia, diperiksa paling sering sekali sehari.",
       "Pisah vokal memakai dua kolom waktu: mulai dan akhir, dengan akhir terisi otomatis 30 detik dan bisa diubah.",
       "Entri playlist yang videonya sudah dihapus atau privat dilewati otomatis tanpa muncul sebagai kegagalan antrean; inspeksi playlist juga tidak lagi memuat video mati.",
+      "Video yang dibatasi wilayah dikenali sebagai kegagalan geo, jadi tidak ikut dilewati sebagai video hilang.",
+      "Pencarian unduhan menempel di atas Antrean dan Riwayat; tata letak unduhan dan kontrol pemutar dirapikan.",
+      "Kontrol pemutar tidak muncul sendiri saat buffering sesaat; spinner hanya tampil ketika video benar-benar menunggu data, bukan saat buffer latar diisi ulang.",
+      "Pengaturan → Penyimpanan dapat menambahkan folder koleksi lain (maks. 8, mis. kartu memori); melepas folder hanya membersihkan indeks, file tetap utuh.",
       "Teks hak cipta diperjelas dan disclaimer lama dihapus."
     ]
   },
