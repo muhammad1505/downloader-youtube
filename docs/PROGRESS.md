@@ -1317,3 +1317,21 @@ label, tumpang tindih parent/anak, dedup sumber, dan encode/decode preferensi.
 
 Verifikasi: `./gradlew testDebugUnitTest`, `assembleDebug`, dan `lintDebug`. Build rilis dan uji
 perangkat untuk fitur ini belum dijalankan.
+
+## Rilis 1.1.61 — 2 November 2026
+
+Nomor versi dinaikkan ke **1.1.61/code76**. Entri `changelog.json` teratas ikut digeser dari
+1.1.60 ke 1.1.61 karena 1.1.60/75 tidak pernah terbit (tag terakhir `v1.1.57`) dan seluruh
+sorotannya adalah pekerjaan sesi ini; menambah entri kedua akan menduplikasi catatan yang sama.
+`AppChangelogTest` memastikan `BuildConfig.VERSION_CODE` 76 punya catatan sendiri.
+
+Pekerjaan sesi ini dipecah menjadi commit per topik di atas baseline `fb10e1d`: klasifikasi geo,
+pemeriksaan pembaruan engine harian (+ `docs/PRIVACY.md`), spinner pemutar, guard versi tema,
+folder koleksi tambahan, catatan rilis, lalu kenaikan versi.
+
+Verifikasi: `./gradlew testDebugUnitTest assembleDebug` lulus (1m24s) termasuk `AppChangelogTest`,
+`CollectionFoldersTest`, `FailureDetailsTest`, dan `VideoPlaybackTest`; JSON changelog valid dengan
+urutan kode `[76, 73, 72, 71]` tanpa duplikat. Belum dijalankan: `lintRelease`, build rilis
+ber-minify, audit native/ZIP, dan uji perangkat, sehingga 1.1.61 belum punya APK terbit dan
+update di atas 1.1.60 belum dibuktikan. Tag `v1.1.61` dibuat sebagai penanda kode, bukan bukti
+validasi runtime.
