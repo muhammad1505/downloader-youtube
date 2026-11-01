@@ -191,7 +191,11 @@ object Engine {
   onPhase(InspectionPhase.PREPARING_ENGINE)
   initialize(context)
   onPhase(InspectionPhase.FETCHING_PLAYLIST)
+  // yt-dlp memuat ulang playlist DENGAN video yang sudah dihapus/privat secara bawaan; entri itu
+  // lalu gagal di tahap PREPARING ("Video unavailable"). Matikan perilaku tersebut agar hanya
+  // video yang benar-benar tersedia yang tampil di pemilih dan masuk antrean.
   val request = YoutubeDLRequest(url.trim()).addOption("--ignore-config").addOption("--no-colors").addOption("--yes-playlist").addOption("--flat-playlist").addOption("--skip-download").addOption("--dump-single-json").addOption("--playlist-end", 500).addOption("--socket-timeout", 20)
+   .addOption("--compat-options", "no-youtube-unavailable-videos")
   if (Selection.isMix(url)) request.addOption("--tubeflow-mix-snapshot")
   val json = JSONObject(execute(request,id))
   onPhase(InspectionPhase.READING_ENTRIES)
