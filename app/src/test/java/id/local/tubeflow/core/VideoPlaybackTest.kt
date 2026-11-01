@@ -1,6 +1,7 @@
 package id.local.tubeflow.core
 
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -440,6 +441,14 @@ class VideoPlaybackTest {
         assertTrue(titled.endsWith(".png"))
         assertEquals(68, VideoPlayback.screenshotFileName("a".repeat(80), 1_793_000_400_000L).length)
         assertTrue(VideoPlayback.screenshotFileName("///", 1_793_000_400_000L).startsWith("video-"))
+    }
+
+    @Test
+    fun bufferingIndicatorIgnoresNormalBackgroundPrefetch() {
+        // Prefetch latar dapat membuat isLoading true saat STATE_READY; spinner tidak boleh ikut.
+        assertTrue(VideoPlayback.shouldShowBuffering(Player.STATE_BUFFERING, hasError = false))
+        assertFalse(VideoPlayback.shouldShowBuffering(Player.STATE_READY, hasError = false))
+        assertFalse(VideoPlayback.shouldShowBuffering(Player.STATE_BUFFERING, hasError = true))
     }
 
     @Test

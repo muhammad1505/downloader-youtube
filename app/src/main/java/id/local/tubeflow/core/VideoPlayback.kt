@@ -1,6 +1,7 @@
 package id.local.tubeflow.core
 
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLDecoder
@@ -260,6 +261,14 @@ object VideoPlayback {
     /** Home hanya boleh masuk PiP saat video aktif diputar, bukan saat aplikasi membuka picker. */
     fun shouldEnterPipOnLeave(active: Boolean, playing: Boolean, suppressed: Boolean): Boolean =
         active && playing && !suppressed
+
+    /**
+     * Spinner buffering hanya saat ExoPlayer benar-benar menunggu data. `isLoading` saja tidak
+     * cukup karena prefetch latar yang normal juga menyalakannya; memakainya membuat indikator
+     * berkedip setiap buffer refill walaupun video terus berjalan.
+     */
+    fun shouldShowBuffering(playbackState: Int, hasError: Boolean): Boolean =
+        !hasError && playbackState == Player.STATE_BUFFERING
 
     /** Setelah fallback software gagal, pemutar harus dibuat ulang agar percobaan berikutnya bisa hardware. */
     fun needsDecoderRestart(hasPlayer: Boolean, softwareFallbackUsed: Boolean): Boolean =

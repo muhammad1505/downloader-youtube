@@ -129,11 +129,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             if (!isPlaying) saveNow()
         }
 
-        override fun onIsLoadingChanged(isLoading: Boolean) {
-            val current = _state.value
-            if (current.error == null) _state.value = current.copy(buffering = isLoading)
-        }
-
+        // Jangan memakai onIsLoadingChanged untuk spinner: isLoading juga bernilai true saat
+        // ExoPlayer melakukan prefetch latar yang normal. Indikator buffering hanya boleh
+        // mengikuti STATE_BUFFERING agar tidak berkedip setiap buffer refill (~50 detik).
         override fun onPlaybackStateChanged(playbackState: Int) {
             val current = _state.value
             _state.value = when (playbackState) {
@@ -144,7 +142,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     error = null,
                     durationMs = player?.duration?.takeIf { it > 0 && it != C.TIME_UNSET } ?: current.durationMs,
                 )
-                Player.STATE_BUFFERING -> current.copy(buffering = current.error == null)
+                Player.STATE_BUFFERING -> current.copy(
+                    buffering = VideoPlayback.shouldShowBuffering(playbackState, current.error != null),
+                )
                 Player.STATE_ENDED -> {
                     currentUri?.let(resume::clear)
                     current.copy(playing = false, buffering = false, ended = true)
