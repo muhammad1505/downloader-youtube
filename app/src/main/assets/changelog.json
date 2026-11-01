@@ -1,7 +1,7 @@
 [
   {
-    "versionCode": 75,
-    "versionName": "1.1.60",
+    "versionCode": 76,
+    "versionName": "1.1.61",
     "highlights": [
       "Kolom tautan kini punya tombol × dan melepas fokus saat diketuk di luar, jadi kursor tidak tertinggal di isian.",
       "Contoh domain menjadi baris logo merek yang bisa digeser; logo yang sama tampil di Antrean, Riwayat, dan Pustaka.",
