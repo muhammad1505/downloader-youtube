@@ -1,6 +1,7 @@
 package id.local.tubeflow.core
 
 import android.content.Context
+import androidx.core.content.edit
 import id.local.tubeflow.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -92,7 +93,7 @@ object EngineUpdater {
         val now = System.currentTimeMillis()
         val last = prefs.getLong("lastCheck", 0L)
         if (last > 0 && now - last < CHECK_INTERVAL_MS) return
-        prefs.edit().putLong("lastCheck", now).apply()
+        prefs.edit { putLong("lastCheck", now) }
         check(context)
     }
 

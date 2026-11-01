@@ -1,6 +1,6 @@
 # Privasi TubeFlow
 
-TubeFlow tidak membutuhkan akun atau server aplikasi. URL dikirim dari perangkat langsung ke penyedia konten untuk memperoleh metadata dan media. Penyedia konten dapat melihat alamat IP serta permintaan jaringan seperti pada akses internet lainnya. Runtime yt-dlp dapat mengakses endpoint lain yang diperlukan oleh extractor. Saat pengguna menekan **Periksa pembaruan** di Pengaturan → Mesin media, aplikasi menghubungi API resmi GitHub dan mengunduh metadata/rilis yt-dlp; URL unduhan, riwayat, dan data media tidak dikirim. Pemeriksaan tidak berjalan otomatis.
+TubeFlow tidak membutuhkan akun atau server aplikasi. URL dikirim dari perangkat langsung ke penyedia konten untuk memperoleh metadata dan media. Penyedia konten dapat melihat alamat IP serta permintaan jaringan seperti pada akses internet lainnya. Runtime yt-dlp dapat mengakses endpoint lain yang diperlukan oleh extractor. Aplikasi menghubungi API resmi GitHub untuk memeriksa metadata rilis yt-dlp paling sering sekali sehari saat dibuka, dan saat pengguna menekan **Periksa pembaruan** di Pengaturan → Mesin media. Pemasangan engine hanya berjalan setelah pengguna memilihnya. URL unduhan, riwayat, dan data media tidak dikirim.
 
 ## Login Bstation opsional
 
