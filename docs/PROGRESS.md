@@ -1335,3 +1335,23 @@ urutan kode `[76, 73, 72, 71]` tanpa duplikat. Belum dijalankan: `lintRelease`, 
 ber-minify, audit native/ZIP, dan uji perangkat, sehingga 1.1.61 belum punya APK terbit dan
 update di atas 1.1.60 belum dibuktikan. Tag `v1.1.61` dibuat sebagai penanda kode, bukan bukti
 validasi runtime.
+
+## Perbaikan folder koleksi dan rilis 1.1.62 — 1 November 2026
+
+Folder koleksi tambahan hanya dipindai saat didaftarkan; berkas yang masuk setelahnya tidak
+ditemukan sampai pengguna menekan **Segarkan katalog** karena observer MediaStore hanya
+memvalidasi ketersediaan baris lama dan pemindaian otomatis lama hanya berjalan pada katalog
+kosong. Katalog sekarang dipanggil dengan `refreshCatalogIfStale()` saat aplikasi `ON_RESUME`
+dan saat tab Koleksi dibuka. Jalur ini memakai `MediaRepository.scan(validateExisting = false)`
+untuk menemukan berkas baru tanpa mengulang validasi seluruh baris, dengan jeda 5 detik;
+`validateAvailability()` tetap menangani berkas yang hilang.
+
+Nomor versi dinaikkan ke **1.1.62/code77**. Entri `changelog.json` teratas ditambahkan untuk
+code77, dan `AppChangelogTest` memastikan versi berjalan memiliki catatan sendiri serta urutan
+kode tetap unik.
+
+Verifikasi: `./gradlew testDebugUnitTest lintDebug` lulus (2m09s), **627 tes Kotlin lulus**
+(0 gagal/error/skipped), lint **0 error/4 warning**. `git diff --check` bersih. Belum dijalankan:
+build rilis ber-minify, audit paket, dan uji perangkat; 1.1.62 belum punya APK terbit. Perubahan
+folder koleksi belum diuji pada perangkat, jadi perilaku auto-refresh setelah berkas baru masuk
+masih perlu dikonfirmasi di HP.

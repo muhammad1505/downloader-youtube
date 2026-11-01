@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
+    private companion object { const val AUTO_SCAN_INTERVAL_MS = 5_000L }
     private val database = DownloadDatabase.get(app)
     private val dao = database.media()
     val repository = MediaRepository(app)
@@ -101,6 +102,8 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     private var availabilityCheck: Job? = null
     private var availabilityRequested = false
+    private var autoScan: Job? = null
+    private var lastAutoScanAt = 0L
     fun validateAvailability() {
         // Calls and this flag belong to Main; retain events arriving during provider I/O.
         availabilityRequested = true
@@ -191,6 +194,25 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { _message.value = error.message ?: "Pemindaian otomatis gagal; buka kembali aplikasi untuk mencoba lagi." }
             finally { _busy.value = false; updateDeviceStorage() }
+        }
+    }
+    /**
+     * Menemukan file yang belakangan masuk ke folder koleksi tanpa menunggu tombol Segarkan.
+     * Dipanggil saat aplikasi kembali aktif dan saat tab Koleksi dibuka; validasi file lama tetap
+     * ditangani [validateAvailability], jadi pemindaian ini tidak mengulang seluruh baris katalog.
+     */
+    fun refreshCatalogIfStale() {
+        val now = System.currentTimeMillis()
+        if (_busy.value || autoScan?.isActive == true ||
+            (lastAutoScanAt > 0 && now - lastAutoScanAt < AUTO_SCAN_INTERVAL_MS)) return
+        lastAutoScanAt = now
+        autoScan = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.scan(validateExisting = false)
+                _lastScan.value = System.currentTimeMillis()
+                getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { lastAutoScanAt = 0 }
         }
     }
     fun grantFolder(uri: android.net.Uri?) {

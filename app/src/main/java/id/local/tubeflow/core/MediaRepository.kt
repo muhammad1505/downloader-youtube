@@ -241,7 +241,11 @@ class MediaRepository(private val context: Context) {
         }
     }
 
-    suspend fun scan(): ScanSummary = withContext(Dispatchers.IO) { operations.withLock {
+    /**
+     * [validateExisting] false dipakai penyegaran otomatis: cukup temukan file baru/berubah
+     * tanpa memeriksa ulang seluruh baris lama. Pemeriksaan ketersediaan tetap dilakukan terpisah.
+     */
+    suspend fun scan(validateExisting: Boolean = true): ScanSummary = withContext(Dispatchers.IO) { operations.withLock {
         recoverRename()
         var checked = 0; var failed = 0
         val rows = mutableListOf<Triple<String, String, String>>()
@@ -303,8 +307,10 @@ class MediaRepository(private val context: Context) {
             val job = jobsByUri[canonical(uri)]
             try { index(uri, job, folder, lyrics[folder to name.substringBeforeLast('.')]); checked++ } catch (_: Exception) { failed++ }
         }
-        for (item in dao.oldest(4000)) if (item.checkedAt < System.currentTimeMillis() - 1000) {
-            try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
+        if (validateExisting) {
+            for (item in dao.oldest(4000)) if (item.checkedAt < System.currentTimeMillis() - 1000) {
+                try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
+            }
         }
         ScanSummary(checked, failed, rows.size)
     } }

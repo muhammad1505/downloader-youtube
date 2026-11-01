@@ -37,7 +37,10 @@ fun MediaLibraryScreen(
     onPlayVideo: (List<VideoEntry>, Int) -> Unit = { _, _ -> },
     onRedownload: (DownloadJob) -> Unit = {},
 ) {
-    LaunchedEffect(Unit) { model.validateAvailability() }
+    LaunchedEffect(Unit) {
+        model.refreshCatalogIfStale()
+        model.validateAvailability()
+    }
     val media by model.items.collectAsStateWithLifecycle()
     val playlists by model.playlists.collectAsStateWithLifecycle()
     val favorites by model.favorites.collectAsStateWithLifecycle()

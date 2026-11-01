@@ -208,7 +208,10 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val libraryOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(libraryOwner) {
         val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
-            if (event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) library.validateAvailability()
+            if (event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                library.refreshCatalogIfStale()
+                library.validateAvailability()
+            }
         }
         libraryOwner.lifecycle.addObserver(observer)
         onDispose { libraryOwner.lifecycle.removeObserver(observer) }

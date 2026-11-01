@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 77,
+    "versionName": "1.1.62",
+    "highlights": [
+      "Berkas yang belakangan masuk ke folder koleksi kini muncul otomatis di katalog tanpa menekan Segarkan.",
+      "Folder tambahan dipindai ulang saat aplikasi kembali aktif atau tab Koleksi dibuka, dengan jeda agar tidak berulang.",
+      "Folder yang sudah ditambahkan tidak perlu dipilih ulang untuk melihat item baru."
+    ]
+  },
+  {
     "versionCode": 76,
     "versionName": "1.1.61",
     "highlights": [
