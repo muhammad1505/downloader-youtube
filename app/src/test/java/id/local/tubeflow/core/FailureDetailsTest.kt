@@ -67,6 +67,10 @@ class FailureDetailsTest {
         val geo = report("ERROR: [BiliIntl] This video is not available from your location due to geo restriction")
         assertEquals("geo", geo.category)
         assertTrue(geo.userMessage.contains("wilayah"))
+        // YouTube memakai kalimat "not available" untuk pembatasan negara; jangan sampai
+        // diklasifikasikan sebagai video terhapus lalu dilewati dari playlist.
+        assertEquals("geo", report("ERROR: [youtube] x: This video is not available in your country").category)
+        assertEquals("geo", report("ERROR: [youtube] x: The uploader has not made this video available in your country").category)
         val premium = report("ERROR: [BiliIntl] This video is only available for registered users")
         assertEquals("premium", premium.category)
         assertTrue(premium.userMessage.contains("login") || premium.userMessage.contains("premium"))

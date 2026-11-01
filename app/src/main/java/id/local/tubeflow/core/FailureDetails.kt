@@ -73,7 +73,7 @@ data class FailureDetails(val category: String, val phase: String, val message: 
                 // Katalog season kosong bukan kegagalan tautan; beri pesan yang menjelaskan.
                 "tidak memuat episode" in lower -> "empty"
                 // BiliIntl/Bstation: 10004001 = geo, kode login/VIP memakai pesan khas "registered users".
-                listOf("10004001", "geo restriction", "geo-restricted", "not available from your location", "地区受限", "版权地区受限").any { it in lower } -> "geo"
+                listOf("10004001", "geo restriction", "geo-restricted", "not available from your location", "not available in your country", "not available in your region", "has not made this video available", "地区受限", "版权地区受限").any { it in lower } -> "geo"
                 // Video yang dihapus/privat tetap terdaftar di playlist; jangan samakan dengan gangguan jaringan.
                 // Dicek sebelum premium: pesan "Private video. Sign in…" bukan konten berlangganan.
                 listOf("video unavailable", "this video is not available", "this video is unavailable", "video is not available", "video has been removed", "removed by the uploader", "video has been deleted", "deleted video", "private video", "account associated with this video has been terminated", "video tidak tersedia").any { it in lower } -> "unavailable"
