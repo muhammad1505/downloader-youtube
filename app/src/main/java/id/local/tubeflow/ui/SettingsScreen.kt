@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.BuildConfig
+import id.local.tubeflow.core.CollectionFolders
 import id.local.tubeflow.core.Format
 import id.local.tubeflow.core.Lyrics
 import id.local.tubeflow.core.SettingsStore
@@ -46,6 +47,7 @@ import id.local.tubeflow.core.StorageFolderAccess
 fun SettingsScreen(
     karaoke: id.local.tubeflow.core.KaraokeViewModel,
     player: id.local.tubeflow.core.PlayerViewModel,
+    library: id.local.tubeflow.core.MediaLibraryViewModel,
     themeMode: String,
     onThemeMode: (String) -> Unit,
     dynamicColor: Boolean,
@@ -150,6 +152,25 @@ fun SettingsScreen(
             }
         }
     }
+
+    // Folder koleksi tambahan: hanya izin baca; tujuan download tetap diatur panel penyimpanan di atas.
+    val collectionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) library.addCollectionFolder(uri)
+    }
+    var pendingRemoveCollection by rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingRemoveFolder = SettingsStore.collectionFolders.firstOrNull { it.uri == pendingRemoveCollection }
+    if (pendingRemoveFolder != null) AlertDialog(
+        onDismissRequest = { pendingRemoveCollection = null },
+        title = { Text("Lepas folder?") },
+        text = { Text("\"${pendingRemoveFolder.label}\" tidak lagi dipindai ke Koleksi. File dan subfolder di penyimpanan tidak dihapus, dan tujuan download tidak berubah.") },
+        confirmButton = {
+            TextButton(
+                onClick = { pendingRemoveCollection = null; library.removeCollectionFolder(pendingRemoveFolder) },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text("Lepas") }
+        },
+        dismissButton = { TextButton(onClick = { pendingRemoveCollection = null }) { Text("Batal") } },
+    )
 
     val scroll = rememberScrollState()
     LaunchedEffect(section) { scroll.scrollTo(0) }
@@ -499,6 +520,64 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+        }
+
+        if (section == "storage") Panel(
+            title = "Folder koleksi",
+            description = "Folder lain yang ikut dipindai ke Koleksi. Tujuan download tidak berubah dan file tidak dipindahkan.",
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    if (tree != null) "Folder pilihan: ${treeLabel(tree)}" else "Downloads/${SettingsStore.storageFolder}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                "Folder ini selalu dipindai dan tidak bisa dilepas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SettingsStore.collectionFolders.forEach { folder ->
+                AdaptivePair(
+                    leading = { available ->
+                        Row(available, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Outlined.FolderOpen, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(folder.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        }
+                    },
+                    trailing = {
+                        ActionButton(
+                            "Lepas",
+                            { pendingRemoveCollection = folder.uri },
+                            emphasis = ActionEmphasis.Quiet,
+                            destructive = true,
+                        )
+                    },
+                )
+            }
+            if (SettingsStore.collectionFolders.isEmpty()) Text(
+                "Belum ada folder tambahan. Musik atau video di luar Downloads/${SettingsStore.storageFolder} (mis. kartu memori) perlu ditambahkan di sini agar muncul di Koleksi.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ActionButton(
+                text = "Tambah folder…",
+                onClick = {
+                    collectionLauncher.launch(DocumentsContract.buildDocumentUri(
+                        "com.android.externalstorage.documents", "primary:Download/${SettingsStore.storageFolder}",
+                    ))
+                },
+                icon = Icons.Outlined.CreateNewFolder,
+                enabled = SettingsStore.collectionFolders.size < CollectionFolders.MAX,
+                fillWidth = true,
+            )
+            Text(
+                "Maksimum ${CollectionFolders.MAX} folder. Melepas folder hanya membersihkan indeks Koleksi; file dan subfolder di penyimpanan tetap utuh.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (section == "downloads") Panel(

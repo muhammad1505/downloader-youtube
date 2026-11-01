@@ -69,6 +69,8 @@ interface MediaDao {
     @Query("DELETE FROM media_items WHERE uri = :uri") suspend fun remove(uri: String)
     @Query("UPDATE media_items SET checkedAt = :at WHERE uri IN (:uris)") suspend fun checked(uris: List<String>, at: Long)
     @Query("SELECT * FROM media_items ORDER BY checkedAt ASC LIMIT :limit") suspend fun oldest(limit: Int): List<MediaItem>
+    /** Dipakai pelepasan folder koleksi untuk memeriksa prefix URI akses tanpa menyentuh file. */
+    @Query("SELECT * FROM media_items") suspend fun all(): List<MediaItem>
     // Koleksi utuh untuk antrean auto-play: lagu tersedia dalam urutan koleksi (terbaru lebih dulu).
     @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY addedAt DESC, title COLLATE NOCASE ASC") suspend fun availableAudio(): List<MediaItem>
     // Alat massal bekerja pada seleksi eksplisit; batasnya sama dengan daftar putar eksplisit.

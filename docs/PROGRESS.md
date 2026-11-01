@@ -1299,3 +1299,21 @@ byte, SHA256 `0b2099a3151e6cbf1c31479339aea9aad791dbeaed38b4aeaa8de757c18acdb6`.
 arm64 SHA256 `304a275e…fee88` dipasang di Realme Android 10 dan dialog "Apa yang baru" muncul.
 Belum dibuktikan: penerapan tag katalog, penyimpanan hasil ketuk-waktu, dan pemrosesan karaoke
 dari Alat. [Rincian, batas dan tindak lanjut](TOOLS_HUB_2026-10-29.md).
+
+## Folder koleksi tambahan — 2 November 2026
+
+Pekerjaan yang tertinggal setengah jadi: lapisan inti sudah ada (`CollectionFolders`,
+`SettingsStore.collectionFolders`, pemindaian beberapa sumber SAF di `MediaRepository.scan`,
+`removeCollectionSource`, `addCollectionFolder`/`removeCollectionFolder`), tetapi belum ada
+jalur di UI sehingga pengguna tidak bisa memakainya; import `CollectionFolder`/`CollectionFolders`
+di `SettingsScreen` juga tidak terpakai.
+
+Diselesaikan: Pengaturan → Penyimpanan punya panel **Folder koleksi** (daftar folder tambahan,
+Lepas dengan konfirmasi, Tambah folder… lewat pemilih folder sistem, batas 8). Melepas folder
+hanya menghapus baris indeks milik folder itu; file, subfolder, serta baris folder bawaan dan
+folder tujuan download tidak disentuh. Folder bawaan/tujuan tidak bisa dilepas karena selalu
+tercakup pemindaian. Regresi murni `CollectionFoldersTest` mengunci normalisasi, document id,
+label, tumpang tindih parent/anak, dedup sumber, dan encode/decode preferensi.
+
+Verifikasi: `./gradlew testDebugUnitTest`, `assembleDebug`, dan `lintDebug`. Build rilis dan uji
+perangkat untuk fitur ini belum dijalankan.

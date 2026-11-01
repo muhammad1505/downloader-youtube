@@ -265,10 +265,24 @@ class MediaRepository(private val context: Context) {
                 while (c.moveToNext()) add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/'))
             } ?: throw FileNotFoundException("Folder belum dapat dibaca.")
         } catch (error: Exception) { storeError = error }
-        val tree = SettingsStore.storageTree ?: StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString()
+        // Sumber SAF: folder bawaan (bila pernah diberi grant), folder output pilihan, lalu folder
+        // koleksi tambahan. Hanya folder terdaftar yang dipindai; tidak ada pemindaian seluruh perangkat.
+        val defaultTree = StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString()
+        val sources = CollectionFolders.sources(
+            defaultTree = defaultTree,
+            defaultLabel = "Download/${SettingsStore.storageFolder}",
+            outputTree = SettingsStore.storageTree,
+            extras = SettingsStore.collectionFolders,
+        )
         var treeError: Exception? = null
-        if (tree != null) {
-            val root = tree.toUri()
+        for (source in sources) {
+            val root = source.tree.toUri()
+            val rootId = CollectionFolders.documentId(source.tree)
+                ?: runCatching { DocumentsContract.getTreeDocumentId(root) }.getOrNull()
+            if (rootId == null) {
+                if (treeError == null) treeError = IllegalArgumentException("Folder koleksi tidak valid.")
+                continue
+            }
             fun walk(id: String, folder: String, depth: Int) {
                 require(depth <= 8 && rows.size < 4000) { "Batas pemindaian folder tercapai." }
                 resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(root, id), arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
@@ -278,8 +292,7 @@ class MediaRepository(private val context: Context) {
                     }
                 } ?: error("Akses folder tidak tersedia.")
             }
-            val rootLabel = if (SettingsStore.storageTree != null) "Folder pilihan" else "Download/${SettingsStore.storageFolder}"
-            try { walk(DocumentsContract.getTreeDocumentId(root), rootLabel, 0) } catch (error: Exception) { treeError = error }
+            try { walk(rootId, source.label, 0) } catch (error: Exception) { if (treeError == null) treeError = error }
         }
         if (rows.isEmpty() && (treeError != null || storeError != null)) throw (treeError ?: storeError!!)
         val jobs = database.downloads().observe().let { flow -> flow.first() }
@@ -294,6 +307,41 @@ class MediaRepository(private val context: Context) {
             try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
         }
         ScanSummary(checked, failed, rows.size)
+    } }
+
+    /**
+     * Melepas satu folder koleksi: hanya baris indeks yang berasal dari folder itu yang dibuang.
+     * File, subfolder, dan baris milik sumber lain tidak disentuh. Bila folder juga menjadi folder
+     * output/bawaan (mis. pengaturan berubah), baris yang masih tercakup sumber aktif dipertahankan.
+     */
+    suspend fun removeCollectionSource(tree: String): Int = withContext(Dispatchers.IO) { operations.withLock {
+        recoverRename()
+        val removed = CollectionFolders.normalize(tree)
+        if (removed.isBlank()) return@withLock 0
+        val prefix = "$removed/document/"
+        val defaultFolder = "Download/${SettingsStore.storageFolder}"
+        val defaultTree = StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString()
+        val keep = CollectionFolders.sources(
+            defaultTree = defaultTree,
+            defaultLabel = defaultFolder,
+            outputTree = SettingsStore.storageTree,
+            extras = SettingsStore.collectionFolders.filterNot { CollectionFolders.normalize(it.uri) == removed },
+        ).flatMap { source ->
+            listOf("${source.tree}/document/")
+        }
+        val rows = dao.all().filter { item ->
+            val access = CollectionFolders.normalize(item.location)
+            val owned = access.startsWith(prefix) || item.uri.startsWith(prefix)
+            if (!owned || keep.any { access.startsWith(it) }) return@filter false
+            // Baris MediaStore di folder bawaan tetap milik koleksi utama meski pernah terlihat lewat
+            // grant SAF folder lain; jangan sampai pelepasan folder menghapusnya.
+            !(item.uri.startsWith("content://media/") &&
+                (item.folder == defaultFolder || item.folder.startsWith("$defaultFolder/")))
+        }
+        if (rows.isNotEmpty()) database.withTransaction {
+            rows.forEach { database.personal().removeMedia(it.uri); dao.remove(it.uri) }
+        }
+        rows.size
     } }
 
     /** Cheap presence checks; no metadata extraction/LRCLIB request for unchanged media. */

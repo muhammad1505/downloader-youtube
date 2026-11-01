@@ -160,12 +160,12 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         val (count, failed, discovered) = repository.scan()
         _lastScan.value = System.currentTimeMillis()
         getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
-        if (count == 0 && discovered == 0) return "Tidak ada media terlihat di folder. Bila file memang ada, periksa izin baca atau pilih folder Download/TubeFlow sekali lewat Pengaturan."
+        if (count == 0 && discovered == 0) return "Tidak ada media terlihat di folder. Bila file memang ada, periksa izin baca atau tambahkan folder lewat Pengaturan → Penyimpanan."
         return "$count media diperiksa" + if (failed > 0) "; $failed file tidak dapat dibaca. Statistik dapat parsial." else "."
     }
     fun scan() = operation { scanCatalog() }
     /** Cukup izin untuk membaca seluruh isi folder: tree pilihan atau grant default Download/TubeFlow. */
-    fun hasFolderAccess(): Boolean = SettingsStore.storageTree != null ||
+    fun hasFolderAccess(): Boolean = SettingsStore.collectionFolders.isNotEmpty() || SettingsStore.storageTree != null ||
         StorageFolderAccess.defaultTree(getApplication(), SettingsStore.storageFolder) != null
     /** Izin baca media membuat query MediaStore melihat file lama milik versi/SAF lain tanpa grant SAF. */
     fun hasReadPermission(): Boolean {
@@ -208,6 +208,59 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             SettingsStore.setStorageTree(app, if (default) null else uri.toString())
             scanCatalog()
         }
+    }
+
+    private fun treeId(uri: android.net.Uri): String? = CollectionFolders.documentId(uri.toString())
+        ?: runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+
+    /**
+     * Menambahkan folder SAF sebagai sumber Koleksi tambahan. Ini tidak memindahkan tujuan download;
+     * folder bawaan `Download/[folder]` tetap menjadi koleksi utama dan sudah dipindai otomatis.
+     */
+    fun addCollectionFolder(uri: android.net.Uri) = operation {
+        val app = getApplication<Application>()
+        val tree = CollectionFolders.normalize(uri.toString())
+        val id = treeId(uri) ?: error("Folder tidak valid atau tidak dapat dibaca.")
+        val existing = SettingsStore.collectionFolders
+        require(existing.size < CollectionFolders.MAX) { "Maksimum ${CollectionFolders.MAX} folder koleksi tambahan." }
+        require(existing.none { CollectionFolders.normalize(it.uri) == tree }) { "Folder ini sudah ada di koleksi." }
+        val defaultUri = StorageFolderAccess.defaultTree(app, SettingsStore.storageFolder)
+            ?: DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/${SettingsStore.storageFolder}")
+        val defaultId = treeId(defaultUri) ?: "primary:Download/${SettingsStore.storageFolder}"
+        require(!CollectionFolders.overlaps(id, defaultId)) {
+            "Folder ini masih termasuk Downloads/${SettingsStore.storageFolder}; subfoldernya sudah dipindai otomatis."
+        }
+        val outputId = SettingsStore.storageTree?.toUri()?.let(::treeId)
+        require(outputId == null || !CollectionFolders.overlaps(id, outputId)) {
+            "Folder ini sama dengan folder tujuan download. Pilih folder lain agar hasil unduhan dan koleksi tidak bercampur."
+        }
+        existing.forEach { other ->
+            val otherId = treeId(other.uri.toUri()) ?: return@forEach
+            require(!CollectionFolders.overlaps(id, otherId)) {
+                if (id.startsWith("$otherId/")) "Folder ini sudah tercakup folder koleksi lain."
+                else "Folder ini menaungi folder koleksi yang sudah ditambahkan."
+            }
+        }
+        runCatching {
+            app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }.getOrThrow()
+        val labels = existing.map { it.label }.toMutableSet()
+        labels += "Download/${SettingsStore.storageFolder}"
+        SettingsStore.storageTree?.let { labels += CollectionFolders.FALLBACK_LABEL }
+        val label = CollectionFolders.uniqueLabel(CollectionFolders.labelForId(id), labels)
+        SettingsStore.setCollectionFolders(app, existing + CollectionFolder(tree, label))
+        "Folder \"$label\" ditambahkan. ${scanCatalog()}"
+    }
+
+    /** Melepas folder koleksi dari indeks tanpa menghapus file atau subfolder di penyimpanan. */
+    fun removeCollectionFolder(folder: CollectionFolder) = operation {
+        val app = getApplication<Application>()
+        val removed = repository.removeCollectionSource(folder.uri)
+        SettingsStore.setCollectionFolders(app, SettingsStore.collectionFolders.filterNot {
+            CollectionFolders.normalize(it.uri) == CollectionFolders.normalize(folder.uri)
+        })
+        runCatching { app.contentResolver.releasePersistableUriPermission(folder.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        "Folder \"${folder.label}\" dilepas dari koleksi. $removed baris indeks dibersihkan; file di penyimpanan tidak dihapus."
     }
     fun import(uris: List<android.net.Uri>) = operation {
         var count = 0; var failed = 0

@@ -486,6 +486,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 else -> SettingsScreen(
                     karaoke = karaoke,
                     player = player,
+                    library = library,
                     themeMode = SettingsStore.themeMode,
                     onThemeMode = { SettingsStore.setThemeMode(context, it) },
                     dynamicColor = SettingsStore.dynamicColor,

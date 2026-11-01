@@ -53,6 +53,10 @@ object SettingsStore {
     var storageTree: String? by mutableStateOf(null)
         private set
 
+    /** Folder SAF tambahan yang ikut dipindai sebagai sumber Koleksi (bukan tujuan download). */
+    var collectionFolders by mutableStateOf<List<CollectionFolder>>(emptyList())
+        private set
+
     /** How many downloads may run at the same time (1..4). */
     var maxConcurrent by mutableIntStateOf(1)
         private set
@@ -106,6 +110,7 @@ object SettingsStore {
         artworkAccent = prefs.getBoolean("artwork_accent", true)
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER
         storageTree = prefs.getString("tree", "")?.takeIf { it.isNotBlank() }
+        collectionFolders = CollectionFolders.decode(prefs.getString("collection_folders", ""))
         maxConcurrent = prefs.getInt("concurrent", 1).coerceIn(1, 4)
         historyAutoDays = prefs.getInt("history_auto_days", 0).coerceIn(0, 365)
     }
@@ -115,6 +120,21 @@ object SettingsStore {
         storageTree = uri?.takeIf { it.isNotBlank() }
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit { putString("tree", storageTree ?: "") }
+    }
+
+    /**
+     * Menyimpan daftar folder koleksi tambahan (maksimum [CollectionFolders.MAX]). Hanya pendaftaran
+     * indeks; file di penyimpanan tidak pernah disentuh.
+     */
+    fun setCollectionFolders(context: Context, folders: List<CollectionFolder>) {
+        val unique = folders
+            .map { it.copy(uri = CollectionFolders.normalize(it.uri)) }
+            .filter { it.uri.isNotBlank() }
+            .distinctBy { it.uri }
+            .take(CollectionFolders.MAX)
+        collectionFolders = unique
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putString("collection_folders", CollectionFolders.encode(unique)) }
     }
 
     fun setMaxConcurrent(context: Context, value: Int) {
