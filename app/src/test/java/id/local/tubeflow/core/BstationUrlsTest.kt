@@ -82,6 +82,45 @@ class BstationUrlsTest {
     }
 
     @Test
+    fun shortLinksAreRecognizedOnlyForTheOfficialHost() {
+        assertTrue(BstationUrls.isShortLink("https://bili.im/JKqzH3H"))
+        assertTrue(BstationUrls.isShortLink("https://bili.im/JKqzH3H/?share=1"))
+        listOf(
+            "http://bili.im/JKqzH3H",
+            "https://user@bili.im/JKqzH3H",
+            "https://bili.im:8443/JKqzH3H",
+            "https://bili.im/",
+            "https://bili.im/a/b",
+            "https://bili.im.evil.org/JKqzH3H",
+            "https://evilbili.im/JKqzH3H",
+        ).forEach { assertFalse(it, BstationUrls.isShortLink(it)) }
+        // URL pendek belum menjadi halaman episode/video; resolver harus dijalankan dulu.
+        assertNull(BstationUrls.canonical("https://bili.im/JKqzH3H"))
+    }
+
+    @Test
+    fun shortLinkPageResolvesCanonicalBstationTargets() {
+        val seasonHtml = """<html><head><link rel="canonical" href="https://www.bilibili.tv/en/play/2432940"><meta property="og:url" content="https://www.bilibili.tv/en/play/2432940?s_locale=id_ID&amp;from=COPY"></head></html>"""
+        assertEquals("https://www.bilibili.tv/play/2432940", BstationUrls.shortLinkTarget(seasonHtml))
+
+        val episodeHtml = """<meta property="og:url" content="https://www.bilibili.tv/id/play/2432940/31524599?bstar_from=share">"""
+        assertEquals("https://www.bilibili.tv/play/2432940/31524599", BstationUrls.shortLinkTarget(episodeHtml))
+
+        val reorderedVideoHtml = """<link href="https://www.bilibili.tv/en/video/2045730385" rel="canonical">"""
+        assertEquals("https://www.bilibili.tv/video/2045730385", BstationUrls.shortLinkTarget(reorderedVideoHtml))
+    }
+
+    @Test
+    fun shortLinkPageRejectsForeignOrUnsupportedCanonicalTargets() {
+        listOf(
+            """<link rel="canonical" href="https://evil.example/play/2432940">""",
+            """<link rel="canonical" href="https://www.bilibili.tv.evil.org/play/2432940">""",
+            """<meta property="og:url" content="https://www.bilibili.com/video/BV1xx">""",
+            """<link rel="stylesheet" href="https://www.bilibili.tv/play/2432940">""",
+        ).forEach { assertNull(it, BstationUrls.shortLinkTarget(it)) }
+    }
+
+    @Test
     fun unsafeOrIncompleteUrlsStayUnsupported() {
         listOf(
             "http://www.bilibili.tv/id/play/2432940/31524599",

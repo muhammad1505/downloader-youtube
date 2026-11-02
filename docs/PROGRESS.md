@@ -2,6 +2,14 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 2 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Tautan pendek Bstation — 1.1.67/code82, 2 November 2026
+
+Laporan pengguna: `https://bili.im/JKqzH3H` ditolak sebagai tautan yang tidak didukung. Host `bili.im` memang bukan host extractor BiliIntl, dan halaman short link tidak melakukan redirect HTTP: respons GET 200 langsung memuat halaman Bstation dengan `<link rel="canonical" href="https://www.bilibili.tv/en/play/2432940">` serta `og:url`. Karena itu meneruskan URL pendek apa adanya ke yt-dlp tidak cukup; URL harus dibuka dan di-resolve lebih dulu.
+
+`BstationUrls` kini mengenali bentuk `https://bili.im/<token>` secara ketat (https, tanpa userInfo/port asing, satu segmen token) dan menyediakan `resolveShortLink`. Resolver mengambil HTML dengan GET, timeout 10/15 detik dan batas 512 KiB, lalu membaca canonical/og:url. Hanya URL hasil yang lolos gerbang host Bstation yang diterima; canonical asing, lookalike, atau halaman tanpa target Bstation menghasilkan null. Komposer membuka tautan pendek sebelum validasi, mengganti isian dengan URL Bstation asli, lalu memakai pemilih season atau inspeksi episode yang sudah ada. Tautan yang gagal menampilkan pesan untuk menyalin tautan lengkap, bukan error engine mentah.
+
+Verifikasi: `BstationUrlsTest` 10 kasus lulus (bentuk short link, canonical season/episode/video, penolakan host asing). Resolver live di host mengubah link laporan menjadi `https://www.bilibili.tv/play/2432940`. `./gradlew testDebugUnitTest lintDebug --no-daemon` lulus: 635 tes Kotlin, 0 gagal; lint 0 error dan 4 warning lama. Build rilis/APK, audit native 16 KB, dan uji perangkat 1.1.67 belum dijalankan; pemilih episode dan unduhan Bstation pada build ini belum diverifikasi di HP.
+
 ## Penyelarasan tema Transformers — 1.1.66/code81, 2 November 2026
 
 Tema Transformers kini dipakai konsisten di luar menu utama. Pemutar penuh memakai strip header berlambang, bingkai sampul gradien, tombol aksi dan indikator halaman bersudut; antrean putar serta opsi video memakai sheet bersudut; ringkasan antrean unduhan menjadi banner berikon dengan aksi massal. Komponen `DialogTitle` memberi seluruh `AlertDialog` judul berikon dan garis aksen, dengan fallback teks biasa untuk tema lain. Palet dan kontrasnya tetap seperti semula.

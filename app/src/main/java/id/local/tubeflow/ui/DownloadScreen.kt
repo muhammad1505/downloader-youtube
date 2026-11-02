@@ -137,6 +137,8 @@ internal fun DownloadComposer(
     var showFailureDetails by remember(url.trim()) { mutableStateOf(false) }
     if (showFailureDetails && inspectDetails != null) FailureDetailsDialog(inspectDetails) { showFailureDetails = false }
     var inspectedUrl by rememberSaveable { mutableStateOf("") }
+    var shortLinkResolving by remember(url) { mutableStateOf(false) }
+    var shortLinkError by remember(url) { mutableStateOf<String?>(null) }
     var spotifyCandidateUrl by rememberSaveable { mutableStateOf("") }
     var selectedSpotifyIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var spotifyCollectionQuery by rememberSaveable { mutableStateOf("") }
@@ -150,6 +152,7 @@ internal fun DownloadComposer(
     LaunchedEffect(SettingsStore.autoArtwork) { embedThumb = SettingsStore.autoArtwork }
 
     val trimmed = url.trim()
+    val isBstationShortLink = BstationUrls.isShortLink(trimmed)
     val isVideo = Selection.validUrl(trimmed)
     val isPlaylistLink = Selection.validPlaylistUrl(trimmed)
     val hasList = Selection.hasListParam(trimmed)
@@ -200,6 +203,24 @@ internal fun DownloadComposer(
     val inspectProgressText = (inspectPhase?.let(InspectionPhase::label) ?: "Membaca detail link…") +
         if (inspectElapsed >= 3) " · ${inspectElapsed} dtk" else ""
 
+    // bili.im bukan host extractor: buka tautan pendek dulu, lalu ganti isian dengan halaman
+    // Bstation aslinya agar pemilih season dan validasi URL yang sudah ada tetap dipakai.
+    LaunchedEffect(trimmed) {
+        if (!isBstationShortLink) return@LaunchedEffect
+        delay(700)
+        shortLinkResolving = true
+        shortLinkError = null
+        val resolved = BstationUrls.resolveShortLink(trimmed)
+        shortLinkResolving = false
+        if (resolved == null) {
+            shortLinkError = BstationUrls.SHORT_LINK_ERROR
+        } else {
+            inspectedUrl = ""
+            onUrl(resolved)
+            clearPlaylist()
+        }
+    }
+
     // Auto-baca detail: jeda singkat lalu inspect tanpa tombol "Cek link".
     LaunchedEffect(trimmed) {
         if (isSpotifyLink) {
@@ -216,6 +237,9 @@ internal fun DownloadComposer(
         }
         if (spotify.url.isNotEmpty()) clearSpotify()
         if (spotifyCollection.url.isNotEmpty()) clearSpotifyCollection()
+        // URL pendek masih menunggu resolver; jangan tampilkan "link belum didukung" atau
+        // meneruskannya ke engine sebelum menjadi halaman Bstation kanonis.
+        if (isBstationShortLink) { inspectedUrl = ""; return@LaunchedEffect }
         if (!isVideo && !isCollectionLink) { inspectedUrl = ""; return@LaunchedEffect }
         delay(700)
         if (shownVideo?.url == trimmed || shownPlaylist?.url == trimmed) { inspectedUrl = trimmed; return@LaunchedEffect }
@@ -302,7 +326,7 @@ internal fun DownloadComposer(
                 label = { Text("Link video, season, playlist, atau lagu Spotify") },
                 placeholder = { Text("https://youtu.be/… , bilibili.tv/play/… , playlist?list=… , atau open.spotify.com/track/…") },
                 singleLine = true,
-                isError = url.isNotBlank() && !isVideo && !isCollectionLink && !isSpotifyLink,
+                isError = url.isNotBlank() && !isVideo && !isCollectionLink && !isSpotifyLink && !isBstationShortLink,
                 supportingText = {
                     when {
                         busy -> Text(inspectProgressText)
@@ -310,6 +334,8 @@ internal fun DownloadComposer(
                             (if (isSpotifyCollectionLink) spotifyCollection.phase else spotify.phase)
                                 ?.let(InspectionPhase::label) ?: "Membaca link Spotify…"
                         )
+                        shortLinkError != null -> Text(shortLinkError.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        isBstationShortLink -> Text(BstationUrls.SHORT_LINK_LOADING)
                         isBstationSeason -> Text(if (shownPlaylist != null) "Season Bstation · pilih episode di bawah." else BstationUrls.SEASON_LOADING)
                         url.isNotBlank() && !isVideo && !isCollectionLink && !isSpotifyLink -> Text("Link belum didukung — gunakan https dari platform yang tersedia.")
                         isPlaylistLink -> Text("Terdeteksi link playlist.")
@@ -321,7 +347,7 @@ internal fun DownloadComposer(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (busy || spotifyBusy) {
+                        if (busy || spotifyBusy || shortLinkResolving) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else if (url.isEmpty()) {
                             IconButton(onClick = {

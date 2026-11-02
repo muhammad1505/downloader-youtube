@@ -1,5 +1,13 @@
 [
   {
+    "versionCode": 82,
+    "versionName": "1.1.67",
+    "highlights": [
+      "Tautan pendek Bstation (bili.im) kini dibuka ke halaman season atau episode aslinya, sehingga pemilih episode dan unduhan berjalan seperti tautan bilibili.tv.",
+      "Resolver hanya meneruskan URL kanonis Bstation yang sah; tautan pendek rusak atau halaman asing tetap ditolak dengan pesan yang jelas."
+    ]
+  },
+  {
     "versionCode": 81,
     "versionName": "1.1.66",
     "highlights": [
