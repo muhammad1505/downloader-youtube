@@ -1398,8 +1398,10 @@ Status hanya di memori: setelah proses aplikasi berakhir, semua grup kembali ter
 Nomor versi dinaikkan ke **1.1.64/code79**. Entri `changelog.json` teratas ditambahkan untuk
 code79, dan README mencatat kandidat rilis ini.
 
-Verifikasi: pasangan kurung kurawal dan kurung biasa seimbang di `MediaLibraryScreen.kt` dan
-`MediaLibraryViewModel.kt`; `git diff --check` bersih; JSON changelog divalidasi (kode menurun,
-sorotan 20–220 karakter, tanpa spasi akhir). Belum dijalankan: `./gradlew testDebugUnitTest
-lintDebug`, build rilis, audit paket, dan uji perangkat karena JDK/Android SDK tidak tersedia;
+Verifikasi: `./gradlew testDebugUnitTest lintDebug` lulus (631 tes Kotlin, 0 gagal; lint 0 error/4
+warning), termasuk `AppChangelogTest` dan `CollectionGroupsTest`. Kompilasi pertama gagal karena
+`import androidx.compose.foundation.lazy.stickyHeader` tidak lagi tersedia di Compose Foundation
+1.12.1 — `stickyHeader` kini method `LazyListScope`, jadi import itu dihapus dan build diulang
+sampai lulus. `git diff --check` bersih; JSON changelog divalidasi (kode menurun, sorotan 20–220
+karakter, tanpa spasi akhir). Belum dijalankan: build rilis, audit paket, dan uji perangkat;
 interaksi lipat dan TalkBack perlu dikonfirmasi di HP.
