@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 79,
+    "versionName": "1.1.64",
+    "highlights": [
+      "Header folder di tab Koleksi kini bisa diketuk untuk melipat atau membuka isi grup.",
+      "Status lipat diingat selama sesi, termasuk saat berpindah tab, mengganti filter, atau memuat halaman berikutnya.",
+      "Jumlah item dan header lengket tetap tampil saat grup dilipat, jadi ringkasan folder tidak hilang."
+    ]
+  },
+  {
     "versionCode": 78,
     "versionName": "1.1.63",
     "highlights": [

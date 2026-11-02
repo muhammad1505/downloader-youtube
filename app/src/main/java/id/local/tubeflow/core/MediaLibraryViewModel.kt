@@ -68,6 +68,12 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         dao.folderCounts(f.kind, f.folder, f.artist, f.album, SmartMedia.search(f.query), f.playlistId)
     }.map { rows -> rows.associate { it.folder to it.count } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    /** Folder yang dilipat di Koleksi; hanya di memori selama sesi, tidak disimpan ke disk. */
+    private val _collapsedFolders = MutableStateFlow<Set<String>>(emptySet())
+    val collapsedFolders = _collapsedFolders.asStateFlow()
+    fun toggleFolder(folder: String) {
+        _collapsedFolders.update { collapsed -> if (folder in collapsed) collapsed - folder else collapsed + folder }
+    }
     val folders = dao.folders().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val artists = dao.artists().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val albums = dao.albums().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

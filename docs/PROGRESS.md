@@ -1381,3 +1381,25 @@ divalidasi: kode `[78, 77, ...]` urut menurun dan tiga sorotan berukuran 20–22
 `git diff --check` bersih. Belum dijalankan: `./gradlew testDebugUnitTest lintDebug`, build rilis,
 audit paket, dan uji perangkat karena JDK/Android SDK tidak tersedia di lingkungan ini; 1.1.63
 belum punya APK terbit. Header lengket dan perilaku gulir perlu dikonfirmasi di HP.
+
+## Grup folder bisa dilipat dan rilis 1.1.64 — 2 November 2026
+
+Header folder di tab Koleksi sekarang menjadi tombol lipat/buka. Mengetuk seluruh baris header
+(tinggi minimum 48 dp) membalik status grup; chevron ExpandMore/ExpandLess menunjukkan hasilnya,
+dan pembaca layar mendapat label "Buka folder"/"Lipat folder" serta stateDescription
+"Dibuka"/"Dilipat". Saat dilipat, item grup tidak dirender, tetapi header lengket dan jumlah item
+tetap tampil.
+
+Status disimpan sebagai `Set<String>` di `MediaLibraryViewModel` (`collapsedFolders` +
+`toggleFolder`). ViewModel `library` dipakai bersama di tingkat aplikasi, jadi status bertahan
+saat berpindah tab, mengganti filter/pencarian, memuat halaman berikutnya, dan rotasi layar.
+Status hanya di memori: setelah proses aplikasi berakhir, semua grup kembali terbuka.
+
+Nomor versi dinaikkan ke **1.1.64/code79**. Entri `changelog.json` teratas ditambahkan untuk
+code79, dan README mencatat kandidat rilis ini.
+
+Verifikasi: pasangan kurung kurawal dan kurung biasa seimbang di `MediaLibraryScreen.kt` dan
+`MediaLibraryViewModel.kt`; `git diff --check` bersih; JSON changelog divalidasi (kode menurun,
+sorotan 20–220 karakter, tanpa spasi akhir). Belum dijalankan: `./gradlew testDebugUnitTest
+lintDebug`, build rilis, audit paket, dan uji perangkat karena JDK/Android SDK tidak tersedia;
+interaksi lipat dan TalkBack perlu dikonfirmasi di HP.

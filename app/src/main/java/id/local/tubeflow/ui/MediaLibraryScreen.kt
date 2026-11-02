@@ -23,6 +23,7 @@ import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +59,7 @@ fun MediaLibraryScreen(
     val artists by model.artists.collectAsStateWithLifecycle()
     val albums by model.albums.collectAsStateWithLifecycle()
     val folderCounts by model.folderCounts.collectAsStateWithLifecycle()
+    val collapsedFolders by model.collapsedFolders.collectAsStateWithLifecycle()
     // Angka header dari seluruh database; halaman yang termuat hanya menentukan isi tiap grup.
     val groups = remember(media, folderCounts) { CollectionGroups.group(media, folderCounts) }
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -152,8 +154,11 @@ fun MediaLibraryScreen(
             )
         }
         groups.forEach { group ->
-            stickyHeader(key = "folder:${group.folder}") { CollectionFolderHeader(group.folder, group.total) }
-            items(group.items, key = { it.uri }) { item ->
+            val collapsed = group.folder in collapsedFolders
+            stickyHeader(key = "folder:${group.folder}") {
+                CollectionFolderHeader(group.folder, group.total, collapsed) { model.toggleFolder(group.folder) }
+            }
+            items(if (collapsed) emptyList() else group.items, key = { it.uri }) { item ->
                 val accent=rememberCoverAccent(item.coverPath)
                 Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
@@ -347,13 +352,20 @@ fun MediaLibraryScreen(
     clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
 }
 
-/** Header lengket per folder; [total] dihitung dari database penuh, bukan halaman yang termuat. */
+/**
+ * Header lengket per folder; [total] dihitung dari database penuh, bukan halaman yang termuat.
+ * Mengetuk header melipat/membuka isi grup; statusnya dipegang ViewModel selama sesi.
+ */
 @Composable
-private fun CollectionFolderHeader(folder: String, total: Long) {
+private fun CollectionFolderHeader(folder: String, total: Long, collapsed: Boolean, onToggle: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Surface(color = scheme.background, modifier = Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth()
+                .clickable(onClickLabel = if (collapsed) "Buka folder" else "Lipat folder") { onToggle() }
+                .semantics { stateDescription = if (collapsed) "Dilipat" else "Dibuka" }
+                .heightIn(min = 48.dp)
+                .padding(top = 10.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -367,6 +379,12 @@ private fun CollectionFolderHeader(folder: String, total: Long) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text("$total item", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+            Icon(
+                if (collapsed) Icons.Outlined.ExpandMore else Icons.Outlined.ExpandLess,
+                null,
+                Modifier.size(20.dp),
+                tint = scheme.onSurfaceVariant,
+            )
         }
     }
 }
