@@ -274,6 +274,21 @@ object VideoPlayback {
     fun needsDecoderRestart(hasPlayer: Boolean, softwareFallbackUsed: Boolean): Boolean =
         !hasPlayer || softwareFallbackUsed
 
+    /**
+     * Kunci input pipeline efek video. Setiap `setVideoEffects` membangun ulang pipeline GL dan
+     * memutus gambar sesaat; kunci yang sama karena itu harus dilewati supaya tick progres dan
+     * perubahan viewport tidak memicu hitch berkala. Pemutar baru menghasilkan `playerVersion`
+     * baru, sehingga efek tetap diterapkan ulang saat sesi dibuka kembali.
+     */
+    fun effectsKey(
+        enhance: VideoEnhance,
+        saving: Boolean,
+        aspect: VideoAspect,
+        width: Int,
+        height: Int,
+        playerVersion: Int,
+    ): String = "${if (saving) VideoEnhance.OFF else enhance}|$aspect|$width|$height|$playerVersion"
+
     /** Delay subtitle positif menampilkan teks lebih lambat; batasnya menjaga hasil tetap masuk akal. */
     fun adjustSubtitleDelay(currentMs: Int, deltaMs: Int): Int =
         (currentMs + deltaMs).coerceIn(-SUBTITLE_DELAY_LIMIT_MS, SUBTITLE_DELAY_LIMIT_MS)

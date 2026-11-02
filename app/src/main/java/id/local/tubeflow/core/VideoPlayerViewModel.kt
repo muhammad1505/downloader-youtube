@@ -232,6 +232,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         override fun onPlayerError(error: PlaybackException) {
             val current = _state.value
+            VideoDiagnostics.failure(error.errorCode, VideoPlayback.isCodecFailure(error.errorCode))
             // Jangan memakai currentPosition mentah: ExoPlayer dapat melaporkan 0 setelah
             // dekoder gagal, sehingga fallback/retry akan memutar ulang dari awal.
             val position = VideoPlayback.reopenPosition(current.positionMs, player?.currentPosition ?: 0)
@@ -432,8 +433,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 addListener(listener)
             }
             player = exo
+            exo.addAnalyticsListener(VideoDiagnostics.analytics())
             _state.value = _state.value.copy(effectPresentation = false)
             audioFx.attach(exo.audioSessionId, preferences.equalizer, preferences.audioEffect)
+            VideoDiagnostics.session(
+                reason = if (preferSoftware) "buka-software" else "buka",
+                decoder = preferences.decoderMode.name,
+                positionMs = startPosition,
+                playerVersion = version,
+            )
             // Efek GL memakai pipeline frame platform; renderer FFmpeg/dav1d bisa gagal saat
             // efek warna dipasang. Lewati efek untuk sesi software, bukan menggagalkan video.
             if (mode != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER) {
@@ -613,6 +621,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (width == viewportWidth && height == viewportHeight) return
         viewportWidth = width
         viewportHeight = height
+        VideoDiagnostics.viewport(width, height)
         refreshPowerPolicy()
         // Permukaan SurfaceView berukuran baru, tetapi hanya terisi ketika pemutar menggambar
         // frame berikutnya. Pemutar yang sedang berjalan melakukannya sendiri; pemutar yang
@@ -857,6 +866,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private fun releasePlayer() {
         attachmentJob?.cancel()
         attachmentJob = null
+        // Pemutar baru wajib menerima efek lagi walau kombinasi inputnya sama.
+        effectsSignature = null
+        VideoDiagnostics.release(playerVersion)
         ticker?.cancel()
         ticker = null
         player?.removeListener(listener)
@@ -882,10 +894,17 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
+    /**
+     * Tanda tangan input efek terakhir. Pipeline GL tidak dibangun ulang bila kombinasi ini tidak
+     * berubah, sehingga tick progres dan perubahan viewport tidak memicu hitch berkala.
+     */
+    private var effectsSignature: String? = null
+
     /** Efek warna real-time Media3; preset hanya memakai API yang stabil untuk video SDR/HDR. */
     @androidx.annotation.OptIn(UnstableApi::class)
     private fun applyVideoEffects(exo: ExoPlayer, enhance: VideoEnhance) {
-        val effects: List<Effect> = when (if (PlaybackPower.saving) VideoEnhance.OFF else enhance) {
+        val effective = if (PlaybackPower.saving) VideoEnhance.OFF else enhance
+        val effects: List<Effect> = when (effective) {
             VideoEnhance.OFF -> emptyList()
             VideoEnhance.LIGHT -> listOf(
                 Contrast(0.05f),
@@ -904,6 +923,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         // Efek GL tidak didukung semua kombinasi dekoder/GPU; kegagalan efek tidak boleh
         // menghentikan pemutaran video.
         val aspect = _state.value.aspect
+        val signature = VideoPlayback.effectsKey(
+            enhance = enhance,
+            saving = PlaybackPower.saving,
+            aspect = aspect,
+            width = viewportWidth,
+            height = viewportHeight,
+            playerVersion = _state.value.playerVersion,
+        )
+        if (signature == effectsSignature) return
         val layout = when (aspect) {
             VideoAspect.FIT -> Presentation.LAYOUT_SCALE_TO_FIT
             // FILL and ZOOM keep the source aspect ratio while covering the viewport; FILL no
@@ -918,7 +946,13 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         // The GL pipeline letterboxes independently of PlayerView.resizeMode.
         val presentation = if (viewportWidth > 0 && viewportHeight > 0)
             Presentation.createForWidthAndHeight(viewportWidth, viewportHeight, layout) else null
-        val applied = runCatching { exo.setVideoEffects(effects + listOfNotNull(zoom, presentation)) }.isSuccess
+        // `effectPresentation` berarti permukaan boleh memenuhi seluruh viewport karena pipeline GL
+        // sudah mengurus letterbox/crop. Tanpa `presentation` anggapan itu salah: permukaan selebar
+        // layar akan memotong gambar. Karena itu pemasangan tanpa Presentation dihitung gagal.
+        val applied = presentation != null &&
+            runCatching { exo.setVideoEffects(effects + listOfNotNull(zoom, presentation)) }.isSuccess
+        VideoDiagnostics.effects(signature, applied)
+        effectsSignature = signature
         _state.value = _state.value.copy(effectPresentation = applied)
     }
 

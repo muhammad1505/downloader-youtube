@@ -42,6 +42,13 @@ pemisah navigasi. Konten, hierarki tindakan, bentuk kontrol, dan navigasi tetap 
 yang sama; tidak memakai glow animasi atau hiasan yang mengganggu pemindaian daftar. Palet Cyberpunk
 diuji kontrasnya bersama palet gelap/terang di `ThemeContrastTest`.
 
+Penyelarasan susulan menutup dua celah. Lencana ikon (`IconBadge`) kini memakai isi turquoise–cyan
+dengan outline cyan, sehingga ikon kartu Alat dan header halaman benar-benar berada di palet
+Cyberpunk, bukan hanya memakai wadah lama. Aksen sampul juga tidak lagi mengganti warna pemutar:
+mini player, pemutar penuh, antrean putar, dan progres unduhan memakai `primary` turquoise saat
+Cyberpunk aktif. `AccentTheme` di akar aplikasi memang sudah mematikan aksen artwork untuk tema ini,
+tetapi pemakaian `rememberCoverAccent` langsung di layar melewati gerbang tersebut.
+
 ## Tema Transformers (1.1.66)
 
 Transformers adalah tema eksplisit di Pengaturan → Tampilan. Paletnya memakai baja navy
@@ -53,6 +60,19 @@ Penyelarasan 1.1.66 membawa bahasa itu ke header pemutar penuh, bingkai sampul, 
 indikator halaman, sheet antrean/opsi video, banner antrean unduhan, dan judul dialog. Tema
 gelap/terang/Cyberpunk tetap memakai kontrol dan radius lamanya; kontras keempat palet dikunci
 `ThemeContrastTest`.
+
+Penyelarasan susulan menutup bentuk dan warna pemutar video yang masih di-hardcode: overlay
+lanjut-tonton, pengaturan cepat, lencana status, dan lembar opsi kini mengambil bentuk dari
+`MaterialTheme.shapes` (bukan `RoundedCornerShape` tetap), latar lembar/overlay memakai
+`surfaceContainer` palet Transformers, dan aksen status memakai `primary` palet. Tema lain tetap
+memakai radius, latar, dan biru pemutarnya sendiri — pemutar video selalu gelap, sehingga warna
+tema terang tidak dijamin berkontras di atas panel gelap. Kontrol ringkas (ikon bulat pengaturan
+cepat, ChoicePill) sengaja tidak diubah bentuknya agar tetap komponen Material 3 yang sama.
+Wadah lencana yang tersisa ikut diselaraskan: lingkaran ikon status kosong (`EmptyState`) dan badge
+platform di layar Download memakai sudut terpotong pada tema Transformers, sedangkan chip status dan
+`ChoicePill` tetap berbentuk pil agar sejalan dengan `FilterChip`. Dialog `AlertDialog` tidak diubah
+karena sudutnya sudah berasal dari `MaterialTheme.shapes.extraLarge`, dan `ModalBottomSheet` pemutar
+audio sudah memilih bentuk serta drag handle-nya sendiri sejak 1.1.66.
 
 ### Ukuran kontekstual dan ruang tersedia (1.1.25)
 

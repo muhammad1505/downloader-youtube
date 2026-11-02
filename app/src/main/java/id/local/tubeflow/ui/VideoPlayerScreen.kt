@@ -55,7 +55,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -175,6 +174,22 @@ private val PlayerContent = Color.White
 private val PlayerMuted = Color.White.copy(alpha = 0.62f)
 private val SheetBackground = Color(0xFF1B1B1F)
 private val AccentBlue = Color(0xFF8AB4F8)
+
+/**
+ * Aksen kontrol pemutar. Tema Transformers memakai biru elektrik paletnya sendiri supaya status
+ * aktif di pengaturan cepat, lencana, dan tanda pilih tidak tertinggal di biru generik.
+ */
+@Composable
+private fun PlayerAccent(): Color =
+    if (LocalTransformersTheme.current) MaterialTheme.colorScheme.primary else AccentBlue
+
+/**
+ * Latar lembar/overlay pemutar. Pemutar tetap gelap di semua tema, tetapi tema Transformers memakai
+ * panel baja navy paletnya agar lembar opsi dan galat tidak tampil sebagai hitam generik.
+ */
+@Composable
+private fun PlayerSheet(): Color =
+    if (LocalTransformersTheme.current) MaterialTheme.colorScheme.surfaceContainer else SheetBackground
 
 private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, EFFECTS, DECODER, QUEUE, MORE }
 
@@ -370,6 +385,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         val host = activity
         val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
             inPip = info.isInPictureInPictureMode
+            id.local.tubeflow.core.VideoDiagnostics.pip(info.isInPictureInPictureMode)
         }
         host?.addOnPictureInPictureModeChangedListener(listener)
         onDispose { host?.removeOnPictureInPictureModeChangedListener(listener) }
@@ -390,9 +406,10 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
 
     DisposableEffect(lifecycleOwner, activity) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                if (activity?.isInPictureInPictureMode == true) video.close() else video.pause()
-            }
+            // Saat masuk PiP, sebagian perangkat tetap mengirim ON_STOP. Melepas pemutar di sini
+            // mematikan permukaan yang masih dipakai jendela PiP, sehingga pemutaran berhenti dan
+            // tampak sebagai galat dekoder. Cukup jeda ketika aplikasi benar-benar ke latar.
+            if (event == Lifecycle.Event.ON_STOP && activity?.isInPictureInPictureMode != true) video.pause()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -421,6 +438,22 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 val (surfaceWidth, surfaceHeight) = if (state.effectPresentation) maxWidth.value to maxHeight.value else id.local.tubeflow.core.VideoViewport.size(
                     maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
                 )
+                LaunchedEffect(surfaceWidth, surfaceHeight, videoAspect, state.videoWidth, state.videoHeight, state.pixelRatio, state.effectPresentation) {
+                    id.local.tubeflow.core.VideoDiagnostics.geometry(
+                        aspect = videoAspect.name,
+                        containerWidth = maxWidth.value,
+                        containerHeight = maxHeight.value,
+                        videoWidth = state.videoWidth,
+                        videoHeight = state.videoHeight,
+                        pixelRatio = state.pixelRatio,
+                        surfaceWidth = surfaceWidth,
+                        surfaceHeight = surfaceHeight,
+                        presenting = state.effectPresentation,
+                    )
+                }
+            // `update` berjalan setiap tick progres. setStyle/setTextSize memicu layout ulang
+            // SubtitleView, jadi pengaturan subtitle hanya diterapkan saat nilainya berubah.
+            val appliedSubtitle = remember { mutableStateOf<String?>(null) }
             AndroidView(
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
@@ -430,9 +463,17 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 },
                 update = { view ->
                     view.player = video.exoPlayer
-                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    // Permukaan sudah berukuran tepat, jadi FIT tidak menambah letterbox. Bila
+                    // pipeline GL ternyata tidak mengurus rasio, FIT berletterbox benar alih-alih
+                    // memotong tepi seperti FILL.
+                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     view.keepScreenOn = state.playing && !inPip
-                    applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
+                    val subtitleKey = "${subtitleSize.name}|${subtitleStyle.name}|${subtitlePosition.name}|${subtitleBackground.name}"
+                    if (appliedSubtitle.value != subtitleKey) {
+                        applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
+                        id.local.tubeflow.core.VideoDiagnostics.subtitle(subtitleSize.name, subtitleStyle.name)
+                        appliedSubtitle.value = subtitleKey
+                    }
                 },
                 onRelease = { view ->
                     view.player = null
@@ -715,7 +756,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     .padding(bottom = if (landscape) 110.dp else 156.dp, start = 16.dp, end = 16.dp),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(28.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
                     color = Color.White.copy(alpha = 0.16f),
                     contentColor = PlayerContent,
                 ) {
@@ -979,7 +1020,7 @@ private fun PlayerTopBar(
             onClick = onToggleQuickSettings,
             modifier = Modifier.size(44.dp),
             colors = IconButtonDefaults.iconButtonColors(
-                contentColor = if (quickSettingsVisible) AccentBlue else PlayerContent,
+                contentColor = if (quickSettingsVisible) PlayerAccent() else PlayerContent,
             ),
         ) {
             Icon(
@@ -1244,7 +1285,7 @@ private fun QuickIcon(
     Box(
         modifier = modifier
             .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable(onClickLabel = description, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = description },
         contentAlignment = Alignment.Center,
@@ -1272,7 +1313,7 @@ private fun subtitleChipDescription(state: VideoPlayerViewModel.State): String =
 private fun PlayerNoticeOverlay(notice: PlayerNotice, modifier: Modifier = Modifier) {
     Surface(
         modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         color = Color.Black.copy(alpha = 0.78f),
         contentColor = PlayerContent,
     ) {
@@ -1281,7 +1322,7 @@ private fun PlayerNoticeOverlay(notice: PlayerNotice, modifier: Modifier = Modif
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(notice.icon, null, Modifier.size(22.dp), tint = AccentBlue)
+            Icon(notice.icon, null, Modifier.size(22.dp), tint = PlayerAccent())
             Column {
                 Text(notice.title, color = PlayerMuted, style = MaterialTheme.typography.labelSmall)
                 Text(notice.value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -1374,7 +1415,7 @@ private fun GestureOverlay(feedback: GestureFeedback, modifier: Modifier = Modif
     }
     Surface(
         modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         color = Color.Black.copy(alpha = 0.72f),
         contentColor = PlayerContent,
     ) {
@@ -1412,8 +1453,8 @@ private fun PlayerErrorOverlay(
     ) {
         Surface(
             Modifier.padding(24.dp).widthIn(max = 460.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = SheetBackground,
+            shape = MaterialTheme.shapes.large,
+            color = PlayerSheet(),
             contentColor = PlayerContent,
         ) {
             Column(
@@ -1481,7 +1522,7 @@ private fun VideoOptionsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = if (transformers) CutCornerShape(topStart = 28.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp) else BottomSheetDefaults.ExpandedShape,
-        containerColor = SheetBackground,
+        containerColor = PlayerSheet(),
         contentColor = PlayerContent,
         dragHandle = {
             if (transformers) {
@@ -1813,7 +1854,7 @@ private fun VideoOptionsSheet(
                                 Modifier.padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = AccentBlue,
+                                color = PlayerAccent(),
                             )
                             AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
                             }
@@ -1885,7 +1926,7 @@ private fun SheetChoice(label: String, selected: Boolean, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (selected) Icon(Icons.Outlined.Check, null, tint = AccentBlue)
+        if (selected) Icon(Icons.Outlined.Check, null, tint = PlayerAccent())
     }
 }
 

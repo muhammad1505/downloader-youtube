@@ -4,6 +4,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -468,5 +469,37 @@ class VideoPlaybackTest {
         assertTrue(VideoSubtitleBackground.LIGHT.alphaPercent < VideoSubtitleBackground.MEDIUM.alphaPercent)
         assertTrue(VideoSubtitleBackground.MEDIUM.alphaPercent < VideoSubtitleBackground.DARK.alphaPercent)
         assertTrue(VideoSubtitleBackground.DARK.alphaPercent <= 100)
+    }
+
+    @Test
+    fun effectsKeyOnlyChangesWhenPipelineInputsChange() {
+        // Tick progres dan recomposition biasa tidak boleh membangun ulang pipeline GL.
+        assertEquals(
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+        )
+        // Setiap input yang benar-benar berubah menghasilkan kunci berbeda.
+        assertNotEquals(
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.VIVID, false, VideoAspect.FIT, 1080, 1920, 3),
+        )
+        assertNotEquals(
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FILL, 1080, 1920, 3),
+        )
+        assertNotEquals(
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 720, 1280, 3),
+        )
+        assertNotEquals(
+            "Pemutar baru wajib menerima efek lagi",
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 4),
+        )
+        // Mode hemat baterai melepas efek, jadi kuncinya sama dengan enhance OFF.
+        assertEquals(
+            VideoPlayback.effectsKey(VideoEnhance.OFF, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.SHARP, true, VideoAspect.FIT, 1080, 1920, 3),
+        )
     }
 }

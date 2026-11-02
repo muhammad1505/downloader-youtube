@@ -207,6 +207,8 @@ private fun PlaylistRow(
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        // Outline kartu bersama agar Cyberpunk tidak kehilangan garis cyan-nya di baris playlist.
+        border = cyberpunkCardBorder(),
     ) {
         AdaptivePair(
             Modifier.padding(start = UiSpacing.item, end = UiSpacing.row, top = UiSpacing.row, bottom = UiSpacing.row),

@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CutCornerShape
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -748,7 +750,7 @@ internal fun DownloadComposer(
         }
 
         if (shownVideo != null || (shownPlaylist != null && entries.isNotEmpty()) || spotifyTrack != null || spotifyCollectionData != null) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
                 val summary = buildSummary(mode, videoFormat, audioFormat, qualityTier, bitrate, if (mode == MediaMode.VIDEO) subtitleLang else if (lyrics) "on" else "", embedThumb && mode == MediaMode.AUDIO && Selection.coverSupported(mode, audioFormat))
                 Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -809,7 +811,9 @@ private fun SupportedPlatforms() {
         contentPadding = PaddingValues(end = 4.dp),
     ) {
         items(platforms, key = { it.id }) { platform ->
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
+            // Badge platform memakai sudut terpotong pada tema Transformers; tema lain tetap bulat.
+            val badgeShape = if (LocalTransformersTheme.current) CutCornerShape(topStart = 6.dp, bottomEnd = 6.dp) else CircleShape
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = badgeShape) {
                 Box(Modifier.padding(7.dp)) {
                     PlatformBrandLogo(platform, Modifier.size(18.dp), platform.label)
                 }
@@ -821,7 +825,7 @@ private fun SupportedPlatforms() {
 @Composable
 private fun VideoPreviewCard(meta: VideoMetadata, subtitleLang: String) {
     SectionCard {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
             Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)) {
                 AsyncImage(
                     model = meta.thumbnail,
@@ -910,7 +914,7 @@ private fun spotifyDeltaLabel(delta: Long): String = when {
 @Composable
 private fun SpotifyPreviewCard(track: SpotifyTrack, candidates: List<SpotifyCandidate>, selected: String, onSelect: (String) -> Unit) {
     SectionCard {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AsyncImage(
                     model = track.coverUrl,
@@ -991,7 +995,7 @@ private fun SpotifyCollectionCard(
 ) {
     val kindLabel = if (collection.kind == SpotifyKind.ALBUM) "Album" else "Playlist"
     SectionCard {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AsyncImage(
                     model = collection.coverUrl,

@@ -407,8 +407,9 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
 }
 
 /**
- * Lencana ikon bersama untuk folder, alat, dan pengaturan. Pada tema Transformers memakai sudut
- * terpotong dengan garis gradien biru-merah; tema lain tetap memakai wadah lembut yang lama.
+ * Lencana ikon bersama untuk folder, alat, dan pengaturan. Transformers memakai sudut terpotong
+ * dengan garis gradien biru-merah; Cyberpunk memakai isi turquoise-cyan dengan outline cyan;
+ * tema lain tetap memakai wadah lembut yang lama.
  */
 @Composable
 fun IconBadge(
@@ -419,20 +420,26 @@ fun IconBadge(
     tint: Color? = null,
 ) {
     val transformers = LocalTransformersTheme.current
+    val cyberpunk = LocalCyberpunkTheme.current
     val scheme = MaterialTheme.colorScheme
     val shape = if (transformers) CutCornerShape(topStart = size * 0.26f, bottomEnd = size * 0.26f) else MaterialTheme.shapes.small
-    val fill = if (transformers) {
-        Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.30f), scheme.secondary.copy(alpha = 0.22f)))
-    } else {
-        Brush.linearGradient(listOf(scheme.primaryContainer, scheme.primaryContainer))
+    val fill = when {
+        transformers -> Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.30f), scheme.secondary.copy(alpha = 0.22f)))
+        // Cyberpunk: turquoise ke cyan dengan outline cyan; magenta tetap aksen sekunder saja.
+        cyberpunk -> Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.26f), scheme.secondary.copy(alpha = 0.14f)))
+        else -> Brush.linearGradient(listOf(scheme.primaryContainer, scheme.primaryContainer))
     }
     Box(
         modifier.size(size).clip(shape).background(fill).then(
-            if (transformers) Modifier.border(
-                1.dp,
-                Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.85f), scheme.secondary.copy(alpha = 0.75f))),
-                shape,
-            ) else Modifier,
+            when {
+                transformers -> Modifier.border(
+                    1.dp,
+                    Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.85f), scheme.secondary.copy(alpha = 0.75f))),
+                    shape,
+                )
+                cyberpunk -> Modifier.border(1.dp, scheme.secondary.copy(alpha = 0.55f), shape)
+                else -> Modifier
+            },
         ),
         contentAlignment = Alignment.Center,
     ) {
@@ -626,8 +633,10 @@ fun EmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
         ) {
+            // Lencana status kosong ikut bahasa bentuk tema: terpotong di Transformers, bulat di tema lain.
+            val badgeShape = if (LocalTransformersTheme.current) CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp) else CircleShape
             Box(
-                Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+                Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, badgeShape),
                 contentAlignment = Alignment.Center,
             ) { Icon(icon, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
@@ -783,7 +792,8 @@ private fun formatMeta(job: DownloadJob): String {
 fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
-    val accent=rememberCoverAccent(job.coverPath)
+    // Cyberpunk memakai palet tetapnya: aksen sampul tidak mengganti warna tema.
+    val accent=if (LocalCyberpunkTheme.current) MaterialTheme.colorScheme.primary else rememberCoverAccent(job.coverPath)
     val song=job.songIdentity()
     Card(
         modifier.fillMaxWidth().clickable(

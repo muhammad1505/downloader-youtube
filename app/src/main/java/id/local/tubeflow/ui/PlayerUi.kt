@@ -64,6 +64,7 @@ import id.local.tubeflow.core.PlaybackQueue
 import id.local.tubeflow.core.PlaybackQueueSearch
 import id.local.tubeflow.core.PlayerEqualizer
 import id.local.tubeflow.core.PlayerViewModel
+import id.local.tubeflow.ui.theme.LocalCyberpunkTheme
 import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -74,8 +75,10 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
     // Sengaja memakai bahasa visual kartu lagu di Koleksi (radius medium, latar datar bernuansa
     // aksen sampul) supaya mini player terbaca sebagai bagian dari daftar, bukan panel terpisah.
     val transformers=LocalTransformersTheme.current
+    // Cyberpunk memakai palet tetapnya: aksen sampul tidak mengganti warna tema.
+    val cyberpunk=LocalCyberpunkTheme.current
     val scheme=MaterialTheme.colorScheme
-    val accent=if (transformers) scheme.primary else rememberCoverAccent(track.cover)
+    val accent=if (transformers||cyberpunk) scheme.primary else rememberCoverAccent(track.cover)
     val cardColors=if (transformers) CardDefaults.cardColors(containerColor=scheme.surfaceContainer,contentColor=scheme.onSurface) else mediaCardColors(accent)
     val cardBorder=if (transformers) BorderStroke(1.dp,Brush.horizontalGradient(listOf(scheme.primary.copy(alpha=0.55f),scheme.secondary.copy(alpha=0.45f)))) else cyberpunkCardBorder()
     Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)) {
@@ -117,9 +120,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     val scheme=MaterialTheme.colorScheme
     val transformers=LocalTransformersTheme.current
     val accent=scheme.primary
-    // Aksen sampul hanya dipakai di tema lama; Transformers memakai palet baja navy yang tetap.
+    // Aksen sampul hanya dipakai di tema lama; Transformers dan Cyberpunk memakai palet tetapnya.
     val coverAccent=rememberCoverAccent(track.cover)
-    val pageAccent=if (transformers) scheme.primary else coverAccent
+    val pageAccent=if (transformers||LocalCyberpunkTheme.current) scheme.primary else coverAccent
     val speedDescription=stringResource(id.local.tubeflow.R.string.player_speed_description, speedLabel(state.speed))
     val list=rememberLazyListState()
     val active=LrcLines.activeIndex(state.lines,state.positionMs)
@@ -568,7 +571,7 @@ private fun PlayerAction(
 private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, dismiss: () -> Unit) {
     val transformers=LocalTransformersTheme.current
     val scheme=MaterialTheme.colorScheme
-    val accent=if (transformers) scheme.primary else rememberCoverAccent(state.track?.cover.orEmpty())
+    val accent=if (transformers||LocalCyberpunkTheme.current) scheme.primary else rememberCoverAccent(state.track?.cover.orEmpty())
     val list=rememberLazyListState()
     var confirmClear by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
