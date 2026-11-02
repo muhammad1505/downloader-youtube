@@ -9,12 +9,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,16 +61,16 @@ fun ToolsScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(UiSpacing.screen),
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
-        PageHeading(stringResource(R.string.tools_title), stringResource(R.string.tools_subtitle))
+        PageHeading(stringResource(R.string.tools_title), stringResource(R.string.tools_subtitle), Icons.Outlined.Build)
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolHubCard(
+            ToolTile(
                 title = stringResource(R.string.tools_lyrics_title),
                 description = stringResource(R.string.tools_lyrics_description),
                 icon = Icons.Outlined.Lyrics,
                 enabled = items.any { it.lyricUri != null } && !model.busy,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) { lyricOpen = true }
-            ToolHubCard(
+            ToolTile(
                 title = stringResource(R.string.tools_rename_title),
                 description = stringResource(R.string.tools_rename_description),
                 icon = Icons.Outlined.DriveFileRenameOutline,
@@ -78,14 +79,14 @@ fun ToolsScreen(
             ) { renameOpen = true }
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolHubCard(
+            ToolTile(
                 title = stringResource(R.string.tools_karaoke_title),
                 description = stringResource(R.string.tools_karaoke_description),
                 icon = Icons.Outlined.MicOff,
                 enabled = items.isNotEmpty() && !model.busy,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) { instrumentalOpen = true }
-            ToolHubCard(
+            ToolTile(
                 title = stringResource(R.string.tools_tag_title),
                 description = stringResource(R.string.tools_tag_description),
                 icon = Icons.Outlined.Sell,
@@ -144,8 +145,12 @@ fun ToolsScreen(
     }
 }
 
+/**
+ * Alat tampil sebagai ubin bersih: ikon, nama, dan penjelasan singkat. Tidak ada kartu pembungkus
+ * maupun panah, sehingga daftar alat terasa lapang dan seragam dengan ubin folder di Koleksi.
+ */
 @Composable
-private fun ToolHubCard(
+private fun ToolTile(
     title: String,
     description: String,
     icon: ImageVector,
@@ -153,45 +158,35 @@ private fun ToolHubCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val cyberpunk = id.local.tubeflow.ui.theme.LocalCyberpunkTheme.current
-    SectionCard(
+    Column(
         modifier
-            .heightIn(min = 190.dp)
-            .alpha(if (enabled) 1f else 0.48f)
-            .clickable(enabled = enabled, onClickLabel = "Buka $title", onClick = onClick),
+            .heightIn(min = 150.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(enabled = enabled, onClickLabel = "Buka $title", onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 12.dp)
+            .alpha(if (enabled) 1f else 0.45f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(44.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .then(if (cyberpunk) Modifier.border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), MaterialTheme.shapes.small) else Modifier),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, null, Modifier.size(23.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
-            }
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        IconBadge(icon, size = 54.dp)
+        Text(
+            title,
+            Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            description,
+            Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -285,7 +280,7 @@ private fun LyricPickerDialog(
     val selected = items.firstOrNull { it.uri == chosen }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tools_lyrics_title)) },
+        title = { DialogTitle(stringResource(R.string.tools_lyrics_title), icon = Icons.Outlined.Lyrics) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
                 Text(stringResource(R.string.tools_lyrics_mode_help), style = MaterialTheme.typography.bodySmall)
@@ -327,7 +322,7 @@ private fun RenameToolDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tools_rename_title)) },
+        title = { DialogTitle(stringResource(R.string.tools_rename_title), icon = Icons.Outlined.DriveFileRenameOutline) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -393,7 +388,7 @@ private fun TagToolDialog(
     val changes = plan.count { it.changed }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tools_tag_title)) },
+        title = { DialogTitle(stringResource(R.string.tools_tag_title), icon = Icons.Outlined.Sell) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -439,7 +434,7 @@ private fun InstrumentalToolDialog(
     val chosen = items.filter { it.uri in selected }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tools_karaoke_title)) },
+        title = { DialogTitle(stringResource(R.string.tools_karaoke_title), icon = Icons.Outlined.MicOff) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -508,7 +503,7 @@ private fun TapSyncDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tools_tap_title)) },
+        title = { DialogTitle(stringResource(R.string.tools_tap_title), icon = Icons.Outlined.Timer) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.item), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(item.title.ifBlank { item.displayName }, style = MaterialTheme.typography.titleSmall)

@@ -53,7 +53,7 @@ fun EngineUpdatePanel(blockedReason: String? = null) {
     if (confirmUpdate && available != null) {
         AlertDialog(
             onDismissRequest = { confirmUpdate = false },
-            title = { Text(stringResource(R.string.engine_update_title)) },
+            title = { DialogTitle(stringResource(R.string.engine_update_title), icon = Icons.Outlined.Download) },
             text = { Text(stringResource(R.string.engine_update_warning, available.version)) },
             confirmButton = {
                 TextButton(onClick = {
@@ -69,7 +69,7 @@ fun EngineUpdatePanel(blockedReason: String? = null) {
     if (confirmRollback) {
         AlertDialog(
             onDismissRequest = { confirmRollback = false },
-            title = { Text(stringResource(R.string.engine_rollback_title)) },
+            title = { DialogTitle(stringResource(R.string.engine_rollback_title), icon = Icons.Outlined.Restore) },
             text = { Text(stringResource(R.string.engine_rollback_warning)) },
             confirmButton = {
                 TextButton(onClick = {

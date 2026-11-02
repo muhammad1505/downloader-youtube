@@ -3,6 +3,7 @@ package id.local.tubeflow.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -80,7 +81,27 @@ internal val CyberpunkPalette = darkColorScheme(
     errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
 )
 
+// Tema Transformers: biru elektrik dan merah di atas baja navy gelap, dengan sudut terpotong
+// sebagai bahasa bentuk khas. Semua warna dipilih sendiri untuk aplikasi ini.
+internal val TransformersPalette = darkColorScheme(
+    primary = Color(0xFF4FD8FF), onPrimary = Color(0xFF00202E),
+    primaryContainer = Color(0xFF0B3A5A), onPrimaryContainer = Color(0xFFC4ECFF),
+    secondary = Color(0xFFFF6A5C), onSecondary = Color(0xFF3D0004),
+    secondaryContainer = Color(0xFF5C1614), onSecondaryContainer = Color(0xFFFFDAD5),
+    tertiary = Color(0xFFFFC93C), onTertiary = Color(0xFF2E2400),
+    tertiaryContainer = Color(0xFF4F3D00), onTertiaryContainer = Color(0xFFFFE7A8),
+    background = Color(0xFF04070F), onBackground = Color(0xFFE8F3FF),
+    surface = Color(0xFF070D19), onSurface = Color(0xFFE8F3FF),
+    surfaceVariant = Color(0xFF17253A), onSurfaceVariant = Color(0xFFAEC4DC),
+    surfaceContainerLowest = Color(0xFF02050B), surfaceContainerLow = Color(0xFF081120),
+    surfaceContainer = Color(0xFF0C1728), surfaceContainerHigh = Color(0xFF122035), surfaceContainerHighest = Color(0xFF182A43),
+    outline = Color(0xFF7F9DBC), outlineVariant = Color(0xFF2A4361),
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+)
+
 val LocalCyberpunkTheme = staticCompositionLocalOf { false }
+val LocalTransformersTheme = staticCompositionLocalOf { false }
 
 private val AppTypography = Typography(
     headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 38.sp),
@@ -105,11 +126,21 @@ private val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
+// Sudut terpotong dipakai konsisten oleh kartu, chip, dialog, dan tombol saat tema Transformers aktif.
+private val TransformersShapes = Shapes(
+    extraSmall = CutCornerShape(topStart = 6.dp, bottomEnd = 6.dp),
+    small = CutCornerShape(topStart = 10.dp, bottomEnd = 10.dp),
+    medium = CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp),
+    large = CutCornerShape(topStart = 22.dp, bottomEnd = 22.dp),
+    extraLarge = CutCornerShape(topStart = 28.dp, bottomEnd = 28.dp),
+)
+
 @Composable
 fun TubeFlowTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     cyberpunk: Boolean = false,
+    transformers: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
@@ -120,23 +151,24 @@ fun TubeFlowTheme(
             isAppearanceLightStatusBars = !darkTheme
             isAppearanceLightNavigationBars = !darkTheme
         }
-        window.isNavigationBarContrastEnforced = !cyberpunk
-        window.isStatusBarContrastEnforced = !cyberpunk
+        window.isNavigationBarContrastEnforced = !cyberpunk && !transformers
+        window.isStatusBarContrastEnforced = !cyberpunk && !transformers
     }
     val supportsDynamic = Build.VERSION.SDK_INT >= 31
-    val useDynamicColor = dynamicColor && !cyberpunk
+    val useDynamicColor = dynamicColor && !cyberpunk && !transformers
     val colorScheme = when {
+        transformers -> TransformersPalette
         useDynamicColor && supportsDynamic && darkTheme -> dynamicDarkColorScheme(context)
         useDynamicColor && supportsDynamic -> dynamicLightColorScheme(context)
         cyberpunk -> CyberpunkPalette
         darkTheme -> DarkPalette
         else -> LightPalette
     }
-    CompositionLocalProvider(LocalCyberpunkTheme provides cyberpunk) {
+    CompositionLocalProvider(LocalCyberpunkTheme provides cyberpunk, LocalTransformersTheme provides transformers) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
-            shapes = AppShapes,
+            shapes = if (transformers) TransformersShapes else AppShapes,
             content = content,
         )
     }

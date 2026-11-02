@@ -10,9 +10,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Login
@@ -83,13 +83,13 @@ fun SettingsScreen(
     var confirmBstationLogout by rememberSaveable { mutableStateOf(false) }
     if (confirmBstationLogout) AlertDialog(
         onDismissRequest = { confirmBstationLogout = false },
-        title = { Text("Keluar dari Bstation?") },
+        title = { DialogTitle("Keluar dari Bstation?", icon = Icons.AutoMirrored.Outlined.Logout) },
         text = { Text("Cookie login akan dihapus dari perangkat. Episode Premium tidak bisa dipilih lagi sampai kamu masuk kembali. Unduhan yang sudah selesai tidak terpengaruh.") },
         confirmButton = { TextButton(onClick = { confirmBstationLogout = false; onBstationLogout() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Keluar") } },
         dismissButton = { TextButton(onClick = { confirmBstationLogout = false }) { Text("Batal") } },
     )
     if (confirmPartial) AlertDialog(onDismissRequest = { confirmPartial = false },
-        title = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title)) },
+        title = { DialogTitle(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_title), icon = Icons.Outlined.DeleteSweep, destructive = true) },
         text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_warning)) },
         confirmButton = { TextButton(onClick = { confirmPartial = false; onClearPartial() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.partial_clear_confirm)) } },
         dismissButton = { TextButton(onClick = { confirmPartial = false }) { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.action_cancel)) } })
@@ -117,7 +117,7 @@ fun SettingsScreen(
     if (confirmClearFiles) {
         AlertDialog(
             onDismissRequest = { confirmClearFiles = false },
-            title = { Text("Hapus semua file?") },
+            title = { DialogTitle("Hapus semua file?", icon = Icons.Outlined.DeleteForever, destructive = true) },
             text = { Text(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.storage_clear_description,
                 if (tree != null) "folder pilihan" else "Download/${SettingsStore.storageFolder}")) },
             confirmButton = { TextButton(onClick = {
@@ -161,7 +161,7 @@ fun SettingsScreen(
     val pendingRemoveFolder = SettingsStore.collectionFolders.firstOrNull { it.uri == pendingRemoveCollection }
     if (pendingRemoveFolder != null) AlertDialog(
         onDismissRequest = { pendingRemoveCollection = null },
-        title = { Text("Lepas folder?") },
+        title = { DialogTitle("Lepas folder?", icon = Icons.Outlined.FolderOff, destructive = true) },
         text = { Text("\"${pendingRemoveFolder.label}\" tidak lagi dipindai ke Koleksi. File dan subfolder di penyimpanan tidak dihapus, dan tujuan download tidak berubah.") },
         confirmButton = {
             TextButton(
@@ -179,7 +179,11 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         if (section == null) {
-            PageHeading(androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings), androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help))
+            PageHeading(
+                androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings),
+                androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.page_settings_help),
+                Icons.Outlined.Settings,
+            )
             val smartCount = listOf(
                 SettingsStore.autoRename, SettingsStore.autoTag, SettingsStore.autoArtwork,
                 SettingsStore.autoLyrics, SettingsStore.autoLibrary,
@@ -200,6 +204,7 @@ fun SettingsScreen(
                     title = "Tampilan",
                     summary = "${themeModeLabel(themeMode)} · " + when {
                         themeMode == SettingsStore.MODE_CYBERPUNK -> "palet neon"
+                        themeMode == SettingsStore.MODE_TRANSFORMERS -> "baja, biru elektrik, dan merah"
                         SettingsStore.artworkAccent -> "aksen dari sampul"
                         else -> "aksen tema"
                     },
@@ -234,26 +239,24 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Info,
                 ) { onSection("about") },
             )
-            categories.chunked(2).forEach { row ->
-                Row(
-                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    row.forEach { category ->
-                        SettingsCategoryCard(
-                            title = category.title,
-                            summary = category.summary,
-                            icon = category.icon,
-                            onClick = category.onClick,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
+            // Satu kolom tanpa kartu: ikon, judul, dan ringkasan saja — tanpa panah yang kaku.
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                categories.forEachIndexed { index, category ->
+                    SettingsCategoryRow(
+                        title = category.title,
+                        summary = category.summary,
+                        icon = category.icon,
+                        onClick = category.onClick,
+                    )
+                    if (index != categories.lastIndex) HorizontalDivider(
+                        Modifier.padding(start = 52.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                    )
                 }
             }
         } else {
             val (title, subtitle) = settingsSectionInfo(section)
-            PageHeading(title, subtitle)
+            PageHeading(title, subtitle, settingsSectionIcon(section))
         }
         if (section == "media") {
             MediaToolsSettings(karaoke, player)
@@ -363,6 +366,7 @@ fun SettingsScreen(
             OptionMenu(
                 label = "Mode tema",
                 options = listOf(
+                    SettingsStore.MODE_TRANSFORMERS to "Transformers",
                     SettingsStore.MODE_SYSTEM to "Ikut sistem",
                     SettingsStore.MODE_LIGHT to "Terang",
                     SettingsStore.MODE_DARK to "Gelap",
@@ -374,12 +378,15 @@ fun SettingsScreen(
             if (themeMode == SettingsStore.MODE_CYBERPUNK) {
                 Text("Neon turquoise, cyan, dan magenta di atas latar navy gelap. Tema Cyberpunk tetap memakai paletnya sendiri meski aksen sampul atau warna dinamis diaktifkan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (themeMode == SettingsStore.MODE_TRANSFORMERS) {
+                Text("Tema Transformers memakai baja navy gelap, biru elektrik, merah, dan sudut terpotong yang sama di semua menu: Ringkasan, Download, Koleksi, Alat, serta Pengaturan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             ToggleRow(
                 title = "Aksen dari sampul",
                 description = "Ikuti sampul lagu yang diputar atau unduhan terbaru.",
                 checked = SettingsStore.artworkAccent,
                 onCheckedChange = { SettingsStore.setArtworkAccent(context, it) },
-                enabled = themeMode != SettingsStore.MODE_CYBERPUNK,
+                enabled = themeMode != SettingsStore.MODE_CYBERPUNK && themeMode != SettingsStore.MODE_TRANSFORMERS,
             )
             if (Build.VERSION.SDK_INT >= 31) {
                 ToggleRow(
@@ -387,7 +394,7 @@ fun SettingsScreen(
                     description = "Ikuti warna wallpaper (Material You).",
                     checked = dynamicColor,
                     onCheckedChange = onDynamicColor,
-                    enabled = themeMode != SettingsStore.MODE_CYBERPUNK,
+                    enabled = themeMode != SettingsStore.MODE_CYBERPUNK && themeMode != SettingsStore.MODE_TRANSFORMERS,
                 )
             }
         }
@@ -675,7 +682,20 @@ private fun themeModeLabel(mode: String): String = when (mode) {
     SettingsStore.MODE_LIGHT -> "Mode terang"
     SettingsStore.MODE_DARK -> "Mode gelap"
     SettingsStore.MODE_CYBERPUNK -> "Cyberpunk"
+    SettingsStore.MODE_TRANSFORMERS -> "Transformers"
     else -> "Ikut sistem"
+}
+
+/** Ikon judul bagian agar banner tiap layar Pengaturan konsisten dengan menu lain. */
+private fun settingsSectionIcon(section: String): ImageVector = when (section) {
+    "downloads" -> Icons.Outlined.Download
+    "storage" -> Icons.Outlined.Folder
+    "display" -> Icons.Outlined.Palette
+    "playback" -> Icons.Outlined.PlayCircle
+    "history" -> Icons.Outlined.History
+    "media" -> Icons.Outlined.Build
+    "accounts" -> Icons.Outlined.AccountCircle
+    else -> Icons.Outlined.Info
 }
 
 private fun settingsSectionInfo(section: String): Pair<String, String> = when (section) {
@@ -697,36 +717,26 @@ private data class SettingsCategory(
     val onClick: () -> Unit,
 )
 
+/** Satu baris kategori tanpa kartu dan tanpa panah: ikon, judul, dan ringkasan nilai aktif. */
 @Composable
-private fun SettingsCategoryCard(
+private fun SettingsCategoryRow(
     title: String,
     summary: String,
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SectionCard(
-        modifier.clickable(onClickLabel = "Buka $title", onClick = onClick),
+    Row(
+        modifier.fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClickLabel = "Buka $title", onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().heightIn(min = 156.dp).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Outlined.ChevronRight,
-                    null,
-                    Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        IconBadge(icon, size = 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,
@@ -738,7 +748,7 @@ private fun SettingsCategoryCard(
                 summary,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

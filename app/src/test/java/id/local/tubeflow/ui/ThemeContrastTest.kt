@@ -8,11 +8,12 @@ import org.junit.Test
 /**
  * Kontras adalah bagian dari kualitas visual yang harus terbukti, bukan sekadar terlihat.
  * Pasangan teks wajib 4,5:1; pasangan komponen/ikon besar minimal 3:1. Regresi ini mengunci
- * kedua palet (gelap dan terang) agar pembaruan warna tidak diam-diam merusak keterbacaan.
+ * semua palet (gelap, terang, cyberpunk, transformers) agar pembaruan warna tidak diam-diam
+ * merusak keterbacaan.
  */
 class ThemeContrastTest {
     @Test fun sharedPanelsAndPausedStateKeepReadableTextInBothThemes() {
-        for (palette in listOf(DarkPalette, LightPalette, CyberpunkPalette)) {
+        for (palette in listOf(DarkPalette, LightPalette, CyberpunkPalette, TransformersPalette)) {
             assertRatio("panel text",palette.onSurface,palette.surfaceContainer,4.5f)
             assertRatio("panel secondary text",palette.onSurfaceVariant,palette.surfaceContainer,4.5f)
             assertRatio("paused state",palette.onTertiaryContainer,palette.tertiaryContainer,4.5f)
@@ -43,6 +44,18 @@ class ThemeContrastTest {
         assertRatio("ikon di tombol turquoise", p.onPrimary, p.primary, 4.5f)
         assertRatio("teks kontainer aksen", p.onPrimaryContainer, p.primaryContainer, 4.5f)
         assertRatio("teks status magenta", p.onTertiaryContainer, p.tertiaryContainer, 4.5f)
+    }
+
+    @Test fun transformersPaletteKeepsElectricBlueAndRedReadable() {
+        val p = TransformersPalette
+        assertRatio("teks transformers di latar", p.onBackground, p.background, 4.5f)
+        assertRatio("teks transformers di kartu", p.onSurface, p.surfaceContainer, 4.5f)
+        assertRatio("teks sekunder transformers di kartu", p.onSurfaceVariant, p.surfaceContainer, 4.5f)
+        assertRatio("aksen biru elektrik di latar", p.primary, p.background, 4.5f)
+        assertRatio("aksen merah di latar", p.secondary, p.background, 4.5f)
+        assertRatio("ikon di tombol biru", p.onPrimary, p.primary, 4.5f)
+        assertRatio("teks kontainer aksen", p.onPrimaryContainer, p.primaryContainer, 4.5f)
+        assertRatio("teks status kuning", p.onTertiaryContainer, p.tertiaryContainer, 4.5f)
     }
 
     @Test fun lightPaletteKeepsReadableTextAndControls() {

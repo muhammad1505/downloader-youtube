@@ -22,7 +22,7 @@ fun SleepTimerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
     val timer by player.sleep.collectAsStateWithLifecycle()
     var custom by remember { mutableStateOf("") }
     val minutes = custom.toIntOrNull()?.takeIf { it in 1..180 }
-    AlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(R.string.sleep_title)) }, text = {
+    AlertDialog(onDismissRequest = dismiss, title = { DialogTitle(stringResource(R.string.sleep_title), icon = Icons.Outlined.Bedtime) }, text = {
         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.sleep_help), style = MaterialTheme.typography.bodySmall)
             if (timer.remainingMs > 0) Text(stringResource(R.string.sleep_remaining, duration(timer.remainingMs)))

@@ -1,17 +1,23 @@
 package id.local.tubeflow.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -24,7 +30,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import id.local.tubeflow.core.DownloadJob
 import id.local.tubeflow.core.DownloadSections
 import id.local.tubeflow.core.JobState
@@ -120,6 +130,43 @@ private fun QueueSummary(
     onResumeAll: () -> Unit,
     onCancelAllRequest: () -> Unit,
 ) {
+    if (LocalTransformersTheme.current) {
+        val scheme = MaterialTheme.colorScheme
+        val shape = CutCornerShape(topStart = 12.dp, bottomEnd = 12.dp)
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(scheme.secondary.copy(alpha = 0.28f), scheme.surfaceContainerHigh, scheme.primary.copy(alpha = 0.14f)),
+                    ),
+                )
+                .border(
+                    1.dp,
+                    Brush.horizontalGradient(listOf(scheme.secondary.copy(alpha = 0.65f), scheme.primary.copy(alpha = 0.45f))),
+                    shape,
+                )
+                .padding(start = 10.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Download, null, Modifier.size(18.dp), tint = scheme.primary)
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Antrean", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    summary.removePrefix("Antrean · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+            if (showBulkActions) {
+                if (pausable > 0) IconAction(Icons.Outlined.Pause, "Jeda semua", onPauseAll)
+                if (paused > 0) IconAction(Icons.Outlined.PlayArrow, "Lanjutkan semua", onResumeAll)
+                IconAction(Icons.Outlined.Close, "Batalkan semua", onCancelAllRequest, destructive = true)
+            }
+        }
+        return
+    }
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,

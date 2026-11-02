@@ -15,9 +15,10 @@ object SettingsStore {
     const val MODE_LIGHT = "light"
     const val MODE_DARK = "dark"
     const val MODE_CYBERPUNK = "cyberpunk"
-    private val supported = setOf(MODE_SYSTEM, MODE_LIGHT, MODE_DARK, MODE_CYBERPUNK)
+    const val MODE_TRANSFORMERS = "transformers"
+    private val supported = setOf(MODE_SYSTEM, MODE_LIGHT, MODE_DARK, MODE_CYBERPUNK, MODE_TRANSFORMERS)
 
-    var themeMode by mutableStateOf(MODE_SYSTEM)
+    var themeMode by mutableStateOf(MODE_TRANSFORMERS)
         private set
 
     var dynamicColor by mutableStateOf(true)
@@ -105,7 +106,7 @@ object SettingsStore {
         analyticsSince = prefs.getLong("analytics_since", 0).takeIf { it > 0 } ?: System.currentTimeMillis().also {
             prefs.edit { putLong("analytics_since", it) }
         }
-        themeMode = prefs.getString("theme", MODE_SYSTEM)?.takeIf { it in supported } ?: MODE_SYSTEM
+        themeMode = prefs.getString("theme", MODE_TRANSFORMERS)?.takeIf { it in supported } ?: MODE_TRANSFORMERS
         dynamicColor = prefs.getBoolean("dynamic", true)
         artworkAccent = prefs.getBoolean("artwork_accent", true)
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER
@@ -169,7 +170,7 @@ object SettingsStore {
 
     fun isDark(systemDark: Boolean): Boolean = when (themeMode) {
         MODE_LIGHT -> false
-        MODE_DARK, MODE_CYBERPUNK -> true
+        MODE_DARK, MODE_CYBERPUNK, MODE_TRANSFORMERS -> true
         else -> systemDark
     }
 }

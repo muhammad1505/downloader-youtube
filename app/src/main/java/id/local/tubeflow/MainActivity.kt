@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = SettingsStore.isDark(isSystemInDarkTheme()),
                 dynamicColor = SettingsStore.dynamicColor,
                 cyberpunk = SettingsStore.themeMode == SettingsStore.MODE_CYBERPUNK,
+                transformers = SettingsStore.themeMode == SettingsStore.MODE_TRANSFORMERS,
             ) {
                 TubeFlowApp(model, library, player, karaoke, video, incomingUrl.value, ::requestDownloadNotifications,
                     navigation = navigation.value,

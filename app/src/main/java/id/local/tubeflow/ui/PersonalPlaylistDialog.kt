@@ -61,14 +61,11 @@ fun PersonalPlaylistDialog(model: MediaLibraryViewModel, dismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = dismiss,
         title = {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.library_manage_playlists))
-                Text(
-                    pluralStringResource(R.plurals.playlist_count, entries.size, entries.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            DialogTitle(
+                stringResource(R.string.library_manage_playlists),
+                subtitle = pluralStringResource(R.plurals.playlist_count, entries.size, entries.size),
+                icon = Icons.AutoMirrored.Outlined.QueueMusic,
+            )
         },
         text = {
             LazyColumn(

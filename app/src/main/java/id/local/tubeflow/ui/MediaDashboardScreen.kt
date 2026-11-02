@@ -68,7 +68,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
     )
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item)) {
-        item { PageHeading("Ringkasan media", "Koleksi di perangkat dan aktivitas yang benar-benar tercatat.") }
+        item { PageHeading("Ringkasan media", "Koleksi di perangkat dan aktivitas yang benar-benar tercatat.", Icons.Outlined.Dashboard) }
         item { ScrollRow {
             AssistChip(onClick = { collection("AUDIO") }, label = { Text("Musik") }, leadingIcon = { Icon(Icons.Outlined.LibraryMusic, null, Modifier.size(18.dp)) })
             AssistChip(onClick = { collection("VIDEO") }, label = { Text("Video") }, leadingIcon = { Icon(Icons.Outlined.Videocam, null, Modifier.size(18.dp)) })
@@ -179,7 +179,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
     }
     if (notesOpen) AlertDialog(
         onDismissRequest = { notesOpen = false },
-        title = { Text(stringResource(R.string.ringkasan_penjelasan)) },
+        title = { DialogTitle(stringResource(R.string.ringkasan_penjelasan), icon = Icons.Outlined.Info) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) { order.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) } } },
         confirmButton = { TextButton(onClick = { notesOpen = false }) { Text(stringResource(R.string.karaoke_close)) } },
     )

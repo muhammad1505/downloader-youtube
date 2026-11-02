@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 81,
+    "versionName": "1.1.66",
+    "highlights": [
+      "Tema Transformers kini menyatukan header pemutar penuh, sampul bersudut, kontrol, dan antrean putar dengan aksen baja navy, biru elektrik, serta merah.",
+      "Antrean unduhan tampil sebagai banner berikon dengan aksi massal; dialog memakai judul berikon dan garis aksen yang konsisten.",
+      "Layar video ikut memakai lambang Transformers dan panel opsi bersudut, sementara tema lain tetap mempertahankan tampilan lamanya."
+    ]
+  },
+  {
     "versionCode": 80,
     "versionName": "1.1.65",
     "highlights": [

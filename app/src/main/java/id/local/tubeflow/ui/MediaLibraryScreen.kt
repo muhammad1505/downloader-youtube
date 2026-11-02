@@ -17,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
@@ -106,7 +108,7 @@ fun MediaLibraryScreen(
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
-        item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.") }
+        item { PageHeading(if (filter.kind == "AUDIO") "Koleksi musik" else if (filter.kind == "VIDEO") "Koleksi video" else "Koleksi media", "File di perangkat, terpisah dari riwayat download.", Icons.Outlined.Folder) }
         val playable = media.filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
         // Dua baris ringkas: jenis + aksi utama, lalu favorit + satu pintu filter.
         // Urutan/folder/artis/album tidak lagi memenuhi layar; semuanya ada di dialog Filter.
@@ -165,7 +167,7 @@ fun MediaLibraryScreen(
                 items(folderCards.chunked(2), key = { row -> "folders:" + row.joinToString("|") { it.key } }) { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         row.forEach { (folder, total) ->
-                            FolderCard(folder, total, Modifier.weight(1f)) {
+                            FolderTile(folder, total, Modifier.weight(1f)) {
                                 model.filter(filter.copy(folder = folder))
                             }
                         }
@@ -255,7 +257,7 @@ fun MediaLibraryScreen(
     }
     if (filterOpen) AlertDialog(
         onDismissRequest = { filterOpen = false },
-        title = { Text("Filter koleksi") },
+        title = { DialogTitle("Filter koleksi", icon = Icons.Outlined.FilterList) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OptionMenu(
@@ -312,7 +314,7 @@ fun MediaLibraryScreen(
     )
     if (managePlaylists) PersonalPlaylistDialog(model) { managePlaylists = false }
     addPlaylist?.let { selected -> AlertDialog(onDismissRequest = { addPlaylist = null },
-        title = { Text(stringResource(R.string.library_add_playlist)) }, text = {
+        title = { DialogTitle(stringResource(R.string.library_add_playlist), icon = Icons.Outlined.PlaylistAdd, subtitle = selected.title) }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(selected.title)
                 playlists.filter { it.id != PersonalLibrary.FAVORITES }.forEach { entry ->
@@ -321,7 +323,7 @@ fun MediaLibraryScreen(
                 ActionButton(stringResource(R.string.library_create_playlist), { addPlaylist = null; managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd, emphasis = ActionEmphasis.Quiet)
             }
         }, confirmButton = { TextButton(onClick = { addPlaylist = null }) { Text(stringResource(R.string.action_cancel)) } }) }
-    detail?.let { item -> AlertDialog(onDismissRequest = { detail = null }, title = { Text("Detail media") }, text = {
+    detail?.let { item -> AlertDialog(onDismissRequest = { detail = null }, title = { DialogTitle("Detail media", icon = Icons.Outlined.Info) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(item.displayName); Text(item.folder); Text("MIME: ${item.mime.ifBlank { "Belum diketahui" }}")
             item.sizeBytes?.let { Text("Ukuran: ${Format.bytes(it)}") }; item.durationMs?.let { Text("Durasi: ${duration(it)}") }
@@ -339,7 +341,7 @@ fun MediaLibraryScreen(
     rename?.let { item ->
         var name by remember(item.uri) { mutableStateOf(item.displayName) }
         var searchAfter by remember(item.uri) { mutableStateOf(item.kind == "AUDIO") }
-        AlertDialog(onDismissRequest = { rename = null }, title = { Text("Ubah nama file") }, text = {
+        AlertDialog(onDismissRequest = { rename = null }, title = { DialogTitle("Ubah nama file", icon = Icons.Outlined.DriveFileRenameOutline) }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nama file") }, singleLine = true, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false))
                 if (item.kind == "AUDIO") Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(searchAfter,{ searchAfter=it }); Text("Cari lirik dengan nama baru") }
@@ -370,57 +372,48 @@ fun MediaLibraryScreen(
 
 @Composable
 private fun FolderSectionHeading(count: Int) {
-    Row(
-        Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Folder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text("$count folder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    SectionBanner("Daftar folder", icon = Icons.Outlined.Folder, trailing = "$count folder")
 }
 
+/**
+ * Folder hanya menampilkan ikon, nama, letak, dan jumlah file — tanpa kartu dan tanpa panah.
+ * Seluruh baris tetap dapat diketuk dengan label aksesibilitas yang jelas.
+ */
 @Composable
-private fun FolderCard(folder: String, total: Long, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+private fun FolderTile(folder: String, total: Long, modifier: Modifier = Modifier, onOpen: () -> Unit) {
     val label = CollectionGroups.label(folder)
     val name = label.substringAfterLast('/').ifBlank { label }
     val parent = label.substringBeforeLast('/', "").trim().ifBlank { null }
     val scheme = MaterialTheme.colorScheme
-    SectionCard(
-        modifier.clickable(onClickLabel = "Buka folder $label", onClick = onOpen),
+    Column(
+        modifier.fillMaxWidth()
+            .heightIn(min = 128.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClickLabel = "Buka folder $label", onClick = onOpen)
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = scheme.primaryContainer, shape = MaterialTheme.shapes.small) {
-                    Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.FolderOpen, null, Modifier.size(24.dp), tint = scheme.primary)
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp), tint = scheme.onSurfaceVariant)
-            }
-            Text(
-                name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (parent != null) Text(
-                parent,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "$total item",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (parent == null) scheme.onSurfaceVariant else scheme.primary,
-            )
+        IconBadge(Icons.Outlined.Folder, size = 58.dp)
+        Text(
+            name,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (parent != null) Text(
+            parent,
+            style = MaterialTheme.typography.labelSmall,
+            color = scheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(Icons.Outlined.FolderOpen, null, Modifier.size(13.dp), tint = scheme.primary)
+            Text("$total item", style = MaterialTheme.typography.labelMedium, color = scheme.primary)
         }
     }
 }
@@ -477,7 +470,7 @@ fun LyricTimingDialog(item: MediaItem, model: MediaLibraryViewModel, dismiss: ()
         try { text = withContext(Dispatchers.IO) { LrcTiming.shift(original.original, offset, item.durationMs).lineSequence().take(8).joinToString("\n") }; error = null }
         catch (failure: Exception) { error = failure.message }
     } }
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Waktu lirik · ${item.title}") }, text = {
+    AlertDialog(onDismissRequest = dismiss, title = { DialogTitle("Waktu lirik", subtitle = item.title, icon = Icons.Outlined.EditNote) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Sorotan terlambat: majukan lirik. Koreksi hanya lagu ini; perubahan tersimpan pada LRC.")
             OutlinedTextField(seconds, { seconds=it }, label={ Text("Koreksi waktu (detik)") }, supportingText={ Text("Negatif = majukan, positif = mundurkan. Contoh: −2 atau 0,5. Total dari waktu asli.") }, keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text), singleLine=true, isError=offset == null, enabled=preview != null)

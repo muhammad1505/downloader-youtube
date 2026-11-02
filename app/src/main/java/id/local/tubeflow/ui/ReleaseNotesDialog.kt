@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,8 +29,7 @@ import id.local.tubeflow.core.ReleaseNotes
 fun ReleaseNotesDialog(notes: ReleaseNotes, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.NewReleases, null, tint = MaterialTheme.colorScheme.primary) },
-        title = { Text(stringResource(R.string.whats_new_title, notes.versionName)) },
+        title = { DialogTitle(stringResource(R.string.whats_new_title, notes.versionName), icon = Icons.Outlined.NewReleases) },
         text = {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),

@@ -38,7 +38,7 @@ fun LyricsSearchDialog(model: MediaLibraryViewModel) {
     LaunchedEffect(current.failureStatus) {
         while (true) { retrySeconds=Lyrics.retryAfterSeconds(); delay(1000) }
     }
-    AlertDialog(onDismissRequest=model::closeLyrics, title={ Text("Cari dan pilih lirik") }, text={
+    AlertDialog(onDismissRequest=model::closeLyrics, title={ DialogTitle("Cari dan pilih lirik", icon = Icons.Outlined.Lyrics) }, text={
         Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(current.item.displayName,style=MaterialTheme.typography.labelMedium)
             Text("Sumber: LRCLIB. Parameter pencarian dapat diedit; tag audio tetap sama.",style=MaterialTheme.typography.bodySmall)

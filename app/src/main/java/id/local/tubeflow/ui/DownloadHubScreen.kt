@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -229,6 +231,7 @@ fun DownloadScreen(
                 PageHeading(
                     "Riwayat unduhan",
                     "Unduhan yang selesai. File tetap tersimpan di perangkat.",
+                    Icons.Outlined.History,
                 )
             }
             item(key = "history-back") {
@@ -251,6 +254,7 @@ fun DownloadScreen(
             PageHeading(
                 stringResource(R.string.page_download),
                 stringResource(R.string.download_section_help),
+                Icons.Outlined.Download,
             )
         }
 

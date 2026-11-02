@@ -54,6 +54,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -165,6 +166,7 @@ import id.local.tubeflow.core.VideoSubtitleBackground
 import id.local.tubeflow.core.VideoSubtitlePosition
 import id.local.tubeflow.core.VideoSubtitleSize
 import id.local.tubeflow.core.VideoSubtitleStyle
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -935,6 +937,7 @@ private fun PlayerTopBar(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val transformers = LocalTransformersTheme.current
     Row(
         modifier
             .fillMaxWidth()
@@ -950,6 +953,10 @@ private fun PlayerTopBar(
             colors = IconButtonDefaults.iconButtonColors(contentColor = PlayerContent),
         ) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Tutup pemutar")
+        }
+        if (transformers) {
+            TransformerEmblem(Modifier.size(24.dp), tint = PlayerContent)
+            Spacer(Modifier.width(6.dp))
         }
         Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
             Text(
@@ -1470,11 +1477,24 @@ private fun VideoOptionsSheet(
     onDismiss: () -> Unit,
 ) {
     val host = LocalActivity.current
+    val transformers = LocalTransformersTheme.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        shape = if (transformers) CutCornerShape(topStart = 28.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp) else BottomSheetDefaults.ExpandedShape,
         containerColor = SheetBackground,
         contentColor = PlayerContent,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = PlayerContent.copy(alpha = 0.4f)) },
+        dragHandle = {
+            if (transformers) {
+                Box(
+                    Modifier.padding(top = 10.dp, bottom = 2.dp).width(48.dp).height(4.dp).background(
+                        Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary)),
+                        CutCornerShape(topStart = 2.dp, bottomEnd = 2.dp),
+                    ),
+                )
+            } else {
+                BottomSheetDefaults.DragHandle(color = PlayerContent.copy(alpha = 0.4f))
+            }
+        },
     ) {
         VideoDialogBrightness((LocalView.current.parent as? DialogWindowProvider)?.window, brightnessOverride)
         Column(

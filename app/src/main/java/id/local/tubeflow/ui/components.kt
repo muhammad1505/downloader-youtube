@@ -11,7 +11,9 @@ import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.core.net.toUri
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
@@ -29,12 +32,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import id.local.tubeflow.ui.theme.LocalCyberpunkTheme
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -46,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.R
 import id.local.tubeflow.core.BstationUrls
@@ -85,12 +93,16 @@ enum class ActionEmphasis { Primary, Secondary, Quiet }
 @Composable
 fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val cyberpunk = LocalCyberpunkTheme.current
+    val transformers = LocalTransformersTheme.current
     Card(
         modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = MaterialTheme.shapes.medium,
-        border = if (cyberpunk) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
-            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)),
+        border = when {
+            cyberpunk -> BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
+            transformers -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
+            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f))
+        },
         content = content,
     )
 }
@@ -348,10 +360,17 @@ fun ConfirmDialog(
     destructive: Boolean = false,
     confirmEnabled: Boolean = true,
     dismissLabel: String? = null,
+    icon: ImageVector? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = {
+            DialogTitle(
+                title = title,
+                icon = icon ?: if (destructive) Icons.Outlined.Warning else Icons.Outlined.Info,
+                destructive = destructive,
+            )
+        },
         text = { Text(text) },
         confirmButton = {
             TextButton(
@@ -387,10 +406,147 @@ fun StatRow(stats: List<StatSpec>, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Lencana ikon bersama untuk folder, alat, dan pengaturan. Pada tema Transformers memakai sudut
+ * terpotong dengan garis gradien biru-merah; tema lain tetap memakai wadah lembut yang lama.
+ */
 @Composable
-fun PageHeading(title: String, subtitle: String) {
-    val cyberpunk = LocalCyberpunkTheme.current
+fun IconBadge(
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    size: Dp = 52.dp,
+    description: String? = null,
+    tint: Color? = null,
+) {
+    val transformers = LocalTransformersTheme.current
     val scheme = MaterialTheme.colorScheme
+    val shape = if (transformers) CutCornerShape(topStart = size * 0.26f, bottomEnd = size * 0.26f) else MaterialTheme.shapes.small
+    val fill = if (transformers) {
+        Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.30f), scheme.secondary.copy(alpha = 0.22f)))
+    } else {
+        Brush.linearGradient(listOf(scheme.primaryContainer, scheme.primaryContainer))
+    }
+    Box(
+        modifier.size(size).clip(shape).background(fill).then(
+            if (transformers) Modifier.border(
+                1.dp,
+                Brush.linearGradient(listOf(scheme.primary.copy(alpha = 0.85f), scheme.secondary.copy(alpha = 0.75f))),
+                shape,
+            ) else Modifier,
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, description, Modifier.size(size * 0.48f), tint = tint ?: scheme.primary)
+    }
+}
+
+/** Lambang perisai geometris untuk identitas tema Transformers (bukan logo pihak ketiga). */
+@Composable
+fun TransformerEmblem(
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.primary,
+) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val shield = Path().apply {
+            moveTo(w * 0.5f, 0f)
+            lineTo(w, h * 0.22f)
+            lineTo(w * 0.82f, h * 0.76f)
+            lineTo(w * 0.5f, h)
+            lineTo(w * 0.18f, h * 0.76f)
+            lineTo(0f, h * 0.22f)
+            close()
+        }
+        drawPath(shield, tint, style = Stroke(width = w * 0.09f))
+        drawLine(tint, Offset(w * 0.28f, h * 0.36f), Offset(w * 0.5f, h * 0.56f), strokeWidth = w * 0.09f)
+        drawLine(tint, Offset(w * 0.72f, h * 0.36f), Offset(w * 0.5f, h * 0.56f), strokeWidth = w * 0.09f)
+        drawLine(tint, Offset(w * 0.5f, h * 0.56f), Offset(w * 0.5f, h * 0.82f), strokeWidth = w * 0.09f)
+    }
+}
+
+/** Judul bagian ringkas: baris biasa di tema lama, pita bersudut di tema Transformers. */
+@Composable
+fun SectionBanner(
+    title: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    trailing: String? = null,
+) {
+    val transformers = LocalTransformersTheme.current
+    val scheme = MaterialTheme.colorScheme
+    if (!transformers) {
+        Row(
+            modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (trailing != null) Text(trailing, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+        }
+        return
+    }
+    val shape = CutCornerShape(topStart = 12.dp, bottomEnd = 12.dp)
+    Row(
+        modifier.fillMaxWidth()
+            .clip(shape)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(scheme.secondary.copy(alpha = 0.30f), scheme.surfaceContainerHigh, scheme.primary.copy(alpha = 0.16f)),
+                ),
+            )
+            .border(
+                1.dp,
+                Brush.horizontalGradient(listOf(scheme.secondary.copy(alpha = 0.65f), scheme.primary.copy(alpha = 0.45f))),
+                shape,
+            )
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon?.let { Icon(it, null, Modifier.size(18.dp), tint = scheme.primary) }
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        if (trailing != null) Text(trailing, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun PageHeading(title: String, subtitle: String, icon: ImageVector? = null) {
+    val transformers = LocalTransformersTheme.current
+    val scheme = MaterialTheme.colorScheme
+    if (transformers) {
+        val shape = CutCornerShape(topStart = 22.dp, bottomEnd = 22.dp)
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(scheme.secondary.copy(alpha = 0.30f), scheme.surfaceContainerHigh, scheme.primary.copy(alpha = 0.16f)),
+                    ),
+                )
+                .border(
+                    1.dp,
+                    Brush.horizontalGradient(listOf(scheme.secondary.copy(alpha = 0.80f), scheme.primary.copy(alpha = 0.60f))),
+                    shape,
+                )
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBadge(icon ?: Icons.Outlined.Bolt, size = 46.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+    val cyberpunk = LocalCyberpunkTheme.current
     val accent = if (cyberpunk) scheme.secondary else scheme.primary
     val outline = if (cyberpunk) scheme.secondary.copy(alpha = 0.65f) else scheme.outlineVariant.copy(alpha = 0.45f)
     Surface(
@@ -411,6 +567,48 @@ fun PageHeading(title: String, subtitle: String) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+/**
+ * Judul dialog bersama. Tema Transformers memakai lencana ikon dan garis aksen biru-merah;
+ * tema lain tetap memakai judul teks seperti sebelumnya.
+ */
+@Composable
+fun DialogTitle(
+    title: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    subtitle: String? = null,
+    destructive: Boolean = false,
+) {
+    if (!LocalTransformersTheme.current) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+    val scheme = MaterialTheme.colorScheme
+    val accent = if (destructive) scheme.error else scheme.primary
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon ?: Icons.Outlined.Bolt, size = 42.dp, tint = accent)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                if (subtitle != null) {
+                    Text(subtitle, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                }
+            }
+        }
+        Box(
+            Modifier.fillMaxWidth().height(2.dp).background(
+                Brush.horizontalGradient(listOf(accent, scheme.secondary.copy(alpha = 0.45f), Color.Transparent)),
+                CutCornerShape(topStart = 2.dp, bottomEnd = 2.dp),
+            ),
+        )
     }
 }
 

@@ -95,7 +95,7 @@ fun MediaToolsSettings(karaoke: KaraokeViewModel, player: PlayerViewModel) {
         var metadata by remember(current) { mutableStateOf(false) }
         var lyrics by remember(current) { mutableStateOf(true) }
         var replace by remember(current) { mutableStateOf(false) }
-        AlertDialog(onDismissRequest = backup::dismiss, title = { Text(stringResource(R.string.backup_restore_title)) }, text = {
+        AlertDialog(onDismissRequest = backup::dismiss, title = { DialogTitle(stringResource(R.string.backup_restore_title), icon = Icons.Outlined.SettingsBackupRestore) }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(pluralStringResource(R.plurals.backup_summary, current.matches.size, current.matches.size, current.missing, current.conflicts))
                 Text(stringResource(R.string.backup_restore_help), style = MaterialTheme.typography.bodySmall)

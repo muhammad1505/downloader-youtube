@@ -67,7 +67,7 @@ fun KaraokeDialog(model: KaraokeViewModel, player: PlayerViewModel, notification
         else if (model.isPrivatePreview(player.state.value.track?.uri)) player.stop() else player.pause()
     } }
 
-    AlertDialog(onDismissRequest = model::close, title = { Text(stringResource(R.string.karaoke_title)) }, text = {
+    AlertDialog(onDismissRequest = model::close, title = { DialogTitle(stringResource(R.string.karaoke_title), icon = Icons.Outlined.MicOff) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(track?.title ?: stringResource(R.string.karaoke_source_loading), style = MaterialTheme.typography.titleSmall)
             Text(stringResource(R.string.karaoke_local_description), style = MaterialTheme.typography.bodySmall)

@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -12,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -28,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -47,6 +50,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -60,6 +64,7 @@ import id.local.tubeflow.core.PlaybackQueue
 import id.local.tubeflow.core.PlaybackQueueSearch
 import id.local.tubeflow.core.PlayerEqualizer
 import id.local.tubeflow.core.PlayerViewModel
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
@@ -68,9 +73,13 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
     val track=state.track ?: return
     // Sengaja memakai bahasa visual kartu lagu di Koleksi (radius medium, latar datar bernuansa
     // aksen sampul) supaya mini player terbaca sebagai bagian dari daftar, bukan panel terpisah.
-    val accent=rememberCoverAccent(track.cover)
+    val transformers=LocalTransformersTheme.current
+    val scheme=MaterialTheme.colorScheme
+    val accent=if (transformers) scheme.primary else rememberCoverAccent(track.cover)
+    val cardColors=if (transformers) CardDefaults.cardColors(containerColor=scheme.surfaceContainer,contentColor=scheme.onSurface) else mediaCardColors(accent)
+    val cardBorder=if (transformers) BorderStroke(1.dp,Brush.horizontalGradient(listOf(scheme.primary.copy(alpha=0.55f),scheme.secondary.copy(alpha=0.45f)))) else cyberpunkCardBorder()
     Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=6.dp)) {
-        Card(colors=mediaCardColors(accent), border=cyberpunkCardBorder()) {
+        Card(colors=cardColors, border=cardBorder) {
             Column {
                 AdaptivePair(Modifier.padding(start=10.dp,end=2.dp,top=6.dp,bottom=6.dp), minInlineWidth=360.dp,
                     leading = { available -> Row(available.clickable(onClickLabel="Buka pemutar",onClick=expand).padding(end=6.dp), verticalAlignment=Alignment.CenterVertically) {
@@ -105,9 +114,12 @@ fun MiniPlayer(state: PlayerViewModel.State, player: PlayerViewModel, expand: ()
 fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: MediaLibraryViewModel, karaoke: () -> Unit, dismiss: () -> Unit) {
     val track=state.track ?: return
     val timer by player.sleep.collectAsStateWithLifecycle()
-    val accent=MaterialTheme.colorScheme.primary
-    // Aksen diambil dari sampul lagu: latar pemutar dan lirik ikut bernuansa sampul, bukan hitam polos.
+    val scheme=MaterialTheme.colorScheme
+    val transformers=LocalTransformersTheme.current
+    val accent=scheme.primary
+    // Aksen sampul hanya dipakai di tema lama; Transformers memakai palet baja navy yang tetap.
     val coverAccent=rememberCoverAccent(track.cover)
+    val pageAccent=if (transformers) scheme.primary else coverAccent
     val speedDescription=stringResource(id.local.tubeflow.R.string.player_speed_description, speedLabel(state.speed))
     val list=rememberLazyListState()
     val active=LrcLines.activeIndex(state.lines,state.positionMs)
@@ -158,13 +170,31 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
             val compactHeight=maxHeight<600.dp || LocalDensity.current.fontScale>=1.3f
             val pageHeight=if(compactHeight) (maxHeight-280.dp).coerceIn(140.dp,400.dp)
                 else (maxHeight-370.dp).coerceIn(220.dp,400.dp)
-            val background=Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),MaterialTheme.colorScheme.background))
+            val background=if (transformers) Brush.verticalGradient(
+                listOf(scheme.primary.copy(alpha=0.16f),scheme.secondary.copy(alpha=0.07f),scheme.background),
+            ) else Brush.verticalGradient(listOf(coverAccent.copy(alpha=0.18f),coverAccent.copy(alpha=0.06f),scheme.background))
             val coverDescription=stringResource(id.local.tubeflow.R.string.player_page_show_cover)
             val lyricsDescription=stringResource(id.local.tubeflow.R.string.player_page_show_lyrics)
             val header: @Composable (Modifier) -> Unit = { headerModifier ->
-                Row(headerModifier,verticalAlignment=Alignment.CenterVertically) {
+                val stripShape=CutCornerShape(topStart=18.dp,bottomEnd=18.dp)
+                Row(
+                    if (transformers) headerModifier.fillMaxWidth().clip(stripShape)
+                        .background(Brush.horizontalGradient(listOf(scheme.secondary.copy(alpha=0.28f),scheme.surfaceContainerHigh,scheme.primary.copy(alpha=0.14f))))
+                        .border(1.dp,Brush.horizontalGradient(listOf(scheme.secondary.copy(alpha=0.70f),scheme.primary.copy(alpha=0.50f))),stripShape)
+                    else headerModifier,
+                    verticalAlignment=Alignment.CenterVertically,
+                ) {
                     IconButton(onClick=dismiss) { Icon(Icons.Outlined.ExpandMore,"Kembali ke mini player") }
-                    Text(stringResource(id.local.tubeflow.R.string.player_now_playing),Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (transformers) {
+                        TransformerEmblem(Modifier.size(26.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("TUBEFLOW",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Black,letterSpacing=1.4.sp)
+                            Text("Pemutar audio",style=MaterialTheme.typography.labelSmall,color=scheme.onSurfaceVariant)
+                        }
+                    } else {
+                        Text(stringResource(id.local.tubeflow.R.string.player_now_playing),Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Box {
                         TextButton(
                             onClick = { speedOpen = true },
@@ -204,7 +234,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     selectedPage = pager.currentPage,
                     coverDescription = coverDescription,
                     lyricsDescription = lyricsDescription,
-                    accent = coverAccent,
+                    accent = pageAccent,
                     onSelect = { page -> userChoseView = true; scope.launch { pager.animateScrollToPage(page) } },
                 )
             }
@@ -212,7 +242,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                 Box(paneModifier) {
                     HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),pageSpacing=12.dp) { page ->
                         if (page==1) {
-                            LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor)
+                            LyricsPage(track,state.lines,active,pageAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor)
                         } else {
                             PlayerCoverPage(track)
                         }
@@ -281,6 +311,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                         IconButton(onClick={ player.skip(-10000) },enabled=!state.loading) { Icon(Icons.Outlined.Replay10,"Mundur 10 detik") }
                         IconButton(onClick=player::previous,enabled=!state.loading) { Icon(Icons.Outlined.SkipPrevious,"Lagu sebelumnya") }
                         FilledIconButton(onClick=player::toggle,modifier=Modifier.size(if(landscape) 64.dp else 72.dp),enabled=!state.loading,
+                            shape=if (transformers) CutCornerShape(topStart=22.dp,bottomEnd=22.dp) else CircleShape,
                             colors=IconButtonDefaults.filledIconButtonColors(containerColor=accent,contentColor=AccentContrast.ink(accent))) {
                             Icon(if (state.playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,if (state.playing) "Jeda audio" else "Putar audio",Modifier.size(34.dp))
                         }
@@ -319,7 +350,7 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
                     header(Modifier.fillMaxWidth().padding(horizontal=12.dp))
                     Row(Modifier.fillMaxWidth().weight(1f).padding(start=12.dp,end=12.dp,bottom=8.dp)) {
                         // Kiri hanya lirik — tanpa pager sampul/indikator — agar bersih.
-                        LyricsPage(track,state.lines,active,coverAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor,
+                        LyricsPage(track,state.lines,active,pageAccent,state.lyricError,lyricToolError,list,seekLine,openSearch,openEditor,
                             Modifier.weight(1.15f).fillMaxHeight())
                         Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -358,8 +389,22 @@ private fun PlayerCoverPage(track: PlayerViewModel.Track) {
     // Sisi sampul dibatasi tinggi pager juga, agar di landscape tidak meluber menutupi header.
     BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp),contentAlignment=Alignment.Center) {
         val side=minOf(maxWidth,maxHeight,380.dp)
-        CoverThumb(track.cover,"",MediaMode.AUDIO,
-            Modifier.size(side),shape=MaterialTheme.shapes.large)
+        if (LocalTransformersTheme.current) {
+            val scheme=MaterialTheme.colorScheme
+            val frame=CutCornerShape(topStart=28.dp,bottomEnd=28.dp)
+            Box(
+                Modifier.size(side).clip(frame)
+                    .background(Brush.linearGradient(listOf(scheme.primary.copy(alpha=0.30f),scheme.secondary.copy(alpha=0.16f))))
+                    .border(1.dp,Brush.linearGradient(listOf(scheme.primary.copy(alpha=0.85f),scheme.secondary.copy(alpha=0.65f))),frame)
+                    .padding(10.dp),
+                contentAlignment=Alignment.Center,
+            ) {
+                CoverThumb(track.cover,"",MediaMode.AUDIO,Modifier.fillMaxSize(),shape=CutCornerShape(topStart=20.dp,bottomEnd=20.dp))
+            }
+        } else {
+            CoverThumb(track.cover,"",MediaMode.AUDIO,
+                Modifier.size(side),shape=MaterialTheme.shapes.large)
+        }
     }
 }
 
@@ -424,7 +469,7 @@ private fun PlayerPageIndicator(
 ) {
     Surface(
         modifier = modifier,
-        shape = CircleShape,
+        shape = if (LocalTransformersTheme.current) CutCornerShape(topStart = 12.dp, bottomEnd = 12.dp) else CircleShape,
         // Opak: indikator mengambang di atas lirik, jadi teks yang lewat di belakangnya tidak boleh tembus.
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
@@ -466,7 +511,12 @@ private fun PlayerPageDot(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.width(width).height(8.dp).background(color, CircleShape))
+        Box(
+            Modifier.width(width).height(8.dp).background(
+                color,
+                if (LocalTransformersTheme.current) CutCornerShape(topStart = 4.dp, bottomEnd = 4.dp) else CircleShape,
+            ),
+        )
     }
 }
 
@@ -481,12 +531,9 @@ private fun PlayerAction(
     count: Int? = null,
     description: String? = null,
 ) {
-    TextButton(onClick=onClick, enabled=enabled,
-        modifier=modifier.heightIn(min=48.dp).semantics {
-            if (description != null) contentDescription=description
-        },
-        shape=MaterialTheme.shapes.small, contentPadding=PaddingValues(8.dp),
-        colors=ButtonDefaults.textButtonColors(contentColor=tint)) {
+    val scheme=MaterialTheme.colorScheme
+    val contentColor=if (enabled) tint else scheme.onSurfaceVariant.copy(alpha=0.38f)
+    val actionContent: @Composable () -> Unit = {
         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 Icon(icon,null,Modifier.size(20.dp))
@@ -495,12 +542,33 @@ private fun PlayerAction(
             Text(label,style=MaterialTheme.typography.labelSmall,textAlign=TextAlign.Center,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
     }
+    val actionSemantics=Modifier.heightIn(min=48.dp).semantics {
+        if (description != null) contentDescription=description
+    }
+    if (LocalTransformersTheme.current) {
+        Surface(
+            onClick=onClick,
+            enabled=enabled,
+            modifier=modifier.then(actionSemantics),
+            shape=CutCornerShape(topStart=12.dp,bottomEnd=12.dp),
+            color=if (enabled) tint.copy(alpha=0.10f) else scheme.surfaceContainer.copy(alpha=0.45f),
+            contentColor=contentColor,
+            border=BorderStroke(1.dp,contentColor.copy(alpha=0.35f)),
+        ) { actionContent() }
+    } else {
+        TextButton(onClick=onClick, enabled=enabled,
+            modifier=modifier.then(actionSemantics),
+            shape=MaterialTheme.shapes.small, contentPadding=PaddingValues(8.dp),
+            colors=ButtonDefaults.textButtonColors(contentColor=tint)) { actionContent() }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, dismiss: () -> Unit) {
-    val accent=rememberCoverAccent(state.track?.cover.orEmpty())
+    val transformers=LocalTransformersTheme.current
+    val scheme=MaterialTheme.colorScheme
+    val accent=if (transformers) scheme.primary else rememberCoverAccent(state.track?.cover.orEmpty())
     val list=rememberLazyListState()
     var confirmClear by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -508,17 +576,44 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
         PlaybackQueueSearch.positions(state.queueTracks,query) { "${it.title} ${it.artist}" }
     }
     LaunchedEffect(query) { list.scrollToItem(if (query.isBlank()) (state.queueIndex-1).coerceAtLeast(0) else 0) }
-    ModalBottomSheet(onDismissRequest=dismiss, sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+    val handle: @Composable (() -> Unit)? = if (transformers) {
+        { Box(Modifier.padding(top=10.dp,bottom=2.dp).width(48.dp).height(4.dp).background(Brush.horizontalGradient(listOf(scheme.secondary,scheme.primary)),CutCornerShape(topStart=2.dp,bottomEnd=2.dp))) }
+    } else {
+        { BottomSheetDefaults.DragHandle() }
+    }
+    ModalBottomSheet(
+        onDismissRequest=dismiss,
+        sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
+        shape=if (transformers) CutCornerShape(topStart=28.dp,topEnd=0.dp,bottomEnd=0.dp,bottomStart=0.dp) else BottomSheetDefaults.ExpandedShape,
+        dragHandle=handle,
+    ) {
         Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=16.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Outlined.QueueMusic,null,tint=accent)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Antrean putar",style=MaterialTheme.typography.titleLarge)
-                    Text("${state.queueTracks.size} lagu · ${if (state.shuffle) "acak" else "urut"} · ulangi ${repeatLabel(state.repeat)}",
-                        style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            if (transformers) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    IconBadge(Icons.AutoMirrored.Outlined.QueueMusic,size=44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("ANTREAN PUTAR",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold,letterSpacing=1.2.sp)
+                        Text("${state.queueTracks.size} lagu · ${if (state.shuffle) "acak" else "urut"} · ulangi ${repeatLabel(state.repeat)}",
+                            style=MaterialTheme.typography.labelSmall,color=scheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick=dismiss) { Icon(Icons.Outlined.Close,stringResource(id.local.tubeflow.R.string.player_queue_close)) }
                 }
-                IconButton(onClick=dismiss) { Icon(Icons.Outlined.Close,stringResource(id.local.tubeflow.R.string.player_queue_close)) }
+                Box(Modifier.fillMaxWidth().padding(top=10.dp).height(2.dp).background(
+                    Brush.horizontalGradient(listOf(scheme.primary,scheme.secondary.copy(alpha=0.5f),Color.Transparent)),
+                    CutCornerShape(topStart=2.dp,bottomEnd=2.dp),
+                ))
+            } else {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Outlined.QueueMusic,null,tint=accent)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Antrean putar",style=MaterialTheme.typography.titleLarge)
+                        Text("${state.queueTracks.size} lagu · ${if (state.shuffle) "acak" else "urut"} · ulangi ${repeatLabel(state.repeat)}",
+                            style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick=dismiss) { Icon(Icons.Outlined.Close,stringResource(id.local.tubeflow.R.string.player_queue_close)) }
+                }
             }
             OutlinedTextField(value=query,onValueChange={ query=it },singleLine=true,
                 label={ Text(stringResource(id.local.tubeflow.R.string.player_queue_search)) },
@@ -596,7 +691,7 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
 private fun EqualizerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
     var snapshot by remember { mutableStateOf(player.equalizer.snapshot()) }
     var presetOpen by remember { mutableStateOf(false) }
-    AlertDialog(onDismissRequest=dismiss,title={ Text("Equalizer") },text={
+    AlertDialog(onDismissRequest=dismiss,title={ DialogTitle("Equalizer", icon = Icons.Outlined.Tune, subtitle = "Atur nada untuk semua lagu") },text={
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if (!snapshot.available) {
                 Text("Equalizer tidak tersedia pada perangkat ini. Pemutaran tetap berjalan tanpa efek.")

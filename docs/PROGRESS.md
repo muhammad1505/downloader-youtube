@@ -1,6 +1,12 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 29 Oktober 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 2 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Penyelarasan tema Transformers — 1.1.66/code81, 2 November 2026
+
+Tema Transformers kini dipakai konsisten di luar menu utama. Pemutar penuh memakai strip header berlambang, bingkai sampul gradien, tombol aksi dan indikator halaman bersudut; antrean putar serta opsi video memakai sheet bersudut; ringkasan antrean unduhan menjadi banner berikon dengan aksi massal. Komponen `DialogTitle` memberi seluruh `AlertDialog` judul berikon dan garis aksen, dengan fallback teks biasa untuk tema lain. Palet dan kontrasnya tetap seperti semula.
+
+`./gradlew testDebugUnitTest lintDebug --no-daemon` lulus: 632 tes Kotlin, 0 gagal; lint 0 error dan 4 warning lama. Kompilasi pertama gagal karena `PlayerUi.kt` belum mengimpor `LocalTransformersTheme`; impor ditambahkan dan build diulang sampai lulus. Kompilasi JVM memakai AAR FFmpeg upstream resmi karena AAR `webp16k` lokal belum dibangun. Build rilis/APK, audit native 16 KB, dan uji perangkat belum dijalankan, jadi tata letak, TalkBack, dan runtime belum terverifikasi di HP.
 
 ## Penyelarasan UI dan splash — 1.1.54/code69, 29 Oktober 2026
 

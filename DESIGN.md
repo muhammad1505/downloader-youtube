@@ -42,6 +42,18 @@ pemisah navigasi. Konten, hierarki tindakan, bentuk kontrol, dan navigasi tetap 
 yang sama; tidak memakai glow animasi atau hiasan yang mengganggu pemindaian daftar. Palet Cyberpunk
 diuji kontrasnya bersama palet gelap/terang di `ThemeContrastTest`.
 
+## Tema Transformers (1.1.66)
+
+Transformers adalah tema eksplisit di Pengaturan → Tampilan. Paletnya memakai baja navy
+`#04070F` sampai `#182A43`, biru elektrik `#4FD8FF` untuk aksi utama, merah `#FF6A5C` untuk aksen
+sekunder, dan kuning `#FFC93C` hanya untuk status. Sudut terpotong menjadi bahasa bentuk; lambang
+perisai geometris dipakai di header dan pemutar.
+
+Penyelarasan 1.1.66 membawa bahasa itu ke header pemutar penuh, bingkai sampul, tombol aksi,
+indikator halaman, sheet antrean/opsi video, banner antrean unduhan, dan judul dialog. Tema
+gelap/terang/Cyberpunk tetap memakai kontrol dan radius lamanya; kontras keempat palet dikunci
+`ThemeContrastTest`.
+
 ### Ukuran kontekstual dan ruang tersedia (1.1.25)
 
 Tombol formulir memakai tinggi minimum40dp (utama48dp), padding16×8dp,

@@ -12,8 +12,11 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,16 +28,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.local.tubeflow.BuildConfig
 import id.local.tubeflow.core.*
 import id.local.tubeflow.ui.theme.LocalCyberpunkTheme
+import id.local.tubeflow.ui.theme.LocalTransformersTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -237,7 +248,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     val accentCover=playback.track?.cover?.takeIf { it.isNotBlank() }
         ?: jobs.firstOrNull { it.state == JobState.COMPLETED && it.coverPath.isNotBlank() }?.coverPath.orEmpty()
     val cyberpunkMode = SettingsStore.themeMode == SettingsStore.MODE_CYBERPUNK
-    AccentTheme(accentCover, SettingsStore.artworkAccent && !cyberpunkMode) {
+    val transformersMode = SettingsStore.themeMode == SettingsStore.MODE_TRANSFORMERS
+    AccentTheme(accentCover, SettingsStore.artworkAccent && !cyberpunkMode && !transformersMode) {
     // Saat pemutar penuh terbuka, dialog lirik dihost di dalam jendela pemutar (z-order dialog).
     if (!fullPlayer) LyricsSearchDialog(library)
     lyricTiming?.let { LyricTimingDialog(it, library) { lyricTiming = null } }
@@ -260,48 +272,116 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     Scaffold(
         topBar = {
             val cyberpunk = LocalCyberpunkTheme.current
-            TopAppBar(
-                title = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id.local.tubeflow.R.drawable.ic_launcher_foreground),
-                            contentDescription = null,
-                            modifier = Modifier.size(34.dp).background(
-                                colorResource(id.local.tubeflow.R.color.launcher_background),
-                                RoundedCornerShape(10.dp),
-                            ),
-                        )
-                        Column {
-                            Text("TubeFlow", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
-                            if (activeCount > 0) Text(
-                                "$activeCount unduhan sedang berjalan",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+            val transformers = LocalTransformersTheme.current
+            Column {
+                TopAppBar(
+                    title = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (transformers) {
+                                val badgeShape = CutCornerShape(topStart = 12.dp, bottomEnd = 12.dp)
+                                Box(
+                                    Modifier.size(38.dp).clip(badgeShape)
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f),
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
+                                                ),
+                                            ),
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary)),
+                                            badgeShape,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    TransformerEmblem(Modifier.size(22.dp))
+                                }
+                            } else {
+                                Image(
+                                    painter = painterResource(id.local.tubeflow.R.drawable.ic_launcher_foreground),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(34.dp).background(
+                                        colorResource(id.local.tubeflow.R.color.launcher_background),
+                                        RoundedCornerShape(10.dp),
+                                    ),
+                                )
+                            }
+                            Column {
+                                Text(
+                                    "TubeFlow",
+                                    fontWeight = if (transformers) FontWeight.Black else FontWeight.SemiBold,
+                                    fontStyle = if (transformers) FontStyle.Italic else FontStyle.Normal,
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                                val subtitle = when {
+                                    activeCount > 0 -> "$activeCount unduhan sedang berjalan"
+                                    transformers -> "MEDIA DOWNLOADER & MANAGER"
+                                    else -> null
+                                }
+                                if (subtitle != null) Text(
+                                    subtitle,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    letterSpacing = if (transformers && activeCount == 0) 1.1.sp else 0.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = { if (tab == settingsTab) IconButton(onClick={ if (settingsSection != null) settingsSection = null else tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, if (settingsSection != null) "Kembali ke daftar pengaturan" else "Kembali") } },
-                actions = {
-                    if (karaokeRequest != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
-                    if (tab != settingsTab) IconButton(onClick={ previousTab=tab; settingsSection=null; tab=settingsTab }) { Icon(Icons.Outlined.Settings,"Pengaturan") }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (cyberpunk) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLowest,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
+                    },
+                    navigationIcon = { if (tab == settingsTab) IconButton(onClick={ if (settingsSection != null) settingsSection = null else tab=previousTab }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, if (settingsSection != null) "Kembali ke daftar pengaturan" else "Kembali") } },
+                    actions = {
+                        if (karaokeRequest != null) IconButton(onClick=karaoke::openCurrent) { Icon(Icons.Outlined.MicOff,"Status dan hasil karaoke") }
+                        if (tab != settingsTab) IconButton(
+                            onClick={ previousTab=tab; settingsSection=null; tab=settingsTab },
+                            modifier = if (transformers) Modifier
+                                .padding(vertical = 6.dp)
+                                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), CutCornerShape(topStart = 10.dp, bottomEnd = 10.dp)) else Modifier,
+                        ) { Icon(Icons.Outlined.Settings,"Pengaturan") }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = when {
+                            transformers -> MaterialTheme.colorScheme.background
+                            cyberpunk -> MaterialTheme.colorScheme.surface
+                            else -> MaterialTheme.colorScheme.surfaceContainerLowest
+                        },
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+                if (transformers) Box(
+                    Modifier.fillMaxWidth().height(1.dp).background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             val cyberpunk = LocalCyberpunkTheme.current
+            val transformers = LocalTransformersTheme.current
             Column {
             if (cyberpunk) HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
             if (playback.track != null) Box(Modifier.fillMaxWidth(), contentAlignment=Alignment.Center) {
                 Box(Modifier.widthIn(max=840.dp)) { MiniPlayer(playback,player) { fullPlayer=true } }
             }
             if (!useRail) {
+            if (transformers) {
+                TransformersTabBar(
+                    tabs = tabs,
+                    icons = icons,
+                    selected = tab,
+                    showLabels = showLabels,
+                    activeCount = activeCount,
+                    onSelect = { index -> tab = index; downloadTarget = null },
+                )
+            } else {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
                 windowInsets = if (cyberpunk) WindowInsets.navigationBars else NavigationBarDefaults.windowInsets,
@@ -332,6 +412,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             }
             }
             }
+            }
         },
     ) { padding ->
         Row(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
@@ -353,12 +434,24 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         selectedTextColor=MaterialTheme.colorScheme.primary,
                         unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant,
-                        indicatorColor=if (LocalCyberpunkTheme.current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                        indicatorColor=if (LocalCyberpunkTheme.current || LocalTransformersTheme.current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
                     ),
                 )
             }
         }
         Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment=Alignment.TopCenter) {
+        // Cahaya biru-merah tipis di belakang konten agar bahasa visual Transformers terasa di semua menu.
+        if (transformersMode) Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                        Color.Transparent,
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f),
+                    ),
+                ),
+            ),
+        )
         AnimatedContent(
             targetState = tab,
             modifier = Modifier.widthIn(max=840.dp).fillMaxSize(),
@@ -534,6 +627,87 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         ReleaseNotesDialog(notes) {
             ChangelogStore.markSeen(context, BuildConfig.VERSION_CODE)
             releaseNotes = null
+        }
+    }
+}
+
+/**
+ * Bilah bawah tema Transformers: empat tombol bersudut dengan garis biru-merah. Tab aktif memakai
+ * warna merah khas tema, sementara tab lain tetap biru elektrik agar arah navigasi mudah dibaca.
+ */
+@Composable
+private fun TransformersTabBar(
+    tabs: List<String>,
+    icons: List<ImageVector>,
+    selected: Int,
+    showLabels: Boolean,
+    activeCount: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(color = scheme.background) {
+        Column {
+            Box(
+                Modifier.fillMaxWidth().height(1.dp).background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            scheme.secondary.copy(alpha = 0.70f),
+                            scheme.primary.copy(alpha = 0.70f),
+                            scheme.secondary.copy(alpha = 0.70f),
+                        ),
+                    ),
+                ),
+            )
+            Row(
+                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    val active = index == selected
+                    val shape = CutCornerShape(topStart = 12.dp, bottomEnd = 12.dp)
+                    val tint = if (active) scheme.onSecondaryContainer else scheme.primary
+                    Column(
+                        Modifier.weight(1f)
+                            .heightIn(min = 52.dp)
+                            .clip(shape)
+                            .background(
+                                if (active) Brush.verticalGradient(listOf(scheme.secondaryContainer, scheme.secondary.copy(alpha = 0.35f)))
+                                else Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surfaceContainerLow)),
+                            )
+                            .border(
+                                1.dp,
+                                if (active) scheme.secondary.copy(alpha = 0.90f) else scheme.primary.copy(alpha = 0.25f),
+                                shape,
+                            )
+                            .selectable(selected = active, role = Role.Tab, onClick = { onSelect(index) })
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        if (index == 1 && activeCount > 0) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(containerColor = scheme.secondary, contentColor = scheme.onSecondary) {
+                                        Text(if (activeCount > 99) "99+" else "$activeCount")
+                                    }
+                                },
+                            ) {
+                                Icon(icons[index], if (showLabels) null else title, Modifier.size(22.dp), tint = tint)
+                            }
+                        } else {
+                            Icon(icons[index], if (showLabels) null else title, Modifier.size(22.dp), tint = tint)
+                        }
+                        if (showLabels) Text(
+                            title,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            color = if (active) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
         }
     }
 }

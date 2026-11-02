@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 fun FailureDetailsDialog(details: FailureDetails, dismiss: () -> Unit) {
     val context = LocalContext.current
     var copied by remember(details) { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = dismiss, title = { Text(stringResource(if (details.phase == "LYRICS") R.string.failure_lyrics_details else R.string.failure_details)) },
+    AlertDialog(onDismissRequest = dismiss, title = { DialogTitle(stringResource(if (details.phase == "LYRICS") R.string.failure_lyrics_details else R.string.failure_details), icon = Icons.Outlined.Info, destructive = true) },
         text = { SelectionContainer { Text(details.text(), Modifier.verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) } },
         confirmButton = { TextButton(onClick = {
             context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("TubeFlow", details.text()))
