@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 83,
+    "versionName": "1.1.68",
+    "highlights": [
+      "Pemutaran video tidak lagi tersendat berkala: pipeline efek warna hanya dibangun ulang saat pengaturan benar-benar berubah, bukan setiap tick progres.",
+      "Mode picture-in-picture kembali berjalan tanpa galat dekoder karena pemutar tidak lagi dilepas saat jendela PiP aktif.",
+      "Gambar di layar penuh tidak terpotong di tepi sehingga hard sub tetap utuh, dan tema Transformers serta Cyberpunk kini konsisten di kontrol pemutar, lencana ikon, dan baris playlist."
+    ]
+  },
+  {
     "versionCode": 82,
     "versionName": "1.1.67",
     "highlights": [
