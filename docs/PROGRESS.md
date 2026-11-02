@@ -1355,3 +1355,29 @@ Verifikasi: `./gradlew testDebugUnitTest lintDebug` lulus (2m09s), **627 tes Kot
 build rilis ber-minify, audit paket, dan uji perangkat; 1.1.62 belum punya APK terbit. Perubahan
 folder koleksi belum diuji pada perangkat, jadi perilaku auto-refresh setelah berkas baru masuk
 masih perlu dikonfirmasi di HP.
+
+## Grup folder di Koleksi dan rilis 1.1.63 — 2 November 2026
+
+Tab Koleksi sebelumnya menampilkan audio dan video dalam satu daftar datar, sehingga file dari
+folder berbeda sulit dibedakan. Daftar sekarang dikelompokkan per folder dengan `stickyHeader`;
+setiap header menampilkan nama folder dan jumlah item. Urutan grup mengikuti kemunculan pertama
+pada hasil filter, dan item di dalam grup mempertahankan urutan sort yang aktif.
+
+Angka header tidak dihitung dari halaman yang termuat. `MediaDao.folderCounts()` menjalankan
+`GROUP BY folder` dengan filter yang sama dengan `page()` (jenis, folder, artis, album, pencarian,
+playlist) tanpa `LIMIT`, lalu `MediaLibraryViewModel.folderCounts` memetakan hasilnya. Tombol
+**Muat lebih banyak** hanya menambah baris yang ditampilkan; jumlah di header tetap berasal dari
+seluruh database. `CollectionGroups` menyatukan halaman dan hitungan itu, dengan fallback ke
+jumlah baris termuat bila hitungan belum tiba agar header tidak sempat menampilkan angka lebih
+kecil daripada daftar.
+
+Nomor versi dinaikkan ke **1.1.63/code78**. Entri `changelog.json` teratas ditambahkan untuk
+code78.
+
+Verifikasi: `python3 -m unittest scripts.test_media_database -v` lulus (9 tes), termasuk
+`test_folder_counts_use_whole_filter_not_loaded_page` yang membandingkan hitungan tanpa `LIMIT`
+dengan halaman berisi 2 baris serta memastikan filter jenis tetap diterapkan. JSON changelog
+divalidasi: kode `[78, 77, ...]` urut menurun dan tiga sorotan berukuran 20–220 karakter.
+`git diff --check` bersih. Belum dijalankan: `./gradlew testDebugUnitTest lintDebug`, build rilis,
+audit paket, dan uji perangkat karena JDK/Android SDK tidak tersedia di lingkungan ini; 1.1.63
+belum punya APK terbit. Header lengket dan perilaku gulir perlu dikonfirmasi di HP.

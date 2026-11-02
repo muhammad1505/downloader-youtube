@@ -90,6 +90,23 @@ class MediaDatabaseTest(unittest.TestCase):
         params.update(search='%', artist='Other', limit=1)
         self.assertEqual(['two'], [r['uri'] for r in self.db.execute(self.queries[0], params)])
 
+    def test_folder_counts_use_whole_filter_not_loaded_page(self):
+        for index in range(5):
+            self.media(f'a{index}', folder='Download/TubeFlow/Album A', title=f'A {index}')
+        for index in range(3):
+            self.media(f'b{index}', folder='Download/TubeFlow/Album B', title=f'B {index}')
+        self.media('video', folder='Download/TubeFlow/Album A', kind='VIDEO', title='Clip')
+        sql = next(q for q in self.queries if q.lstrip().startswith('SELECT folder, COUNT(*)'))
+        params = dict(kind='AUDIO', folder='', artist='', album='', search='%', playlistId='')
+        counts = {row['folder']: row['count'] for row in self.db.execute(sql, params)}
+        self.assertEqual(5, counts['Download/TubeFlow/Album A'])
+        self.assertEqual(3, counts['Download/TubeFlow/Album B'])
+        # Angka header tidak boleh mengikuti LIMIT halaman daftar.
+        page = list(self.db.execute(self.queries[0], dict(params, sort='recent', limit=2)))
+        self.assertEqual(2, len(page))
+        counts = {row['folder']: row['count'] for row in self.db.execute(sql, dict(params, kind=''))}
+        self.assertEqual(6, counts['Download/TubeFlow/Album A'])
+
     def test_storage_totals_follow_catalogue_changes_without_download_events(self):
         # Scan/import/karaoke can change catalogue bytes while download history stays identical.
         history = self.db.execute('SELECT count(*) FROM downloads').fetchone()[0]

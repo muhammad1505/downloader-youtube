@@ -58,6 +58,7 @@ data class LibraryTotals(
 data class EventCount(val action: String, val count: Long)
 data class DailyCount(val day: String, val count: Long)
 data class PlatformCount(val platformId: String, val count: Long)
+data class FolderCount(val folder: String, val count: Long)
 
 @Dao
 interface MediaDao {
@@ -106,6 +107,13 @@ interface MediaDao {
         COALESCE(SUM(kind='AUDIO' AND availability='AVAILABLE' AND artworkStatus='ABSENT'),0) AS artworkAbsent,
         COALESCE(SUM(kind='AUDIO' AND availability='AVAILABLE' AND lyricStatus=''),0) AS lyricsUnchecked FROM media_items""")
     fun totals(): Flow<LibraryTotals>
+    /** Jumlah per folder dari SELURUH tabel untuk filter aktif; header tidak boleh memakai halaman. */
+    @Query("""SELECT folder, COUNT(*) AS count FROM media_items WHERE (:kind = '' OR kind = :kind)
+        AND (:folder = '' OR folder = :folder) AND (:artist = '' OR artist = :artist) AND (:album = '' OR album = :album)
+        AND (:playlistId = '' OR EXISTS (SELECT 1 FROM playlist_members WHERE playlistId = :playlistId AND mediaUri = media_items.uri))
+        AND (title LIKE :search ESCAPE '\' OR displayName LIKE :search ESCAPE '\' OR artist LIKE :search ESCAPE '\')
+        GROUP BY folder ORDER BY folder COLLATE NOCASE""")
+    fun folderCounts(kind: String, folder: String, artist: String, album: String, search: String, playlistId: String = ""): Flow<List<FolderCount>>
     @Insert suspend fun event(event: MediaEvent)
     @Query("SELECT * FROM media_events ORDER BY at DESC, id DESC LIMIT 20") fun recentEvents(): Flow<List<MediaEvent>>
     @Query("SELECT action, COUNT(*) AS count FROM media_events WHERE at >= :since GROUP BY action") fun eventCounts(since: Long): Flow<List<EventCount>>

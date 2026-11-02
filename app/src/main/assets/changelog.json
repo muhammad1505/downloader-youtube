@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 78,
+    "versionName": "1.1.63",
+    "highlights": [
+      "Tab Koleksi kini mengelompokkan media per folder dengan header lengket saat daftar digulir.",
+      "Header folder menampilkan jumlah item dari seluruh database, bukan hanya halaman yang sudah dimuat.",
+      "Audio dan video dari folder berbeda tidak lagi tercampur dalam satu daftar tanpa penanda."
+    ]
+  },
+  {
     "versionCode": 77,
     "versionName": "1.1.62",
     "highlights": [

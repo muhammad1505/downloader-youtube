@@ -63,6 +63,11 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         database.personal().remove(id, item.uri); "Lagu dikeluarkan dari daftar. File tetap tersedia."
     }
     val totals = dao.totals().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    /** Jumlah item per folder dari database penuh, memakai filter yang sama dengan daftar. */
+    val folderCounts = filter.debounce(180).flatMapLatest { f ->
+        dao.folderCounts(f.kind, f.folder, f.artist, f.album, SmartMedia.search(f.query), f.playlistId)
+    }.map { rows -> rows.associate { it.folder to it.count } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
     val folders = dao.folders().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val artists = dao.artists().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val albums = dao.albums().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

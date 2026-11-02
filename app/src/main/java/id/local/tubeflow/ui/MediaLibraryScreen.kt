@@ -1,6 +1,7 @@
 package id.local.tubeflow.ui
 
 import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -8,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -29,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaLibraryScreen(
     model: MediaLibraryViewModel,
@@ -51,6 +57,9 @@ fun MediaLibraryScreen(
     val folders by model.folders.collectAsStateWithLifecycle()
     val artists by model.artists.collectAsStateWithLifecycle()
     val albums by model.albums.collectAsStateWithLifecycle()
+    val folderCounts by model.folderCounts.collectAsStateWithLifecycle()
+    // Angka header dari seluruh database; halaman yang termuat hanya menentukan isi tiap grup.
+    val groups = remember(media, folderCounts) { CollectionGroups.group(media, folderCounts) }
     val busy by model.busy.collectAsStateWithLifecycle()
     // Peta sekali per perubahan daftar job; jangan memindai seluruh riwayat untuk tiap kartu.
     val completedJobs = remember(jobs) { jobs.filter { it.state == JobState.COMPLETED }.associateBy { it.id } }
@@ -142,80 +151,83 @@ fun MediaLibraryScreen(
                 onAction = { model.scan() },
             )
         }
-        items(media, key = { it.uri }) { item ->
-            val accent=rememberCoverAccent(item.coverPath)
-            Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
-                // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
-                if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
-            },colors=mediaCardColors(accent),border=cyberpunkCardBorder()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                        // Nama file hanya ditampilkan bila tidak mengulang judul — hierarki seperti daftar lagu.
-                        val fileName = item.displayName.substringBeforeLast('.')
-                        if (item.title.isBlank() || (!fileName.startsWith(item.title, ignoreCase = true) && fileName != item.title)) {
-                            Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+        groups.forEach { group ->
+            stickyHeader(key = "folder:${group.folder}") { CollectionFolderHeader(group.folder, group.total) }
+            items(group.items, key = { it.uri }) { item ->
+                val accent=rememberCoverAccent(item.coverPath)
+                Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
+                    // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
+                    if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
+                },colors=mediaCardColors(accent),border=cyberpunkCardBorder()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                            // Nama file hanya ditampilkan bila tidak mengulang judul — hierarki seperti daftar lagu.
+                            val fileName = item.displayName.substringBeforeLast('.')
+                            if (item.title.isBlank() || (!fileName.startsWith(item.title, ignoreCase = true) && fileName != item.title)) {
+                                Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                            }
+                            if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                PlatformBrandLogo(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
+                            }
+                            if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                         }
-                        if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            PlatformBrandLogo(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
-                        }
-                        if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                     }
-                }
-                AttachmentInfo(item.location, item.kind == "AUDIO", item.lyricUri,
-                    completedJobs[item.jobId]?.sidecarUris, item.checkedAt to item.lyricStatus)
-                // Aksi kartu memakai rencana bersama dengan Riwayat; semua aksi tampil langsung.
-                val sourceJob = completedJobs[item.jobId]
-                MediaActionBar(
-                    audio = item.kind == "AUDIO",
-                    specs = MediaCardPlan.library(
+                    AttachmentInfo(item.location, item.kind == "AUDIO", item.lyricUri,
+                        completedJobs[item.jobId]?.sidecarUris, item.checkedAt to item.lyricStatus)
+                    // Aksi kartu memakai rencana bersama dengan Riwayat; semua aksi tampil langsung.
+                    val sourceJob = completedJobs[item.jobId]
+                    MediaActionBar(
                         audio = item.kind == "AUDIO",
-                        favorite = item.uri in favorites,
-                        inPlaylist = filter.playlistId.isNotBlank(),
-                        hasLyrics = item.lyricUri != null,
-                        canRedownload = sourceJob != null,
-                    ),
-                    enabled = { kind ->
-                        val available = item.availability == "AVAILABLE"
-                        when (kind) {
-                            MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
-                            MediaActionKind.ENQUEUE, MediaActionKind.PLAY_NEXT -> available
-                            MediaActionKind.FIND_LYRICS -> !busy
-                            MediaActionKind.REDOWNLOAD -> !busy
-                            MediaActionKind.EDIT_LYRIC_TIMING, MediaActionKind.RENAME,
-                            MediaActionKind.DELETE -> !busy && available
-                            MediaActionKind.CLIP_STATUS -> !busy && available
-                            else -> true
-                        }
-                    },
-                    onClick = { kind ->
-                        when (kind) {
-                            MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
-                            MediaActionKind.OPEN -> open(item)
-                            MediaActionKind.SHARE -> open(item, share = true)
-                            MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
-                            MediaActionKind.FAVORITE_REMOVE -> model.removeFromPlaylist(item, PersonalLibrary.FAVORITES)
-                            MediaActionKind.ENQUEUE -> player.enqueue(item)
-                            MediaActionKind.PLAY_NEXT -> player.playNext(item)
-                            MediaActionKind.ADD_PLAYLIST -> addPlaylist = item
-                            MediaActionKind.REMOVE_PLAYLIST -> model.removeFromPlaylist(item, filter.playlistId)
-                            MediaActionKind.FIND_LYRICS -> model.openLyrics(item)
-                            MediaActionKind.EDIT_LYRIC_TIMING -> timing = item
-                            MediaActionKind.DETAIL -> detail = item
-                            MediaActionKind.RENAME -> rename = item
-                            MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
-                            MediaActionKind.CLIP_STATUS -> clipStatus = item
-                            MediaActionKind.DELETE -> delete = item
-                            else -> Unit
-                        }
-                    },
-                )
-            }
-        } }
+                        specs = MediaCardPlan.library(
+                            audio = item.kind == "AUDIO",
+                            favorite = item.uri in favorites,
+                            inPlaylist = filter.playlistId.isNotBlank(),
+                            hasLyrics = item.lyricUri != null,
+                            canRedownload = sourceJob != null,
+                        ),
+                        enabled = { kind ->
+                            val available = item.availability == "AVAILABLE"
+                            when (kind) {
+                                MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
+                                MediaActionKind.ENQUEUE, MediaActionKind.PLAY_NEXT -> available
+                                MediaActionKind.FIND_LYRICS -> !busy
+                                MediaActionKind.REDOWNLOAD -> !busy
+                                MediaActionKind.EDIT_LYRIC_TIMING, MediaActionKind.RENAME,
+                                MediaActionKind.DELETE -> !busy && available
+                                MediaActionKind.CLIP_STATUS -> !busy && available
+                                else -> true
+                            }
+                        },
+                        onClick = { kind ->
+                            when (kind) {
+                                MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
+                                MediaActionKind.OPEN -> open(item)
+                                MediaActionKind.SHARE -> open(item, share = true)
+                                MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
+                                MediaActionKind.FAVORITE_REMOVE -> model.removeFromPlaylist(item, PersonalLibrary.FAVORITES)
+                                MediaActionKind.ENQUEUE -> player.enqueue(item)
+                                MediaActionKind.PLAY_NEXT -> player.playNext(item)
+                                MediaActionKind.ADD_PLAYLIST -> addPlaylist = item
+                                MediaActionKind.REMOVE_PLAYLIST -> model.removeFromPlaylist(item, filter.playlistId)
+                                MediaActionKind.FIND_LYRICS -> model.openLyrics(item)
+                                MediaActionKind.EDIT_LYRIC_TIMING -> timing = item
+                                MediaActionKind.DETAIL -> detail = item
+                                MediaActionKind.RENAME -> rename = item
+                                MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
+                                MediaActionKind.CLIP_STATUS -> clipStatus = item
+                                MediaActionKind.DELETE -> delete = item
+                                else -> Unit
+                            }
+                        },
+                    )
+                }
+                } }
+        }
         if (media.size >= filter.limit && filter.limit < 3000) item {
             ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
         }
@@ -333,6 +345,30 @@ fun MediaLibraryScreen(
     ) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
     clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
+}
+
+/** Header lengket per folder; [total] dihitung dari database penuh, bukan halaman yang termuat. */
+@Composable
+private fun CollectionFolderHeader(folder: String, total: Long) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(color = scheme.background, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp), tint = scheme.primary)
+            Text(
+                CollectionGroups.label(folder),
+                modifier = Modifier.weight(1f).semantics { heading() },
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text("$total item", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+        }
+    }
 }
 
 /** Dialog atur waktu lirik; dipakai Koleksi DAN pemutar penuh supaya tidak bolak-balik. */
