@@ -277,7 +277,6 @@
     <string name="tools_refresh">Segarkan katalog</string>
     <string name="tools_lyrics_title">Sinkronkan lirik</string>
     <string name="tools_lyrics_description">Perbaiki offset atau ketuk ulang waktu baris lirik yang sudah tersimpan. Lagu tanpa lirik belum bisa disinkronkan di sini.</string>
-    <string name="tools_lyrics_action">Pilih lagu</string>
     <string name="tools_lyrics_empty">Belum ada lagu dengan lirik tersimpan. Cari lirik dari kartu lagu lebih dulu.</string>
     <string name="tools_lyrics_mode_help">Pilih cara menyelaraskan lirik lagu ini.</string>
     <string name="tools_lyrics_offset">Koreksi offset</string>
@@ -286,7 +285,6 @@
     <string name="tools_lyrics_tap_help">Putar lagu lalu ketuk setiap baris saat mulai dinyanyikan.</string>
     <string name="tools_rename_title">Ubah nama massal</string>
     <string name="tools_rename_description">Susun nama dari judul, artis, album, atau nomor trek. Pratinjau menunjukkan nama akhir sebelum diterapkan; berkas yang gagal dipulihkan ke nama semula.</string>
-    <string name="tools_rename_action">Atur nama</string>
     <string name="tools_rename_pattern">Pola nama</string>
     <string name="tools_rename_pattern_help">Token: {judul}, {artis}, {album}, {track}, {nama}. Bagian kosong dan pemisah berlebih dibersihkan otomatis. Kosongkan pola untuk memakai cari-ganti pada nama asli.</string>
     <string name="tools_rename_find">Cari</string>
@@ -303,7 +301,6 @@
     </plurals>
     <string name="tools_karaoke_title">Buat instrumental (hapus vokal)</string>
     <string name="tools_karaoke_description">Pisahkan vokal dari audio pilihan. Satu lagu membuka pratinjau; beberapa lagu diproses berurutan dan hasilnya langsung masuk Koleksi. Audio asli tidak diubah dan model UVR diunduh sekali.</string>
-    <string name="tools_karaoke_action">Pilih lagu</string>
     <string name="tools_karaoke_single">Pratinjau satu</string>
     <string name="tools_karaoke_batch">Proses massal</string>
     <string name="tools_karaoke_confirm_title">Proses instrumental?</string>
@@ -315,7 +312,6 @@
     <string name="tools_kind_karaoke">Instrumental</string>
     <string name="tools_tag_title">Tag otomatis</string>
     <string name="tools_tag_description">Isi judul dan artis di katalog dari nama file. Tag di dalam audio tidak ditulis, dan artis yang sudah terbukti tidak ditimpa.</string>
-    <string name="tools_tag_action">Lihat usulan</string>
     <string name="tools_tag_fill_title">Perbarui judul</string>
     <string name="tools_tag_fill_artist">Isi artis yang masih kosong</string>
     <plurals name="tools_tag_preview">

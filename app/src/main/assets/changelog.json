@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 80,
+    "versionName": "1.1.65",
+    "highlights": [
+      "Folder di Koleksi tampil sebagai kartu dua kolom; ketuk kartu untuk membuka isinya, lalu kembali lewat breadcrumb.",
+      "Menu Alat kini berupa grid dua kolom tanpa tombol tambahan; ketuk kartu alat untuk langsung membuka pilihannya.",
+      "Kategori Pengaturan memakai kartu dua kolom yang konsisten dengan menu Alat agar daftar lebih ringkas dan mudah dipindai."
+    ]
+  },
+  {
     "versionCode": 79,
     "versionName": "1.1.64",
     "highlights": [

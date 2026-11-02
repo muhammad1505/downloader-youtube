@@ -1,7 +1,6 @@
 package id.local.tubeflow.ui
 
 import android.content.Context
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,9 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
@@ -34,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaLibraryScreen(
     model: MediaLibraryViewModel,
@@ -58,9 +53,16 @@ fun MediaLibraryScreen(
     val artists by model.artists.collectAsStateWithLifecycle()
     val albums by model.albums.collectAsStateWithLifecycle()
     val folderCounts by model.folderCounts.collectAsStateWithLifecycle()
-    val collapsedFolders by model.collapsedFolders.collectAsStateWithLifecycle()
-    // Angka header dari seluruh database; halaman yang termuat hanya menentukan isi tiap grup.
-    val groups = remember(media, folderCounts) { CollectionGroups.group(media, folderCounts) }
+    // Kartu folder memakai hitungan database penuh; halaman pertama hanya cadangan saat hitungan
+    // belum tiba supaya grid tidak berkedip kosong.
+    val folderCards = remember(media, folderCounts) {
+        val totals = folderCounts.ifEmpty {
+            media.groupingBy { it.folder }.eachCount().mapValues { it.value.toLong() }
+        }
+        totals.entries.filter { it.value > 0 }.sortedBy { CollectionGroups.label(it.key).lowercase() }
+    }
+    val browsingFolders = filter.folder.isBlank() && filter.playlistId.isBlank() &&
+        filter.query.isBlank() && filter.artist.isBlank() && filter.album.isBlank()
     val busy by model.busy.collectAsStateWithLifecycle()
     // Peta sekali per perubahan daftar job; jangan memindai seluruh riwayat untuk tiap kartu.
     val completedJobs = remember(jobs) { jobs.filter { it.state == JobState.COMPLETED }.associateBy { it.id } }
@@ -142,7 +144,12 @@ fun MediaLibraryScreen(
             }
         } }
         openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
-        if (media.isEmpty() && !busy) item {
+        if (filter.folder.isNotBlank()) item {
+            LibraryBreadcrumb(CollectionGroups.label(filter.folder)) {
+                model.filter(filter.copy(folder = ""))
+            }
+        }
+        if (media.isEmpty() && !busy && (!browsingFolders || folderCards.isEmpty())) item {
             if (filter.playlistId.isNotBlank()) EmptyState(Icons.Outlined.LibraryMusic, stringResource(if (filter.playlistId == PersonalLibrary.FAVORITES) R.string.library_favorites_empty else R.string.library_playlist_empty), stringResource(R.string.library_playlist_empty_help))
             else EmptyState(
                 Icons.Outlined.Folder,
@@ -152,12 +159,22 @@ fun MediaLibraryScreen(
                 onAction = { model.scan() },
             )
         }
-        groups.forEach { group ->
-            val collapsed = group.folder in collapsedFolders
-            stickyHeader(key = "folder:${group.folder}") {
-                CollectionFolderHeader(group.folder, group.total, collapsed) { model.toggleFolder(group.folder) }
+        if (browsingFolders) {
+            if (folderCards.isNotEmpty()) {
+                item { FolderSectionHeading(folderCards.size) }
+                items(folderCards.chunked(2), key = { row -> "folders:" + row.joinToString("|") { it.key } }) { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { (folder, total) ->
+                            FolderCard(folder, total, Modifier.weight(1f)) {
+                                model.filter(filter.copy(folder = folder))
+                            }
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
             }
-            items(if (collapsed) emptyList() else group.items, key = { it.uri }) { item ->
+        } else {
+            items(media, key = { it.uri }) { item ->
                 val accent=rememberCoverAccent(item.coverPath)
                 Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
@@ -231,9 +248,9 @@ fun MediaLibraryScreen(
                     )
                 }
                 } }
-        }
-        if (media.size >= filter.limit && filter.limit < 3000) item {
-            ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+            if (media.size >= filter.limit && filter.limit < 3000) item {
+                ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+            }
         }
     }
     if (filterOpen) AlertDialog(
@@ -351,38 +368,92 @@ fun MediaLibraryScreen(
     clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
 }
 
-/**
- * Header lengket per folder; [total] dihitung dari database penuh, bukan halaman yang termuat.
- * Mengetuk header melipat/membuka isi grup; statusnya dipegang ViewModel selama sesi.
- */
 @Composable
-private fun CollectionFolderHeader(folder: String, total: Long, collapsed: Boolean, onToggle: () -> Unit) {
+private fun FolderSectionHeading(count: Int) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Folder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("$count folder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun FolderCard(folder: String, total: Long, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+    val label = CollectionGroups.label(folder)
+    val name = label.substringAfterLast('/').ifBlank { label }
+    val parent = label.substringBeforeLast('/', "").trim().ifBlank { null }
     val scheme = MaterialTheme.colorScheme
-    Surface(color = scheme.background, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth()
-                .clickable(onClickLabel = if (collapsed) "Buka folder" else "Lipat folder") { onToggle() }
-                .semantics { stateDescription = if (collapsed) "Dilipat" else "Dibuka" }
-                .heightIn(min = 48.dp)
-                .padding(top = 10.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    SectionCard(
+        modifier.clickable(onClickLabel = "Buka folder $label", onClick = onOpen),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp), tint = scheme.primary)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(color = scheme.primaryContainer, shape = MaterialTheme.shapes.small) {
+                    Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.FolderOpen, null, Modifier.size(24.dp), tint = scheme.primary)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp), tint = scheme.onSurfaceVariant)
+            }
             Text(
-                CollectionGroups.label(folder),
-                modifier = Modifier.weight(1f).semantics { heading() },
+                name,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (parent != null) Text(
+                parent,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text("$total item", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+            Text(
+                "$total item",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (parent == null) scheme.onSurfaceVariant else scheme.primary,
+            )
+        }
+    }
+}
+
+/** Breadcrumb dua tingkat: akar Koleksi selalu bisa diketuk untuk kembali ke grid folder. */
+@Composable
+private fun LibraryBreadcrumb(path: String, onRoot: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                onClick = onRoot,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) { Text("Koleksi", style = MaterialTheme.typography.labelLarge) }
             Icon(
-                if (collapsed) Icons.Outlined.ExpandMore else Icons.Outlined.ExpandLess,
+                Icons.Outlined.ChevronRight,
                 null,
-                Modifier.size(20.dp),
-                tint = scheme.onSurfaceVariant,
+                Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                path,
+                modifier = Modifier.weight(1f).padding(start = 6.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -1405,3 +1405,28 @@ warning), termasuk `AppChangelogTest` dan `CollectionGroupsTest`. Kompilasi pert
 sampai lulus. `git diff --check` bersih; JSON changelog divalidasi (kode menurun, sorotan 20–220
 karakter, tanpa spasi akhir). Belum dijalankan: build rilis, audit paket, dan uji perangkat;
 interaksi lipat dan TalkBack perlu dikonfirmasi di HP.
+
+## Folder kartu, breadcrumb, dan grid menu — 1.1.65/code80, 2 November 2026
+
+Tab Koleksi tidak lagi memakai akordeon header lengket. Di akar, folder tampil sebagai grid kartu
+dua kolom berisi nama folder, induk path, dan jumlah item dari database penuh. Mengetuk kartu
+memilih folder lewat `Filter.folder` dan menampilkan isinya; breadcrumb "Koleksi › path" di atas
+daftar mengembalikan filter folder ke kosong. Pencarian, Favorit, playlist, artis, dan album tetap
+menampilkan berkas langsung agar hasil filter tidak terkubur di balik kartu folder. Status
+`collapsedFolders`/`toggleFolder` di ViewModel dihapus karena tidak ada lagi grup yang dilipat.
+
+Menu Alat diubah menjadi grid 2×2. Setiap kartu memuat ikon, judul, dan ringkasan; seluruh kartu
+adalah target ketuk yang langsung membuka dialog alat, tanpa tombol "Pilih lagu/Atur nama" di
+dalam kartu. Kartu nonaktif diredupkan ketika koleksi kosong atau alat sedang sibuk. Empat string
+tombol lama dihapus agar lint tidak menambah peringatan resource tak terpakai.
+
+Daftar kategori Pengaturan memakai grid kartu dua kolom dengan ikon, judul, ringkasan maksimal
+tiga baris, dan chevron; mengetuk kartu tetap membuka kategori seperti sebelumnya.
+
+Nomor versi dinaikkan ke **1.1.65/code80** dan entri `changelog.json` teratas ditambahkan.
+
+Verifikasi: `./gradlew testDebugUnitTest lintDebug assembleDebug` lulus (631 tes Kotlin, 0 gagal;
+lint 0 error/4 warning). `changelog.json` divalidasi: 16 entri, kode menurun dan unik, code80/1.1.65
+di atas, tiga sorotan berukuran 114/111/121 karakter. `git diff --check` bersih. Tiga APK debug
+(arm64-v8a, armeabi-v7a, x86_64) terbentuk. Batas: build rilis, audit native, dan uji perangkat
+belum dijalankan; tata letak kartu, breadcrumb, dan TalkBack perlu dikonfirmasi di HP.

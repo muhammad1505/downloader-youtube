@@ -184,62 +184,73 @@ fun SettingsScreen(
                 SettingsStore.autoRename, SettingsStore.autoTag, SettingsStore.autoArtwork,
                 SettingsStore.autoLyrics, SettingsStore.autoLibrary,
             ).count { it }
-            SettingsCategoryCard(
-                title = "Unduhan",
-                summary = "Antrean ${SettingsStore.maxConcurrent}× · Smart Media $smartCount/5 · notifikasi",
-                icon = Icons.Outlined.Download,
-                onClick = { onSection("downloads") },
+            val categories = listOf(
+                SettingsCategory(
+                    title = "Unduhan",
+                    summary = "Antrean ${SettingsStore.maxConcurrent}× · Smart Media $smartCount/5 · notifikasi",
+                    icon = Icons.Outlined.Download,
+                ) { onSection("downloads") },
+                SettingsCategory(
+                    title = "Penyimpanan",
+                    summary = (if (tree != null) "Folder pilihan" else "Downloads/${SettingsStore.storageFolder}") +
+                        " · ukuran, cache, dan pembersihan",
+                    icon = Icons.Outlined.Folder,
+                ) { onSection("storage") },
+                SettingsCategory(
+                    title = "Tampilan",
+                    summary = "${themeModeLabel(themeMode)} · " + when {
+                        themeMode == SettingsStore.MODE_CYBERPUNK -> "palet neon"
+                        SettingsStore.artworkAccent -> "aksen dari sampul"
+                        else -> "aksen tema"
+                    },
+                    icon = Icons.Outlined.Palette,
+                ) { onSection("display") },
+                SettingsCategory(
+                    title = "Pemutaran",
+                    summary = "Lanjutkan otomatis setelah terputus" + if (Build.VERSION.SDK_INT >= 31) " · Bluetooth" else "",
+                    icon = Icons.Outlined.PlayCircle,
+                ) { onSection("playback") },
+                SettingsCategory(
+                    title = "Riwayat",
+                    summary = if (SettingsStore.historyAutoDays == 0) "Hapus otomatis nonaktif"
+                        else "Hapus otomatis setelah ${SettingsStore.historyAutoDays} hari",
+                    icon = Icons.Outlined.History,
+                ) { onSection("history") },
+                SettingsCategory(
+                    title = "Media & alat",
+                    summary = "Karaoke, cadangan lirik, dan pembaruan mesin",
+                    icon = Icons.Outlined.Build,
+                ) { onSection("media") },
+                SettingsCategory(
+                    title = "Akun Bstation",
+                    summary = if (bstationSignedIn)
+                        "Masuk" + (bstationAccountId.takeIf { it.isNotBlank() }?.let { " · UID $it" } ?: "") + " · episode Premium dapat dipilih"
+                    else "Belum masuk · episode Premium terkunci",
+                    icon = Icons.Outlined.AccountCircle,
+                ) { onSection("accounts") },
+                SettingsCategory(
+                    title = "Tentang",
+                    summary = "Versi ${BuildConfig.VERSION_NAME} · privasi dan ketentuan",
+                    icon = Icons.Outlined.Info,
+                ) { onSection("about") },
             )
-            SettingsCategoryCard(
-                title = "Penyimpanan",
-                summary = (if (tree != null) "Folder pilihan" else "Downloads/${SettingsStore.storageFolder}") +
-                    " · ukuran, cache, dan pembersihan",
-                icon = Icons.Outlined.Folder,
-                onClick = { onSection("storage") },
-            )
-            SettingsCategoryCard(
-                title = "Tampilan",
-                summary = "${themeModeLabel(themeMode)} · " + when {
-                    themeMode == SettingsStore.MODE_CYBERPUNK -> "palet neon"
-                    SettingsStore.artworkAccent -> "aksen dari sampul"
-                    else -> "aksen tema"
-                },
-                icon = Icons.Outlined.Palette,
-                onClick = { onSection("display") },
-            )
-            SettingsCategoryCard(
-                title = "Pemutaran",
-                summary = "Lanjutkan otomatis setelah terputus" + if (Build.VERSION.SDK_INT >= 31) " · Bluetooth" else "",
-                icon = Icons.Outlined.PlayCircle,
-                onClick = { onSection("playback") },
-            )
-            SettingsCategoryCard(
-                title = "Riwayat",
-                summary = if (SettingsStore.historyAutoDays == 0) "Hapus otomatis nonaktif"
-                    else "Hapus otomatis setelah ${SettingsStore.historyAutoDays} hari",
-                icon = Icons.Outlined.History,
-                onClick = { onSection("history") },
-            )
-            SettingsCategoryCard(
-                title = "Media & alat",
-                summary = "Karaoke, cadangan lirik, dan pembaruan mesin",
-                icon = Icons.Outlined.Build,
-                onClick = { onSection("media") },
-            )
-            SettingsCategoryCard(
-                title = "Akun Bstation",
-                summary = if (bstationSignedIn)
-                    "Masuk" + (bstationAccountId.takeIf { it.isNotBlank() }?.let { " · UID $it" } ?: "") + " · episode Premium dapat dipilih"
-                else "Belum masuk · episode Premium terkunci",
-                icon = Icons.Outlined.AccountCircle,
-                onClick = { onSection("accounts") },
-            )
-            SettingsCategoryCard(
-                title = "Tentang",
-                summary = "Versi ${BuildConfig.VERSION_NAME} · privasi dan ketentuan",
-                icon = Icons.Outlined.Info,
-                onClick = { onSection("about") },
-            )
+            categories.chunked(2).forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    row.forEach { category ->
+                        SettingsCategoryCard(
+                            title = category.title,
+                            summary = category.summary,
+                            icon = category.icon,
+                            onClick = category.onClick,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
         } else {
             val (title, subtitle) = settingsSectionInfo(section)
             PageHeading(title, subtitle)
@@ -679,42 +690,56 @@ private fun settingsSectionInfo(section: String): Pair<String, String> = when (s
 }
 
 /** Satu baris kategori: ikon, judul, ringkasan nilai aktif, dan tanda buka. */
+private data class SettingsCategory(
+    val title: String,
+    val summary: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
 @Composable
 private fun SettingsCategoryCard(
     title: String,
     summary: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     SectionCard(
-        Modifier.fillMaxWidth().clickable(onClickLabel = "Buka $title", onClick = onClick),
+        modifier.clickable(onClickLabel = "Buka $title", onClick = onClick),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Column(
+            Modifier.fillMaxWidth().heightIn(min = 156.dp).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Outlined.ChevronRight,
+                    null,
+                    Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(
-                Icons.Outlined.ChevronRight,
-                null,
-                Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

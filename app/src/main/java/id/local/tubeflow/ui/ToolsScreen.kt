@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
@@ -60,57 +61,37 @@ fun ToolsScreen(
         verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
     ) {
         PageHeading(stringResource(R.string.tools_title), stringResource(R.string.tools_subtitle))
-        ToolHubCard(
-            title = stringResource(R.string.tools_lyrics_title),
-            description = stringResource(R.string.tools_lyrics_description),
-            icon = Icons.Outlined.Lyrics,
-        ) {
-            ActionButton(
-                stringResource(R.string.tools_lyrics_action),
-                { lyricOpen = true },
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ToolHubCard(
+                title = stringResource(R.string.tools_lyrics_title),
+                description = stringResource(R.string.tools_lyrics_description),
                 icon = Icons.Outlined.Lyrics,
                 enabled = items.any { it.lyricUri != null } && !model.busy,
-                fillWidth = true,
-            )
-        }
-        ToolHubCard(
-            title = stringResource(R.string.tools_rename_title),
-            description = stringResource(R.string.tools_rename_description),
-            icon = Icons.Outlined.DriveFileRenameOutline,
-        ) {
-            ActionButton(
-                stringResource(R.string.tools_rename_action),
-                { renameOpen = true },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) { lyricOpen = true }
+            ToolHubCard(
+                title = stringResource(R.string.tools_rename_title),
+                description = stringResource(R.string.tools_rename_description),
                 icon = Icons.Outlined.DriveFileRenameOutline,
                 enabled = items.isNotEmpty() && !model.busy,
-                fillWidth = true,
-            )
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) { renameOpen = true }
         }
-        ToolHubCard(
-            title = stringResource(R.string.tools_karaoke_title),
-            description = stringResource(R.string.tools_karaoke_description),
-            icon = Icons.Outlined.MicOff,
-        ) {
-            ActionButton(
-                stringResource(R.string.tools_karaoke_action),
-                { instrumentalOpen = true },
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ToolHubCard(
+                title = stringResource(R.string.tools_karaoke_title),
+                description = stringResource(R.string.tools_karaoke_description),
                 icon = Icons.Outlined.MicOff,
                 enabled = items.isNotEmpty() && !model.busy,
-                fillWidth = true,
-            )
-        }
-        ToolHubCard(
-            title = stringResource(R.string.tools_tag_title),
-            description = stringResource(R.string.tools_tag_description),
-            icon = Icons.Outlined.Sell,
-        ) {
-            ActionButton(
-                stringResource(R.string.tools_tag_action),
-                { tagOpen = true },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) { instrumentalOpen = true }
+            ToolHubCard(
+                title = stringResource(R.string.tools_tag_title),
+                description = stringResource(R.string.tools_tag_description),
                 icon = Icons.Outlined.Sell,
                 enabled = items.isNotEmpty() && !model.busy,
-                fillWidth = true,
-            )
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) { tagOpen = true }
         }
         progress?.let { state -> ToolWorkPanel(state, onCancel = model::cancel, onDismiss = model::dismissProgress) }
         if (items.isEmpty()) {
@@ -168,28 +149,48 @@ private fun ToolHubCard(
     title: String,
     description: String,
     icon: ImageVector,
-    action: @Composable ColumnScope.() -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
     val cyberpunk = id.local.tubeflow.ui.theme.LocalCyberpunkTheme.current
-    SectionCard {
-        Column(Modifier.padding(UiSpacing.panel), verticalArrangement = Arrangement.spacedBy(UiSpacing.row)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    SectionCard(
+        modifier
+            .heightIn(min = 190.dp)
+            .alpha(if (enabled) 1f else 0.48f)
+            .clickable(enabled = enabled, onClickLabel = "Buka $title", onClick = onClick),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(48.dp)
+                    Modifier.size(44.dp)
                         .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .then(if (cyberpunk) Modifier.border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), MaterialTheme.shapes.small) else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                    Icon(icon, null, Modifier.size(23.dp), tint = MaterialTheme.colorScheme.primary)
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
             }
-            action()
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
