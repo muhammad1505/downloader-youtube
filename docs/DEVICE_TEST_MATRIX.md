@@ -2,9 +2,10 @@
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
 seluruh skenario sudah lulus. Status terakhir diperbarui **3 November 2026**
-untuk kandidat **1.1.71/code 86**. HP fisik sempat tersambung dan build ini
-sudah terpasang lewat ADB (bukti hash di [PROGRESS.md](PROGRESS.md)), tetapi
-belum ada skenario di bawah yang dijalankan pada build ini; semua baris masih
+untuk kandidat **1.1.72/code 87** (dibangun CI dari tag; build lokal
+dibatalkan sehingga belum terpasang di perangkat). Build 1.1.71 sempat
+terpasang lewat ADB (bukti hash di [PROGRESS.md](PROGRESS.md)) tetapi belum
+ada skenario di bawah yang dijalankan pada build ini; semua baris masih
 **belum dijalankan**.
 
 Gunakan hanya konten milik sendiri atau yang diizinkan. Hasil lama pada
@@ -63,6 +64,7 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-13 | Aksesibilitas dan tata letak | Font 1,6×, TalkBack, portrait/lanskap, layar sempit; periksa toggle antrean, status folder, dan dialog hapus. | Semua kontrol terjangkau dan terbaca; status tidak hanya dibedakan warna; tidak ada teks terpotong permanen; target sentuh minimal 48 dp. |
 | DTM-14 | Penyimpanan hampir penuh | Isi penyimpanan sampai tersisa sedikit, mulai unduhan dan publikasi, lalu batalkan. | Pesan jelas; tidak ada file selesai yang rusak; ruang kembali setelah pembatalan; antrean dapat dicoba lagi setelah ruang tersedia. |
 | DTM-15 | Baris ringkas Koleksi & Riwayat | Buka Koleksi: cari file yang judulnya berbeda dari nama file dan file berlirik/subtitle. Lalu buka tab Download → Riwayat. | Nama file tampil di baris keterangan bila tidak mengulang judul; ikon lirik/CC muncul di ujung baris tanpa baris tambahan; kartu Riwayat memakai baris ringkas tapi tanggal selesai, `AttachmentInfo`, dan status lirik tetap tampil; semua aksi tersedia di menu ⋮; tap baris tetap memutar. |
+| DTM-16 | Favorit, teks bergulir, antrean seragam | Tandai beberapa item sebagai favorit di Koleksi; buka item berjudul panjang/nama file panjang; buka antrean putar audio (pemutar lagu) dan antrean video (pemutar video). | Hati favorit tampil hanya pada item di playlist Favorit; judul/baris keterangan yang terpotong bergulir kanan ke kiri (diam bila muat); kedua antrean memakai kartu sama: sampul 48 dp, judul, `AttachmentInfo`, label "Sedang diputar" + aksen pada item aktif; menu ⋮ tetap ada di audio; tap baris melompat ke item tersebut. |
 
 ## Format hasil
 
@@ -85,6 +87,7 @@ Salin tabel ini ke laporan sesi dan isi satu baris per percobaan:
 | DTM-13 |  |  | Belum dijalankan |  |  |
 | DTM-14 |  |  | Belum dijalankan |  |  |
 | DTM-15 |  |  | Belum dijalankan |  |  |
+| DTM-16 |  |  | Belum dijalankan |  |  |
 
 ## Batas
 

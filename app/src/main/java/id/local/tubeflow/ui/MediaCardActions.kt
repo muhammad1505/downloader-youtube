@@ -3,7 +3,6 @@ package id.local.tubeflow.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -235,6 +234,10 @@ object MediaCardPlan {
  * Baris aksi kartu media: aksi utama sebagai ikon 48dp yang membungkus, lalu satu tombol titik
  * tiga untuk aksi sekunder. Urutan dan pembagian slot berasal dari [MediaCardPlan]; `enabled`
  * dan `onClick` diisi pemanggil.
+ *
+ * `FlowRow` sengaja TANPA `fillMaxWidth`: di dalam `Row`, anak non-weight diukur lebih dulu
+ * dengan sisa lebar (`RowColumnMeasurePolicy`), jadi action bar ber-lebar penuh melahap seluruh
+ * ruang dan kolom teks `weight(1f)` terukur dengan lebar 0 — judul/keterangan hilang dari baris.
  */
 @Composable
 fun MediaActionBar(
@@ -248,7 +251,7 @@ fun MediaActionBar(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     FlowRow(
-        modifier.fillMaxWidth(),
+        modifier,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -325,10 +328,11 @@ fun hasSubtitleAttachment(audio: Boolean, sidecarUris: String?): Boolean =
     !audio && attachmentUris(sidecarUris).keys.any { it != ATTACHMENT_THUMBNAIL }
 
 /**
- * Penanda lampiran kecil di ujung baris Koleksi: ikon lirik bila ada berkas lirik, dan ikon
- * subtitle beserta jumlahnya. Murni (tanpa Compose) supaya bisa diuji di JVM.
+ * Penanda kecil di ujung baris Koleksi: ikon lirik bila ada berkas lirik, ikon subtitle beserta
+ * jumlahnya, dan hati favorit bila item ada di playlist Favorit. Murni (tanpa Compose) supaya
+ * bisa diuji di JVM.
  */
-data class RowBadges(val lyrics: Boolean = false, val subtitles: Int = 0)
+data class RowBadges(val lyrics: Boolean = false, val subtitles: Int = 0, val favorite: Boolean = false)
 
 /** Jumlah baris lampiran yang bukan thumbnail; berkas LRC audio ikut terhitung sebagai lirik. */
 fun sidecarCount(sidecarUris: String?): Int = sidecarUris.orEmpty().lines().count { line ->
@@ -338,12 +342,13 @@ fun sidecarCount(sidecarUris: String?): Int = sidecarUris.orEmpty().lines().coun
 
 /**
  * Penanda yang layak ditampilkan satu baris media: audio menandai lirik (dari `lyricUri` atau
- * baris `sub|` unduhan), video menghitung subtitle tanpa menghitung thumbnail.
+ * baris `sub|` unduhan), video menghitung subtitle tanpa menghitung thumbnail, dan `favorite`
+ * mewakili keanggotaan playlist Favorit tanpa bergantung pada lampiran.
  */
-fun rowBadges(audio: Boolean, lyricUri: String?, sidecarUris: String?): RowBadges {
+fun rowBadges(audio: Boolean, lyricUri: String?, sidecarUris: String?, favorite: Boolean = false): RowBadges {
     val sidecars = sidecarCount(sidecarUris)
-    return if (audio) RowBadges(lyrics = !lyricUri.isNullOrBlank() || sidecars > 0)
-    else RowBadges(subtitles = sidecars)
+    return if (audio) RowBadges(lyrics = !lyricUri.isNullOrBlank() || sidecars > 0, favorite = favorite)
+    else RowBadges(subtitles = sidecars, favorite = favorite)
 }
 
 /**

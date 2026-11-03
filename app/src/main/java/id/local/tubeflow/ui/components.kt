@@ -16,6 +16,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.basicMarquee
 import androidx.core.net.toUri
 import id.local.tubeflow.core.songIdentity
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -771,9 +773,10 @@ fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifie
 }
 /**
  * Baris media ringkas untuk semua daftar Koleksi: sampul 52 dp, satu baris judul, satu baris
- * keterangan, penanda lampiran kecil (ikon lirik/subtitle), dan slot aksi di kanan (biasanya
+ * keterangan, penanda kecil (favorit/lirik/subtitle), dan slot aksi di kanan (biasanya
  * menu titik tiga). Dipakai bersama supaya daftar musik, video, folder, favorit, dan playlist
- * punya tinggi item yang sama.
+ * punya tinggi item yang sama. Judul dan keterangan memakai [basicMarquee]: teks yang muat
+ * diam, teks yang meluber bergulir kanan ke kiri supaya nama file terbaca penuh.
  */
 @Composable
 fun MediaListRow(
@@ -805,6 +808,7 @@ fun MediaListRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     title,
+                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -812,6 +816,7 @@ fun MediaListRow(
                 )
                 Text(
                     errorText ?: subtitle,
+                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (errorText != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -820,6 +825,77 @@ fun MediaListRow(
             }
             RowAttachmentIcons(badges)
             trailing()
+        }
+    }
+}
+
+/**
+ * Baris antrean putar bersama pemutar audio dan video: sampul 48 dp, judul, keterangan opsional,
+ * status lampiran, dan label "Sedang diputar" bila kartu aktif (fill+border aksen). Lembar video
+ * mengirim warnanya sendiri karena selalu tampil gelap di semua tema; pemutar audio memakai
+ * warna tema lewat default. Aksi per item (menu ⋮) tetap milik pemanggil — jangan menyalin aksi
+ * khusus audio ke video demi menyamakan jumlah tombol.
+ */
+@Composable
+fun QueueRow(
+    coverPath: String,
+    mode: MediaMode,
+    title: String,
+    current: Boolean,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    meta: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    metaColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    playingLabel: String = "Sedang diputar",
+    onClickLabel: String = "Putar dari antrean",
+    attachments: @Composable () -> Unit = {},
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (current) accent.copy(alpha = 0.12f).compositeOver(containerColor) else containerColor,
+        border = if (current) BorderStroke(1.dp, accent.copy(alpha = 0.30f)) else null,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier.weight(1f).clickable(onClickLabel = onClickLabel, onClick = onClick).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CoverThumb(coverPath, "", mode, Modifier.size(48.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
+                        color = contentColor,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (meta != null) Text(
+                        meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = metaColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    attachments()
+                    if (current) Text(
+                        playingLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = accent,
+                    )
+                }
+            }
+            trailing?.invoke()
         }
     }
 }

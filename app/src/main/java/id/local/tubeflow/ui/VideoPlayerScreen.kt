@@ -148,6 +148,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import id.local.tubeflow.core.VideoAspect
 import id.local.tubeflow.core.VideoBrightnessMode
+import id.local.tubeflow.core.MediaMode
 import id.local.tubeflow.core.VideoBrightnessPolicy
 import id.local.tubeflow.core.VideoVolumePolicy
 import id.local.tubeflow.core.VideoAudioEffect
@@ -1857,26 +1858,34 @@ private fun VideoOptionsSheet(
                     SheetHint("Mengganti dekoder membuka ulang video pada posisi yang sama. Mode Perangkat tidak jatuh ke software otomatis; dari layar error tersedia tombol Coba dekoder software.")
                 }
                 VideoSheet.QUEUE -> {
-                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                        itemsIndexed(state.entries) { index, entry ->
-                            Column {
-                            SheetChoice(
-                                label = "${index + 1}. ${entry.displayTitle}",
-                                selected = index == state.index,
+                    // Baris memakai QueueRow yang sama dengan antrean audio (sampul, judul,
+                    // status lampiran, label "Sedang diputar"); warna tetap palet pemutar.
+                    LazyColumn(
+                        Modifier.fillMaxWidth().heightIn(max = 360.dp).padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        itemsIndexed(
+                            state.entries,
+                            key = { index, entry -> "${entry.uri}#$index" },
+                        ) { index, entry ->
+                            QueueRow(
+                                coverPath = "",
+                                mode = MediaMode.VIDEO,
+                                title = entry.displayTitle,
+                                current = index == state.index,
+                                accent = PlayerAccent(),
+                                containerColor = PlayerSheet(),
+                                contentColor = PlayerContent,
+                                metaColor = PlayerMuted,
                                 onClick = {
                                     video.jumpTo(index)
                                     onDismiss()
                                 },
+                                attachments = {
+                                    AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
+                                },
                             )
-                            if (index == state.index) Text(
-                                "Sedang diputar",
-                                Modifier.padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = PlayerAccent(),
-                            )
-                            AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
-                            }
                         }
                     }
                     if (state.entries.size <= 1) {

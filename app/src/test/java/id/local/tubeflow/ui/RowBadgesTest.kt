@@ -50,6 +50,26 @@ class RowBadgesTest {
     }
 
     @Test
+    fun favoriteShowsTheHeartEvenWithoutAnyAttachment() {
+        // Hati menyangkut status item (playlist Favorit), bukan isinya — muncul sendirian.
+        assertEquals(RowBadges(favorite = true), rowBadges(audio = true, lyricUri = null, sidecarUris = null, favorite = true))
+        assertEquals(RowBadges(favorite = true), rowBadges(audio = false, lyricUri = null, sidecarUris = null, favorite = true))
+    }
+
+    @Test
+    fun favoriteCombinesWithLyricsAndSubtitles() {
+        val audio = rowBadges(audio = true, lyricUri = "content://media/external/audio/1", sidecarUris = null, favorite = true)
+        assertTrue(audio.favorite)
+        assertTrue(audio.lyrics)
+
+        val video = rowBadges(audio = false, lyricUri = null, sidecarUris = "sub|content://media/subs/id.srt", favorite = true)
+        assertTrue(video.favorite)
+        assertEquals(1, video.subtitles)
+        // Item non-favorit tetap tanpa hati meski lampiran lengkap.
+        assertFalse(rowBadges(audio = true, lyricUri = "content://media/external/audio/1", sidecarUris = null).favorite)
+    }
+
+    @Test
     fun fileNameAppearsOnlyWhenItDoesNotRepeatTheTitle() {
         // Judul kosong: nama file satu-satunya identitas yang tersedia.
         assertTrue(showFileName("", "Judul Tanpa Judul.mp3"))

@@ -217,7 +217,7 @@ fun MediaLibraryScreen(
                     onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video",
                     enabled = item.availability == "AVAILABLE",
                     errorText = if (item.availability != "AVAILABLE") "File tidak tersedia atau izin akses berubah" else null,
-                    badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris),
+                    badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris, favorite = item.uri in favorites),
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
                     onClick = { if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item) },
                 ) {

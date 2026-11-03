@@ -2,6 +2,16 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Ikon favorit, teks bergulir, dan antrean seragam — 3 November 2026
+
+Tiga permintaan pengguna setelah verifikasi perbaikan teks baris 1.1.72; rencana desain (token + sketsa ASCII + kritik) ditulis sebelum kode, dengan dua keputusan yang dikonfirmasi pengguna: marquee **terus-menerus** dan cakupan antrean video **tampilan saja** (tanpa menu keluarkan/pindah yang butuh perubahan engine).
+
+- **Ikon favorit.** `RowBadges` bertambah field `favorite`; `rowBadges(..., favorite = false)` meneruskan keanggotaan playlist Favorit (`item.uri in favorites` di `MediaLibraryScreen`) tanpa bergantung pada lampiran. `RowAttachmentIcons` me-render hati 14 dp (`Icons.Filled.Favorite`, peran `error`) lebih dulu sebelum ikon lirik/CC, `contentDescription` "Ada di playlist Favorit"; hati muncul sendirian bila item favorit tanpa lampiran.
+- **Teks bergulir (marquee).** Judul dan baris keterangan `MediaListRow` memakai `Modifier.basicMarquee(iterations = Int.MAX_VALUE)`: konten diukur tanpa batas lebar (jadi tidak perlu elipsis — `TextOverflow.Ellipsis` tetap sebagai jaring), diam ±1,2 detik lalu bergulir kanan ke kiri 30 dp/s dan mengulang selama baris terlihat; teks yang muat tidak bergerak sama sekali (dijamin `MarqueeNode`: animasi berhenti bila `contentWidth <= containerWidth`). Gerak mengabaikan skala animasi sistem (sama seperti TextView marquee bawaan Android).
+- **Antrean putar seragam.** Composable baru `QueueRow` (`components.kt`) menjadi satu-satunya baris antrean: sampul 48 dp, judul (bold bila aktif), keterangan opsional, slot `AttachmentInfo`, label "Sedang diputar", kartu aktif dapat fill `accent 12%` + border `accent 30%`, dan slot `trailing` untuk menu. `QueueDialog` audio memakainya dengan warna tema + menu ⋮ (urutan aksi tidak berubah); lembar antrean video memakainya dengan palet pemutar (`PlayerSheet`/`PlayerContent`/`PlayerAccent`) tanpa menu, menggantikan `SheetChoice` bernomor. Baris video kini punya inset 16 dp dan jarak 8 dp seperti audio (sebelumnya `AttachmentInfo` menempel di tepi layar tanpa padding).
+
+Verifikasi host: `./gradlew testDebugUnitTest --tests "id.local.tubeflow.ui.RowBadgesTest" --no-daemon` lulus — **8 tes, 0 gagal** (2 tes favorit baru). Belum diuji di perangkat; skenario HP-nya ada di `DEVICE_TEST_MATRIX.md` **DTM-16**.
+
 ## Rilis 1.1.71 (code 86) — 3 November 2026
 
 Kandidat dibangun lokal dengan `bash scripts/build_release.sh --no-daemon --max-workers=1` (unit Kotlin + lint debug/release + `assembleRelease` + `bundleRelease`, keystore produksi): **BUILD SUCCESSFUL 19m22s** — 654 tes Kotlin 0 gagal, lint 0 error / 5 warning (debug dan release, baseline yang sama), dan 101 tes Python **OK** (6 skipped) setelah ffmpeg 7.1.5 dipasang di host; sebelumnya satu tes gagal hanya karena binary `ffmpeg` belum ada.
@@ -9,6 +19,8 @@ Kandidat dibangun lokal dengan `bash scripts/build_release.sh --no-daemon --max-
 APK arm64-v8a (78.356.742 byte) diaudit penuh: `audit_native.py` 262 ELF 0 gagal (alignment 16 KB), `audit_release_zip_fields.py` 13 kelas 0 gagal, `zipalign -c -P 16 4` lolos, `apksigner verify` lolos dengan sertifikat produksi `CN=TubeFlow Release` (skema v2, bukan debug), dan `verify_engine_asset.py` valid (engine 2026.10.21). SHA-256 APK: `3837dc902d12245537ecacfb95cdf8d71eed088d34720f6f612b1c5f05b1c2fa`.
 
 Instalasi ke HP (Realme RMX1821, Android 10/API 29, arm64-v8a, `PAGE_SIZE` 4096) lewat `adb install -r`: **Success**; `dumpsys package` menunjukkan `versionCode=86` / `versionName=1.1.71`, dan `base.apk` yang ditarik dari HP ber-SHA-256 identik dengan build lokal. Skenario matriks `DEVICE_TEST_MATRIX.md` (DTM-01…DTM-15) **belum dijalankan** pada build ini — instalasi dan verifikasi hash hanya membuktikan pemasangan, bukan perilaku; uji tampilan baris ringkas/Koleksi/Riwayat menunggu pengamatan pengguna di HP.
+
+**Cacat terkonfirmasi di perangkat:** pengguna melaporkan baris Koleksi hanya menampilkan sampul, ikon lampiran, dan menu ⋮ — judul/keterangan hilang. Akar masalahnya `MediaActionBar` memaksa `FlowRow(modifier.fillMaxWidth())`; di dalam `Row`, Compose mengukur anak non-weight lebih dulu dengan sisa lebar (`RowColumnMeasurePolicy`), sehingga action bar menyerap seluruh ruang dan kolom teks `weight(1f)` terukur lebar nol. Cacat ini sudah ada sejak `MediaListRow` diperkenalkan (1.1.70) dan baru ketahuan saat ikon lampiran menambah lebar baris. Perbaikan (tanpa `fillMaxWidth`) masuk rilis **1.1.72/code87**; rilis GitHub 1.1.71 (APK `b3ac99b8…`) tetap memuat cacat ini.
 
 ## Nama file, ikon lampiran, dan kartu Riwayat ringkas — 3 November 2026
 

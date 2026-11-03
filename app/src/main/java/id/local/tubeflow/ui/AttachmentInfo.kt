@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material3.Icon
@@ -49,14 +50,21 @@ fun AttachmentInfo(raw: String, audio: Boolean, lyricUri: String? = null, sideca
 }
 
 /**
- * Penanda lampiran di ujung baris Koleksi: ikon saja (lirik/subtitle) sehingga baris tetap satu
- * baris. Ketersediaan datang dari catatan unduhan/scan; baris status lengkap tetap memakai
- * [AttachmentInfo] yang memeriksa berkas sungguhan.
+ * Penanda lampiran di ujung baris Koleksi: ikon saja (favorit/lirik/subtitle) sehingga baris tetap
+ * satu baris. Hati tampil lebih dulu karena menyangkut status item, bukan isinya. Ketersediaan
+ * lampiran datang dari catatan unduhan/scan; baris status lengkap tetap memakai [AttachmentInfo]
+ * yang memeriksa berkas sungguhan.
  */
 @Composable
 fun RowAttachmentIcons(badges: RowBadges) {
-    if (!badges.lyrics && badges.subtitles <= 0) return
+    if (!badges.favorite && !badges.lyrics && badges.subtitles <= 0) return
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (badges.favorite) Icon(
+            Icons.Filled.Favorite,
+            "Ada di playlist Favorit",
+            Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.error,
+        )
         if (badges.lyrics) Icon(
             Icons.Outlined.Lyrics,
             "Lirik tersedia",

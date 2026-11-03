@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.LocalView
@@ -641,36 +640,30 @@ private fun QueueDialog(state: PlayerViewModel.State, player: PlayerViewModel, d
                     val queued=state.queueTracks[position]
                     val current=position==state.queueIndex
                     var menu by remember(queued.uri,position) { mutableStateOf(false) }
-                    Surface(shape=MaterialTheme.shapes.medium,
-                        color=if (current) accent.copy(alpha=0.12f).compositeOver(MaterialTheme.colorScheme.surface) else MaterialTheme.colorScheme.surfaceContainer,
-                        border=if (current) BorderStroke(1.dp,accent.copy(alpha=0.30f)) else null) {
-                        Row(Modifier.fillMaxWidth().padding(start=12.dp,end=4.dp,top=8.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Row(Modifier.weight(1f).clickable(onClickLabel="Putar dari antrean") { player.jumpTo(position) }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
-                                CoverThumb(queued.cover,"",MediaMode.AUDIO,Modifier.size(48.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(queued.title,style=MaterialTheme.typography.titleSmall,fontWeight=if (current) FontWeight.Bold else FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis)
-                                    Text(queued.artist.ifBlank { "Artis belum diketahui" },style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,
-                                        color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    AttachmentInfo(queued.uri, true, queued.lyricUri)
-                                    if (current) Text("Sedang diputar",style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold,color=accent)
-                                }
-                            }
-                            Box {
-                                IconButton(onClick={ menu=true }) { Icon(Icons.Outlined.MoreVert,"Menu ${queued.title}") }
-                                DropdownMenu(menu,onDismissRequest={ menu=false }) {
-                                    DropdownMenuItem(text={ Text("Putar sekarang") },leadingIcon={ Icon(Icons.Outlined.PlayArrow,null) },
-                                        onClick={ menu=false; player.jumpTo(position) })
-                                    DropdownMenuItem(text={ Text(stringResource(id.local.tubeflow.R.string.player_queue_next)) },leadingIcon={ Icon(Icons.AutoMirrored.Outlined.PlaylistPlay,null) },
-                                        enabled=position!=state.queueIndex && position!=state.queueIndex+1,
-                                        onClick={ menu=false; player.moveInQueue(position,if (position<state.queueIndex) state.queueIndex else state.queueIndex+1) })
-                                    DropdownMenuItem(text={ Text("Pindah ke atas") },leadingIcon={ Icon(Icons.Outlined.ArrowUpward,null) },enabled=position>0,
-                                        onClick={ menu=false; player.moveInQueue(position,position-1) })
-                                    DropdownMenuItem(text={ Text("Pindah ke bawah") },leadingIcon={ Icon(Icons.Outlined.ArrowDownward,null) },enabled=position<state.queueTracks.size-1,
-                                        onClick={ menu=false; player.moveInQueue(position,position+1) })
-                                    DropdownMenuItem(text={ Text("Keluarkan dari antrean",color=MaterialTheme.colorScheme.error) },leadingIcon={ Icon(Icons.Outlined.DeleteOutline,null) },enabled=state.queueTracks.size>1,
-                                        onClick={ menu=false; player.removeFromQueue(position) })
-                                }
+                    QueueRow(
+                        coverPath = queued.cover,
+                        mode = MediaMode.AUDIO,
+                        title = queued.title,
+                        meta = queued.artist.ifBlank { "Artis belum diketahui" },
+                        current = current,
+                        accent = accent,
+                        onClick = { player.jumpTo(position) },
+                        attachments = { AttachmentInfo(queued.uri, true, queued.lyricUri) },
+                    ) {
+                        Box {
+                            IconButton(onClick={ menu=true }) { Icon(Icons.Outlined.MoreVert,"Menu ${queued.title}") }
+                            DropdownMenu(menu,onDismissRequest={ menu=false }) {
+                                DropdownMenuItem(text={ Text("Putar sekarang") },leadingIcon={ Icon(Icons.Outlined.PlayArrow,null) },
+                                    onClick={ menu=false; player.jumpTo(position) })
+                                DropdownMenuItem(text={ Text(stringResource(id.local.tubeflow.R.string.player_queue_next)) },leadingIcon={ Icon(Icons.AutoMirrored.Outlined.PlaylistPlay,null) },
+                                    enabled=position!=state.queueIndex && position!=state.queueIndex+1,
+                                    onClick={ menu=false; player.moveInQueue(position,if (position<state.queueIndex) state.queueIndex else state.queueIndex+1) })
+                                DropdownMenuItem(text={ Text("Pindah ke atas") },leadingIcon={ Icon(Icons.Outlined.ArrowUpward,null) },enabled=position>0,
+                                    onClick={ menu=false; player.moveInQueue(position,position-1) })
+                                DropdownMenuItem(text={ Text("Pindah ke bawah") },leadingIcon={ Icon(Icons.Outlined.ArrowDownward,null) },enabled=position<state.queueTracks.size-1,
+                                    onClick={ menu=false; player.moveInQueue(position,position+1) })
+                                DropdownMenuItem(text={ Text("Keluarkan dari antrean",color=MaterialTheme.colorScheme.error) },leadingIcon={ Icon(Icons.Outlined.DeleteOutline,null) },enabled=state.queueTracks.size>1,
+                                    onClick={ menu=false; player.removeFromQueue(position) })
                             }
                         }
                     }

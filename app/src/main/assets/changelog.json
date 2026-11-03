@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 87,
+    "versionName": "1.1.72",
+    "highlights": [
+      "Judul dan keterangan di baris Koleksi serta kartu Riwayat kembali tampil penuh; pada 1.1.71 baris aksi memakai lebar penuh sehingga kolom teks judul terukur nol dan hanya sampul serta ikon yang terlihat.",
+      "Baris Koleksi menampilkan hati favorit untuk item yang ada di playlist Favorit, dan judul serta baris keterangan yang terpotong kini bergulir otomatis dari kanan ke kiri sehingga nama file panjang terbaca penuh.",
+      "Antrean putar audio dan video memakai baris yang sama: sampul, judul, status lampiran, dan label Sedang diputar; antrean video kini berupa kartu seperti antrean lagu, bukan daftar teks bernomor."
+    ]
+  },
+  {
     "versionCode": 86,
     "versionName": "1.1.71",
     "highlights": [
