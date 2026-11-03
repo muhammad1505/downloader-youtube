@@ -37,7 +37,7 @@ class MediaCardPlanTest {
         val plan = MediaCardPlan.library(audio = false, favorite = false, inPlaylist = false, hasLyrics = false)
 
         assertEquals(
-            listOf(MediaActionKind.PLAY, MediaActionKind.SHARE, MediaActionKind.RENAME, MediaActionKind.DELETE),
+            listOf(MediaActionKind.PLAY, MediaActionKind.FAVORITE_ADD, MediaActionKind.SHARE, MediaActionKind.RENAME, MediaActionKind.DELETE),
             plan.inline(),
         )
         assertFalse("Video tidak punya aksi lirik", plan.inline().contains(MediaActionKind.FIND_LYRICS))

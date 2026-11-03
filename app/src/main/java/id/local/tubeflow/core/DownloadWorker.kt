@@ -77,10 +77,6 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
    clearProgressNotification()
   }
  }
- override fun onStopped() {
-  super.onStopped()
-  clearProgressNotification()
- }
  private fun clearProgressNotification() {
   runCatching {
    applicationContext.getSystemService(NotificationManager::class.java)
