@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 86,
+    "versionName": "1.1.71",
+    "highlights": [
+      "Semua daftar Koleksi memakai baris ringkas yang sama: nama file tampil bila berbeda dari judul, dan ikon lirik/subtitle muncul di ujung baris tanpa menambah tinggi baris.",
+      "Tombol back di Koleksi kembali bertahap — dari isi folder ke daftar folder, lalu playlist, kata kunci, dan filter — sebelum keluar aplikasi.",
+      "Grid folder Koleksi kini tiga sampai empat kolom, dan kartu Riwayat diringkas dengan pola baris yang sama sambil mempertahankan progres, tanggal selesai, serta status lampiran."
+    ]
+  },
+  {
     "versionCode": 85,
     "versionName": "1.1.70",
     "highlights": [

@@ -2,6 +2,14 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Rilis 1.1.71 (code 86) — 3 November 2026
+
+Kandidat dibangun lokal dengan `bash scripts/build_release.sh --no-daemon --max-workers=1` (unit Kotlin + lint debug/release + `assembleRelease` + `bundleRelease`, keystore produksi): **BUILD SUCCESSFUL 19m22s** — 654 tes Kotlin 0 gagal, lint 0 error / 5 warning (debug dan release, baseline yang sama), dan 101 tes Python **OK** (6 skipped) setelah ffmpeg 7.1.5 dipasang di host; sebelumnya satu tes gagal hanya karena binary `ffmpeg` belum ada.
+
+APK arm64-v8a (78.356.742 byte) diaudit penuh: `audit_native.py` 262 ELF 0 gagal (alignment 16 KB), `audit_release_zip_fields.py` 13 kelas 0 gagal, `zipalign -c -P 16 4` lolos, `apksigner verify` lolos dengan sertifikat produksi `CN=TubeFlow Release` (skema v2, bukan debug), dan `verify_engine_asset.py` valid (engine 2026.10.21). SHA-256 APK: `3837dc902d12245537ecacfb95cdf8d71eed088d34720f6f612b1c5f05b1c2fa`.
+
+Instalasi ke HP (Realme RMX1821, Android 10/API 29, arm64-v8a, `PAGE_SIZE` 4096) lewat `adb install -r`: **Success**; `dumpsys package` menunjukkan `versionCode=86` / `versionName=1.1.71`, dan `base.apk` yang ditarik dari HP ber-SHA-256 identik dengan build lokal. Skenario matriks `DEVICE_TEST_MATRIX.md` (DTM-01…DTM-15) **belum dijalankan** pada build ini — instalasi dan verifikasi hash hanya membuktikan pemasangan, bukan perilaku; uji tampilan baris ringkas/Koleksi/Riwayat menunggu pengamatan pengguna di HP.
+
 ## Nama file, ikon lampiran, dan kartu Riwayat ringkas — 3 November 2026
 
 Tiga kelanjutan baris ringkas yang dipilih langsung lewat pertanyaan; dua catatan terbuka pada catatan sebelumnya kini dikerjakan.

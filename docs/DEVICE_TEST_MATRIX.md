@@ -2,8 +2,10 @@
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
 seluruh skenario sudah lulus. Status terakhir diperbarui **3 November 2026**
-untuk kandidat **1.1.69/code84**. Tidak ada HP yang tersambung saat dokumen ini
-ditulis, jadi semua baris di bawah masih **belum dijalankan** pada build ini.
+untuk kandidat **1.1.71/code 86**. HP fisik sempat tersambung dan build ini
+sudah terpasang lewat ADB (bukti hash di [PROGRESS.md](PROGRESS.md)), tetapi
+belum ada skenario di bawah yang dijalankan pada build ini; semua baris masih
+**belum dijalankan**.
 
 Gunakan hanya konten milik sendiri atau yang diizinkan. Hasil lama pada
 [DEVICE_TEST.md](DEVICE_TEST.md) tetap berlaku untuk versi yang disebut di sana
