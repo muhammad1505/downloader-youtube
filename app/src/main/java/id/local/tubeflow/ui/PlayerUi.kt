@@ -705,8 +705,15 @@ private fun EqualizerDialog(player: PlayerViewModel, dismiss: () -> Unit) {
                         }
                     }
                 }
-                if (snapshot.preset==AutoEq.AUTO_PRESET) Text(stringResource(id.local.tubeflow.R.string.eq_auto_description),
-                    style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                if (snapshot.preset==AutoEq.AUTO_PRESET) {
+                    Text(stringResource(id.local.tubeflow.R.string.eq_auto_description),
+                        style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (snapshot.genreLabel.isBlank()) "Genre lagu belum dikenali; kurva bass bulat tetap dipakai."
+                        else "Menyesuaikan genre ${snapshot.genreLabel} dari tag lagu ini.",
+                        style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary,
+                    )
+                }
                 snapshot.bands.forEach { band ->
                     Column {
                         Row(Modifier.fillMaxWidth()) { Text(band.label,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)

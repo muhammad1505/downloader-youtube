@@ -1,5 +1,19 @@
 [
   {
+    "versionCode": 88,
+    "versionName": "1.1.73",
+    "highlights": [
+      "Equalizer otomatis pemutar audio kini mengikuti genre lagu dari tag file (Bass, Elektronik, Rock, Pop, Jazz, Klasik, Akustik, Vokal); pemutar video tidak terpengaruh.",
+      "Pengaturan → Akun & login menyediakan login YouTube untuk video yang membutuhkan akun; cookie disimpan terenkripsi dan hanya dipakai untuk tautan YouTube/Google.",
+      "Notifikasi progres unduhan dibersihkan saat pekerjaan selesai atau dibatalkan, jadi tidak tertinggal setelah antrean dihentikan.",
+      "Satu judul yang dipilih dari playlist tidak lagi dibuatkan folder playlist khusus.",
+      "Antrean video tampil sebagai kartu di sisi kanan pemutar dan opsi pemutar dikelompokkan agar lebih mudah dipindai.",
+      "Ikon favorit selalu tampil di kartu Koleksi sejak awal, termasuk untuk video.",
+      "Pembersihan folder menguji izin tulis yang masih berlaku dan meminta akses baru bila grant sudah kedaluwarsa.",
+      "Label pemeriksaan playlist tidak lagi menyebut episode untuk tautan YouTube, dan urutan mode tema dirapikan."
+    ]
+  },
+  {
     "versionCode": 87,
     "versionName": "1.1.72",
     "highlights": [

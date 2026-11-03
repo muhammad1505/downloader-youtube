@@ -1,7 +1,9 @@
 package id.local.tubeflow.core
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.media.audiofx.Equalizer
+import android.net.Uri
 import androidx.core.content.edit
 
 /**
@@ -11,9 +13,19 @@ import androidx.core.content.edit
  */
 class PlayerEqualizer(context: Context) {
     data class Band(val index: Int, val label: String, val minDb: Float, val maxDb: Float, val levelDb: Float)
-    data class Snapshot(val available: Boolean, val enabled: Boolean, val preset: String, val presets: List<String>, val bands: List<Band>)
+    data class Snapshot(
+        val available: Boolean,
+        val enabled: Boolean,
+        val preset: String,
+        val presets: List<String>,
+        val bands: List<Band>,
+        /** Profil genre yang sedang dipakai kurva otomatis; kosong bila genre tak dikenali. */
+        val genreLabel: String = "",
+    )
 
-    private val prefs = context.applicationContext.getSharedPreferences("player-fx", 0)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("player-fx", 0)
+    private var genre: String? = null
     private var effect: Equalizer? = null
     private var bandLabels: List<String> = emptyList()
     private var presets: List<String> = emptyList()
@@ -38,6 +50,33 @@ class PlayerEqualizer(context: Context) {
         effect = null
     }
 
+    /**
+     * Baca tag genre lagu di latar belakang, lalu sesuaikan kurva otomatis. Hanya pemutar audio
+     * yang memanggil ini; pemutar video punya equalizer sendiri.
+     */
+    @Synchronized
+    fun followGenre(rawUri: String?) {
+        genre = null
+        val uri = runCatching { Uri.parse(rawUri.orEmpty()) }.getOrNull() ?: return
+        Thread {
+            val value = runCatching {
+                MediaMetadataRetriever().use { retriever ->
+                    retriever.setDataSource(appContext, uri)
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
+                }
+            }.getOrNull()
+            applyGenre(value)
+        }.apply { isDaemon = true }.start()
+    }
+
+    @Synchronized
+    private fun applyGenre(value: String?) {
+        genre = value?.takeIf { AutoEq.profileFor(it) != null }
+        val current = effect ?: return
+        val preset = AutoEq.defaultPreset(prefs.getString("eq_preset", null), prefs.contains("eq_levels"))
+        if (preset == AutoEq.AUTO_PRESET) applyAuto(current)
+    }
+
     @Synchronized
     fun snapshot(): Snapshot {
         val current = effect ?: return Snapshot(available = false, enabled = false, preset = "", presets = emptyList(), bands = emptyList())
@@ -45,7 +84,8 @@ class PlayerEqualizer(context: Context) {
             Band(index, label, bandRange.start, bandRange.endInclusive, runCatching { current.getBandLevel(index.toShort()) }.getOrDefault(0) / 100f)
         }
         return Snapshot(available = true, enabled = runCatching { current.enabled }.getOrDefault(false),
-            preset = AutoEq.defaultPreset(prefs.getString("eq_preset", null), prefs.contains("eq_levels")), presets = presets, bands = bands)
+            preset = AutoEq.defaultPreset(prefs.getString("eq_preset", null), prefs.contains("eq_levels")), presets = presets, bands = bands,
+            genreLabel = AutoEq.profileFor(genre)?.label.orEmpty())
     }
 
     @Synchronized
@@ -88,8 +128,9 @@ class PlayerEqualizer(context: Context) {
 
     /** Kurva otomatis per band dari frekuensi tengahnya; diterapkan pada setiap lagu. */
     private fun applyAuto(created: Equalizer) {
+        val curve = AutoEq.curveFor(genre)
         for (index in 0 until created.numberOfBands) runCatching {
-            val db = AutoEq.levelDb(created.getCenterFreq(index.toShort()), bandRange.start, bandRange.endInclusive)
+            val db = AutoEq.levelDb(created.getCenterFreq(index.toShort()), bandRange.start, bandRange.endInclusive, curve)
             created.setBandLevel(index.toShort(), (db * 100).toInt().toShort()) }
     }
 

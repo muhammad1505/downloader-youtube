@@ -19,7 +19,24 @@ object StorageFolderAccess {
         api == 29 && legacy && writeGranted
 
     fun canClearDefault(context: Context, folder: String): Boolean =
-        hasLegacyWriteAccess(context) || defaultTree(context, folder, requireWrite = true) != null
+        hasLegacyWriteAccess(context) || defaultTree(context, folder, requireWrite = true)?.let { canWriteTree(context, it) } == true
+
+    /**
+     * Grant persisten bisa terlihat ada tetapi sudah tidak berlaku (folder dihapus/dibuat ulang,
+     * izin dicabut sistem). Uji dengan membuat lalu menghapus berkas kecil agar pemanggil meminta
+     * akses baru sebelum pembersihan, bukan gagal di tengah jalan.
+     */
+    fun canWriteTree(context: Context, uri: Uri): Boolean {
+        return runCatching {
+            val resolver = context.contentResolver
+            val root = DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
+            val probe = DocumentsContract.createDocument(
+                resolver, root, "application/octet-stream", ".tubeflow-write-probe",
+            ) ?: return@runCatching false
+            DocumentsContract.deleteDocument(resolver, probe)
+            true
+        }.getOrDefault(false)
+    }
 
     /**
      * Grant SAF persisten yang tepat menunjuk folder bawaan Download/[folder], bila pernah dipilih

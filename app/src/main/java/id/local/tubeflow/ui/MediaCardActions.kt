@@ -116,7 +116,9 @@ object MediaCardPlan {
         // Enam aksi yang selalu terlihat, urut sesuai kebiasaan memakai kartu.
         // Video juga diputar di dalam TubeFlow; membuka di aplikasi lain tetap tersedia di menu.
         add(inline(MediaActionKind.PLAY))
-        if (audio && favorite != null) add(inline(if (favorite) MediaActionKind.FAVORITE_REMOVE else MediaActionKind.FAVORITE_ADD))
+        // Favorit selalu terlihat di kartu — untuk audio maupun video — supaya pengguna tidak
+        // perlu menebak apakah item sudah bisa difavoritkan.
+        if (favorite != null) add(inline(if (favorite) MediaActionKind.FAVORITE_REMOVE else MediaActionKind.FAVORITE_ADD))
         add(inline(MediaActionKind.SHARE))
         if (rename) add(inline(MediaActionKind.RENAME))
         if (audio) add(inline(MediaActionKind.FIND_LYRICS))

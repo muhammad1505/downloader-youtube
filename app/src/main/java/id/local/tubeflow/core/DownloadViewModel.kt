@@ -502,6 +502,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
   try {
    val season = BstationUrls.isSeasonOnly(playlist.url)
+   // Satu judul yang dipilih dari playlist bukan koleksi: jangan buat folder playlist khusus.
+   val single = entries.size == 1
    val folder = Selection.safeFolder(playlist.folderName)
      ?: if (season) Selection.seriesFolder(playlist.title, BstationUrls.seasonId(playlist.url).orEmpty())
         else Selection.collectionFolder(playlist)
@@ -517,7 +519,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      val meta = VideoMetadata(entry.title, entry.uploader, entry.durationSeconds, entry.thumbnail, entry.url,
        artist = entry.artist, track = entry.track, creator = entry.uploader,
        platformId = SourcePlatforms.fromUrl(entry.url).id, sourceId = entry.id)
-     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=folder, entryMetadata=credits?.apply(meta) ?: meta, autoFolder=if (season) "" else "collection", onQueued = { id ->
+     submit(options.copy(url=entry.url), durationSeconds=entry.durationSeconds.takeIf { it > 0 }, subfolder=if (single) null else folder, entryMetadata=credits?.apply(meta) ?: meta, autoFolder=if (season || single) "" else "collection", onQueued = { id ->
       if (firstQueued == null) { firstQueued = id; onQueued?.invoke(id) }
      })
      queued++
@@ -526,7 +528,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    }
    _notice.value=buildString {
     append(if (season) "Season: $queued episode diantrekan" else "Playlist: $queued video diantrekan")
-    append("; semua file masuk folder $folder.")
+    if (single) append("; satu judul disimpan seperti unduhan tunggal tanpa folder playlist.")
+    else append("; semua file masuk folder $folder.")
     if (skipped > 0) append(" $skipped dilewati.")
     if (premiumSkipped > 0) append(" $premiumSkipped Premium terkunci — masuk ke Bstation dulu.")
    }

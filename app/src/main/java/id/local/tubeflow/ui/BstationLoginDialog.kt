@@ -46,9 +46,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import id.local.tubeflow.core.BstationAuth
+import id.local.tubeflow.core.YouTubeAuth
 import kotlinx.coroutines.delay
 
 private const val BSTATION_HOME = "https://www.bilibili.tv/id"
+
+/** Provider yang memakai dialog WebView resmi yang sama; cookie tetap disimpan terpisah. */
+enum class LoginProvider { BSTATION, YOUTUBE }
 
 /**
  * Perbaikan tampilan halaman login Bstation di WebView.
@@ -106,8 +110,11 @@ private val LOGIN_LAYOUT_FIX_JS = """
 fun BstationLoginDialog(
     onDismiss: () -> Unit,
     onSignedIn: () -> Unit,
+    provider: LoginProvider = LoginProvider.BSTATION,
 ) {
     val context = LocalContext.current
+    val bstation = provider == LoginProvider.BSTATION
+    val home = if (bstation) BSTATION_HOME else "https://m.youtube.com"
     var webView by remember { mutableStateOf<WebView?>(null) }
     var loading by remember { mutableStateOf(true) }
     var pageError by remember { mutableStateOf<String?>(null) }
@@ -116,9 +123,11 @@ fun BstationLoginDialog(
 
     fun capture(): Boolean {
         if (finishing) return true
-        return runCatching { BstationAuth.saveFromWebView(context) }
+        return runCatching {
+            if (bstation) BstationAuth.saveFromWebView(context) else YouTubeAuth.saveFromWebView(context)
+        }
             .getOrElse { error ->
-                saveError = error.message ?: "Sesi Bstation tidak dapat disimpan."
+                saveError = error.message ?: "Sesi ${if (bstation) "Bstation" else "YouTube"} tidak dapat disimpan."
                 false
             }
             .also { saved ->
@@ -153,12 +162,13 @@ fun BstationLoginDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, "Tutup login Bstation")
+                        Icon(Icons.Outlined.Close, "Tutup login ${if (bstation) "Bstation" else "YouTube"}")
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("Masuk Bstation", style = MaterialTheme.typography.titleMedium)
+                        Text(if (bstation) "Masuk Bstation" else "Masuk YouTube", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Episode Premium · halaman resmi bilibili.tv",
+                            if (bstation) "Episode Premium · halaman resmi bilibili.tv"
+                            else "Video terbatas · halaman resmi YouTube",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -173,7 +183,8 @@ fun BstationLoginDialog(
                     ) {
                         Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Text(
-                            "Ketuk Masuk/Log in di halaman Bstation. Setelah berhasil, jendela ini tertutup otomatis. Kata sandi tidak pernah disimpan TubeFlow.",
+                            if (bstation) "Ketuk Masuk/Log in di halaman Bstation. Setelah berhasil, jendela ini tertutup otomatis. Kata sandi tidak pernah disimpan TubeFlow."
+                            else "Ketuk Masuk di halaman YouTube/Google. Setelah berhasil, jendela ini tertutup otomatis. Kata sandi tidak pernah disimpan TubeFlow.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -213,13 +224,14 @@ fun BstationLoginDialog(
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         loading = false
-                                        view?.evaluateJavascript(LOGIN_LAYOUT_FIX_JS, null)
+                                        // Perbaikan tata letak hanya untuk halaman login Bstation.
+                                        if (bstation) view?.evaluateJavascript(LOGIN_LAYOUT_FIX_JS, null)
                                     }
 
                                     override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                         if (request?.isForMainFrame == true) {
                                             loading = false
-                                            pageError = "Halaman Bstation gagal dimuat. Periksa koneksi lalu coba lagi."
+                                            pageError = "Halaman ${if (bstation) "Bstation" else "YouTube"} gagal dimuat. Periksa koneksi lalu coba lagi."
                                         }
                                     }
 
@@ -230,7 +242,7 @@ fun BstationLoginDialog(
                                     }
                                 }
                                 webView = this
-                                loadUrl(BSTATION_HOME)
+                                loadUrl(home)
                             }
                         },
                         onRelease = { view ->

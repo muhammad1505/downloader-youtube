@@ -93,7 +93,9 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     var highlightedJobId by rememberSaveable { mutableStateOf<String?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
     var bstationLoginOpen by rememberSaveable { mutableStateOf(false) }
+    var youtubeLoginOpen by rememberSaveable { mutableStateOf(false) }
     val bstationSession = BstationAuth.session
+    val youtubeSession = YouTubeAuth.session
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var releaseNotes by remember { mutableStateOf<ReleaseNotes?>(null) }
@@ -253,6 +255,16 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
             // Katalog dimuat ulang dengan cookie: penanda akses Premium dapat berubah setelah login.
             if (BstationUrls.isSeasonOnly(url)) model.inspectPlaylist(url.trim())
         },
+    )
+    if (youtubeLoginOpen) BstationLoginDialog(
+        onDismiss = { youtubeLoginOpen = false },
+        onSignedIn = {
+            youtubeLoginOpen = false
+            appScope.launch { snackbar.showSnackbar("Akun YouTube tersimpan. Video yang butuh login sekarang bisa diunduh.") }
+            // Ulangi pemeriksaan tautan YouTube yang sedang menunggu login.
+            if (url.isNotBlank()) model.retryInspect(url.trim())
+        },
+        provider = LoginProvider.YOUTUBE,
     )
     if (fullPlayer && playback.track != null) FullPlayer(playback,player,library,karaoke={ playback.track?.let { karaoke.open(it, playback.positionMs) } }) { fullPlayer=false }
     val tabs = listOf("Ringkasan", "Download", "Koleksi", "Alat")
@@ -596,6 +608,12 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     onBstationLogout = {
                         BstationAuth.clear(context)
                         appScope.launch { snackbar.showSnackbar("Sesi Bstation dihapus dari TubeFlow.") }
+                    },
+                    youtubeSignedIn = youtubeSession != null,
+                    onYouTubeLogin = { youtubeLoginOpen = true },
+                    onYouTubeLogout = {
+                        YouTubeAuth.clear(context)
+                        appScope.launch { snackbar.showSnackbar("Sesi YouTube dihapus dari TubeFlow.") }
                     },
                     section = settingsSection,
                     onSection = { settingsSection = it },

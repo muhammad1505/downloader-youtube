@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -848,7 +849,16 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         }
 
         if (!inPip) {
-            sheet?.let { kind ->
+            if (sheet == VideoSheet.QUEUE) {
+                VideoQueuePanel(
+                    state = state,
+                    onJump = {
+                        video.jumpTo(it)
+                        sheet = null
+                    },
+                    onDismiss = { sheet = null },
+                )
+            } else sheet?.let { kind ->
                 VideoOptionsSheet(
                     kind = kind,
                     state = state,
@@ -1901,6 +1911,7 @@ private fun VideoOptionsSheet(
                     SheetChoice("Kecepatan · ${VideoPlayback.speedLabel(state.speed)}", false) { onOpen(VideoSheet.SPEED) }
                     SheetChoice("Subtitle · $subtitleLabel", false) { onOpen(VideoSheet.SUBTITLES) }
                     SheetChoice("Track audio · $audioLabel", false) { onOpen(VideoSheet.AUDIO) }
+                    SheetSection("Gambar & suara")
                     SheetChoice("Tampilan · ${state.aspect.label} · ${orientation.label}", false) { onOpen(VideoSheet.DISPLAY) }
                     SheetChoice("Equalizer & efek audio · ${state.equalizer.label} · ${state.audioEffect.label}", false) {
                         onOpen(VideoSheet.EFFECTS)
@@ -1908,12 +1919,89 @@ private fun VideoOptionsSheet(
                     SheetChoice("Smart Enhance · ${state.enhance.label}", false) { onOpen(VideoSheet.EFFECTS) }
                     SheetChoice("Dekoder · ${state.decoderMode.label}", false) { onOpen(VideoSheet.DECODER) }
                     SheetChoice("Antrean · ${state.index + 1} dari ${state.entries.size}", false) { onOpen(VideoSheet.QUEUE) }
+                    SheetSection("Tangkapan & jendela")
                     SheetChoice("Ambil screenshot", false, onScreenshot)
                     SheetChoice("Kunci kontrol", false, onLock)
                     if (supportsPip) {
                         SheetChoice("Putar di jendela kecil", false, onEnterPip)
                     }
                     SheetHint("Tombol cepat di bawah pemutar berputar satu ketuk. Audio tetap memakai pemutar lagu terpisah; menutup video tidak mengubah antrean audio.")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Antrean video sebagai kartu di sisi kanan pemutar, bukan lembar bawah yang menutupi gambar.
+ * Baris memakai QueueRow yang sama dengan antrean audio/video agar konsisten.
+ */
+@Composable
+private fun VideoQueuePanel(
+    state: VideoPlayerViewModel.State,
+    onJump: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(onClick = onDismiss),
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .fillMaxWidth(0.88f)
+                .widthIn(max = 400.dp)
+                .padding(horizontal = 12.dp, vertical = 16.dp)
+                .pointerInput(Unit) { detectTapGestures { } },
+            color = PlayerSheet(),
+            contentColor = PlayerContent,
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 18.dp,
+        ) {
+            Column(Modifier.fillMaxSize().padding(vertical = 10.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            "Antrean video",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "${state.index + 1} dari ${state.entries.size} · ketuk untuk memutar",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PlayerMuted,
+                        )
+                    }
+                    TextButton(onClick = onDismiss) { Text("Tutup", color = PlayerContent) }
+                }
+                LazyColumn(
+                    Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    itemsIndexed(
+                        state.entries,
+                        key = { index, entry -> "${entry.uri}#$index" },
+                    ) { index, entry ->
+                        QueueRow(
+                            coverPath = "",
+                            mode = MediaMode.VIDEO,
+                            title = entry.displayTitle,
+                            current = index == state.index,
+                            accent = PlayerAccent(),
+                            containerColor = PlayerSheet(),
+                            contentColor = PlayerContent,
+                            metaColor = PlayerMuted,
+                            onClick = { onJump(index) },
+                            attachments = {
+                                AttachmentInfo(entry.uri, false, sidecars = entry.subtitles.joinToString("\n") { "sub|${it.uri}" })
+                            },
+                        )
+                    }
                 }
             }
         }

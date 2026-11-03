@@ -71,6 +71,20 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   } catch(error: Exception) {
    jobId?.let { recordFailure(it, generation, error) }
    return Result.success()
+  } finally {
+   // WorkManager membersihkan foreground notification-nya sendiri, tetapi notifikasi progres
+   // milik worker ini (id yang sama) bisa tertinggal bila pekerjaan dibatalkan dari UI.
+   clearProgressNotification()
+  }
+ }
+ override fun onStopped() {
+  super.onStopped()
+  clearProgressNotification()
+ }
+ private fun clearProgressNotification() {
+  runCatching {
+   applicationContext.getSystemService(NotificationManager::class.java)
+    ?.cancel(id.hashCode().let { if (it == 0) 1 else it })
   }
  }
  private suspend fun recordFailure(jobId: String, generation: Int, error: Exception, skipUnavailableCollection: Boolean = false): String? = withContext(Dispatchers.IO) {

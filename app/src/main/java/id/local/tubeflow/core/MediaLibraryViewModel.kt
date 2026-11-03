@@ -46,15 +46,17 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         "Playlist dihapus. File lagu tetap tersedia."
     }
     fun addToPlaylist(item: MediaItem, id: String) = operation {
+        var kind = "AUDIO"
         database.withTransaction {
-            require(dao.get(item.uri)?.kind == "AUDIO") { "Pilih lagu yang masih ada di Koleksi." }
+            kind = dao.get(item.uri)?.kind ?: error("Item tidak ditemukan di Koleksi.")
+            require(kind == "AUDIO" || kind == "VIDEO") { "Pilih item yang masih ada di Koleksi." }
             if (id == PersonalLibrary.FAVORITES) database.personal().insert(PersonalPlaylist(id, "Favorit", 0))
             if (!database.personal().contains(id, item.uri)) {
-                require(database.personal().count(id) < 3000) { "Maksimum 3000 lagu per playlist." }
+                require(database.personal().count(id) < 3000) { "Maksimum 3000 item per playlist." }
                 database.personal().add(PlaylistMember(id, item.uri, database.personal().nextPosition(id)))
             }
         }
-        "Lagu ditambahkan."
+        if (kind == "VIDEO") "Video ditambahkan." else "Lagu ditambahkan."
     }
     fun removeFromPlaylist(item: MediaItem, id: String) = operation {
         database.personal().remove(id, item.uri); "Lagu dikeluarkan dari daftar. File tetap tersedia."

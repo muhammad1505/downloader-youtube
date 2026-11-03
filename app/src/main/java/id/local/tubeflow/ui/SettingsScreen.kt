@@ -69,6 +69,9 @@ fun SettingsScreen(
     bstationAccountId: String = "",
     onBstationLogin: () -> Unit = {},
     onBstationLogout: () -> Unit = {},
+    youtubeSignedIn: Boolean = false,
+    onYouTubeLogin: () -> Unit = {},
+    onYouTubeLogout: () -> Unit = {},
     section: String? = null,
     onSection: (String?) -> Unit = {},
     onShowReleaseNotes: () -> Unit = {},
@@ -316,6 +319,49 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            HorizontalDivider()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (youtubeSignedIn) Icons.Outlined.AccountCircle else Icons.Outlined.Lock,
+                    null,
+                    Modifier.size(24.dp),
+                    tint = if (youtubeSignedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (youtubeSignedIn) "Akun YouTube aktif" else "Belum masuk ke YouTube",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        if (youtubeSignedIn) "Sesi tersimpan di perangkat ini dan dipakai untuk video terbatas."
+                        else "Video yang butuh login (usia/anggota kanal) belum bisa diunduh sampai kamu masuk.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (youtubeSignedIn) {
+                ActionButton(
+                    "Keluar dari YouTube",
+                    onYouTubeLogout,
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    destructive = true,
+                    fillWidth = true,
+                )
+            } else {
+                ActionButton(
+                    "Masuk ke YouTube",
+                    onYouTubeLogin,
+                    icon = Icons.AutoMirrored.Outlined.Login,
+                    emphasis = ActionEmphasis.Primary,
+                    fillWidth = true,
+                )
+            }
+            Text(
+                "Cookie YouTube/Google disimpan terenkripsi di perangkat dan hanya dipakai untuk membaca atau mengunduh tautan YouTube. TubeFlow tidak mengirim cookie ke platform lain.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (section == "history") Panel(
@@ -366,12 +412,13 @@ fun SettingsScreen(
         ) {
             OptionMenu(
                 label = "Mode tema",
+                // Urutan tetap: ikut sistem → terang → gelap → tema khusus di ujung daftar.
                 options = listOf(
-                    SettingsStore.MODE_TRANSFORMERS to "Transformers",
                     SettingsStore.MODE_SYSTEM to "Ikut sistem",
                     SettingsStore.MODE_LIGHT to "Terang",
                     SettingsStore.MODE_DARK to "Gelap",
                     SettingsStore.MODE_CYBERPUNK to "Cyberpunk",
+                    SettingsStore.MODE_TRANSFORMERS to "Transformers",
                 ),
                 selected = themeMode,
                 onSelect = onThemeMode,

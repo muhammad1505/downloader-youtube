@@ -470,6 +470,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 current.setOnPreparedListener { ready ->
                     if (media !== ready || token.get() != id) return@setOnPreparedListener
                     equalizer.attach(ready.audioSessionId)
+                    equalizer.followGenre(track.uri)
                     val duration = ready.duration.toLong().coerceAtLeast(0)
                     val target = startPositionMs.coerceIn(0, (duration - 1).coerceAtLeast(0))
                     updateEngine { it.copy(durationMs = duration, positionMs = target) }

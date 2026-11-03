@@ -15,7 +15,7 @@ object InspectionPhase {
         FETCHING_PLAYLIST -> "Mengambil daftar playlist…"
         FETCHING_COLLECTION -> "Mengambil daftar lagu…"
         FETCHING_SEASON -> "Mengambil daftar episode…"
-        READING_ENTRIES -> "Membaca pilihan episode…"
+        READING_ENTRIES -> "Membaca daftar pilihan…"
         SEARCHING -> "Mencari audio yang cocok di YouTube…"
         else -> "Membaca detail link…"
     }

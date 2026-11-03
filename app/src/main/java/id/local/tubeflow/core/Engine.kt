@@ -154,9 +154,12 @@ object Engine {
  }
  /** File cookie sementara hanya untuk URL Bstation; null membuat engine memakai jalur tanpa login. */
  private fun cookieFile(context: Context, url: String): File? {
-  val host = runCatching { java.net.URI(url.trim()).host }.getOrNull() ?: return null
-  if (!BstationUrls.isHost(host)) return null
-  return BstationAuth.cookieFile(context)
+  val host = runCatching { java.net.URI(url.trim()).host }.getOrNull()?.lowercase() ?: return null
+  if (BstationUrls.isHost(host)) return BstationAuth.cookieFile(context)
+  val youtube = host == "youtu.be" || host == "youtube.com" || host.endsWith(".youtube.com") ||
+      host == "google.com" || host.endsWith(".google.com")
+  if (youtube) return YouTubeAuth.cookieFile(context)
+  return null
  }
  private suspend fun dumpInfo(context: Context, url: String, id: String, onPhase: (String) -> Unit = {}): JSONObject {
   onPhase(InspectionPhase.PREPARING_ENGINE)
