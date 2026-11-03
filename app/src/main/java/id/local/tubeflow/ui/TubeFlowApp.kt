@@ -202,16 +202,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
     // otomatis bila koleksi kosong — tanpa pilih folder atau impor file. Izin baca juga membuat file
     // lama (owner MediaStore kosong/SAF) terbaca; grant SAF hanya fallback bila izin ditolak.
     val readPermissions = remember {
-        when {
-            android.os.Build.VERSION.SDK_INT >= 33 -> arrayOf(
-                android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO,
-            )
-            // API 29 dengan mode legacy memerlukan izin baca/tulis klasik untuk membaca file lama.
-            android.os.Build.VERSION.SDK_INT <= 29 -> arrayOf(
-                android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            )
-            else -> arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
+        MediaPermissions.requested(android.os.Build.VERSION.SDK_INT)
     }
     val requestRead = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it }) library.scanIfEmpty()
@@ -228,7 +219,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         onDispose { libraryOwner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(Unit) {
-        if (library.hasReadPermission() || library.hasFolderAccess()) library.scanIfEmpty() else requestRead.launch(readPermissions)
+        if (library.hasReadPermission() || library.hasPartialVisualAccess() || library.hasFolderAccess()) library.scanIfEmpty() else requestRead.launch(readPermissions)
     }
     // Retensi riwayat: dijalankan saat aplikasi dibuka dan setiap pilihan di Pengaturan berubah.
     LaunchedEffect(SettingsStore.historyAutoDays) { model.pruneHistory(SettingsStore.historyAutoDays) }

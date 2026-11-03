@@ -12,9 +12,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import androidx.core.net.toUri
 import android.provider.DocumentsContract
-import android.os.Build
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
@@ -181,13 +178,9 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun hasFolderAccess(): Boolean = SettingsStore.collectionFolders.isNotEmpty() || SettingsStore.storageTree != null ||
         StorageFolderAccess.defaultTree(getApplication(), SettingsStore.storageFolder) != null
     /** Izin baca media membuat query MediaStore melihat file lama milik versi/SAF lain tanpa grant SAF. */
-    fun hasReadPermission(): Boolean {
-        val app = getApplication<Application>()
-        val permissions = if (Build.VERSION.SDK_INT >= 33) listOf(
-            android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO,
-        ) else listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-        return permissions.all { ContextCompat.checkSelfPermission(app, it) == PackageManager.PERMISSION_GRANTED }
-    }
+    fun hasReadPermission(): Boolean = MediaPermissions.hasFullRead(getApplication())
+    /** Android 14+ dapat memberi izin visual sebagian; media terpilih tetap layak dipindai. */
+    fun hasPartialVisualAccess(): Boolean = MediaPermissions.hasPartialVisualAccess(getApplication())
     /** Pemulihan otomatis: saat koleksi kosong (biasanya setelah data aplikasi dihapus), pindai sendiri tanpa memilih folder. */
     fun scanIfEmpty() {
         if (_busy.value) return
