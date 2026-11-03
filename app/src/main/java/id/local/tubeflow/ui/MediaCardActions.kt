@@ -241,6 +241,8 @@ fun MediaActionBar(
     specs: List<MediaActionSpec>,
     audio: Boolean,
     modifier: Modifier = Modifier,
+    /** Baris ringkas: semua aksi pindah ke menu titik tiga agar tinggi item tetap kecil. */
+    compact: Boolean = false,
     enabled: (MediaActionKind) -> Boolean = { true },
     onClick: (MediaActionKind) -> Unit,
 ) {
@@ -250,7 +252,7 @@ fun MediaActionBar(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        specs.filter { it.slot == MediaActionSlot.Inline }.forEach { spec ->
+        if (!compact) specs.filter { it.slot == MediaActionSlot.Inline }.forEach { spec ->
             IconAction(
                 MediaCardPlan.icon(spec.kind),
                 MediaCardPlan.label(spec.kind, audio),
@@ -259,7 +261,7 @@ fun MediaActionBar(
                 destructive = MediaCardPlan.destructive(spec.kind),
             )
         }
-        val secondary = specs.filter { it.slot == MediaActionSlot.Menu }
+        val secondary = if (compact) specs else specs.filter { it.slot == MediaActionSlot.Menu }
         if (secondary.isNotEmpty()) {
             Box {
                 IconAction(Icons.Outlined.MoreVert, "Aksi lainnya", { menuOpen = true })

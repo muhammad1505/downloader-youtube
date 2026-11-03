@@ -2,6 +2,16 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Baris media ringkas dan tombol back Koleksi — 3 November 2026
+
+Semua daftar media di tab Koleksi (Semua/Musik/Video, isi folder, Favorit, playlist, dan hasil cari) kini memakai `MediaListRow` di `components.kt`: sampul 52 dp, judul satu baris, satu baris keterangan (artis · ukuran · durasi · platform), dan slot aksi di kanan, sehingga tinggi item seragam. `MediaActionBar` mendapat mode `compact` yang memindahkan seluruh aksi (Putar, favorit, bagikan, ubah nama, cari lirik, hapus, antrean, playlist, detail, dll.) ke menu ⋮; tap baris tetap memutar dan item yang tidak tersedia menampilkan keterangan error di baris kedua. Indikator lampiran per item (“Lirik tersedia”/“N subtitle”) tidak lagi tampil di baris karena memakai baris tambahan; aksinya tetap ada di menu ⋮.
+
+Tombol back sistem juga tidak lagi langsung keluar aplikasi dari Koleksi. `MediaLibraryScreen` memakai `BackHandler` berjenjang: dari isi folder kembali ke Daftar folder, lalu playlist, kata kunci pencarian, dan filter jenis; aplikasi baru keluar bila tidak ada filter aktif.
+
+Bukti perangkat (Realme RMX1821, Android 10): APK 1.1.70 terpasang dengan `base.apk` SHA-256 `2108d1cc…99c7c0`, identik dengan build. Dari isi folder TubeFlow, tombol back sistem menampilkan Daftar folder dengan 3 kartu (7/42/25 item) tanpa mengeluarkan aplikasi; grid folder terukur 3 kolom dan baris media ±5 item per layar dengan teks terpotong rapi. Satu `FATAL EXCEPTION` di logcat berasal dari `com.oppo.lfeh` (layanan ColorOS), bukan TubeFlow.
+
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug` lulus (648 tes Kotlin, 0 gagal; lint 0 error/5 warning — baseline, tanpa warning baru), termasuk `CatalogGridTest` dan `MediaCardPlanTest`. Kartu Riwayat di tab Download belum ikut diringkas; indikator lampiran per baris sudah dilepas sesuai keputusan desain.
+
 ## Grid folder Koleksi tiga–empat kolom — 3 November 2026
 
 Grid folder di tab Koleksi sebelumnya dipaku dua kolom, sehingga separuh lebar layar sering kosong saat kartu folder hanya sedikit. `CatalogGrid.folderColumns(screenWidthDp)` (murni, diuji JVM) memilih tiga kolom untuk ponsel dan empat kolom mulai 600 dp; `MediaLibraryScreen` membagi baris sesuai nilai itu dan mengisi slot sisa dengan `Spacer(weight)` agar lebar kartu tetap seragam pada baris terakhir. Lebar jendela dibaca lewat `LocalWindowInfo.current.containerSize` + `LocalDensity`, bukan `LocalConfiguration.screenWidthDp` yang memunculkan warning lint `ConfigurationScreenWidthHeight`. `FolderTile` dirapatkan (ikon 48 dp, tinggi minimum 112 dp, padding 4/8 dp) supaya tiga kolom tidak sesak; kartu media tetap satu per baris.

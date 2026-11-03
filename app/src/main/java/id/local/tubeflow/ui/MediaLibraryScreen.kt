@@ -1,6 +1,7 @@
 package id.local.tubeflow.ui
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -74,6 +75,18 @@ fun MediaLibraryScreen(
     // Peta sekali per perubahan daftar job; jangan memindai seluruh riwayat untuk tiap kartu.
     val completedJobs = remember(jobs) { jobs.filter { it.state == JobState.COMPLETED }.associateBy { it.id } }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    // Back dari isi folder atau filter kembali ke daftar folder; tanpa ini sistem langsung keluar.
+    val filterActive = filter.folder.isNotBlank() || filter.playlistId.isNotBlank() ||
+        filter.query.isNotBlank() || filter.kind.isNotBlank()
+    BackHandler(enabled = filterActive || searchOpen) {
+        when {
+            filter.folder.isNotBlank() -> model.filter(filter.copy(folder = ""))
+            filter.playlistId.isNotBlank() -> model.filter(filter.copy(playlistId = ""))
+            filter.query.isNotBlank() -> model.filter(filter.copy(query = ""))
+            searchOpen -> searchOpen = false
+            else -> model.filter(MediaLibraryViewModel.Filter())
+        }
+    }
     var detail by remember { mutableStateOf<MediaItem?>(null) }
     var rename by remember { mutableStateOf<MediaItem?>(null) }
     var delete by remember { mutableStateOf<MediaItem?>(null) }
@@ -184,34 +197,30 @@ fun MediaLibraryScreen(
         } else {
             items(media, key = { it.uri }) { item ->
                 val accent=rememberCoverAccent(item.coverPath)
-                Card(Modifier.fillMaxWidth().clickable(enabled = item.availability == "AVAILABLE", onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video") {
+                // Satu baris ringkas untuk semua daftar Koleksi; aksi pindah ke menu titik tiga.
+                val sourceJob = completedJobs[item.jobId]
+                val subtitle = buildList {
+                    if (item.kind == "AUDIO") add(item.artist.ifBlank { "Artis belum diketahui" })
+                    item.sizeBytes?.let { add(Format.bytes(it)) }
+                    item.durationMs?.let { add(duration(it)) }
+                    if (item.platformId.isNotBlank()) add(SourcePlatforms.fromId(item.platformId).label)
+                }.joinToString(" · ")
+                MediaListRow(
+                    coverPath = item.coverPath,
+                    mode = if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO,
+                    title = (if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title)
+                        .ifBlank { item.displayName.substringBeforeLast('.') },
+                    subtitle = subtitle,
+                    accent = accent,
+                    onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video",
+                    enabled = item.availability == "AVAILABLE",
+                    errorText = if (item.availability != "AVAILABLE") "File tidak tersedia atau izin akses berubah" else null,
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
-                    if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
-                },colors=mediaCardColors(accent),border=cyberpunkCardBorder()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CoverThumb(item.coverPath, "", if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO, Modifier.size(60.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(if (item.kind == "AUDIO") Format.musicLabel(TitleSplit.identify(item.title, metadataArtist=item.artist, recognizeCollaboration=false)) else item.title, fontWeight=FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                            // Nama file hanya ditampilkan bila tidak mengulang judul — hierarki seperti daftar lagu.
-                            val fileName = item.displayName.substringBeforeLast('.')
-                            if (item.title.isBlank() || (!fileName.startsWith(item.title, ignoreCase = true) && fileName != item.title)) {
-                                Text(item.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2)
-                            }
-                            if (item.kind == "AUDIO") Text(item.artist.ifBlank { "Artis belum diketahui" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(listOfNotNull(item.kind.let { if (it == "AUDIO") "Audio" else "Video" }, item.sizeBytes?.let(Format::bytes), item.durationMs?.let { duration(it) }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (item.platformId.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                PlatformBrandLogo(SourcePlatforms.fromId(item.platformId), Modifier.size(14.dp)); Text(SourcePlatforms.fromId(item.platformId).label, style = MaterialTheme.typography.labelSmall)
-                            }
-                            if (item.availability != "AVAILABLE") Text("File tidak tersedia atau izin akses berubah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    AttachmentInfo(item.location, item.kind == "AUDIO", item.lyricUri,
-                        completedJobs[item.jobId]?.sidecarUris, item.checkedAt to item.lyricStatus)
-                    // Aksi kartu memakai rencana bersama dengan Riwayat; semua aksi tampil langsung.
-                    val sourceJob = completedJobs[item.jobId]
+                    onClick = { if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item) },
+                ) {
                     MediaActionBar(
                         audio = item.kind == "AUDIO",
+                        compact = true,
                         specs = MediaCardPlan.library(
                             audio = item.kind == "AUDIO",
                             favorite = item.uri in favorites,
@@ -255,7 +264,7 @@ fun MediaLibraryScreen(
                         },
                     )
                 }
-                } }
+            }
             if (media.size >= filter.limit && filter.limit < 3000) item {
                 ActionButton("Muat lebih banyak", model::more, emphasis = ActionEmphasis.Quiet, fillWidth = true)
             }

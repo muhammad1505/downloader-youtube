@@ -769,6 +769,57 @@ fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifie
             modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
     }
 }
+/**
+ * Baris media ringkas untuk semua daftar Koleksi: sampul 52 dp, satu baris judul, satu baris
+ * keterangan, dan slot aksi di kanan (biasanya menu titik tiga). Dipakai bersama supaya daftar
+ * musik, video, folder, favorit, dan playlist punya tinggi item yang sama.
+ */
+@Composable
+fun MediaListRow(
+    coverPath: String,
+    mode: MediaMode,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    onClickLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    errorText: String? = null,
+    trailing: @Composable () -> Unit,
+) {
+    Card(
+        modifier.fillMaxWidth().clickable(enabled = enabled, onClickLabel = onClickLabel, onClick = onClick),
+        colors = mediaCardColors(accent),
+        border = cyberpunkCardBorder(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CoverThumb(coverPath, "", mode, Modifier.size(52.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    errorText ?: subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (errorText != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            trailing()
+        }
+    }
+}
+
 private fun formatMeta(job: DownloadJob): String {
     val base = if (job.mode == MediaMode.VIDEO)
         "${if (job.quality == 0) "Auto" else "${job.quality}p"} · ${job.format.uppercase(Locale.ROOT)}"
