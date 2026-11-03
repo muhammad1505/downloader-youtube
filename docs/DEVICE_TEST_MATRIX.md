@@ -60,6 +60,7 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-12 | PiP dan latar | Masuk/keluar PiP, kunci layar, pindah aplikasi, sambungkan headset, kembali ke TubeFlow. | Tidak ada galat dekoder; posisi dan status putar benar; musik/video tidak memulai pemutar kedua; notifikasi memuat aksi yang sesuai. |
 | DTM-13 | Aksesibilitas dan tata letak | Font 1,6×, TalkBack, portrait/lanskap, layar sempit; periksa toggle antrean, status folder, dan dialog hapus. | Semua kontrol terjangkau dan terbaca; status tidak hanya dibedakan warna; tidak ada teks terpotong permanen; target sentuh minimal 48 dp. |
 | DTM-14 | Penyimpanan hampir penuh | Isi penyimpanan sampai tersisa sedikit, mulai unduhan dan publikasi, lalu batalkan. | Pesan jelas; tidak ada file selesai yang rusak; ruang kembali setelah pembatalan; antrean dapat dicoba lagi setelah ruang tersedia. |
+| DTM-15 | Baris ringkas Koleksi & Riwayat | Buka Koleksi: cari file yang judulnya berbeda dari nama file dan file berlirik/subtitle. Lalu buka tab Download → Riwayat. | Nama file tampil di baris keterangan bila tidak mengulang judul; ikon lirik/CC muncul di ujung baris tanpa baris tambahan; kartu Riwayat memakai baris ringkas tapi tanggal selesai, `AttachmentInfo`, dan status lirik tetap tampil; semua aksi tersedia di menu ⋮; tap baris tetap memutar. |
 
 ## Format hasil
 
@@ -81,6 +82,7 @@ Salin tabel ini ke laporan sesi dan isi satu baris per percobaan:
 | DTM-12 |  |  | Belum dijalankan |  |  |
 | DTM-13 |  |  | Belum dijalankan |  |  |
 | DTM-14 |  |  | Belum dijalankan |  |  |
+| DTM-15 |  |  | Belum dijalankan |  |  |
 
 ## Batas
 

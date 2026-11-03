@@ -200,6 +200,8 @@ fun MediaLibraryScreen(
                 // Satu baris ringkas untuk semua daftar Koleksi; aksi pindah ke menu titik tiga.
                 val sourceJob = completedJobs[item.jobId]
                 val subtitle = buildList {
+                    // Nama file tampil hanya bila tidak mengulang judul — info berkas tanpa baris tambahan.
+                    if (showFileName(item.title, item.displayName)) add(item.displayName)
                     if (item.kind == "AUDIO") add(item.artist.ifBlank { "Artis belum diketahui" })
                     item.sizeBytes?.let { add(Format.bytes(it)) }
                     item.durationMs?.let { add(duration(it)) }
@@ -215,6 +217,7 @@ fun MediaLibraryScreen(
                     onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video",
                     enabled = item.availability == "AVAILABLE",
                     errorText = if (item.availability != "AVAILABLE") "File tidak tersedia atau izin akses berubah" else null,
+                    badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris),
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
                     onClick = { if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item) },
                 ) {

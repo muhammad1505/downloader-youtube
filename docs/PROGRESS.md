@@ -2,15 +2,25 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Nama file, ikon lampiran, dan kartu Riwayat ringkas — 3 November 2026
+
+Tiga kelanjutan baris ringkas yang dipilih langsung lewat pertanyaan; dua catatan terbuka pada catatan sebelumnya kini dikerjakan.
+
+- **Nama file di baris Koleksi.** `showFileName(title, displayName)` (murni, diuji JVM) menampilkan `displayName` hanya bila tidak sekadar mengulang judul — aturan yang sama seperti kartu besar lama — dan menjadi elemen pertama baris keterangan (`namafile.mp3 · artis · ukuran · durasi · platform`) supaya tidak terpotong elipsis di layar sempit.
+- **Ikon lampiran di ujung baris.** `rowBadges(audio, lyricUri, sidecarUris)` menghasilkan `RowBadges`: audio menandai lirik dari `lyricUri` atau baris `sub|` unduhan terkait; video menghitung subtitle tanpa menghitung thumbnail. `RowAttachmentIcons` me-render ikon 14 dp (lirik/CC) di antara teks dan menu ⋮ tanpa baris tambahan; `contentDescription` memuat jumlah subtitle untuk pembaca layar.
+- **Kartu Riwayat ringkas.** `JobCard` mendapat parameter `compact` dan hanya `historySection` yang menyalakannya. Kepala kartu mengikuti pola `MediaListRow`: sampul 52 dp, judul satu baris, satu baris keterangan (artis · opsi unduhan · platform + logo), aksi lengkap pindah ke menu ⋮, padding 12 dp dan jarak 8 dp. Status tetap utuh — baris progres/fase, “Selesai · tanggal”, `AttachmentInfo`, dan baris status lirik (BUG-014); tap baris tetap memutar. Kartu Antrean memakai tampilan besar lama (`compact = false`).
+
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug` lulus — **654 tes Kotlin, 0 gagal** (termasuk `RowBadgesTest` baru untuk badge dan aturan nama file); lint 0 error / 5 warning, baseline yang sama tanpa warning baru. Belum diuji di perangkat; skenario HP-nya ada di `DEVICE_TEST_MATRIX.md` **DTM-15**.
+
 ## Baris media ringkas dan tombol back Koleksi — 3 November 2026
 
-Semua daftar media di tab Koleksi (Semua/Musik/Video, isi folder, Favorit, playlist, dan hasil cari) kini memakai `MediaListRow` di `components.kt`: sampul 52 dp, judul satu baris, satu baris keterangan (artis · ukuran · durasi · platform), dan slot aksi di kanan, sehingga tinggi item seragam. `MediaActionBar` mendapat mode `compact` yang memindahkan seluruh aksi (Putar, favorit, bagikan, ubah nama, cari lirik, hapus, antrean, playlist, detail, dll.) ke menu ⋮; tap baris tetap memutar dan item yang tidak tersedia menampilkan keterangan error di baris kedua. Indikator lampiran per item (“Lirik tersedia”/“N subtitle”) tidak lagi tampil di baris karena memakai baris tambahan; aksinya tetap ada di menu ⋮.
+Semua daftar media di tab Koleksi (Semua/Musik/Video, isi folder, Favorit, playlist, dan hasil cari) kini memakai `MediaListRow` di `components.kt`: sampul 52 dp, judul satu baris, satu baris keterangan (artis · ukuran · durasi · platform), dan slot aksi di kanan, sehingga tinggi item seragam. `MediaActionBar` mendapat mode `compact` yang memindahkan seluruh aksi (Putar, favorit, bagikan, ubah nama, cari lirik, hapus, antrean, playlist, detail, dll.) ke menu ⋮; tap baris tetap memutar dan item yang tidak tersedia menampilkan keterangan error di baris kedua. Indikator lampiran per item (“Lirik tersedia”/“N subtitle”) sempat dilepas karena memakai baris tambahan; kini dikembalikan sebagai ikon kecil di ujung baris (lihat bagian berikut).
 
 Tombol back sistem juga tidak lagi langsung keluar aplikasi dari Koleksi. `MediaLibraryScreen` memakai `BackHandler` berjenjang: dari isi folder kembali ke Daftar folder, lalu playlist, kata kunci pencarian, dan filter jenis; aplikasi baru keluar bila tidak ada filter aktif.
 
 Bukti perangkat (Realme RMX1821, Android 10): APK 1.1.70 terpasang dengan `base.apk` SHA-256 `2108d1cc…99c7c0`, identik dengan build. Dari isi folder TubeFlow, tombol back sistem menampilkan Daftar folder dengan 3 kartu (7/42/25 item) tanpa mengeluarkan aplikasi; grid folder terukur 3 kolom dan baris media ±5 item per layar dengan teks terpotong rapi. Satu `FATAL EXCEPTION` di logcat berasal dari `com.oppo.lfeh` (layanan ColorOS), bukan TubeFlow.
 
-Verifikasi host: `./gradlew testDebugUnitTest lintDebug` lulus (648 tes Kotlin, 0 gagal; lint 0 error/5 warning — baseline, tanpa warning baru), termasuk `CatalogGridTest` dan `MediaCardPlanTest`. Kartu Riwayat di tab Download belum ikut diringkas; indikator lampiran per baris sudah dilepas sesuai keputusan desain.
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug` lulus (648 tes Kotlin, 0 gagal; lint 0 error/5 warning — baseline, tanpa warning baru), termasuk `CatalogGridTest` dan `MediaCardPlanTest`. Pada catatan ini Kartu Riwayat masih kartu besar dan nama file/indikator lampiran belum tampil di baris; ketiganya dikerjakan pada bagian berikut.
 
 ## Grid folder Koleksi tiga–empat kolom — 3 November 2026
 

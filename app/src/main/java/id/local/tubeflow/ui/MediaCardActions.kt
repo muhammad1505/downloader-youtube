@@ -323,3 +323,34 @@ const val ATTACHMENT_THUMBNAIL = "thumb"
  */
 fun hasSubtitleAttachment(audio: Boolean, sidecarUris: String?): Boolean =
     !audio && attachmentUris(sidecarUris).keys.any { it != ATTACHMENT_THUMBNAIL }
+
+/**
+ * Penanda lampiran kecil di ujung baris Koleksi: ikon lirik bila ada berkas lirik, dan ikon
+ * subtitle beserta jumlahnya. Murni (tanpa Compose) supaya bisa diuji di JVM.
+ */
+data class RowBadges(val lyrics: Boolean = false, val subtitles: Int = 0)
+
+/** Jumlah baris lampiran yang bukan thumbnail; berkas LRC audio ikut terhitung sebagai lirik. */
+fun sidecarCount(sidecarUris: String?): Int = sidecarUris.orEmpty().lines().count { line ->
+    val uri = line.substringAfter('|', "")
+    uri.isNotBlank() && line.substringBefore('|') != ATTACHMENT_THUMBNAIL
+}
+
+/**
+ * Penanda yang layak ditampilkan satu baris media: audio menandai lirik (dari `lyricUri` atau
+ * baris `sub|` unduhan), video menghitung subtitle tanpa menghitung thumbnail.
+ */
+fun rowBadges(audio: Boolean, lyricUri: String?, sidecarUris: String?): RowBadges {
+    val sidecars = sidecarCount(sidecarUris)
+    return if (audio) RowBadges(lyrics = !lyricUri.isNullOrBlank() || sidecars > 0)
+    else RowBadges(subtitles = sidecars)
+}
+
+/**
+ * Nama file tampil hanya bila tidak sekadar mengulang judul — hierarki daftar lama sebelum
+ * baris ringkas, supaya baris tidak dobel info.
+ */
+fun showFileName(title: String, displayName: String): Boolean {
+    val fileName = displayName.substringBeforeLast('.')
+    return title.isBlank() || (!fileName.startsWith(title, ignoreCase = true) && fileName != title)
+}

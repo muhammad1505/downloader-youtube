@@ -100,6 +100,8 @@ fun LazyListScope.historySection(
                 retry = { onRedownloadRequest(job) },
                 remove = { onDeleteRequest(job) },
                 modifier = Modifier.animateItem(),
+                // Riwayat memakai pola baris ringkas; progres dan status lampiran tetap tampil.
+                compact = true,
                 refetchLyrics = onRefetchLyrics,
                 searchLyrics = onSearchLyrics,
                 play = { onPlay(filtered, filtered.indexOfFirst { it.id == job.id }) },

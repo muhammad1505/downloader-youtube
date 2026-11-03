@@ -771,8 +771,9 @@ fun CoverThumb(coverPath: String, thumbnailUrl: String, mode: MediaMode, modifie
 }
 /**
  * Baris media ringkas untuk semua daftar Koleksi: sampul 52 dp, satu baris judul, satu baris
- * keterangan, dan slot aksi di kanan (biasanya menu titik tiga). Dipakai bersama supaya daftar
- * musik, video, folder, favorit, dan playlist punya tinggi item yang sama.
+ * keterangan, penanda lampiran kecil (ikon lirik/subtitle), dan slot aksi di kanan (biasanya
+ * menu titik tiga). Dipakai bersama supaya daftar musik, video, folder, favorit, dan playlist
+ * punya tinggi item yang sama.
  */
 @Composable
 fun MediaListRow(
@@ -786,6 +787,8 @@ fun MediaListRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     errorText: String? = null,
+    /** Penanda lampiran kecil di ujung baris (lirik/subtitle) tanpa menambah baris teks. */
+    badges: RowBadges = RowBadges(),
     trailing: @Composable () -> Unit,
 ) {
     Card(
@@ -815,6 +818,7 @@ fun MediaListRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            RowAttachmentIcons(badges)
             trailing()
         }
     }
@@ -840,12 +844,65 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false, compact: Boolean = false) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
     // Cyberpunk memakai palet tetapnya: aksen sampul tidak mengganti warna tema.
     val accent=if (LocalCyberpunkTheme.current) MaterialTheme.colorScheme.primary else rememberCoverAccent(job.coverPath)
     val song=job.songIdentity()
+    val audio = job.mode == MediaMode.AUDIO
+    val attachments = attachmentUris(job.sidecarUris)
+    // Aksi kartu selesai dipakai di dua tempat: baris ringkas (menu titik tiga) atau deret bawah.
+    val completedActions: @Composable () -> Unit = {
+        MediaActionBar(
+            audio = audio,
+            compact = compact,
+            specs = MediaCardPlan.history(
+                audio = audio,
+                hasThumbnail = attachments.containsKey(ATTACHMENT_THUMBNAIL),
+                hasSubtitle = hasSubtitleAttachment(audio, job.sidecarUris),
+                hasLyrics = job.lyricStatus == LyricStatus.SAVED,
+            ).filter { spec ->
+                // Aksi hanya muncul bila pemanggil menyediakan jalurnya.
+                when (spec.kind) {
+                    MediaActionKind.PLAY -> play != null
+                    MediaActionKind.FIND_LYRICS -> searchLyrics != null
+                    MediaActionKind.ENQUEUE -> enqueue != null
+                    MediaActionKind.PLAY_NEXT -> playNext != null
+                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming != null
+                    MediaActionKind.DELETE -> remove != null
+                    else -> true
+                }
+            },
+            enabled = { kind ->
+                when (kind) {
+                    MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
+                    MediaActionKind.FIND_LYRICS -> job.outputUri != null
+                    else -> true
+                }
+            },
+            onClick = { kind ->
+                when (kind) {
+                    MediaActionKind.PLAY -> play?.invoke()
+                    MediaActionKind.ENQUEUE -> enqueue?.invoke()
+                    MediaActionKind.PLAY_NEXT -> playNext?.invoke()
+                    MediaActionKind.OPEN -> openError = launchFile(context, job, false)
+                    MediaActionKind.SHARE -> openError = launchFile(context, job, true)
+                    MediaActionKind.FIND_LYRICS -> searchLyrics?.invoke(job.id)
+                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming?.invoke()
+                    MediaActionKind.REDOWNLOAD -> retry()
+                    MediaActionKind.DELETE -> remove?.invoke()
+                    MediaActionKind.OPEN_THUMBNAIL -> attachments[ATTACHMENT_THUMBNAIL]?.let {
+                        openError = openSidecar(context, it, ATTACHMENT_THUMBNAIL)
+                    }
+                    MediaActionKind.OPEN_SUBTITLE -> attachments.entries
+                        .firstOrNull { it.key != ATTACHMENT_THUMBNAIL }
+                        ?.let { (sidecarKind, uri) -> openError = openSidecar(context, uri, sidecarKind) }
+                    else -> Unit
+                }
+            },
+        )
+    }
     Card(
         modifier.fillMaxWidth().clickable(
             enabled = job.state == JobState.COMPLETED && !job.outputUri.isNullOrBlank() && play != null,
@@ -854,26 +911,52 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
         colors = mediaCardColors(accent),
         border = if (highlighted) BorderStroke(2.dp, accent) else null,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier.padding(if (compact) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(56.dp))
+                CoverThumb(job.coverPath, job.thumbnailUrl, job.mode, Modifier.size(if (compact) 52.dp else 56.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(Format.musicLabel(song), style = MaterialTheme.typography.titleMedium, fontWeight=FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        Format.musicLabel(song),
+                        style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                        fontWeight = if (compact) FontWeight.SemiBold else FontWeight.Bold,
+                        maxLines = if (compact) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     val credit=song.artist.orEmpty().ifBlank { song.remixer }
-                    if (credit.isNotBlank()) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                        Icon(Icons.Outlined.Person,null,Modifier.size(14.dp)); Text(credit,style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    }
-                    // Platform asal tautan (mis. SoundCloud, TikTok) + ikonnya — dikirim oleh Antrean & Riwayat (P2).
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PlatformBrandLogo(job.sourcePlatform, Modifier.size(14.dp))
-                        Text(
-                            formatMeta(job) + " · ${job.sourcePlatform.label}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    if (compact) {
+                        // Satu baris keterangan seragam dengan daftar Koleksi: artis · opsi unduhan · platform.
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            PlatformBrandLogo(job.sourcePlatform, Modifier.size(14.dp))
+                            Text(
+                                listOfNotNull(credit.takeIf { it.isNotBlank() }, formatMeta(job), job.sourcePlatform.label)
+                                    .joinToString(" · "),
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    } else {
+                        if (credit.isNotBlank()) Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Outlined.Person,null,Modifier.size(14.dp)); Text(credit,style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        }
+                        // Platform asal tautan (mis. SoundCloud, TikTok) + ikonnya — dikirim oleh Antrean & Riwayat (P2).
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            PlatformBrandLogo(job.sourcePlatform, Modifier.size(14.dp))
+                            Text(
+                                formatMeta(job) + " · ${job.sourcePlatform.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-                StateChip(job.state)
+                // Baris ringkas: aksi di ujung baris; kartu besar tetap memakai chip status.
+                if (compact && job.state == JobState.COMPLETED) completedActions() else StateChip(job.state)
             }
             when (job.state) {
                 JobState.RUNNING -> {
@@ -964,7 +1047,8 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
             }
             openError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // Baris ringkas menaruh aksi di ujung baris; kartu besar tetap memakai deret ikon bawah.
+            if (!compact || job.state != JobState.COMPLETED) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 when (job.state) {
                     JobState.QUEUED, JobState.RUNNING -> {
                         pause?.let { onClick -> IconAction(Icons.Outlined.Pause, "Jeda", onClick) }
@@ -978,57 +1062,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         IconAction(Icons.Outlined.Refresh, "Coba lagi", retry)
                         remove?.let { IconAction(Icons.Outlined.Delete, "Hapus", it, destructive = true) }
                     }
-                    JobState.COMPLETED -> {
-                        val attachments = attachmentUris(job.sidecarUris)
-                        val audio = job.mode == MediaMode.AUDIO
-                        MediaActionBar(
-                            audio = audio,
-                            specs = MediaCardPlan.history(
-                                audio = audio,
-                                hasThumbnail = attachments.containsKey(ATTACHMENT_THUMBNAIL),
-                                hasSubtitle = hasSubtitleAttachment(audio, job.sidecarUris),
-                                hasLyrics = job.lyricStatus == LyricStatus.SAVED,
-                            ).filter { spec ->
-                                // Aksi hanya muncul bila pemanggil menyediakan jalurnya.
-                                when (spec.kind) {
-                                    MediaActionKind.PLAY -> play != null
-                                    MediaActionKind.FIND_LYRICS -> searchLyrics != null
-                                    MediaActionKind.ENQUEUE -> enqueue != null
-                                    MediaActionKind.PLAY_NEXT -> playNext != null
-                                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming != null
-                                    MediaActionKind.DELETE -> remove != null
-                                    else -> true
-                                }
-                            },
-                            enabled = { kind ->
-                                when (kind) {
-                                    MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
-                                    MediaActionKind.FIND_LYRICS -> job.outputUri != null
-                                    else -> true
-                                }
-                            },
-                            onClick = { kind ->
-                                when (kind) {
-                                    MediaActionKind.PLAY -> play?.invoke()
-                                    MediaActionKind.ENQUEUE -> enqueue?.invoke()
-                                    MediaActionKind.PLAY_NEXT -> playNext?.invoke()
-                                    MediaActionKind.OPEN -> openError = launchFile(context, job, false)
-                                    MediaActionKind.SHARE -> openError = launchFile(context, job, true)
-                                    MediaActionKind.FIND_LYRICS -> searchLyrics?.invoke(job.id)
-                                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming?.invoke()
-                                    MediaActionKind.REDOWNLOAD -> retry()
-                                    MediaActionKind.DELETE -> remove?.invoke()
-                                    MediaActionKind.OPEN_THUMBNAIL -> attachments[ATTACHMENT_THUMBNAIL]?.let {
-                                        openError = openSidecar(context, it, ATTACHMENT_THUMBNAIL)
-                                    }
-                                    MediaActionKind.OPEN_SUBTITLE -> attachments.entries
-                                        .firstOrNull { it.key != ATTACHMENT_THUMBNAIL }
-                                        ?.let { (sidecarKind, uri) -> openError = openSidecar(context, uri, sidecarKind) }
-                                    else -> Unit
-                                }
-                            },
-                        )
-                    }
+                    JobState.COMPLETED -> completedActions()
                 }
             }
         }

@@ -47,3 +47,27 @@ fun AttachmentInfo(raw: String, audio: Boolean, lyricUri: String? = null, sideca
         Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/**
+ * Penanda lampiran di ujung baris Koleksi: ikon saja (lirik/subtitle) sehingga baris tetap satu
+ * baris. Ketersediaan datang dari catatan unduhan/scan; baris status lengkap tetap memakai
+ * [AttachmentInfo] yang memeriksa berkas sungguhan.
+ */
+@Composable
+fun RowAttachmentIcons(badges: RowBadges) {
+    if (!badges.lyrics && badges.subtitles <= 0) return
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (badges.lyrics) Icon(
+            Icons.Outlined.Lyrics,
+            "Lirik tersedia",
+            Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (badges.subtitles > 0) Icon(
+            Icons.Outlined.ClosedCaption,
+            "${badges.subtitles} subtitle tersedia",
+            Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
