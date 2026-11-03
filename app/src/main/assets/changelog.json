@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 89,
+    "versionName": "1.1.74",
+    "highlights": [
+      "Tab Alat tidak lagi menampilkan kartu kosong milik Koleksi beserta tombol Segarkan katalog; alat hanya memberi satu baris keterangan saat belum ada audio untuk diolah.",
+      "Pesan di tab Alat kini membedakan katalog yang benar-benar kosong dari katalog yang hanya berisi video atau berkas tidak terbaca, dan tidak menyebut kosong sebelum data katalog selesai dimuat.",
+      "Alat massal tetap memakai jalur ubah nama, tag katalog, lirik, dan karaoke yang sama; tidak ada perubahan skema Room, izin, atau dependensi."
+    ]
+  },
+  {
     "versionCode": 88,
     "versionName": "1.1.73",
     "highlights": [

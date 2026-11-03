@@ -3,7 +3,7 @@ android {
  namespace = "id.local.tubeflow"
  compileSdk = 37
  ndkVersion = "27.1.12297006"
- defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 88; versionName = "1.1.73" }
+ defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 89; versionName = "1.1.74" }
  splits { abi { isEnable = true; reset(); include("arm64-v8a", "armeabi-v7a", "x86_64"); isUniversalApk = false } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

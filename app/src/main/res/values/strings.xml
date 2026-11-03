@@ -272,9 +272,8 @@
     <string name="video_volume_boost_unavailable">Format audio ini belum mendukung penguat. Audio tetap diputar pada level normal.</string>
     <string name="tools_title">Alat</string>
     <string name="tools_subtitle">Operasi pada file yang sudah ada di perangkat. File asli tidak diubah tanpa konfirmasi.</string>
-    <string name="tools_empty">Koleksi masih kosong</string>
-    <string name="tools_empty_help">Alat bekerja pada file yang sudah ada di Koleksi. Selesaikan unduhan atau segarkan katalog lebih dulu.</string>
-    <string name="tools_refresh">Segarkan katalog</string>
+    <string name="tools_no_media">Belum ada media di Koleksi. Alat bekerja pada berkas yang sudah diunduh, jadi selesaikan unduhan lebih dulu.</string>
+    <string name="tools_no_audio">Belum ada audio tersedia untuk diolah. Alat ini hanya memproses audio di Koleksi; video dan berkas yang tidak terbaca tidak ikut.</string>
     <string name="tools_lyrics_title">Sinkronkan lirik</string>
     <string name="tools_lyrics_description">Perbaiki offset atau ketuk ulang waktu baris lirik yang sudah tersimpan. Lagu tanpa lirik belum bisa disinkronkan di sini.</string>
     <string name="tools_lyrics_empty">Belum ada lagu dengan lirik tersimpan. Cari lirik dari kartu lagu lebih dulu.</string>

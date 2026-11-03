@@ -76,6 +76,9 @@ interface MediaDao {
     @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY addedAt DESC, title COLLATE NOCASE ASC") suspend fun availableAudio(): List<MediaItem>
     // Alat massal bekerja pada seleksi eksplisit; batasnya sama dengan daftar putar eksplisit.
     @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY title COLLATE NOCASE ASC LIMIT 3000") fun audioItems(): Flow<List<MediaItem>>
+    // Seluruh baris katalog, audio maupun video. Dipakai tab Alat agar tidak menyebut "koleksi kosong"
+    // saat katalog hanya berisi video atau berkas yang tidak terbaca.
+    @Query("SELECT COUNT(*) FROM media_items") fun catalogCount(): Flow<Long>
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name AND uri != :exceptUri AND availability = 'AVAILABLE' LIMIT 1") suspend fun collision(folder: String, name: String, exceptUri: String): MediaItem?
     @Query("SELECT DISTINCT folder FROM media_items ORDER BY folder LIMIT 250") fun folders(): Flow<List<String>>
     @Query("SELECT DISTINCT artist FROM media_items WHERE kind = 'AUDIO' AND artist != '' ORDER BY artist LIMIT 250") fun artists(): Flow<List<String>>

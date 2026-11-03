@@ -48,7 +48,10 @@ fun ToolsScreen(
     onEditTiming: (MediaItem) -> Unit,
 ) {
     val model: ToolsViewModel = viewModel()
-    val items by model.audio.collectAsStateWithLifecycle()
+    val loaded by model.audio.collectAsStateWithLifecycle()
+    val items = loaded.orEmpty()
+    val catalogCount by model.catalogCount.collectAsStateWithLifecycle()
+    val scanning by library.busy.collectAsStateWithLifecycle()
     val progress by model.progress.collectAsStateWithLifecycle()
     var renameOpen by rememberSaveable { mutableStateOf(false) }
     var tagOpen by rememberSaveable { mutableStateOf(false) }
@@ -95,13 +98,16 @@ fun ToolsScreen(
             ) { tagOpen = true }
         }
         progress?.let { state -> ToolWorkPanel(state, onCancel = model::cancel, onDismiss = model::dismissProgress) }
-        if (items.isEmpty()) {
-            EmptyState(
-                Icons.Outlined.Build,
-                stringResource(R.string.tools_empty),
-                stringResource(R.string.tools_empty_help),
-                actionLabel = stringResource(R.string.tools_refresh),
-                onAction = { library.scan() },
+        // Status Alat berdiri sendiri: tab ini tidak meminjam kartu kosong Koleksi beserta tombol
+        // Segarkan katalog. Satu baris redup cukup menjelaskan mengapa ubin belum bisa dipakai.
+        val notice = ToolAvailability.notice(loaded?.size, catalogCount, scanning)
+        if (notice != ToolsNotice.NONE) {
+            Text(
+                stringResource(if (notice == ToolsNotice.EMPTY_CATALOG) R.string.tools_no_media else R.string.tools_no_audio),
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
         }
     }

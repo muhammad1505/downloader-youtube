@@ -1524,3 +1524,28 @@ lint 0 error/4 warning). `changelog.json` divalidasi: 16 entri, kode menurun dan
 di atas, tiga sorotan berukuran 114/111/121 karakter. `git diff --check` bersih. Tiga APK debug
 (arm64-v8a, armeabi-v7a, x86_64) terbentuk. Batas: build rilis, audit native, dan uji perangkat
 belum dijalankan; tata letak kartu, breadcrumb, dan TalkBack perlu dikonfirmasi di HP.
+
+## Tab Alat tanpa kartu katalog dan rilis 1.1.74 — 3 November 2026
+
+Tab Alat sebelumnya menampilkan kartu kosong milik Koleksi ("Koleksi masih kosong" beserta
+tombol **Segarkan katalog**) di bawah ubin alat. Kartu itu dipilih hanya dari daftar audio
+tersedia dan dari nilai awal daftar kosong sebelum Room mengirim data, sehingga tab Alat bisa
+menyebut koleksi kosong padahal Koleksi berisi video atau berkas yang tidak terbaca; tombolnya
+juga hanya mengulang pemindaian yang berjalan otomatis.
+
+Perbaikan: kartu katalog dihapus dari tab Alat dan diganti satu baris keterangan redup tanpa
+tombol. `ToolsViewModel.audio` kini `StateFlow<List<MediaItem>?>` (`null` berarti database belum
+menjawab), dan `MediaDao.catalogCount()` menghitung seluruh baris katalog audio maupun video.
+`ToolAvailability.notice()` yang murni (diuji `ToolsNoticeTest`) memilih status: tanpa pesan saat
+data belum dimuat atau pemindaian katalog berjalan, `NO_AUDIO` saat katalog berisi tetapi tidak
+ada audio tersedia, dan `EMPTY_CATALOG` hanya saat tabel benar-benar kosong. Ubin alat, dialog,
+dan jalur operasi massal tidak berubah.
+
+Nomor versi dinaikkan ke **1.1.74/code89** dan entri `changelog.json` teratas ditambahkan untuk
+code89.
+
+Verifikasi: `./gradlew testDebugUnitTest lintDebug` lulus (**669 tes Kotlin, 0 gagal/error/skipped**;
+lint **0 error/6 warning** versi Gradle dan pustaka yang sudah ada), `./gradlew assembleDebug`
+lulus, `python3 -m unittest discover -s scripts -p "test_*.py"` **101 tes OK** setelah `ffmpeg`
+dan `javap` tersedia di PATH, serta `git diff --check` bersih. Belum dijalankan: build rilis
+ber-minify, audit paket, dan uji perangkat, jadi tampilan baris status di HP belum dikonfirmasi.

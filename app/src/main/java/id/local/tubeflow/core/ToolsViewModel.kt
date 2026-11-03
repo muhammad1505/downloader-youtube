@@ -15,7 +15,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -49,7 +51,18 @@ class ToolsViewModel(app: Application) : AndroidViewModel(app) {
         val succeeded: Int get() = (done - failures.size).coerceAtLeast(0)
     }
 
-    val audio = dao.audioItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    /**
+     * `null` berarti database belum mengirim data pertama. Tab Alat tidak boleh menyebut koleksi
+     * kosong selama ini, dan daftar ini memang hanya memuat audio yang tersedia.
+     */
+    val audio: StateFlow<List<MediaItem>?> = dao.audioItems()
+        .map<List<MediaItem>, List<MediaItem>?> { it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Jumlah seluruh baris katalog untuk membedakan katalog kosong dari katalog tanpa audio. */
+    val catalogCount: StateFlow<Long?> = dao.catalogCount()
+        .map<Long, Long?> { it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _progress = MutableStateFlow<Progress?>(null)
     val progress = _progress.asStateFlow()
