@@ -2,6 +2,12 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Grid folder Koleksi tiga–empat kolom — 3 November 2026
+
+Grid folder di tab Koleksi sebelumnya dipaku dua kolom, sehingga separuh lebar layar sering kosong saat kartu folder hanya sedikit. `CatalogGrid.folderColumns(screenWidthDp)` (murni, diuji JVM) memilih tiga kolom untuk ponsel dan empat kolom mulai 600 dp; `MediaLibraryScreen` membagi baris sesuai nilai itu dan mengisi slot sisa dengan `Spacer(weight)` agar lebar kartu tetap seragam pada baris terakhir. Lebar jendela dibaca lewat `LocalWindowInfo.current.containerSize` + `LocalDensity`, bukan `LocalConfiguration.screenWidthDp` yang memunculkan warning lint `ConfigurationScreenWidthHeight`. `FolderTile` dirapatkan (ikon 48 dp, tinggi minimum 112 dp, padding 4/8 dp) supaya tiga kolom tidak sesak; kartu media tetap satu per baris.
+
+Verifikasi: `./gradlew testDebugUnitTest --tests "id.local.tubeflow.ui.CatalogGridTest" compileDebugKotlin lintDebug` lulus (2 tes baru, 0 gagal; lint 0 error/5 warning — baseline, tanpa warning baru) dan `assembleRelease` bertanda tangan produksi lulus (8m37s). APK ARM64 terpasang di Realme RMX1821 (Android 10) dengan `adb install -r`; `base.apk` yang ditarik dari HP SHA-256 `4609b78c…c0960dfb96`, identik dengan build, aplikasi hidup tanpa `FATAL EXCEPTION`. Batas: kenyamanan tiga kolom pada layar sempit belum dinilai oleh pengguna; versi aplikasi belum dinaikkan sehingga artefak 1.1.70 di folder distribusi masih build sebelumnya.
+
 ## Hapus file folder koleksi impor dan izin tulis SAF — 1.1.70/code85, 3 November 2026
 
 Keluhan “gagal hapus file video dari folder yang diimpor, katanya izin akses” berasal dari `MediaLibraryViewModel.addCollectionFolder`: folder koleksi tambahan hanya menyimpan `FLAG_GRANT_READ_URI_PERMISSION`. Pemindaian bekerja karena grant baca cukup, tetapi `DocumentsContract.deleteDocument` menuntut izin tulis pada tree, sehingga `StorageUris.delete` mengembalikan false dan UI menampilkan pesan izin. Folder tujuan unduhan dan impor file pilihan sudah meminta baca+tulis, hanya jalur folder koleksi yang tertinggal.

@@ -24,6 +24,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import id.local.tubeflow.R
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +65,9 @@ fun MediaLibraryScreen(
         }
         totals.entries.filter { it.value > 0 }.sortedBy { CollectionGroups.label(it.key).lowercase() }
     }
+    // Grid folder mengikuti lebar jendela: tiga kolom di ponsel, empat kolom di layar lebar.
+    val windowWidth = LocalWindowInfo.current.containerSize.width
+    val folderColumns = CatalogGrid.folderColumns(with(LocalDensity.current) { windowWidth.toDp().value })
     val browsingFolders = filter.folder.isBlank() && filter.playlistId.isBlank() &&
         filter.query.isBlank() && filter.artist.isBlank() && filter.album.isBlank()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -164,14 +169,15 @@ fun MediaLibraryScreen(
         if (browsingFolders) {
             if (folderCards.isNotEmpty()) {
                 item { FolderSectionHeading(folderCards.size) }
-                items(folderCards.chunked(2), key = { row -> "folders:" + row.joinToString("|") { it.key } }) { row ->
+                items(folderCards.chunked(folderColumns), key = { row -> "folders:" + row.joinToString("|") { it.key } }) { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         row.forEach { (folder, total) ->
                             FolderTile(folder, total, Modifier.weight(1f)) {
                                 model.filter(filter.copy(folder = folder))
                             }
                         }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                        // Slot kosong menjaga lebar kartu sama meski baris terakhir tidak penuh.
+                        repeat(folderColumns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -387,14 +393,14 @@ private fun FolderTile(folder: String, total: Long, modifier: Modifier = Modifie
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier.fillMaxWidth()
-            .heightIn(min = 128.dp)
+            .heightIn(min = 112.dp)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClickLabel = "Buka folder $label", onClick = onOpen)
-            .padding(horizontal = 6.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        IconBadge(Icons.Outlined.Folder, size = 58.dp)
+        IconBadge(Icons.Outlined.Folder, size = 48.dp)
         Text(
             name,
             style = MaterialTheme.typography.titleSmall,
