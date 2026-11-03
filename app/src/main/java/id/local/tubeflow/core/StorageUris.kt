@@ -21,6 +21,7 @@ object StorageUris {
     /**
      * Menghapus URI dan mengembalikan true bila file/baris benar-benar hilang atau memang sudah tidak ada.
      * false berarti provider/izin menolak — pemanggil wajib menganggap file MASIH ADA (jangan melapor sukses).
+     * Folder koleksi yang diimpor dengan grant baca saja akan selalu sampai ke cabang false ini.
      */
     fun delete(context: Context, raw: String): Boolean {
         val uri = runCatching { raw.toUri() }.getOrNull() ?: return false
@@ -39,6 +40,18 @@ object StorageUris {
         // Provider sering hanya mengembalikan false/0 tanpa pesan; bedakan "sudah hilang" dari "ditolak".
         return removed || !exists(context, uri)
     }
+
+    /**
+     * True bila [uri] berada di tree SAF yang grant tersimpannya hanya baca. Penghapusan dokumen pada
+     * grant seperti itu pasti ditolak provider, jadi pemanggil perlu memberi petunjuk yang bisa ditindak.
+     */
+    fun lacksWriteGrant(context: Context, uri: Uri): Boolean = runCatching {
+        val treeId = DocumentsContract.getTreeDocumentId(uri)
+        context.contentResolver.persistedUriPermissions.any { grant ->
+            grant.isReadPermission && !grant.isWritePermission && grant.uri.authority == uri.authority &&
+                runCatching { DocumentsContract.getTreeDocumentId(grant.uri) }.getOrNull() == treeId
+        }
+    }.getOrDefault(false)
 
     /**
      * Masih tersedia di provider? Gagal query dianggap MASIH ADA (konservatif) supaya izin yang dicabut

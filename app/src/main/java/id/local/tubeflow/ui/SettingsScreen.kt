@@ -558,14 +558,17 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val grantedCollectionTrees = remember(SettingsStore.collectionFolders) {
-                context.contentResolver.persistedUriPermissions
-                    .filter { it.isReadPermission }
-                    .map { CollectionFolders.normalize(it.uri.toString()) }
-                    .toSet()
+            // Baca dan tulis dipisah: folder dengan grant baca saja tetap bisa dipindai, tetapi
+            // penghapusan file akan ditolak provider sampai folder ditambahkan ulang.
+            val collectionGrants = remember(SettingsStore.collectionFolders) {
+                context.contentResolver.persistedUriPermissions.associate {
+                    CollectionFolders.normalize(it.uri.toString()) to (it.isReadPermission to it.isWritePermission)
+                }
             }
             SettingsStore.collectionFolders.forEach { folder ->
-                val readable = CollectionFolders.normalize(folder.uri) in grantedCollectionTrees
+                val grant = collectionGrants[CollectionFolders.normalize(folder.uri)]
+                val readable = grant?.first == true
+                val writable = grant?.second == true
                 AdaptivePair(
                     leading = { available ->
                         Row(available, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -578,8 +581,11 @@ fun SettingsScreen(
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(folder.label, style = MaterialTheme.typography.bodyMedium)
                                 Text(
-                                    if (readable) treeLabel(folder.uri)
-                                    else "Akses folder hilang. Lepas lalu tambahkan ulang lewat pemilih folder.",
+                                    when {
+                                        !readable -> "Akses folder hilang. Lepas lalu tambahkan ulang lewat pemilih folder."
+                                        !writable -> "Hanya izin baca. Lepas lalu tambahkan ulang folder agar file bisa dihapus."
+                                        else -> treeLabel(folder.uri)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (readable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                                     maxLines = 2,

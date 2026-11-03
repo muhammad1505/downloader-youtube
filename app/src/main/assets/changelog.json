@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 85,
+    "versionName": "1.1.70",
+    "highlights": [
+      "Menghapus file di folder koleksi yang ditambahkan lewat pemilih folder kini berhasil; sebelumnya penghapusan selalu ditolak dengan pesan izin akses.",
+      "Folder koleksi baru menyimpan izin baca dan tulis sekaligus, dan folder lama yang hanya memberi izin baca ditandai di Pengaturan sehingga bisa ditambahkan ulang.",
+      "Bila provider memang hanya memberi akses baca, pesan hapus kini menjelaskan cara memperbaikinya, bukan sekadar menyuruh memeriksa izin penyimpanan."
+    ]
+  },
+  {
     "versionCode": 84,
     "versionName": "1.1.69",
     "highlights": [

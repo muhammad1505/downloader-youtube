@@ -266,7 +266,11 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                 else "Folder ini menaungi folder koleksi yang sudah ditambahkan."
             }
         }
+        // Izin tulis ikut disimpan: tanpa itu file di folder ini bisa dipindai tetapi selalu ditolak
+        // saat dihapus. Provider yang hanya menawarkan baca tetap diterima; hapus akan memberi petunjuk.
         runCatching {
+            app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }.recoverCatching {
             app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }.getOrThrow()
         val labels = existing.map { it.label }.toMutableSet()
@@ -284,7 +288,12 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         SettingsStore.setCollectionFolders(app, SettingsStore.collectionFolders.filterNot {
             CollectionFolders.normalize(it.uri) == CollectionFolders.normalize(folder.uri)
         })
-        runCatching { app.contentResolver.releasePersistableUriPermission(folder.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        runCatching {
+            app.contentResolver.releasePersistableUriPermission(folder.uri.toUri(),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }.recoverCatching {
+            app.contentResolver.releasePersistableUriPermission(folder.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
         "Folder \"${folder.label}\" dilepas dari koleksi. $removed baris indeks dibersihkan; file di penyimpanan tidak dihapus."
     }
     fun import(uris: List<android.net.Uri>) = operation {

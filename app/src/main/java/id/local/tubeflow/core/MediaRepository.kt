@@ -454,7 +454,14 @@ class MediaRepository(private val context: Context) {
     } }
 
     suspend fun delete(item: MediaItem) = withContext(Dispatchers.IO) { operations.withLock {
-        require(StorageUris.delete(context, item.location)) { "File gagal dihapus; periksa izin penyimpanan." }
+        val location = item.location.toUri()
+        // Folder koleksi lama bisa tersimpan dengan grant baca saja; hapusnya mustahil sampai pengguna
+        // menambahkan ulang folder, jadi pesannya harus menyebut tindakan itu, bukan sekadar "izin".
+        require(StorageUris.delete(context, location)) {
+            if (StorageUris.lacksWriteGrant(context, location))
+                "File gagal dihapus: folder koleksi ini hanya memberi izin baca. Lepas lalu tambahkan ulang folder itu di Pengaturan → Koleksi, setelah itu hapus file lagi."
+            else "File gagal dihapus; periksa izin penyimpanan."
+        }
         var sidecarFailed = false
         val sidecars = item.jobId?.let { database.downloads().get(it)?.sidecarUris?.lines()?.mapNotNull { line -> line.substringAfter('|', "").takeIf(String::isNotBlank) } }.orEmpty()
         (sidecars + listOfNotNull(item.lyricUri)).distinct().forEach { if (!StorageUris.delete(context, it)) sidecarFailed = true }
