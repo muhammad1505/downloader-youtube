@@ -4,6 +4,10 @@
     "versionName": "1.1.75",
     "highlights": [
       "Antrean dan Riwayat di tab Download kini punya tab sendiri: memilih salah satu menyembunyikan yang lain, jumlah item tampil di judul tab, dan kata kunci pencarian dipisah per tab.",
+      "Antrean playlist tidak lagi tertahan di \"Menunggu giliran\": job yang kehilangan jadwal dijadwalkan ulang otomatis, dan kolom link langsung melepas kursor setelah antrean dikirim.",
+      "Panel aksi baris Antrean dan Riwayat memakai satu menu titik tiga yang sama, jadi Jeda/Batalkan serta Putar/Hapus file punya susunan, ikon, dan warna yang seragam.",
+      "Tekan lama folder Koleksi membuka dialog aksi ringkas di tengah layar dengan lebar menyesuaikan layar, bukan lembar penuh dari bawah.",
+      "Sesi login YouTube dipulihkan saat aplikasi dibuka, sehingga akun yang sudah masuk tidak tampak logout sendiri setelah aplikasi ditutup.",
       "Tekan lama kartu folder Koleksi untuk membuka aksi: buka, putar semua lagu, detail jumlah dan ukuran, ganti nama tampilan, atau hapus seluruh isi folder tanpa menghapus folder fisiknya.",
       "Kartu antrean di tab Download kini ringkas seperti Riwayat dan Koleksi: jeda, lanjutkan, batalkan, coba lagi, atau hapus ada di menu titik tiga, sedangkan progres dan fase tetap terlihat.",
       "Baris audio Koleksi mendapat tombol hati favorit dan bagikan di samping ikon lirik tanpa membuka menu; video tetap memakai penanda hati kecil dan hati audio tidak tampil ganda.",

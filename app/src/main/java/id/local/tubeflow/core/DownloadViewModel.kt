@@ -82,8 +82,14 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   }
  }
  private var storageRefresh: Job? = null
+ /** Percobaan penjadwalan ulang per job untuk penjaga antrean; dideklarasikan sebelum `init` karena
+  * `viewModelScope.launch` memakai Main.immediate dan bisa menjalankan `watchQueue` saat konstruksi. */
+ private val rescheduleAttempts = mutableMapOf<String, Int>()
  init {
    refreshStorage()
+   // Penjaga antrean: job QUEUED tanpa pekerjaan aktif dijadwalkan ulang agar playlist tidak
+   // tertinggal di "Menunggu giliran" setelah enqueue terputus atau pekerjaannya dihentikan sistem.
+   viewModelScope.launch { watchQueue() }
    // Panaskan engine saat aplikasi dibuka supaya inspeksi pertama tidak menanggung seluruh biaya init.
    viewModelScope.launch {
     delay(800)
@@ -604,6 +610,38 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { dao.fail(id,failMessage); throw error }
  }
+ /** WorkManager masih memegang pekerjaan hidup untuk job ini? Gagal membaca = anggap hidup (jangan diganggu). */
+ private fun hasLiveWork(id: String): Boolean =
+  runCatching { work.getWorkInfosForUniqueWork("download-$id").get().any { !it.state.isFinished } }.getOrDefault(true)
+ /**
+  * Pemeriksaan berkala antrean: hanya job QUEUED yang diperiksa karena status lain memang tidak
+  * punya pekerjaan aktif (dijeda/dibatalkan/gagal/selesai) atau sedang berjalan. Tanpa penjaga ini,
+  * job yang jadwalnya hilang tetap "Menunggu giliran" selamanya walau tidak ada yang berjalan.
+  */
+ private suspend fun watchQueue() {
+  while (true) {
+   val waiting = try { dao.observe().first().filter { it.state == JobState.QUEUED } }
+   catch (cancelled: CancellationException) { throw cancelled }
+   catch (_: Exception) { emptyList() }
+   // Job yang sudah keluar dari QUEUED tidak lagi dihitung agar percobaan berikutnya tetap penuh.
+   rescheduleAttempts.keys.retainAll(waiting.mapTo(mutableSetOf()) { it.id })
+   if (waiting.isNotEmpty()) withContext(Dispatchers.IO) { waiting.forEach { rescheduleStalled(it) } }
+   delay(if (waiting.isEmpty()) 15_000 else 4_000)
+  }
+ }
+ /** Batas percobaan penjadwalan ulang per job mencegah loop 4 detik untuk job yang memang tak bisa jalan. */
+ private suspend fun rescheduleStalled(job: DownloadJob) {
+  val attempts = rescheduleAttempts[job.id] ?: 0
+  if (attempts >= MAX_RESCHEDULES) return
+  if (!QueueWatchdog.stalled(job.state, hasLiveWork(job.id), Engine.isRunning(job.id))) return
+  try {
+   enqueueWork(job.id, ExistingWorkPolicy.KEEP, "Antrean tidak dapat dijadwalkan ulang.")
+   rescheduleAttempts[job.id] = attempts + 1
+   _notice.value="Antrean dilanjutkan otomatis."
+  } catch(cancelled: CancellationException) { throw cancelled }
+  catch(_: Exception) { /* Penyebab sudah dicatat enqueueWork sebagai status gagal. */ }
+ }
+ private companion object { const val MAX_RESCHEDULES = 3 }
  /** True selama uri hasil unduhan masih bisa dibuka; row basi (file dihapus manual) dianggap tidak ada. */
  private fun outputStillExists(job: DownloadJob): Boolean {
   val raw=job.outputUri ?: return false

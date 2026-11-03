@@ -3,6 +3,7 @@ package id.local.tubeflow.ui
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,6 +21,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.window.Dialog
 import androidx.core.net.toUri
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -416,43 +419,68 @@ fun MediaLibraryScreen(
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
     clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
 
-    // Tekan lama folder: semua aksi folder dikumpulkan di satu lembar agar tidak ada aksi
-    // destruktif yang terpicu oleh ketukan biasa.
+    // Tekan lama folder: aksi folder tampil sebagai dialog ringkas di tengah layar, bukan lembar
+    // bawah selebar layar. Lebarnya mengikuti isi (maks 420 dp) supaya rapi di ponsel dan tablet.
     folderMenu?.let { folder ->
         val label = FolderAliases.label(folder, folderAliases)
-        ModalBottomSheet(
-            onDismissRequest = { folderMenu = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        Dialog(onDismissRequest = { folderMenu = null }) {
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                tonalElevation = 6.dp,
+                modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(Icons.Outlined.Folder, size = 44.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            folder,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconBadge(Icons.Outlined.Folder, size = 44.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                label.substringAfterLast('/').ifBlank { label },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                folder,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
+                    HorizontalDivider()
+                    FolderMenuAction(Icons.Outlined.FolderOpen, "Buka folder") {
+                        folderMenu = null
+                        model.filter(filter.copy(folder = folder))
+                    }
+                    FolderMenuAction(Icons.Outlined.PlayArrow, "Putar semua lagu") {
+                        folderMenu = null
+                        model.playFolder(player, folder)
+                    }
+                    FolderMenuAction(Icons.Outlined.Info, "Detail folder") {
+                        folderMenu = null
+                        model.folderDetail(folder) { folderDetail = it }
+                    }
+                    FolderMenuAction(Icons.Outlined.DriveFileRenameOutline, "Ganti nama tampilan") {
+                        folderMenu = null
+                        folderRename = folder
+                    }
+                    FolderMenuAction(Icons.Outlined.DeleteForever, "Hapus isi folder", destructive = true) {
+                        folderMenu = null
+                        folderDelete = folder
+                    }
+                    Text(
+                        "Ganti nama hanya mengubah label di TubeFlow. Nama folder di penyimpanan tidak berubah agar berkas, lirik, dan riwayat unduhan tetap terhubung.",
+                        Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 18.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                ActionButton("Buka folder", { folderMenu = null; model.filter(filter.copy(folder = folder)) }, icon = Icons.Outlined.FolderOpen, emphasis = ActionEmphasis.Quiet, fillWidth = true)
-                ActionButton("Putar semua lagu", { folderMenu = null; model.playFolder(player, folder) }, icon = Icons.Outlined.PlayArrow, emphasis = ActionEmphasis.Quiet, fillWidth = true)
-                ActionButton("Detail folder", { folderMenu = null; model.folderDetail(folder) { folderDetail = it } }, icon = Icons.Outlined.Info, emphasis = ActionEmphasis.Quiet, fillWidth = true)
-                ActionButton("Ganti nama tampilan", { folderMenu = null; folderRename = folder }, icon = Icons.Outlined.DriveFileRenameOutline, emphasis = ActionEmphasis.Quiet, fillWidth = true)
-                ActionButton("Hapus isi folder", { folderMenu = null; folderDelete = folder }, icon = Icons.Outlined.DeleteForever, emphasis = ActionEmphasis.Quiet, destructive = true, fillWidth = true)
-                Text(
-                    "Ganti nama hanya mengubah label di TubeFlow. Nama folder di penyimpanan tidak berubah agar berkas, lirik, dan riwayat unduhan tetap terhubung.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
@@ -599,6 +627,33 @@ private fun FolderTile(
             Icon(Icons.Outlined.FolderOpen, null, Modifier.size(13.dp), tint = scheme.primary)
             Text("$total item", style = MaterialTheme.typography.labelMedium, color = scheme.primary)
         }
+    }
+}
+
+/** Satu aksi di dialog folder: ikon 20 dp, label, dan seluruh baris dapat diketuk. */
+@Composable
+private fun FolderMenuAction(
+    icon: ImageVector,
+    label: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Icon(
+            icon,
+            null,
+            Modifier.size(20.dp),
+            tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

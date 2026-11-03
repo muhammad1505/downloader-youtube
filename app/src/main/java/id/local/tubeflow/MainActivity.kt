@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import id.local.tubeflow.core.BstationAuth
 import id.local.tubeflow.core.DownloadViewModel
 import id.local.tubeflow.core.SettingsStore
+import id.local.tubeflow.core.YouTubeAuth
 import id.local.tubeflow.core.PlayerViewModel
 import id.local.tubeflow.core.VideoPip
 import id.local.tubeflow.core.VideoPlayerViewModel
@@ -45,6 +46,10 @@ class MainActivity : ComponentActivity() {
         }
         SettingsStore.load(this)
         BstationAuth.load(this)
+        // Sesi YouTube wajib dipulihkan saat aplikasi dibuka. Tanpa ini `YouTubeAuth.session` tetap
+        // null sampai ada unduhan/engine yang memicunya, sehingga akun yang sudah login tampak logout
+        // setiap kali proses aplikasi baru dimulai.
+        YouTubeAuth.load(this)
         val model = ViewModelProvider(this)[DownloadViewModel::class.java]
         val library = ViewModelProvider(this)[id.local.tubeflow.core.MediaLibraryViewModel::class.java]
         player = PlayerViewModel.obtain(application)

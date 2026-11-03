@@ -945,23 +945,27 @@ private fun formatMeta(job: DownloadJob): String {
 }
 
 /**
- * Menu ⋮ kartu antrean ringkas: aksi mengikuti status tanpa deret ikon 48 dp di bawah kartu,
- * sehingga tinggi kartu antrean sama dengan baris Riwayat dan Koleksi.
+ * Panel aksi baris unduhan: SATU menu ⋮ untuk Antrean maupun Riwayat. Aksi mengikuti status
+ * (Jeda/Lanjutkan/Batalkan/Coba lagi/Hapus) atau daftar aksi hasil selesai dengan grup yang sama,
+ * sehingga tinggi baris, ikon, dan susunan menunya tidak lagi berbeda antar-tab.
  */
 @Composable
-private fun QueueActionMenu(
+private fun JobRowMenu(
     job: DownloadJob,
     pause: (() -> Unit)?,
     resume: (() -> Unit)?,
     cancel: () -> Unit,
     retry: () -> Unit,
     remove: (() -> Unit)?,
+    completedSpecs: List<MediaActionSpec>,
+    completedEnabled: (MediaActionKind) -> Boolean,
+    onCompletedAction: (MediaActionKind) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     val destructive = MaterialTheme.colorScheme.error
     Box {
-        IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, "Aksi antrean") }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
+        IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, "Aksi unduhan") }
+        DropdownMenu(open, onDismissRequest = { open = false }, modifier = Modifier.heightIn(max = 420.dp)) {
             when (job.state) {
                 JobState.QUEUED, JobState.RUNNING -> {
                     pause?.let { action ->
@@ -1005,7 +1009,39 @@ private fun QueueActionMenu(
                         )
                     }
                 }
-                JobState.COMPLETED -> Unit
+                JobState.COMPLETED -> {
+                    // Grup dan urutan sama dengan menu baris Koleksi agar panel terbaca seragam.
+                    var currentGroup: String? = null
+                    completedSpecs.forEach { spec ->
+                        if (spec.group != null && spec.group != currentGroup) {
+                            Text(
+                                spec.group,
+                                Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            currentGroup = spec.group
+                        }
+                        val isDestructive = MediaCardPlan.destructive(spec.kind)
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    MediaCardPlan.label(spec.kind, job.mode == MediaMode.AUDIO),
+                                    color = if (isDestructive) destructive else Color.Unspecified,
+                                )
+                            },
+                            onClick = { open = false; onCompletedAction(spec.kind) },
+                            enabled = completedEnabled(spec.kind),
+                            leadingIcon = {
+                                Icon(
+                                    MediaCardPlan.icon(spec.kind),
+                                    null,
+                                    tint = if (isDestructive) destructive else LocalContentColor.current,
+                                )
+                            },
+                        )
+                    }
+                }
             }
         }
     }
@@ -1020,55 +1056,58 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
     val song=job.songIdentity()
     val audio = job.mode == MediaMode.AUDIO
     val attachments = attachmentUris(job.sidecarUris)
-    // Aksi kartu selesai dipakai di dua tempat: baris ringkas (menu titik tiga) atau deret bawah.
+    // Aksi kartu selesai dipakai di dua tempat: menu titik tiga baris ringkas atau deret bawah.
+    val completedSpecs = MediaCardPlan.history(
+        audio = audio,
+        hasThumbnail = attachments.containsKey(ATTACHMENT_THUMBNAIL),
+        hasSubtitle = hasSubtitleAttachment(audio, job.sidecarUris),
+        hasLyrics = job.lyricStatus == LyricStatus.SAVED,
+    ).filter { spec ->
+        // Aksi hanya muncul bila pemanggil menyediakan jalurnya.
+        when (spec.kind) {
+            MediaActionKind.PLAY -> play != null
+            MediaActionKind.FIND_LYRICS -> searchLyrics != null
+            MediaActionKind.ENQUEUE -> enqueue != null
+            MediaActionKind.PLAY_NEXT -> playNext != null
+            MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming != null
+            MediaActionKind.DELETE -> remove != null
+            else -> true
+        }
+    }
+    val completedEnabled: (MediaActionKind) -> Boolean = { kind ->
+        when (kind) {
+            MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
+            MediaActionKind.FIND_LYRICS -> job.outputUri != null
+            else -> true
+        }
+    }
+    val onCompletedAction: (MediaActionKind) -> Unit = { kind ->
+        when (kind) {
+            MediaActionKind.PLAY -> play?.invoke()
+            MediaActionKind.ENQUEUE -> enqueue?.invoke()
+            MediaActionKind.PLAY_NEXT -> playNext?.invoke()
+            MediaActionKind.OPEN -> openError = launchFile(context, job, false)
+            MediaActionKind.SHARE -> openError = launchFile(context, job, true)
+            MediaActionKind.FIND_LYRICS -> searchLyrics?.invoke(job.id)
+            MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming?.invoke()
+            MediaActionKind.REDOWNLOAD -> retry()
+            MediaActionKind.DELETE -> remove?.invoke()
+            MediaActionKind.OPEN_THUMBNAIL -> attachments[ATTACHMENT_THUMBNAIL]?.let {
+                openError = openSidecar(context, it, ATTACHMENT_THUMBNAIL)
+            }
+            MediaActionKind.OPEN_SUBTITLE -> attachments.entries
+                .firstOrNull { it.key != ATTACHMENT_THUMBNAIL }
+                ?.let { (sidecarKind, uri) -> openError = openSidecar(context, uri, sidecarKind) }
+            else -> Unit
+        }
+    }
     val completedActions: @Composable () -> Unit = {
         MediaActionBar(
             audio = audio,
             compact = compact,
-            specs = MediaCardPlan.history(
-                audio = audio,
-                hasThumbnail = attachments.containsKey(ATTACHMENT_THUMBNAIL),
-                hasSubtitle = hasSubtitleAttachment(audio, job.sidecarUris),
-                hasLyrics = job.lyricStatus == LyricStatus.SAVED,
-            ).filter { spec ->
-                // Aksi hanya muncul bila pemanggil menyediakan jalurnya.
-                when (spec.kind) {
-                    MediaActionKind.PLAY -> play != null
-                    MediaActionKind.FIND_LYRICS -> searchLyrics != null
-                    MediaActionKind.ENQUEUE -> enqueue != null
-                    MediaActionKind.PLAY_NEXT -> playNext != null
-                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming != null
-                    MediaActionKind.DELETE -> remove != null
-                    else -> true
-                }
-            },
-            enabled = { kind ->
-                when (kind) {
-                    MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
-                    MediaActionKind.FIND_LYRICS -> job.outputUri != null
-                    else -> true
-                }
-            },
-            onClick = { kind ->
-                when (kind) {
-                    MediaActionKind.PLAY -> play?.invoke()
-                    MediaActionKind.ENQUEUE -> enqueue?.invoke()
-                    MediaActionKind.PLAY_NEXT -> playNext?.invoke()
-                    MediaActionKind.OPEN -> openError = launchFile(context, job, false)
-                    MediaActionKind.SHARE -> openError = launchFile(context, job, true)
-                    MediaActionKind.FIND_LYRICS -> searchLyrics?.invoke(job.id)
-                    MediaActionKind.EDIT_LYRIC_TIMING -> editLyricTiming?.invoke()
-                    MediaActionKind.REDOWNLOAD -> retry()
-                    MediaActionKind.DELETE -> remove?.invoke()
-                    MediaActionKind.OPEN_THUMBNAIL -> attachments[ATTACHMENT_THUMBNAIL]?.let {
-                        openError = openSidecar(context, it, ATTACHMENT_THUMBNAIL)
-                    }
-                    MediaActionKind.OPEN_SUBTITLE -> attachments.entries
-                        .firstOrNull { it.key != ATTACHMENT_THUMBNAIL }
-                        ?.let { (sidecarKind, uri) -> openError = openSidecar(context, uri, sidecarKind) }
-                    else -> Unit
-                }
-            },
+            specs = completedSpecs,
+            enabled = completedEnabled,
+            onClick = onCompletedAction,
         )
     }
     Card(
@@ -1123,10 +1162,19 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         }
                     }
                 }
-                // Baris ringkas: aksi di ujung baris untuk semua status; kartu besar memakai chip status.
+                // Baris ringkas: satu panel ⋮ untuk semua status — Antrean, Riwayat, dan Koleksi seragam.
                 when {
-                    compact && job.state == JobState.COMPLETED -> completedActions()
-                    compact -> QueueActionMenu(job, pause, resume, cancel, retry, remove)
+                    compact -> JobRowMenu(
+                        job = job,
+                        pause = pause,
+                        resume = resume,
+                        cancel = cancel,
+                        retry = retry,
+                        remove = remove,
+                        completedSpecs = if (job.state == JobState.COMPLETED) completedSpecs else emptyList(),
+                        completedEnabled = completedEnabled,
+                        onCompletedAction = onCompletedAction,
+                    )
                     else -> StateChip(job.state)
                 }
             }

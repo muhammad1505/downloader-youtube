@@ -1,6 +1,7 @@
 package id.local.tubeflow.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,5 +45,17 @@ class DownloadSectionsTest {
         )
 
         assertEquals(2, DownloadSections.running(jobs))
+    }
+
+    @Test
+    fun watchdogOnlyReschedulesQueuedJobsWithoutLiveWork() {
+        // Tertinggal: masih menunggu padahal WorkManager dan mesin sama-sama tidak memegangnya.
+        assertTrue(QueueWatchdog.stalled(JobState.QUEUED, hasLiveWork = false, engineRunning = false))
+        // Menunggu slot worker (pekerjaan WorkManager hidup) atau mesin sudah berjalan: jangan diganggu.
+        assertFalse(QueueWatchdog.stalled(JobState.QUEUED, hasLiveWork = true, engineRunning = false))
+        assertFalse(QueueWatchdog.stalled(JobState.QUEUED, hasLiveWork = false, engineRunning = true))
+        // Status lain memang tidak punya pekerjaan aktif — jangan dijadwalkan ulang.
+        listOf(JobState.RUNNING, JobState.PAUSED, JobState.FAILED, JobState.CANCELLED, JobState.COMPLETED)
+            .forEach { assertFalse(it.name, QueueWatchdog.stalled(it, hasLiveWork = false, engineRunning = false)) }
     }
 }

@@ -154,6 +154,15 @@ internal fun DownloadComposer(
     LaunchedEffect(SettingsStore.autoArtwork) { embedThumb = SettingsStore.autoArtwork }
 
     val trimmed = url.trim()
+    // Antrean yang dikirim mengosongkan isian link. Kursor dan papan ketik harus ikut lepas supaya
+    // pengguna tidak terlempar kembali ke kolom link begitu unduhan masuk antrean. `focusComposer`
+    // dikecualikan agar shortcut "Unduh" tetap memfokuskan kolom saat dibuka.
+    LaunchedEffect(trimmed) {
+        if (trimmed.isBlank() && !focusComposer) {
+            linkFocused = false
+            focusManager.clearFocus()
+        }
+    }
     val isBstationShortLink = BstationUrls.isShortLink(trimmed)
     val isVideo = Selection.validUrl(trimmed)
     val isPlaylistLink = Selection.validPlaylistUrl(trimmed)

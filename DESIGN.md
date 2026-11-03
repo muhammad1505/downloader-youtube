@@ -479,6 +479,19 @@ Penghemat baterai berada di Pengaturan → Pemutaran (Ikuti sistem/Aktif/Nonakti
 Mode ini mengurangi frekuensi pembaruan posisi dan sementara melepas efek
 Smart Enhance, mempertahankan preferensi efek pengguna untuk dipakai kembali.
 
+## Panel aksi baris unduhan dan dialog folder — 1.1.75
+
+Antrean dan Riwayat memakai satu panel aksi: menu titik tiga dengan ikon, urutan, dan pengelompokan yang
+sama (`Antrean & playlist`, `Lirik`, `Lampiran`, `Berkas`). Tinggi menu dibatasi 420 dp dan aksi
+destruktif selalu memakai warna galat, sehingga perbedaan hanya berasal dari status job, bukan dari
+komponen yang berbeda. Baris ringkas tidak menambah deret ikon; kartu besar tetap memakai deret ikon.
+
+Aksi folder Koleksi (tekan lama) tampil sebagai dialog tengah layar, bukan lembar bawah: lebar mengikuti
+isi dengan batas 420 dp (nyaman di ponsel 360 dp maupun tablet), tinggi maksimum 560 dp dan dapat
+digulir, judul folder dipotong maksimal dua baris, dan setiap aksi adalah baris ikon 20 dp + label
+dengan seluruh lebar baris sebagai target sentuh. Catatan bahwa ganti nama hanya label TubeFlow tetap
+tampil di bawah daftar aksi.
+
 ## Kecerahan player — 1.1.46
 
 Penyempurnaan Operate, ENERGY2/RHYTHM1/MOTION1. Pilihan Otomatis/Manual berada
