@@ -2,7 +2,8 @@ package id.local.tubeflow.ui
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MediaLibraryScreen(
     model: MediaLibraryViewModel,
@@ -58,13 +60,15 @@ fun MediaLibraryScreen(
     val artists by model.artists.collectAsStateWithLifecycle()
     val albums by model.albums.collectAsStateWithLifecycle()
     val folderCounts by model.folderCounts.collectAsStateWithLifecycle()
+    val folderAliases = SettingsStore.folderAliases
     // Kartu folder memakai hitungan database penuh; halaman pertama hanya cadangan saat hitungan
     // belum tiba supaya grid tidak berkedip kosong.
-    val folderCards = remember(media, folderCounts) {
+    val folderCards = remember(media, folderCounts, folderAliases) {
         val totals = folderCounts.ifEmpty {
             media.groupingBy { it.folder }.eachCount().mapValues { it.value.toLong() }
         }
-        totals.entries.filter { it.value > 0 }.sortedBy { CollectionGroups.label(it.key).lowercase() }
+        totals.entries.filter { it.value > 0 }
+            .sortedBy { FolderAliases.label(it.key, folderAliases).lowercase() }
     }
     // Grid folder mengikuti lebar jendela: tiga kolom di ponsel, empat kolom di layar lebar.
     val windowWidth = LocalWindowInfo.current.containerSize.width
@@ -92,6 +96,11 @@ fun MediaLibraryScreen(
     var delete by remember { mutableStateOf<MediaItem?>(null) }
     var timing by remember { mutableStateOf<MediaItem?>(null) }
     var clipStatus by remember { mutableStateOf<MediaItem?>(null) }
+    // Aksi folder Koleksi: tekan lama membuka lembar aksi, bukan langsung menghapus.
+    var folderMenu by remember { mutableStateOf<String?>(null) }
+    var folderDetail by remember { mutableStateOf<FolderSummary?>(null) }
+    var folderRename by remember { mutableStateOf<String?>(null) }
+    var folderDelete by remember { mutableStateOf<String?>(null) }
     // "Unduh lagi" mengganti file yang ada; pasangkan job sumber dengan item yang dikonfirmasi.
     var redownload by remember { mutableStateOf<Pair<DownloadJob, MediaItem>?>(null) }
     // Favorit punya chip sendiri, jadi tidak dihitung dua kali di label Filter.
@@ -165,7 +174,7 @@ fun MediaLibraryScreen(
         } }
         openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
         if (filter.folder.isNotBlank()) item {
-            LibraryBreadcrumb(CollectionGroups.label(filter.folder)) {
+            LibraryBreadcrumb(FolderAliases.label(filter.folder, folderAliases)) {
                 model.filter(filter.copy(folder = ""))
             }
         }
@@ -185,9 +194,14 @@ fun MediaLibraryScreen(
                 items(folderCards.chunked(folderColumns), key = { row -> "folders:" + row.joinToString("|") { it.key } }) { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         row.forEach { (folder, total) ->
-                            FolderTile(folder, total, Modifier.weight(1f)) {
-                                model.filter(filter.copy(folder = folder))
-                            }
+                            FolderTile(
+                                folder = folder,
+                                alias = FolderAliases.label(folder, folderAliases),
+                                total = total,
+                                modifier = Modifier.weight(1f),
+                                onOpen = { model.filter(filter.copy(folder = folder)) },
+                                onLongClick = { folderMenu = folder },
+                            )
                         }
                         // Slot kosong menjaga lebar kartu sama meski baris terakhir tidak penuh.
                         repeat(folderColumns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -302,7 +316,7 @@ fun MediaLibraryScreen(
                 )
                 OptionMenu(
                     label = "Folder",
-                    options = listOf("" to "Semua folder") + folders.map { it to it },
+                    options = listOf("" to "Semua folder") + folders.map { it to FolderAliases.label(it, folderAliases) },
                     selected = filter.folder,
                     onSelect = { model.filter(filter.copy(folder = it)) },
                     modifier = Modifier.fillMaxWidth(),
@@ -401,20 +415,152 @@ fun MediaLibraryScreen(
     ) }
     timing?.let { LyricTimingDialog(it, model) { timing = null } }
     clipStatus?.let { StatusClipDialog(it) { clipStatus = null } }
+
+    // Tekan lama folder: semua aksi folder dikumpulkan di satu lembar agar tidak ada aksi
+    // destruktif yang terpicu oleh ketukan biasa.
+    folderMenu?.let { folder ->
+        val label = FolderAliases.label(folder, folderAliases)
+        ModalBottomSheet(
+            onDismissRequest = { folderMenu = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.Outlined.Folder, size = 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            folder,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                ActionButton("Buka folder", { folderMenu = null; model.filter(filter.copy(folder = folder)) }, icon = Icons.Outlined.FolderOpen, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+                ActionButton("Putar semua lagu", { folderMenu = null; model.playFolder(player, folder) }, icon = Icons.Outlined.PlayArrow, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+                ActionButton("Detail folder", { folderMenu = null; model.folderDetail(folder) { folderDetail = it } }, icon = Icons.Outlined.Info, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+                ActionButton("Ganti nama tampilan", { folderMenu = null; folderRename = folder }, icon = Icons.Outlined.DriveFileRenameOutline, emphasis = ActionEmphasis.Quiet, fillWidth = true)
+                ActionButton("Hapus isi folder", { folderMenu = null; folderDelete = folder }, icon = Icons.Outlined.DeleteForever, emphasis = ActionEmphasis.Quiet, destructive = true, fillWidth = true)
+                Text(
+                    "Ganti nama hanya mengubah label di TubeFlow. Nama folder di penyimpanan tidak berubah agar berkas, lirik, dan riwayat unduhan tetap terhubung.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    folderDetail?.let { summary ->
+        val label = FolderAliases.label(summary.folder, folderAliases)
+        AlertDialog(
+            onDismissRequest = { folderDetail = null },
+            title = { DialogTitle("Detail folder", icon = Icons.Outlined.Info, subtitle = label) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Lokasi: ${summary.folder}")
+                    Text("Item: ${summary.total} · ${summary.audio} audio · ${summary.video} video")
+                    Text("Tersedia: ${summary.available} · Tidak tersedia: ${summary.unavailable}")
+                    Text(
+                        "Ukuran: ${Format.bytes(summary.bytes)}" +
+                            if (summary.unknownSizes > 0) " + ${summary.unknownSizes} berkas tanpa ukuran" else "",
+                    )
+                    Text(
+                        "Nama tampilan hanya label TubeFlow; folder di penyimpanan tetap memakai lokasi di atas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { folderDetail = null }) { Text("Tutup") } },
+        )
+    }
+
+    folderRename?.let { folder ->
+        val stored = SettingsStore.folderAliases[FolderAliases.normalize(folder)]
+        var name by remember(folder, stored) {
+            mutableStateOf(stored ?: FolderAliases.label(folder, folderAliases).substringAfterLast('/'))
+        }
+        val problem = FolderAliases.validate(name, folder, folderAliases)
+        AlertDialog(
+            onDismissRequest = { folderRename = null },
+            title = { DialogTitle("Ganti nama tampilan", icon = Icons.Outlined.DriveFileRenameOutline, subtitle = folder) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nama folder") },
+                        singleLine = true,
+                        isError = problem != null,
+                        supportingText = { Text(problem ?: "Hanya label di TubeFlow; nama di penyimpanan tidak berubah.") },
+                        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                    )
+                    if (stored != null) {
+                        ActionButton(
+                            "Kembalikan nama penyimpanan",
+                            { model.resetFolderName(folder); folderRename = null },
+                            emphasis = ActionEmphasis.Quiet,
+                            fillWidth = true,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = problem == null, onClick = { model.renameFolder(folder, name); folderRename = null }) {
+                    Text("Simpan")
+                }
+            },
+            dismissButton = { TextButton(onClick = { folderRename = null }) { Text("Batal") } },
+        )
+    }
+
+    folderDelete?.let { folder ->
+        val label = FolderAliases.label(folder, folderAliases)
+        ConfirmDialog(
+            title = "Hapus isi folder?",
+            text = "Semua file tersedia di \"$label\" (termasuk lirik dan thumbnail terkait) akan dihapus permanen. Folder fisik dan nama folder di penyimpanan tetap ada.",
+            confirmLabel = "Hapus isi",
+            onConfirm = { model.deleteFolder(folder); folderDelete = null },
+            onDismiss = { folderDelete = null },
+            destructive = true,
+        )
+    }
 }
 
 @Composable
 private fun FolderSectionHeading(count: Int) {
-    SectionBanner("Daftar folder", icon = Icons.Outlined.Folder, trailing = "$count folder")
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SectionBanner("Daftar folder", icon = Icons.Outlined.Folder, trailing = "$count folder")
+        Text(
+            "Tekan lama folder untuk detail, ganti nama tampilan, atau hapus isinya.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /**
- * Folder hanya menampilkan ikon, nama, letak, dan jumlah file — tanpa kartu dan tanpa panah.
- * Seluruh baris tetap dapat diketuk dengan label aksesibilitas yang jelas.
+ * Folder menampilkan ikon, nama tampilan, letak, dan jumlah file — tanpa kartu dan tanpa panah.
+ * Ketuk membuka folder; tekan lama membuka aksi folder (detail, nama tampilan, hapus isi).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FolderTile(folder: String, total: Long, modifier: Modifier = Modifier, onOpen: () -> Unit) {
-    val label = CollectionGroups.label(folder)
+private fun FolderTile(
+    folder: String,
+    alias: String,
+    total: Long,
+    modifier: Modifier = Modifier,
+    onOpen: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val label = alias
     val name = label.substringAfterLast('/').ifBlank { label }
     val parent = label.substringBeforeLast('/', "").trim().ifBlank { null }
     val scheme = MaterialTheme.colorScheme
@@ -422,7 +568,12 @@ private fun FolderTile(folder: String, total: Long, modifier: Modifier = Modifie
         modifier.fillMaxWidth()
             .heightIn(min = 112.dp)
             .clip(MaterialTheme.shapes.medium)
-            .clickable(onClickLabel = "Buka folder $label", onClick = onOpen)
+            .combinedClickable(
+                onClickLabel = "Buka folder $label",
+                onLongClickLabel = "Aksi folder $label",
+                onClick = onOpen,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),

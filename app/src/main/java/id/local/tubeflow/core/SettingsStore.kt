@@ -58,6 +58,10 @@ object SettingsStore {
     var collectionFolders by mutableStateOf<List<CollectionFolder>>(emptyList())
         private set
 
+    /** Nama tampilan folder Koleksi; kunci memakai jalur folder dan tidak mengubah penyimpanan. */
+    var folderAliases by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
+
     /** How many downloads may run at the same time (1..4). */
     var maxConcurrent by mutableIntStateOf(1)
         private set
@@ -120,6 +124,7 @@ object SettingsStore {
         storageFolder = prefs.getString("folder", DEFAULT_FOLDER)?.let(Selection::safeFolder) ?: DEFAULT_FOLDER
         storageTree = prefs.getString("tree", "")?.takeIf { it.isNotBlank() }
         collectionFolders = CollectionFolders.decode(prefs.getString("collection_folders", ""))
+        folderAliases = FolderAliases.decode(prefs.getString("folder_aliases", ""))
         maxConcurrent = prefs.getInt("concurrent", 1).coerceIn(1, 4)
         downloadWifiOnly = prefs.getBoolean("download_wifi_only", false)
         downloadChargingOnly = prefs.getBoolean("download_charging_only", false)
@@ -146,6 +151,20 @@ object SettingsStore {
         collectionFolders = unique
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit { putString("collection_folders", CollectionFolders.encode(unique)) }
+    }
+
+    /** Menyimpan alias nama folder; peta kosong menghapus seluruh alias. */
+    fun setFolderAliases(context: Context, aliases: Map<String, String>) {
+        val clean = aliases.entries
+            .mapNotNull { (folder, name) ->
+                val key = FolderAliases.normalize(folder)
+                val label = name.trim()
+                if (key.isBlank() || label.isBlank()) null else key to label
+            }
+            .toMap()
+        folderAliases = clean
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putString("folder_aliases", FolderAliases.encode(clean)) }
     }
 
     fun setMaxConcurrent(context: Context, value: Int) {

@@ -80,6 +80,8 @@ interface MediaDao {
     // saat katalog hanya berisi video atau berkas yang tidak terbaca.
     @Query("SELECT COUNT(*) FROM media_items") fun catalogCount(): Flow<Long>
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name AND uri != :exceptUri AND availability = 'AVAILABLE' LIMIT 1") suspend fun collision(folder: String, name: String, exceptUri: String): MediaItem?
+    // Aksi folder bekerja pada seluruh isi folder, bukan hanya halaman pertama yang tampil.
+    @Query("SELECT * FROM media_items WHERE folder = :folder ORDER BY title COLLATE NOCASE, displayName COLLATE NOCASE LIMIT 4000") suspend fun inFolder(folder: String): List<MediaItem>
     @Query("SELECT DISTINCT folder FROM media_items ORDER BY folder LIMIT 250") fun folders(): Flow<List<String>>
     @Query("SELECT DISTINCT artist FROM media_items WHERE kind = 'AUDIO' AND artist != '' ORDER BY artist LIMIT 250") fun artists(): Flow<List<String>>
     @Query("SELECT DISTINCT album FROM media_items WHERE kind = 'AUDIO' AND album != '' ORDER BY album LIMIT 250") fun albums(): Flow<List<String>>

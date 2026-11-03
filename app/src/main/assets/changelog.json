@@ -3,6 +3,8 @@
     "versionCode": 90,
     "versionName": "1.1.75",
     "highlights": [
+      "Antrean dan Riwayat di tab Download kini punya tab sendiri: memilih salah satu menyembunyikan yang lain, jumlah item tampil di judul tab, dan kata kunci pencarian dipisah per tab.",
+      "Tekan lama kartu folder Koleksi untuk membuka aksi: buka, putar semua lagu, detail jumlah dan ukuran, ganti nama tampilan, atau hapus seluruh isi folder tanpa menghapus folder fisiknya.",
       "Kartu antrean di tab Download kini ringkas seperti Riwayat dan Koleksi: jeda, lanjutkan, batalkan, coba lagi, atau hapus ada di menu titik tiga, sedangkan progres dan fase tetap terlihat.",
       "Baris audio Koleksi mendapat tombol hati favorit dan bagikan di samping ikon lirik tanpa membuka menu; video tetap memakai penanda hati kecil dan hati audio tidak tampil ganda.",
       "Tab Alat tidak lagi menampilkan kartu kosong milik Koleksi; pesannya membedakan katalog kosong, katalog video saja, dan berkas tidak terbaca, serta tidak muncul sebelum data selesai dimuat.",

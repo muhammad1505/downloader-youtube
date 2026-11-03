@@ -18,9 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ import id.local.tubeflow.core.SpotifyCollectionPreview
 import id.local.tubeflow.core.SpotifyPreview
 import id.local.tubeflow.core.SpotifyTrack
 import id.local.tubeflow.core.VideoMetadata
+import kotlinx.coroutines.launch
 
 data class QueueActions(
     val cancel: (String) -> Unit,
@@ -130,7 +133,9 @@ fun DownloadScreen(
     onDownloadTargetHandled: () -> Unit = {},
     onEngineUpdate: () -> Unit = {},
 ) {
+    var queueQuery by rememberSaveable { mutableStateOf("") }
     var historyQuery by rememberSaveable { mutableStateOf("") }
+    var activeSection by rememberSaveable { mutableIntStateOf(0) }
     var historyMode by rememberSaveable { mutableIntStateOf(-1) }
     var historyPlatform by rememberSaveable { mutableStateOf("") }
     var confirmCancelAll by remember { mutableStateOf(false) }
@@ -138,17 +143,33 @@ fun DownloadScreen(
     var pendingDelete by remember { mutableStateOf<DownloadJob?>(null) }
     var pendingRedownload by remember { mutableStateOf<DownloadJob?>(null) }
     val listState = rememberLazyListState()
-    val hasQueue = DownloadSections.queue(jobs).isNotEmpty()
-    val hasHistory = DownloadSections.history(jobs).isNotEmpty()
+    val scope = rememberCoroutineScope()
+    val queueJobs = DownloadSections.queue(jobs)
+    val historyJobs = DownloadSections.history(jobs)
+    val hasQueue = queueJobs.isNotEmpty()
+    val hasHistory = historyJobs.isNotEmpty()
     val historyOnly = downloadTarget == DownloadTarget.HISTORY
+    val showSections = !historyOnly && (hasQueue || hasHistory)
     val engineState by EngineUpdater.state.collectAsStateWithLifecycle()
+    // Posisi baris tab: heading, banner pembaruan (opsional), lalu composer.
+    val tabsIndex = if (engineState is EngineUpdateState.Available) 3 else 2
     var previousHistoryOnly by remember { mutableStateOf(false) }
     LaunchedEffect(historyOnly, downloadTarget) {
         val wasHistoryOnly = previousHistoryOnly
         previousHistoryOnly = historyOnly
         when {
-            downloadTarget == DownloadTarget.COMPOSER -> listState.animateScrollToItem(1)
-            historyOnly != wasHistoryOnly -> listState.scrollToItem(0)
+            historyOnly -> {
+                activeSection = 1
+                if (!wasHistoryOnly) listState.scrollToItem(0)
+            }
+            downloadTarget == DownloadTarget.COMPOSER -> {
+                activeSection = 0
+                listState.animateScrollToItem(1)
+            }
+            wasHistoryOnly -> {
+                activeSection = 0
+                listState.scrollToItem(0)
+            }
         }
     }
     BackHandler(enabled = historyOnly) { onDownloadTargetHandled() }
@@ -297,44 +318,100 @@ fun DownloadScreen(
             )
         }
 
-        if (!historyOnly && (hasQueue || hasHistory)) {
-            stickyHeader(key = "download-search") {
-                DownloadSearchHeader(historyQuery) { historyQuery = it }
-            }
-        }
-
-        if (!historyOnly && hasQueue) {
-            queueSection(
-                jobs = jobs,
-                query = historyQuery,
-                highlightedJobId = highlightedJobId,
-                onCancel = queueActions.cancel,
-                onRetry = queueActions.retry,
-                onRetryAll = queueActions.retryAll,
-                onRemove = queueActions.remove,
-                onPause = queueActions.pause,
-                onResume = queueActions.resume,
-                onPauseAll = queueActions.pauseAll,
-                onResumeAll = queueActions.resumeAll,
-                onCancelAllRequest = { confirmCancelAll = true },
-                onClearUnsuccessful = queueActions.clearUnsuccessful,
-            )
-        }
-
-        if (!historyOnly && hasQueue && hasHistory) {
-            item(key = "download-divider") { HorizontalDivider() }
-        }
-
-        if (hasHistory) {
-            historyContent()
-        } else if (historyOnly) {
-            item(key = "history-empty") {
-                Text(
-                    "Belum ada unduhan yang selesai.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (showSections) {
+            stickyHeader(key = "download-tabs") {
+                DownloadSectionTabs(
+                    selected = activeSection,
+                    queueCount = queueJobs.size,
+                    historyCount = historyJobs.size,
+                    onSelect = { index ->
+                        if (activeSection != index) {
+                            activeSection = index
+                            scope.launch {
+                                if (listState.firstVisibleItemIndex > tabsIndex) {
+                                    listState.animateScrollToItem(tabsIndex)
+                                }
+                            }
+                        }
+                    },
                 )
             }
         }
+
+        // Tiap tab punya kata kunci sendiri supaya pindah tab tidak menyaring daftar lainnya.
+        val sectionHasItems = if (activeSection == 0) hasQueue else hasHistory
+        if (!historyOnly && showSections && sectionHasItems) {
+            item(key = "download-search") {
+                if (activeSection == 0) DownloadSearchHeader(queueQuery) { queueQuery = it }
+                else DownloadSearchHeader(historyQuery) { historyQuery = it }
+            }
+        }
+
+        if (!historyOnly && activeSection == 0) {
+            if (hasQueue) {
+                queueSection(
+                    jobs = jobs,
+                    query = queueQuery,
+                    highlightedJobId = highlightedJobId,
+                    onCancel = queueActions.cancel,
+                    onRetry = queueActions.retry,
+                    onRetryAll = queueActions.retryAll,
+                    onRemove = queueActions.remove,
+                    onPause = queueActions.pause,
+                    onResume = queueActions.resume,
+                    onPauseAll = queueActions.pauseAll,
+                    onResumeAll = queueActions.resumeAll,
+                    onCancelAllRequest = { confirmCancelAll = true },
+                    onClearUnsuccessful = queueActions.clearUnsuccessful,
+                )
+            } else if (hasHistory) {
+                item(key = "queue-empty") {
+                    Text(
+                        "Antrean kosong. Unduhan yang selesai ada di tab Riwayat.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        if (historyOnly || (!historyOnly && activeSection == 1)) {
+            if (hasHistory) {
+                historyContent()
+            } else {
+                item(key = "history-empty") {
+                    Text(
+                        "Belum ada unduhan yang selesai.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Dua tab isi unduhan: Antrean dan Riwayat tidak lagi ditumpuk dalam satu gulungan. */
+@Composable
+private fun DownloadSectionTabs(
+    selected: Int,
+    queueCount: Int,
+    historyCount: Int,
+    onSelect: (Int) -> Unit,
+) {
+    PrimaryTabRow(
+        selectedTabIndex = selected,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Tab(
+            selected = selected == 0,
+            onClick = { onSelect(0) },
+            text = { Text(if (queueCount > 0) "Antrean · $queueCount" else "Antrean") },
+        )
+        Tab(
+            selected = selected == 1,
+            onClick = { onSelect(1) },
+            text = { Text(if (historyCount > 0) "Riwayat · $historyCount" else "Riwayat") },
+        )
     }
 }

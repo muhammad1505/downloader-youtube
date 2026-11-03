@@ -184,6 +184,14 @@ aksinya berada di menu. Di tab Download, kartu Antrean memakai `JobCard`
 ringkas yang sama dengan Riwayat: aksi per status pindah ke menu ⋮, sedangkan
 progres dan fase tetap di bawah kepala kartu.
 
+Sejak 3 November 2026 tab Download memisahkan Antrean dan Riwayat menjadi dua tab
+(`PrimaryTabRow`) dengan jumlah item di judul; masing-masing tab punya kata kunci
+pencarian sendiri dan hanya isi tab aktif yang dirender. Folder Koleksi membuka
+lembar aksi lewat tekan lama: Buka, Putar semua lagu, Detail, Ganti nama tampilan,
+dan Hapus isi folder. Ganti nama hanya mengubah label TubeFlow (`FolderAliases`)
+karena rename direktori akan memutus URI berkas, lirik, dan riwayat unduhan; hapus
+hanya membersihkan isi folder, folder fisiknya tetap ada.
+
 Kontrol Koleksi Putar/Acak/Cari dan Bersihkan di Riwayat memakai `ActionChip`
 yang sama dengan deret filter: tinggi visual mengikuti chip Material, target
 sentuh tetap minimal48dp. Tombol formulir/dialog tetap memakai `ActionButton`.

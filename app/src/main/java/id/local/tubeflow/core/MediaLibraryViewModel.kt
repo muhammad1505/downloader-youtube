@@ -316,6 +316,85 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun delete(item: MediaItem) = operation { repository.delete(item); "File dihapus." }
 
+    /**
+     * Ganti nama folder hanya mengubah label di TubeFlow. Direktori penyimpanan tidak disentuh agar
+     * URI berkas, lirik, dan riwayat unduhan tetap valid.
+     */
+    fun renameFolder(folder: String, rawName: String) = operation {
+        val key = FolderAliases.normalize(folder)
+        require(key.isNotBlank()) { "Folder tidak valid." }
+        FolderAliases.validate(rawName, key, SettingsStore.folderAliases)?.let { error(it) }
+        SettingsStore.setFolderAliases(getApplication(), FolderAliases.withAlias(SettingsStore.folderAliases, key, rawName))
+        "Nama tampilan folder diperbarui. Nama di penyimpanan tidak berubah."
+    }
+
+    fun resetFolderName(folder: String) = operation {
+        val key = FolderAliases.normalize(folder)
+        require(key.isNotBlank()) { "Folder tidak valid." }
+        SettingsStore.setFolderAliases(getApplication(), SettingsStore.folderAliases - key)
+        "Nama tampilan folder dikembalikan ke nama penyimpanan."
+    }
+
+    /** Detail isi folder dari seluruh baris katalog; null bila folder tidak dapat dibaca. */
+    fun folderDetail(folder: String, onResult: (FolderSummary?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val key = FolderAliases.normalize(folder)
+                val items = withContext(Dispatchers.IO) { dao.inFolder(key) }
+                withContext(Dispatchers.Main) { onResult(FolderSummary.of(key, items)) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                _message.value = failure.message ?: "Detail folder tidak dapat dibaca."
+                withContext(Dispatchers.Main) { onResult(null) }
+            }
+        }
+    }
+
+    /** Memutar seluruh lagu tersedia di folder tanpa mengubah filter Koleksi yang sedang aktif. */
+    fun playFolder(player: PlayerViewModel, folder: String) {
+        viewModelScope.launch {
+            try {
+                val songs = withContext(Dispatchers.IO) {
+                    dao.inFolder(FolderAliases.normalize(folder))
+                        .filter { it.kind == "AUDIO" && it.availability == "AVAILABLE" }
+                        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.ifBlank { it.displayName } })
+                }
+                if (songs.isEmpty()) _message.value = "Tidak ada lagu tersedia di folder ini."
+                else player.playAll(songs, 0, shuffle = false)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { _message.value = failure.message ?: "Folder belum dapat diputar." }
+        }
+    }
+
+    /** Hapus seluruh file di folder; folder fisik dan namanya di penyimpanan dibiarkan. */
+    fun deleteFolder(folder: String) = operation {
+        val key = FolderAliases.normalize(folder)
+        val items = withContext(Dispatchers.IO) { dao.inFolder(key) }
+        require(items.isNotEmpty()) { "Folder ini tidak memiliki file." }
+        var removed = 0
+        var failed = 0
+        var skipped = 0
+        var firstError: String? = null
+        for (item in items) {
+            if (item.availability != "AVAILABLE") { skipped++; continue }
+            try {
+                repository.delete(item)
+                removed++
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                failed++
+                if (firstError == null) firstError = failure.message
+            }
+        }
+        if (removed == 0) error(firstError ?: "Tidak ada file yang dapat dihapus di folder ini.")
+        buildString {
+            append("$removed file dihapus dari folder.")
+            if (failed > 0) append(" $failed gagal: ${firstError ?: "periksa izin penyimpanan"}.")
+            if (skipped > 0) append(" $skipped file tidak tersedia dilewati.")
+            append(" Folder fisik tidak dihapus.")
+        }
+    }
+
     /** Teks lirik tersimpan untuk alat ketuk-waktu; batasnya sama dengan editor lirik. */
     suspend fun lyricText(item: MediaItem): String = withContext(Dispatchers.IO) {
         val raw = item.lyricUri ?: error("Lagu ini belum punya lirik tersimpan. Cari lirik dulu.")
