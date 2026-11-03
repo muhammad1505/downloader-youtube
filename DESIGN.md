@@ -177,6 +177,13 @@ Kartu audio (Riwayat):  [▷] [↗] [♪] [🗑] [⋮]
 Menu ⋮:                 Antrean & playlist / Lirik / Lampiran / Berkas
 ```
 
+Sejak 3 November 2026 baris Koleksi (`MediaListRow`) memberi aksi cepat 36 dp
+di samping ikon lirik: hati favorit dan bagikan untuk audio yang tersedia. Hati
+terisi memakai warna galat; video tetap memakai penanda hati 14 dp karena
+aksinya berada di menu. Di tab Download, kartu Antrean memakai `JobCard`
+ringkas yang sama dengan Riwayat: aksi per status pindah ke menu ⋮, sedangkan
+progres dan fase tetap di bawah kepala kartu.
+
 Kontrol Koleksi Putar/Acak/Cari dan Bersihkan di Riwayat memakai `ActionChip`
 yang sama dengan deret filter: tinggi visual mengikuti chip Material, target
 sentuh tetap minimal48dp. Tombol formulir/dialog tetap memakai `ActionButton`.

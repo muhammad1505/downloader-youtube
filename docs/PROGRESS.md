@@ -2,6 +2,18 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Aksi cepat baris Koleksi, antrean ringkas, dan rilis 1.1.75 — 3 November 2026
+
+Dua keluhan pengguna setelah 1.1.73: kartu Antrean di tab Download masih memakai kartu besar (satu layar dengan Riwayat yang sudah ringkas), dan baris Koleksi audio belum punya aksi cepat favorit/bagikan di samping ikon lirik.
+
+- **Antrean ringkas.** `queueSection` memanggil `JobCard(compact = true)`. Agar tidak kembali tinggi, baris ringkas tidak lagi menggambar deret ikon 48 dp di bawah kartu: status apa pun memakai menu ⋮ di ujung baris (`QueueActionMenu`) — Jeda/Lanjutkan, Batalkan, Coba lagi, Hapus sesuai status. Progres, fase, kecepatan, dan pesan galat tetap di bawah kepala kartu; kartu besar hanya dipakai di luar daftar (`compact = false`).
+- **Aksi cepat audio.** `MediaListRow` mendapat slot `quickActions` yang dirender di antara penanda lampiran dan menu ⋮. `rowQuickActions(audio, available, favorite)` (murni, diuji JVM) mengembalikan hati favorit + bagikan hanya untuk audio yang tersedia; video tetap memakai penanda hati 14 dp di ujung baris, dan item tidak tersedia tidak mendapat aksi cepat. Tombol memakai `RowIconAction` 36 dp dengan ikon 20 dp; hati terisi dan berwarna galat bila item sudah favorit, `contentDescription` memakai label aksi yang sama dengan menu.
+- **Lebar baris.** Hati favorit audio tidak lagi digambar sebagai penanda agar tidak dobel; ikon lirik 14 dp tetap menjadi penanda "info lirik" di samping tombol. Aksi cepat dan menu memakai satu `onAction` yang sama supaya perilakunya tidak bercabang.
+
+- **Rilis gabungan.** Versi dinaikkan ke 1.1.75/code 90. Entri `changelog.json` 1.1.70–1.1.75 dilebur menjadi satu daftar **11 sorotan** supaya pengguna yang melewatkan rilis antara tetap melihat seluruh perubahan; README memakai satu kandidat 1.1.75 dan entri terpisah 1.1.70/1.1.74 dihapus.
+
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug` lulus — **673 tes Kotlin, 0 gagal/error/skipped**, termasuk `RowQuickActionsTest` (4 tes baru) dan `AppChangelogTest` untuk code 90; lint **0 error / 6 warning** (baseline sama, tanpa warning baru); `git diff --check` bersih. Belum diuji di perangkat; tinggi baris antrean dan lebar teks baris audio perlu dilihat di HP. Build rilis, audit paket, dan uji perangkat 1.1.75 belum dijalankan.
+
 ## Ikon favorit, teks bergulir, dan antrean seragam — 3 November 2026
 
 Tiga permintaan pengguna setelah verifikasi perbaikan teks baris 1.1.72; rencana desain (token + sketsa ASCII + kritik) ditulis sebelum kode, dengan dua keputusan yang dikonfirmasi pengguna: marquee **terus-menerus** dan cakupan antrean video **tampilan saja** (tanpa menu keluarkan/pindah yang butuh perubahan engine).

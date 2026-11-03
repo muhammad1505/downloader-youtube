@@ -1,52 +1,19 @@
 [
   {
-    "versionCode": 89,
-    "versionName": "1.1.74",
+    "versionCode": 90,
+    "versionName": "1.1.75",
     "highlights": [
-      "Tab Alat tidak lagi menampilkan kartu kosong milik Koleksi beserta tombol Segarkan katalog; alat hanya memberi satu baris keterangan saat belum ada audio untuk diolah.",
-      "Pesan di tab Alat kini membedakan katalog yang benar-benar kosong dari katalog yang hanya berisi video atau berkas tidak terbaca, dan tidak menyebut kosong sebelum data katalog selesai dimuat.",
-      "Alat massal tetap memakai jalur ubah nama, tag katalog, lirik, dan karaoke yang sama; tidak ada perubahan skema Room, izin, atau dependensi."
-    ]
-  },
-  {
-    "versionCode": 88,
-    "versionName": "1.1.73",
-    "highlights": [
-      "Equalizer otomatis pemutar audio kini mengikuti genre lagu dari tag file (Bass, Elektronik, Rock, Pop, Jazz, Klasik, Akustik, Vokal); pemutar video tidak terpengaruh.",
+      "Kartu antrean di tab Download kini ringkas seperti Riwayat dan Koleksi: jeda, lanjutkan, batalkan, coba lagi, atau hapus ada di menu titik tiga, sedangkan progres dan fase tetap terlihat.",
+      "Baris audio Koleksi mendapat tombol hati favorit dan bagikan di samping ikon lirik tanpa membuka menu; video tetap memakai penanda hati kecil dan hati audio tidak tampil ganda.",
+      "Tab Alat tidak lagi menampilkan kartu kosong milik Koleksi; pesannya membedakan katalog kosong, katalog video saja, dan berkas tidak terbaca, serta tidak muncul sebelum data selesai dimuat.",
+      "Judul dan keterangan baris Koleksi serta kartu Riwayat kembali tampil penuh dan bergulir bila terpotong; pada 1.1.71 kolom teks terukur nol sehingga hanya sampul dan ikon yang terlihat.",
+      "Semua daftar Koleksi memakai baris ringkas dengan nama file dan ikon lirik/subtitle, grid folder tiga sampai empat kolom, serta tombol back bertahap; kartu Riwayat ikut diringkas.",
+      "Antrean putar audio dan video memakai baris yang sama; antrean video tampil sebagai kartu di sisi kanan pemutar, dan opsi pemutar dikelompokkan agar mudah dipindai.",
+      "Equalizer otomatis pemutar audio mengikuti genre dari tag file (Bass, Elektronik, Rock, Pop, Jazz, Klasik, Akustik, Vokal); pemutar video tidak terpengaruh.",
       "Pengaturan → Akun & login menyediakan login YouTube untuk video yang membutuhkan akun; cookie disimpan terenkripsi dan hanya dipakai untuk tautan YouTube/Google.",
-      "Notifikasi progres unduhan dibersihkan saat pekerjaan selesai atau dibatalkan, jadi tidak tertinggal setelah antrean dihentikan.",
-      "Satu judul yang dipilih dari playlist tidak lagi dibuatkan folder playlist khusus.",
-      "Antrean video tampil sebagai kartu di sisi kanan pemutar dan opsi pemutar dikelompokkan agar lebih mudah dipindai.",
-      "Ikon favorit selalu tampil di kartu Koleksi sejak awal, termasuk untuk video.",
-      "Pembersihan folder menguji izin tulis yang masih berlaku dan meminta akses baru bila grant sudah kedaluwarsa.",
-      "Label pemeriksaan playlist tidak lagi menyebut episode untuk tautan YouTube, dan urutan mode tema dirapikan."
-    ]
-  },
-  {
-    "versionCode": 87,
-    "versionName": "1.1.72",
-    "highlights": [
-      "Judul dan keterangan di baris Koleksi serta kartu Riwayat kembali tampil penuh; pada 1.1.71 baris aksi memakai lebar penuh sehingga kolom teks judul terukur nol dan hanya sampul serta ikon yang terlihat.",
-      "Baris Koleksi menampilkan hati favorit untuk item yang ada di playlist Favorit, dan judul serta baris keterangan yang terpotong kini bergulir otomatis dari kanan ke kiri sehingga nama file panjang terbaca penuh.",
-      "Antrean putar audio dan video memakai baris yang sama: sampul, judul, status lampiran, dan label Sedang diputar; antrean video kini berupa kartu seperti antrean lagu, bukan daftar teks bernomor."
-    ]
-  },
-  {
-    "versionCode": 86,
-    "versionName": "1.1.71",
-    "highlights": [
-      "Semua daftar Koleksi memakai baris ringkas yang sama: nama file tampil bila berbeda dari judul, dan ikon lirik/subtitle muncul di ujung baris tanpa menambah tinggi baris.",
-      "Tombol back di Koleksi kembali bertahap — dari isi folder ke daftar folder, lalu playlist, kata kunci, dan filter — sebelum keluar aplikasi.",
-      "Grid folder Koleksi kini tiga sampai empat kolom, dan kartu Riwayat diringkas dengan pola baris yang sama sambil mempertahankan progres, tanggal selesai, serta status lampiran."
-    ]
-  },
-  {
-    "versionCode": 85,
-    "versionName": "1.1.70",
-    "highlights": [
-      "Menghapus file di folder koleksi yang ditambahkan lewat pemilih folder kini berhasil; sebelumnya penghapusan selalu ditolak dengan pesan izin akses.",
-      "Folder koleksi baru menyimpan izin baca dan tulis sekaligus, dan folder lama yang hanya memberi izin baca ditandai di Pengaturan sehingga bisa ditambahkan ulang.",
-      "Bila provider memang hanya memberi akses baca, pesan hapus kini menjelaskan cara memperbaikinya, bukan sekadar menyuruh memeriksa izin penyimpanan."
+      "Menghapus file di folder koleksi dari pemilih folder kini berhasil karena folder menyimpan izin baca+tulis; folder lama yang hanya baca ditandai dan pesan hapus menjelaskan cara memperbaikinya.",
+      "Notifikasi progres unduhan dibersihkan saat pekerjaan selesai atau dibatalkan; satu judul dari playlist tidak lagi dibuatkan folder khusus, dan label playlist YouTube tidak menyebut episode.",
+      "Ikon favorit selalu tampil di kartu Koleksi sejak awal, termasuk untuk video, dan pembersihan folder meminta akses baru bila izin tulis sudah kedaluwarsa."
     ]
   },
   {

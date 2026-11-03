@@ -792,6 +792,8 @@ fun MediaListRow(
     errorText: String? = null,
     /** Penanda lampiran kecil di ujung baris (lirik/subtitle) tanpa menambah baris teks. */
     badges: RowBadges = RowBadges(),
+    /** Aksi cepat di samping penanda lampiran (mis. hati favorit dan bagikan). */
+    quickActions: @Composable () -> Unit = {},
     trailing: @Composable () -> Unit,
 ) {
     Card(
@@ -823,9 +825,32 @@ fun MediaListRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            RowAttachmentIcons(badges)
-            trailing()
+            // Penanda lampiran, aksi cepat, dan menu berdekatan supaya teks tetap mendapat ruang.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RowAttachmentIcons(badges)
+                quickActions()
+                trailing()
+            }
         }
+    }
+}
+
+/**
+ * Tombol ikon ringkas di baris media (36 dp, ikon 20 dp). Ukuran ini menjaga satu baris tetap
+ * memuat teks, penanda lampiran, dua aksi cepat, dan menu ⋮ tanpa menambah tinggi baris.
+ */
+@Composable
+fun RowIconAction(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    Box(
+        Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, description, Modifier.size(20.dp), tint = tint)
     }
 }
 
@@ -917,6 +942,73 @@ private fun formatMeta(job: DownloadJob): String {
         else if (job.thumbnail) add("Thumb")
     }
     return if (extras.isEmpty()) base else "$base · ${extras.joinToString(" · ")}"
+}
+
+/**
+ * Menu ⋮ kartu antrean ringkas: aksi mengikuti status tanpa deret ikon 48 dp di bawah kartu,
+ * sehingga tinggi kartu antrean sama dengan baris Riwayat dan Koleksi.
+ */
+@Composable
+private fun QueueActionMenu(
+    job: DownloadJob,
+    pause: (() -> Unit)?,
+    resume: (() -> Unit)?,
+    cancel: () -> Unit,
+    retry: () -> Unit,
+    remove: (() -> Unit)?,
+) {
+    var open by remember { mutableStateOf(false) }
+    val destructive = MaterialTheme.colorScheme.error
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, "Aksi antrean") }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            when (job.state) {
+                JobState.QUEUED, JobState.RUNNING -> {
+                    pause?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Jeda") },
+                            leadingIcon = { Icon(Icons.Outlined.Pause, null) },
+                            onClick = { open = false; action() },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Batalkan", color = destructive) },
+                        leadingIcon = { Icon(Icons.Outlined.Close, null, tint = destructive) },
+                        onClick = { open = false; cancel() },
+                    )
+                }
+                JobState.PAUSED -> {
+                    resume?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Lanjutkan") },
+                            leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
+                            onClick = { open = false; action() },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Batalkan", color = destructive) },
+                        leadingIcon = { Icon(Icons.Outlined.Close, null, tint = destructive) },
+                        onClick = { open = false; cancel() },
+                    )
+                }
+                JobState.FAILED, JobState.CANCELLED -> {
+                    DropdownMenuItem(
+                        text = { Text("Coba lagi") },
+                        leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
+                        onClick = { open = false; retry() },
+                    )
+                    remove?.let { action ->
+                        DropdownMenuItem(
+                            text = { Text("Hapus", color = destructive) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = destructive) },
+                            onClick = { open = false; action() },
+                        )
+                    }
+                }
+                JobState.COMPLETED -> Unit
+            }
+        }
+    }
 }
 
 @Composable
@@ -1031,8 +1123,12 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                         }
                     }
                 }
-                // Baris ringkas: aksi di ujung baris; kartu besar tetap memakai chip status.
-                if (compact && job.state == JobState.COMPLETED) completedActions() else StateChip(job.state)
+                // Baris ringkas: aksi di ujung baris untuk semua status; kartu besar memakai chip status.
+                when {
+                    compact && job.state == JobState.COMPLETED -> completedActions()
+                    compact -> QueueActionMenu(job, pause, resume, cancel, retry, remove)
+                    else -> StateChip(job.state)
+                }
             }
             when (job.state) {
                 JobState.RUNNING -> {
@@ -1123,8 +1219,8 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                 }
             }
             openError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            // Baris ringkas menaruh aksi di ujung baris; kartu besar tetap memakai deret ikon bawah.
-            if (!compact || job.state != JobState.COMPLETED) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // Baris ringkas menaruh semua aksi di ujung baris; hanya kartu besar memakai deret ikon bawah.
+            if (!compact) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 when (job.state) {
                     JobState.QUEUED, JobState.RUNNING -> {
                         pause?.let { onClick -> IconAction(Icons.Outlined.Pause, "Jeda", onClick) }

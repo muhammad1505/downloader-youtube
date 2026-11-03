@@ -105,6 +105,8 @@ fun LazyListScope.queueSection(
             resume = if (job.state == JobState.PAUSED) ({ onResume(job.id) }) else null,
             modifier = Modifier.animateItem(),
             highlighted = job.id == highlightedJobId,
+            // Antrean unduhan memakai baris ringkas yang sama dengan Riwayat dan Koleksi.
+            compact = true,
         )
     }
     if (query.isNotBlank() && active.isEmpty() && all.isNotEmpty()) {

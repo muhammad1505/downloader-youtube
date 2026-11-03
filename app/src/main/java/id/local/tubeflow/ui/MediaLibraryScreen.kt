@@ -207,6 +207,29 @@ fun MediaLibraryScreen(
                     item.durationMs?.let { add(duration(it)) }
                     if (item.platformId.isNotBlank()) add(SourcePlatforms.fromId(item.platformId).label)
                 }.joinToString(" · ")
+                val available = item.availability == "AVAILABLE"
+                val favorite = item.uri in favorites
+                val onAction: (MediaActionKind) -> Unit = { kind ->
+                    when (kind) {
+                        MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
+                        MediaActionKind.OPEN -> open(item)
+                        MediaActionKind.SHARE -> open(item, share = true)
+                        MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
+                        MediaActionKind.FAVORITE_REMOVE -> model.removeFromPlaylist(item, PersonalLibrary.FAVORITES)
+                        MediaActionKind.ENQUEUE -> player.enqueue(item)
+                        MediaActionKind.PLAY_NEXT -> player.playNext(item)
+                        MediaActionKind.ADD_PLAYLIST -> addPlaylist = item
+                        MediaActionKind.REMOVE_PLAYLIST -> model.removeFromPlaylist(item, filter.playlistId)
+                        MediaActionKind.FIND_LYRICS -> model.openLyrics(item)
+                        MediaActionKind.EDIT_LYRIC_TIMING -> timing = item
+                        MediaActionKind.DETAIL -> detail = item
+                        MediaActionKind.RENAME -> rename = item
+                        MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
+                        MediaActionKind.CLIP_STATUS -> clipStatus = item
+                        MediaActionKind.DELETE -> delete = item
+                        else -> Unit
+                    }
+                }
                 MediaListRow(
                     coverPath = item.coverPath,
                     mode = if (item.kind == "AUDIO") MediaMode.AUDIO else MediaMode.VIDEO,
@@ -215,9 +238,22 @@ fun MediaLibraryScreen(
                     subtitle = subtitle,
                     accent = accent,
                     onClickLabel = if (item.kind == "AUDIO") "Putar lagu" else "Putar video",
-                    enabled = item.availability == "AVAILABLE",
-                    errorText = if (item.availability != "AVAILABLE") "File tidak tersedia atau izin akses berubah" else null,
-                    badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris, favorite = item.uri in favorites),
+                    enabled = available,
+                    errorText = if (!available) "File tidak tersedia atau izin akses berubah" else null,
+                    // Audio memakai tombol hati di baris; penanda hati hanya untuk video agar tidak dobel.
+                    badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris, favorite = favorite && item.kind != "AUDIO"),
+                    // Aksi cepat di samping ikon lirik supaya favorit/bagikan tidak perlu buka menu ⋮.
+                    quickActions = {
+                        rowQuickActions(item.kind == "AUDIO", available, favorite).forEach { kind ->
+                            RowIconAction(
+                                MediaCardPlan.icon(kind),
+                                MediaCardPlan.label(kind, item.kind == "AUDIO"),
+                                onClick = { onAction(kind) },
+                                tint = if (kind == MediaActionKind.FAVORITE_REMOVE) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
                     onClick = { if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item) },
                 ) {
@@ -232,7 +268,6 @@ fun MediaLibraryScreen(
                             canRedownload = sourceJob != null,
                         ),
                         enabled = { kind ->
-                            val available = item.availability == "AVAILABLE"
                             when (kind) {
                                 MediaActionKind.PLAY, MediaActionKind.OPEN, MediaActionKind.SHARE,
                                 MediaActionKind.ENQUEUE, MediaActionKind.PLAY_NEXT -> available
@@ -244,27 +279,7 @@ fun MediaLibraryScreen(
                                 else -> true
                             }
                         },
-                        onClick = { kind ->
-                            when (kind) {
-                                MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
-                                MediaActionKind.OPEN -> open(item)
-                                MediaActionKind.SHARE -> open(item, share = true)
-                                MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
-                                MediaActionKind.FAVORITE_REMOVE -> model.removeFromPlaylist(item, PersonalLibrary.FAVORITES)
-                                MediaActionKind.ENQUEUE -> player.enqueue(item)
-                                MediaActionKind.PLAY_NEXT -> player.playNext(item)
-                                MediaActionKind.ADD_PLAYLIST -> addPlaylist = item
-                                MediaActionKind.REMOVE_PLAYLIST -> model.removeFromPlaylist(item, filter.playlistId)
-                                MediaActionKind.FIND_LYRICS -> model.openLyrics(item)
-                                MediaActionKind.EDIT_LYRIC_TIMING -> timing = item
-                                MediaActionKind.DETAIL -> detail = item
-                                MediaActionKind.RENAME -> rename = item
-                                MediaActionKind.REDOWNLOAD -> sourceJob?.let { redownload = it to item }
-                                MediaActionKind.CLIP_STATUS -> clipStatus = item
-                                MediaActionKind.DELETE -> delete = item
-                                else -> Unit
-                            }
-                        },
+                        onClick = onAction,
                     )
                 }
             }

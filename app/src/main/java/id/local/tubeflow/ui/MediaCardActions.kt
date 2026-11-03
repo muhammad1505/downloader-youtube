@@ -354,6 +354,19 @@ fun rowBadges(audio: Boolean, lyricUri: String?, sidecarUris: String?, favorite:
 }
 
 /**
+ * Aksi cepat baris Koleksi: audio yang dapat diputar mendapat hati favorit dan bagikan di
+ * samping ikon lirik, tanpa perlu membuka menu ⋮. Video tetap memakai penanda hati di ujung
+ * baris, dan item yang tidak tersedia tidak diberi aksi cepat karena berkasnya tidak bisa
+ * dibagikan atau dibuka.
+ */
+fun rowQuickActions(audio: Boolean, available: Boolean, favorite: Boolean): List<MediaActionKind> =
+    if (!audio || !available) emptyList()
+    else listOf(
+        if (favorite) MediaActionKind.FAVORITE_REMOVE else MediaActionKind.FAVORITE_ADD,
+        MediaActionKind.SHARE,
+    )
+
+/**
  * Nama file tampil hanya bila tidak sekadar mengulang judul — hierarki daftar lama sebelum
  * baris ringkas, supaya baris tidak dobel info.
  */
