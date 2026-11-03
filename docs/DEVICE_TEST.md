@@ -1,9 +1,12 @@
 # Pengujian perangkat fisik
 
-## Cara membaca dan status terkini — 27 Oktober 2026
+## Cara membaca dan status terkini — 3 November 2026
 
-Terbaru **1.1.46/code61**: Manual/Auto dan penguat PCM diuji di HP; pengguna
-mengonfirmasi +6 dB jelas/bersih. [Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+Bukti perangkat terakhir yang tercatat: **1.1.46/code61**. Manual/Auto dan
+penguat PCM diuji di HP; pengguna mengonfirmasi +6 dB jelas/bersih.
+[Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md). Kandidat terbaru
+**1.1.69/code84** belum dijalankan di HP; checklistnya ada di
+[matriks uji perangkat](DEVICE_TEST_MATRIX.md).
 
 Dokumen ini adalah kronologi, bukan checklist semua fitur pada APK terbaru.
 Bagian lama di bawah tetap berlaku hanya untuk versi dan skenario yang disebut.

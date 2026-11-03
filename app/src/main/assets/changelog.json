@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 84,
+    "versionName": "1.1.69",
+    "highlights": [
+      "Indikator buffer tidak lagi berkedip saat ExoPlayer mengisi ulang buffer sekejap; spinner baru muncul setelah buffer bertahan 300 ms.",
+      "Pengaturan antrean kini menyediakan pilihan hanya lewat WiFi dan hanya saat mengisi daya, sementara perilaku default tetap seperti sebelumnya.",
+      "Folder koleksi menampilkan izin yang hilang dan tombol periksa ulang indeks; melepas folder tetap hanya membersihkan indeks, bukan file."
+    ]
+  },
+  {
     "versionCode": 83,
     "versionName": "1.1.68",
     "highlights": [

@@ -596,7 +596,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  }
  /** Menaruh pekerjaan WorkManager untuk sebuah job (dipakai submit baru maupun melanjutkan yang dijeda). */
  private suspend fun enqueueWork(id: String, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP, failMessage: String = "Tidak dapat memasukkan unduhan ke antrean.") {
-  val request=OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(workDataOf("jobId" to id, "generation" to (dao.get(id)?.generation ?: -1))).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).addTag(id).build()
+  val request=OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(workDataOf("jobId" to id, "generation" to (dao.get(id)?.generation ?: -1))).setConstraints(DownloadPolicy.constraints(SettingsStore.downloadWifiOnly, SettingsStore.downloadChargingOnly)).addTag(id).build()
   try { withContext(Dispatchers.IO) { work.enqueueUniqueWork("download-$id",policy,request).result.get() } }
   catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { dao.fail(id,failMessage); throw error }

@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.semantics
@@ -557,12 +558,34 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val grantedCollectionTrees = remember(SettingsStore.collectionFolders) {
+                context.contentResolver.persistedUriPermissions
+                    .filter { it.isReadPermission }
+                    .map { CollectionFolders.normalize(it.uri.toString()) }
+                    .toSet()
+            }
             SettingsStore.collectionFolders.forEach { folder ->
+                val readable = CollectionFolders.normalize(folder.uri) in grantedCollectionTrees
                 AdaptivePair(
                     leading = { available ->
                         Row(available, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Outlined.FolderOpen, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(folder.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Icon(
+                                if (readable) Icons.Outlined.FolderOpen else Icons.Outlined.FolderOff,
+                                null,
+                                Modifier.size(18.dp),
+                                tint = if (readable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                            )
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(folder.label, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    if (readable) treeLabel(folder.uri)
+                                    else "Akses folder hilang. Lepas lalu tambahkan ulang lewat pemilih folder.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (readable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     },
                     trailing = {
@@ -581,6 +604,12 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             ActionButton(
+                text = "Periksa ulang indeks koleksi",
+                onClick = { library.scan() },
+                icon = Icons.Outlined.Refresh,
+                fillWidth = true,
+            )
+            ActionButton(
                 text = "Tambah folder…",
                 onClick = {
                     collectionLauncher.launch(DocumentsContract.buildDocumentUri(
@@ -592,7 +621,7 @@ fun SettingsScreen(
                 fillWidth = true,
             )
             Text(
-                "Maksimum ${CollectionFolders.MAX} folder. Melepas folder hanya membersihkan indeks Koleksi; file dan subfolder di penyimpanan tetap utuh.",
+                "Maksimum ${CollectionFolders.MAX} folder. Melepas folder hanya membersihkan indeks Koleksi; file dan subfolder di penyimpanan tetap utuh. Bila izin dicabut sistem, lepas lalu tambahkan ulang folder yang sama.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -628,6 +657,19 @@ fun SettingsScreen(
                 "Urut (1) paling hemat CPU dan kuota. Mode paralel lebih cepat, dengan progres tiap unduhan tetap tampil di notifikasi. Maksimal 4 bersamaan; perubahan berlaku untuk antrean berikutnya, sedangkan unduhan yang sudah berjalan dibiarkan selesai.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider()
+            ToggleRow(
+                title = "Hanya lewat WiFi",
+                description = "Unduhan baru menunggu koneksi tidak berbayar. Unduhan yang sedang berjalan tidak dihentikan.",
+                checked = SettingsStore.downloadWifiOnly,
+                onCheckedChange = { SettingsStore.setDownloadWifiOnly(context, it) },
+            )
+            ToggleRow(
+                title = "Hanya saat mengisi daya",
+                description = "Hemat baterai untuk unduhan besar; syarat ini digabung dengan pilihan jaringan di atas.",
+                checked = SettingsStore.downloadChargingOnly,
+                onCheckedChange = { SettingsStore.setDownloadChargingOnly(context, it) },
             )
         }
 

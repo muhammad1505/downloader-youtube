@@ -165,11 +165,16 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     private suspend fun scanCatalog(): String {
-        val (count, failed, discovered) = repository.scan()
+        val (count, failed, discovered, unreadable) = repository.scan()
         _lastScan.value = System.currentTimeMillis()
         getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
         if (count == 0 && discovered == 0) return "Tidak ada media terlihat di folder. Bila file memang ada, periksa izin baca atau tambahkan folder lewat Pengaturan → Penyimpanan."
-        return "$count media diperiksa" + if (failed > 0) "; $failed file tidak dapat dibaca. Statistik dapat parsial." else "."
+        val suffix = buildString {
+            if (failed > 0) append("; $failed file tidak dapat dibaca. Statistik dapat parsial.")
+            else append(".")
+            if (unreadable > 0) append(" $unreadable folder tidak dapat diakses; periksa izin di Pengaturan → Penyimpanan.")
+        }
+        return "$count media diperiksa$suffix"
     }
     fun scan() = operation { scanCatalog() }
     /** Cukup izin untuk membaca seluruh isi folder: tree pilihan atau grant default Download/TubeFlow. */

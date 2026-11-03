@@ -1,6 +1,18 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 2 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Buffer, kebijakan antrean, dan kesehatan folder — 1.1.69/code84, 3 November 2026
+
+Keluhan “buffer sekejap” berasal dari `STATE_BUFFERING` singkat saat ExoPlayer mengisi ulang buffer. Sebelumnya UI langsung memakai flag itu, sehingga spinner tengah dan tombol putar berkedip walau video tidak berhenti. `VideoPlayback.BUFFERING_INDICATOR_DELAY_MS` (300 ms) dan `shouldRevealBuffering` kini menjadi gerbang tunggal: `VideoPlayerScreen` menunggu jeda itu, membaca ulang state pemutar, lalu baru menampilkan spinner. Buffer yang selesai sebelum 300 ms tidak terlihat sama sekali. Indikator di transport juga memakai nilai yang sama agar tidak ada dua ambang berbeda.
+
+Antrean mendapat dua pilihan opsional di Pengaturan → Unduhan: **Hanya lewat WiFi** (`UNMETERED`) dan **Hanya saat mengisi daya**. `DownloadPolicy` membangun constraint WorkManager untuk job yang baru diantrekan; default tetap `CONNECTED` tanpa syarat daya supaya perilaku lama tidak berubah. Job yang sudah berjalan tidak dihentikan ketika setelan diubah.
+
+Folder koleksi kini menampilkan kesehatan izin. `SettingsScreen` mencocokkan setiap tree tersimpan dengan `persistedUriPermissions`; folder yang grant-nya hilang memakai ikon `FolderOff`, warna error, dan petunjuk untuk melepas lalu menambahkan ulang. Tombol **Periksa ulang indeks koleksi** memicu `MediaLibraryViewModel.scan()`. `ScanSummary.unreadableSources` menghitung sumber yang gagal dibaca dan pesan pindai menyebut jumlahnya; status ini memeriksa grant tersimpan, sedangkan folder yang provider-nya sedang tidak tersedia tetap terlihat lewat hasil pindai. Melepas folder tetap hanya menghapus baris indeks milik folder itu, bukan file atau subfolder.
+
+Checklist bukti perangkat dipisahkan ke [DEVICE_TEST_MATRIX.md](DEVICE_TEST_MATRIX.md) dan ditautkan dari [DEVICE_TEST.md](DEVICE_TEST.md). Matriks mencakup Android 10/13/14–15/16 KB, pencabutan SAF, process death, buffer 300 ms, constraint WiFi/daya, subtitle BUG-082/083, metadata/lirik BUG-051/052, PiP, aksesibilitas, dan penyimpanan hampir penuh.
+
+Verifikasi: `./gradlew testDebugUnitTest lintDebug` lulus (642 tes Kotlin, 0 gagal; lint 0 error/6 warning), termasuk tes buffer dan `DownloadPolicyTest`; `changelog.json` divalidasi untuk code84. Tanpa HP tersambung, matriks perangkat, BUG-051/052, dan BUG-082/083 belum dijalankan pada build ini; build rilis dan audit native 16 KB juga belum dibuat.
 
 ## Pemutar video dan penyelarasan tema — 1.1.68/code83, 2 November 2026
 

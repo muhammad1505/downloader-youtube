@@ -62,6 +62,14 @@ object SettingsStore {
     var maxConcurrent by mutableIntStateOf(1)
         private set
 
+    /** Unduhan menunggu jaringan tidak berbayar; default false agar perilaku lama tetap. */
+    var downloadWifiOnly by mutableStateOf(false)
+        private set
+
+    /** Unduhan menunggu perangkat terisi daya; default false. */
+    var downloadChargingOnly by mutableStateOf(false)
+        private set
+
     /** Hapus catatan riwayat selesai yang lebih lama dari N hari; 0 = nonaktif. File media tidak disentuh. */
     var historyAutoDays by mutableIntStateOf(0)
         private set
@@ -113,6 +121,8 @@ object SettingsStore {
         storageTree = prefs.getString("tree", "")?.takeIf { it.isNotBlank() }
         collectionFolders = CollectionFolders.decode(prefs.getString("collection_folders", ""))
         maxConcurrent = prefs.getInt("concurrent", 1).coerceIn(1, 4)
+        downloadWifiOnly = prefs.getBoolean("download_wifi_only", false)
+        downloadChargingOnly = prefs.getBoolean("download_charging_only", false)
         historyAutoDays = prefs.getInt("history_auto_days", 0).coerceIn(0, 365)
     }
 
@@ -143,6 +153,18 @@ object SettingsStore {
         maxConcurrent = limit
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit { putInt("concurrent", limit) }
+    }
+
+    fun setDownloadWifiOnly(context: Context, enabled: Boolean) {
+        downloadWifiOnly = enabled
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putBoolean("download_wifi_only", enabled) }
+    }
+
+    fun setDownloadChargingOnly(context: Context, enabled: Boolean) {
+        downloadChargingOnly = enabled
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putBoolean("download_charging_only", enabled) }
     }
 
     /** Returns true when [raw] is a valid folder name and was persisted. */

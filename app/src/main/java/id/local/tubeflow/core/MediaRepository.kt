@@ -23,8 +23,8 @@ import java.io.FileNotFoundException
 import java.security.MessageDigest
 
 /** One URI catalogue in the existing Room database; scanning never copies or transcodes media. */
-/** Ringkasan pindai: diperiksa, gagal dibaca, dan baris yang benar-benar terlihat dari semua sumber. */
-data class ScanSummary(val checked: Int, val failed: Int, val discovered: Int)
+/** Ringkasan pindai: diperiksa, gagal dibaca, baris yang terlihat, dan sumber yang tidak dapat diakses. */
+data class ScanSummary(val checked: Int, val failed: Int, val discovered: Int, val unreadableSources: Int = 0)
 
 /** Tag katalog yang diminta pengguna; nama tampilan diverifikasi ulang sebelum ditulis. */
 data class TagUpdate(val uri: String, val displayName: String, val title: String, val artist: String)
@@ -248,6 +248,7 @@ class MediaRepository(private val context: Context) {
     suspend fun scan(validateExisting: Boolean = true): ScanSummary = withContext(Dispatchers.IO) { operations.withLock {
         recoverRename()
         var checked = 0; var failed = 0
+        var unreadableSources = 0
         val rows = mutableListOf<Triple<String, String, String>>()
         fun add(uri: String, name: String, folder: String) {
             if (rows.none { it.second == name && it.third == folder }) {
@@ -268,7 +269,7 @@ class MediaRepository(private val context: Context) {
                 arrayOf(folder, "$escaped%"), null)?.use { c ->
                 while (c.moveToNext()) add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/'))
             } ?: throw FileNotFoundException("Folder belum dapat dibaca.")
-        } catch (error: Exception) { storeError = error }
+        } catch (error: Exception) { storeError = error; unreadableSources++ }
         // Sumber SAF: folder bawaan (bila pernah diberi grant), folder output pilihan, lalu folder
         // koleksi tambahan. Hanya folder terdaftar yang dipindai; tidak ada pemindaian seluruh perangkat.
         val defaultTree = StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString()
@@ -284,6 +285,7 @@ class MediaRepository(private val context: Context) {
             val rootId = CollectionFolders.documentId(source.tree)
                 ?: runCatching { DocumentsContract.getTreeDocumentId(root) }.getOrNull()
             if (rootId == null) {
+                unreadableSources++
                 if (treeError == null) treeError = IllegalArgumentException("Folder koleksi tidak valid.")
                 continue
             }
@@ -296,7 +298,10 @@ class MediaRepository(private val context: Context) {
                     }
                 } ?: error("Akses folder tidak tersedia.")
             }
-            try { walk(rootId, source.label, 0) } catch (error: Exception) { if (treeError == null) treeError = error }
+            try { walk(rootId, source.label, 0) } catch (error: Exception) {
+                unreadableSources++
+                if (treeError == null) treeError = error
+            }
         }
         if (rows.isEmpty() && (treeError != null || storeError != null)) throw (treeError ?: storeError!!)
         val jobs = database.downloads().observe().let { flow -> flow.first() }
@@ -312,7 +317,7 @@ class MediaRepository(private val context: Context) {
                 try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
             }
         }
-        ScanSummary(checked, failed, rows.size)
+        ScanSummary(checked, failed, rows.size, unreadableSources)
     } }
 
     /**

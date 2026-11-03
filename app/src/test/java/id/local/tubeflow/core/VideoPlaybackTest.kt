@@ -453,6 +453,14 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun bufferingSpinnerWaitsBeforeCoveringTheFrame() {
+        assertFalse(VideoPlayback.shouldRevealBuffering(true, false, VideoPlayback.BUFFERING_INDICATOR_DELAY_MS - 1))
+        assertTrue(VideoPlayback.shouldRevealBuffering(true, false, VideoPlayback.BUFFERING_INDICATOR_DELAY_MS))
+        assertFalse(VideoPlayback.shouldRevealBuffering(false, false, VideoPlayback.BUFFERING_INDICATOR_DELAY_MS))
+        assertFalse(VideoPlayback.shouldRevealBuffering(true, true, VideoPlayback.BUFFERING_INDICATOR_DELAY_MS))
+    }
+
+    @Test
     fun subtitleSizesGrowFromSmallToHuge() {
         assertTrue(VideoSubtitleSize.SMALL.scale < VideoSubtitleSize.NORMAL.scale)
         assertTrue(VideoSubtitleSize.NORMAL.scale < VideoSubtitleSize.LARGE.scale)

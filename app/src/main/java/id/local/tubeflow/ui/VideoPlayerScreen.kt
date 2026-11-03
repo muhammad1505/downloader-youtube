@@ -242,6 +242,21 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     var quickSettingsVisible by rememberSaveable { mutableStateOf(true) }
     var pickingSubtitle by remember { mutableStateOf(false) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    // Buffer sekejap saat refill/seek tidak boleh menampilkan spinner atau mengganti tombol putar.
+    var bufferingVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(state.buffering, state.error) {
+        if (state.buffering && state.error == null) {
+            delay(VideoPlayback.BUFFERING_INDICATOR_DELAY_MS)
+            val latest = video.state.value
+            bufferingVisible = VideoPlayback.shouldRevealBuffering(
+                buffering = latest.buffering,
+                hasError = latest.error != null,
+                waitedMs = VideoPlayback.BUFFERING_INDICATOR_DELAY_MS,
+            )
+        } else {
+            bufferingVisible = false
+        }
+    }
 
     fun touch() {
         controlsVisible = true
@@ -568,7 +583,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     },
             )
 
-            if (state.buffering && state.error == null) {
+            if (bufferingVisible && state.error == null) {
                 CircularProgressIndicator(
                     Modifier.align(Alignment.Center).size(42.dp),
                     color = PlayerContent,
@@ -686,7 +701,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                             },
                         )
                     }
-                    if (!state.playing && !state.buffering && state.error == null) {
+                    if (!state.playing && !bufferingVisible && state.error == null) {
                         FilledIconButton(
                             onClick = {
                                 video.togglePlay()
@@ -707,6 +722,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     }
                     PlayerBottomBar(
                         state = state,
+                        bufferingVisible = bufferingVisible,
                         scrub = scrub,
                         onScrub = { scrub = it; touch() },
                         onScrubFinished = {
@@ -1057,6 +1073,7 @@ private fun stateDescriptionFor(positionMs: Long, durationMs: Long): String =
 @Composable
 private fun PlayerBottomBar(
     state: VideoPlayerViewModel.State,
+    bufferingVisible: Boolean,
     scrub: Float?,
     onScrub: (Float) -> Unit,
     onScrubFinished: () -> Unit,
@@ -1138,6 +1155,7 @@ private fun PlayerBottomBar(
             }
             TransportControls(
                 state = state,
+                bufferingVisible = bufferingVisible,
                 onToggle = onToggle,
                 onPrevious = onPrevious,
                 onNext = onNext,
@@ -1334,6 +1352,7 @@ private fun PlayerNoticeOverlay(notice: PlayerNotice, modifier: Modifier = Modif
 @Composable
 private fun TransportControls(
     state: VideoPlayerViewModel.State,
+    bufferingVisible: Boolean,
     onToggle: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -1366,7 +1385,7 @@ private fun TransportControls(
                 contentColor = PlayerBackground,
             ),
         ) {
-            if (state.buffering) {
+            if (bufferingVisible) {
                 CircularProgressIndicator(Modifier.size(if (compact) 22.dp else 24.dp), color = PlayerBackground, strokeWidth = 2.dp)
             } else {
                 Icon(

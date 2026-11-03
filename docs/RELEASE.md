@@ -9,7 +9,7 @@
 
 ## Pengujian perangkat
 
-Gunakan konten pengujian milik sendiri/diizinkan. Catat model HP, versi Android, ABI, ukuran halaman memori, versi APK, dan hasil tiap kasus.
+Gunakan konten pengujian milik sendiri/diizinkan. Catat model HP, versi Android, ABI, ukuran halaman memori, versi APK, dan hasil tiap kasus. Checklist bukti terbaru ada di [DEVICE_TEST_MATRIX.md](DEVICE_TEST_MATRIX.md).
 
 - Link biasa, Shorts, Music, share dari YouTube, link tidak valid, konten tidak tersedia.
 - Video Auto, MP4 720p/1080p, MKV, WebM; verifikasi hasil benar-benar dapat diputar.

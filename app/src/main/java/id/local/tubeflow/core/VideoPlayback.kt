@@ -169,6 +169,8 @@ object VideoPlayback {
     const val RESUME_TAIL_MS = 5_000L
     const val SUBTITLE_DELAY_STEP_MS = 250
     const val SUBTITLE_DELAY_LIMIT_MS = 10_000
+    /** Buffer sekejap saat refill normal tidak boleh memunculkan spinner. */
+    const val BUFFERING_INDICATOR_DELAY_MS = 300L
 
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
@@ -269,6 +271,14 @@ object VideoPlayback {
      */
     fun shouldShowBuffering(playbackState: Int, hasError: Boolean): Boolean =
         !hasError && playbackState == Player.STATE_BUFFERING
+
+    /**
+     * Spinner baru muncul setelah buffer bertahan cukup lama. ExoPlayer dapat masuk
+     * STATE_BUFFERING sekejap saat refill/seek; tanpa jeda ini indikator berkedip meski
+     * video tidak benar-benar berhenti.
+     */
+    fun shouldRevealBuffering(buffering: Boolean, hasError: Boolean, waitedMs: Long): Boolean =
+        buffering && !hasError && waitedMs >= BUFFERING_INDICATOR_DELAY_MS
 
     /** Setelah fallback software gagal, pemutar harus dibuat ulang agar percobaan berikutnya bisa hardware. */
     fun needsDecoderRestart(hasPlayer: Boolean, softwareFallbackUsed: Boolean): Boolean =
