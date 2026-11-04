@@ -109,6 +109,35 @@ fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.
     )
 }
 
+/** Panel ringkasan bagian: satu susunan untuk Antrean dan Riwayat di semua tema. */
+@Composable
+fun SectionSummary(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    SectionCard(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = UiSpacing.panel, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, content = actions)
+        }
+    }
+}
+
 /** Panel isi bersama: padding 16dp, judul `titleMedium`, deskripsi `bodySmall` redup. */
 @Composable
 fun Panel(

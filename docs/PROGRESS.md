@@ -1578,3 +1578,43 @@ lint **0 error/6 warning** versi Gradle dan pustaka yang sudah ada), `./gradlew 
 lulus, `python3 -m unittest discover -s scripts -p "test_*.py"` **101 tes OK** setelah `ffmpeg`
 dan `javap` tersedia di PATH, serta `git diff --check` bersih. Belum dijalankan: build rilis
 ber-minify, audit paket, dan uji perangkat, jadi tampilan baris status di HP belum dikonfirmasi.
+
+## Tujuh keluhan pasca-1.1.75 — 1.1.76/code91, 4 November 2026
+
+Batch ini menutup tujuh keluhan pengguna setelah 1.1.75 tanpa menambah izin baru.
+
+- **RAM katalog.** `MediaLibraryViewModel` tidak lagi memanggil `validateRecent(force = true)` yang
+  memeriksa 4.000 baris setiap peluncuran. Pemeriksaan otomatis dibatasi 100 baris, observer
+  memakai validasi ringan, dan job riwayat hanya diindeks ulang bila belum punya baris katalog
+  `AVAILABLE` (`MediaDao.byJob`). Pemindaian penuh tetap tersedia lewat **Segarkan katalog**.
+- **Caption Antrean/Riwayat.** Komponen `SectionSummary` menjadi satu-satunya panel ringkasan:
+  ikon, judul `titleSmall`, rincian `labelSmall`, dan aksi di kanan. Tema hanya mengganti warna
+  dan border lewat `SectionCard`; panel gradien khusus Transformers dihapus.
+- **Rename folder fisik.** `MediaRepository.renameFolder` memakai
+  `DocumentsContract.renameDocument` untuk folder SAF (satu operasi direktori) atau memindahkan
+  berkas MediaStore lewat `RELATIVE_PATH`. Baris katalog, URI lirik, playlist, `outputUri`,
+  `sidecarUris`, dan `subfolder` job dipetakan dalam satu transaksi. Folder akar, akar sumber,
+  folder campuran, folder tujuan yang sudah ada, dan grant baca-saja ditolak dengan pesan yang
+  menjelaskan langkah aman. Kegagalan pemetaan mengembalikan nama folder SAF atau berkas
+  MediaStore yang sudah dipindah; job yang belum selesai ikut memakai subfolder baru.
+- **Rasio video.** `VideoAspect` kini `FIT("Utuh")`, `FILL("Isi layar")`, `ZOOM("Zoom")` dengan
+  properti `crops`. Utuh menampilkan seluruh frame, Isi layar memotong tepi, Zoom memperbesar
+  1,25×. Sheet opsi dan notice singkat menjelaskan konsekuensi potong, dan deskripsi TalkBack
+  menyebut mode berikutnya.
+- **Tema awal.** Default `SettingsStore.themeMode` menjadi `MODE_SYSTEM` untuk instalasi baru;
+  nilai `theme` yang sudah tersimpan tidak ditimpa.
+- **Menu audio ganda.** `MediaActionBar` menerima `omit`; baris Koleksi menghitung aksi cepat
+  sekali dan tidak mengulang Favorit/Bagikan di menu ⋮.
+- **Genre kosong.** `prepare_audio_tags` hanya menulis `meta_genre` bila ada nilai eksplisit dan
+  menghapus kunci kosong, sehingga fallback kategori/tag yt-dlp tidak tertimpa tag genre kosong.
+
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+--max-workers=2` **BUILD SUCCESSFUL (4m 24s)** — **686 tes Kotlin** (0 gagal/error/skipped), lint
+**0 error/6 warning** baseline, tiga APK debug (arm64-v8a, armeabi-v7a, x86_64).
+`python3 -m unittest discover -s scripts -p "test_*.py"` **103 tes OK**, termasuk regresi
+`countInTree` dan genre kosong. `changelog.json` divalidasi: 22 entri, code91/1.1.76 di atas,
+kode menurun, delapan sorotan 148–175 karakter. `git diff --check` bersih.
+
+Batas: `adb devices` kosong, jadi rename fisik, rollback provider, pemotongan gambar, RAM,
+tema, menu, dan genre belum diuji di perangkat. Build rilis ber-minify, audit native/ZIP, dan
+APK 1.1.76 belum dijalankan. Verifikasi perangkat mengikuti matriks DTM-17 sampai DTM-19.

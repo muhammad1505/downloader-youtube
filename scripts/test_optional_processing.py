@@ -82,8 +82,15 @@ class AudioTagPolicyTest(unittest.TestCase):
     def test_upload_information_does_not_become_music_metadata(self):
         info = dict(title='Song', uploader='Channel', creator='Uploader', upload_date='20120513', categories=['Music'], tags=['viral'], series='Playlist', webpage_url='https://host/?token=secret', description='Promotion')
         bootstrap.prepare_audio_tags(info, {'streams':[{'codec_type':'video','tags':{'artist':'Cover image'}}]})
-        for key in ('artist','date','genre','album','purl','comment','description'):
+        for key in ('artist','date','album','purl','comment','description'):
             self.assertEqual('', info['meta_'+key])
+        # Jangan menulis genre kosong: yt-dlp berhak memakai fallback kategori/tag.
+        self.assertNotIn('meta_genre', info)
+
+    def test_empty_genre_leaves_room_for_downloader_fallback(self):
+        info = dict(title='Song', genre='', meta_genre='', categories=['Music'])
+        bootstrap.prepare_audio_tags(info, {'format': {'tags': {}}})
+        self.assertNotIn('meta_genre', info)
 
     def test_failed_probe_leaves_original_tags_untouched(self):
         saved = FFmpegMetadataPP.run

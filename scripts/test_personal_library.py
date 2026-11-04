@@ -24,7 +24,7 @@ class PersonalLibraryTest(unittest.TestCase):
         section = MODELS.split('private val MIGRATION_9_10', 1)[1].split('private fun createMediaTables', 1)[0]
         for sql in re.findall(r'db.execSQL\("([^\n]+)"\)', section):
             self.db.execute(json.loads('"' + sql + '"'))
-        self.query = re.search(r'@Query\("""(.*?)"""\)', MEDIA, re.S).group(1)
+        self.query = next(q for q in re.findall(r'@Query\("""(.*?)"""\)', MEDIA, re.S) if 'ORDER BY CASE WHEN :playlistId' in q)
 
     def tearDown(self):
         self.db.close()

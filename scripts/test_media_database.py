@@ -24,6 +24,8 @@ class MediaDatabaseTest(unittest.TestCase):
         for sql in re.findall(r'db.execSQL\("([^\n]+)"\)', triggers):
             self.db.execute(json.loads('"' + sql + '"'))
         self.queries = re.findall(r'@Query\("""(.*?)"""\)', MEDIA, re.S)
+        self.page_query = next(q for q in self.queries if 'ORDER BY CASE WHEN :playlistId' in q)
+        self.totals_query = next(q for q in self.queries if 'AS audioBytes' in q)
 
     def test_worker_sidecar_mutations_reject_replaced_generations(self):
         self.db.execute("UPDATE downloads SET generation=2,state='RUNNING',sidecarPending='new-pending',sidecarUris='new-sidecar',lyricStatus='new-status' WHERE id='old'")
@@ -76,19 +78,19 @@ class MediaDatabaseTest(unittest.TestCase):
         self.media('two', sizeBytes=None)
         self.media('video', kind='VIDEO', sizeBytes=200)
         self.media('gone', sizeBytes=999, availability='UNAVAILABLE')
-        row = self.db.execute(self.queries[1]).fetchone()
+        row = self.db.execute(self.totals_query).fetchone()
         self.assertEqual((2, 1, 1, 120, 200, 1, 1, 1), tuple(row[k] for k in ('audio','video','unavailable','audioBytes','videoBytes','unknownSizes','artists','albums')))
         self.db.execute('DELETE FROM media_items'); self.media('unknown', sizeBytes=None)
-        self.assertIsNone(self.db.execute(self.queries[1]).fetchone()['audioBytes'])
+        self.assertIsNone(self.db.execute(self.totals_query).fetchone()['audioBytes'])
 
     def test_search_escapes_wildcards_and_filters_media_without_cross_category(self):
         self.media('one', title='100%_Song', sizeBytes=123, artist='Artist')
         self.media('two', title='100XXSong', sizeBytes=456, artist='Other')
         self.media('video', kind='VIDEO', title='100%_Song')
         params = dict(playlistId='', kind='AUDIO', folder='', artist='', album='', search=r'%100\%\_Song%', sort='size', limit=100)
-        self.assertEqual(['one'], [r['uri'] for r in self.db.execute(self.queries[0], params)])
+        self.assertEqual(['one'], [r['uri'] for r in self.db.execute(self.page_query, params)])
         params.update(search='%', artist='Other', limit=1)
-        self.assertEqual(['two'], [r['uri'] for r in self.db.execute(self.queries[0], params)])
+        self.assertEqual(['two'], [r['uri'] for r in self.db.execute(self.page_query, params)])
 
     def test_folder_counts_use_whole_filter_not_loaded_page(self):
         for index in range(5):
@@ -102,24 +104,32 @@ class MediaDatabaseTest(unittest.TestCase):
         self.assertEqual(5, counts['Download/TubeFlow/Album A'])
         self.assertEqual(3, counts['Download/TubeFlow/Album B'])
         # Angka header tidak boleh mengikuti LIMIT halaman daftar.
-        page = list(self.db.execute(self.queries[0], dict(params, sort='recent', limit=2)))
+        page = list(self.db.execute(self.page_query, dict(params, sort='recent', limit=2)))
         self.assertEqual(2, len(page))
         counts = {row['folder']: row['count'] for row in self.db.execute(sql, dict(params, kind=''))}
         self.assertEqual(6, counts['Download/TubeFlow/Album A'])
+
+    def test_folder_tree_count_includes_descendants_but_not_similar_names(self):
+        self.media('a', folder='Download/TubeFlow/Artist')
+        self.media('b', folder='Download/TubeFlow/Artist/Live')
+        self.media('c', folder='Download/TubeFlow/Artist2')
+        sql = json.loads('"' + re.search(r'@Query\("([^\n]+)"\) suspend fun countInTree\(', MEDIA).group(1) + '"')
+        params = dict(folder='Download/TubeFlow/Artist', prefix='Download/TubeFlow/Artist/%')
+        self.assertEqual(2, self.db.execute(sql, params).fetchone()[0])
 
     def test_storage_totals_follow_catalogue_changes_without_download_events(self):
         # Scan/import/karaoke can change catalogue bytes while download history stays identical.
         history = self.db.execute('SELECT count(*) FROM downloads').fetchone()[0]
         self.media('import', sizeBytes=10)
         self.media('karaoke', sizeBytes=None)
-        row = self.db.execute(self.queries[1]).fetchone()
+        row = self.db.execute(self.totals_query).fetchone()
         self.assertEqual((10, 1), (row['audioBytes'], row['unknownSizes']))
         self.db.execute("UPDATE media_items SET sizeBytes=30 WHERE uri='karaoke'")
-        self.assertEqual(40, self.db.execute(self.queries[1]).fetchone()['audioBytes'])
+        self.assertEqual(40, self.db.execute(self.totals_query).fetchone()['audioBytes'])
         self.db.execute("DELETE FROM media_items WHERE uri='import'")
-        self.assertEqual(30, self.db.execute(self.queries[1]).fetchone()['audioBytes'])
+        self.assertEqual(30, self.db.execute(self.totals_query).fetchone()['audioBytes'])
         self.db.execute("UPDATE media_items SET availability='UNAVAILABLE' WHERE uri='karaoke'")
-        row = self.db.execute(self.queries[1]).fetchone()
+        row = self.db.execute(self.totals_query).fetchone()
         self.assertEqual(0, row['audio'])
         self.assertIsNone(row['audioBytes'])
         self.assertEqual(history, self.db.execute('SELECT count(*) FROM downloads').fetchone()[0])
@@ -143,7 +153,7 @@ class MediaDatabaseTest(unittest.TestCase):
         self.assertEqual('content://provider/document/one', self.db.execute('SELECT accessUri FROM media_items').fetchone()[0])
         self.media('renamed', jobId='old', sizeBytes=10)
         self.db.execute("DELETE FROM media_items WHERE uri='one'")
-        self.assertEqual(1, self.db.execute(self.queries[1]).fetchone()['audio'])
+        self.assertEqual(1, self.db.execute(self.totals_query).fetchone()['audio'])
 
 if __name__ == '__main__':
     unittest.main()

@@ -64,6 +64,7 @@ data class FolderCount(val folder: String, val count: Long)
 interface MediaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(item: MediaItem)
     @Query("SELECT * FROM media_items WHERE uri = :uri") suspend fun get(uri: String): MediaItem?
+    @Query("SELECT * FROM media_items WHERE jobId = :jobId ORDER BY checkedAt DESC LIMIT 1") suspend fun byJob(jobId: String): MediaItem?
     @Query("SELECT * FROM media_items WHERE accessUri = :raw LIMIT 1") suspend fun getByAccess(raw: String): MediaItem?
     // Dedup pemindaian SAF: file yang sama dapat punya baris MediaStore dan baris dokumen SAF.
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name ORDER BY (availability = 'AVAILABLE') DESC, checkedAt DESC LIMIT 1") suspend fun findByName(folder: String, name: String): MediaItem?
@@ -82,6 +83,11 @@ interface MediaDao {
     @Query("SELECT * FROM media_items WHERE folder = :folder AND displayName = :name AND uri != :exceptUri AND availability = 'AVAILABLE' LIMIT 1") suspend fun collision(folder: String, name: String, exceptUri: String): MediaItem?
     // Aksi folder bekerja pada seluruh isi folder, bukan hanya halaman pertama yang tampil.
     @Query("SELECT * FROM media_items WHERE folder = :folder ORDER BY title COLLATE NOCASE, displayName COLLATE NOCASE LIMIT 4000") suspend fun inFolder(folder: String): List<MediaItem>
+    /** Folder dan seluruh subfoldernya; dipakai rename folder agar isi bertingkat ikut dipetakan. */
+    @Query("""SELECT * FROM media_items WHERE folder = :folder OR folder LIKE :prefix ESCAPE '\'
+        ORDER BY folder COLLATE NOCASE, title COLLATE NOCASE, displayName COLLATE NOCASE LIMIT 4000""")
+    suspend fun folderTree(folder: String, prefix: String): List<MediaItem>
+    @Query("SELECT COUNT(*) FROM media_items WHERE folder = :folder OR folder LIKE :prefix ESCAPE '\\'") suspend fun countInTree(folder: String, prefix: String): Int
     @Query("SELECT DISTINCT folder FROM media_items ORDER BY folder LIMIT 250") fun folders(): Flow<List<String>>
     @Query("SELECT DISTINCT artist FROM media_items WHERE kind = 'AUDIO' AND artist != '' ORDER BY artist LIMIT 250") fun artists(): Flow<List<String>>
     @Query("SELECT DISTINCT album FROM media_items WHERE kind = 'AUDIO' AND album != '' ORDER BY album LIMIT 250") fun albums(): Flow<List<String>>

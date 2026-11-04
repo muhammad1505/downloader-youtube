@@ -693,11 +693,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                             onScreenshot = ::takeScreenshot,
                             onDisplay = {
                                 video.cycleAspect()
+                                val aspect = video.state.value.aspect
                                 notify(
                                     PlayerNotice(
                                         Icons.Outlined.AspectRatio,
-                                        "Rasio layar",
-                                        video.state.value.aspect.label,
+                                        "Tampilan video",
+                                        aspect.label + if (aspect.crops) " · tepi video terpotong" else " · seluruh gambar terlihat",
                                     ),
                                 )
                             },
@@ -1292,7 +1293,7 @@ private fun QuickSettingsBar(
                 )
                 QuickIcon(
                     icon = Icons.Outlined.AspectRatio,
-                    description = "Rasio ${state.aspect.label}. Ketuk untuk berikutnya",
+                    description = "Tampilan ${state.aspect.label}. Ketuk untuk ${state.aspect.next().label.lowercase()}",
                     active = state.aspect != VideoAspect.FIT,
                     onClick = onDisplay,
                     modifier = Modifier.width(itemWidth),
@@ -1780,6 +1781,13 @@ private fun VideoOptionsSheet(
                             ChoicePill(aspect.label, state.aspect == aspect) { video.setAspect(aspect) }
                         }
                     }
+                    SheetHint(
+                        when (state.aspect) {
+                            VideoAspect.FIT -> "Seluruh gambar terlihat. Bilah hitam hanya muncul bila bentuk video berbeda dari layar."
+                            VideoAspect.FILL -> "Isi layar memotong tepi video agar memenuhi layar. Pilih Utuh untuk melihat seluruh gambar."
+                            VideoAspect.ZOOM -> "Zoom memperbesar gambar dan memotong lebih banyak tepi. Pilih Utuh untuk melihat seluruh gambar."
+                        },
+                    )
                     SheetSection("Rotasi layar")
                     FlowRow(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),

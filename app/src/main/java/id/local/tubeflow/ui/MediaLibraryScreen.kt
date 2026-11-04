@@ -226,6 +226,7 @@ fun MediaLibraryScreen(
                 }.joinToString(" · ")
                 val available = item.availability == "AVAILABLE"
                 val favorite = item.uri in favorites
+                val quickActions = rowQuickActions(item.kind == "AUDIO", available, favorite)
                 val onAction: (MediaActionKind) -> Unit = { kind ->
                     when (kind) {
                         MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
@@ -261,7 +262,7 @@ fun MediaLibraryScreen(
                     badges = rowBadges(item.kind == "AUDIO", item.lyricUri, sourceJob?.sidecarUris, favorite = favorite && item.kind != "AUDIO"),
                     // Aksi cepat di samping ikon lirik supaya favorit/bagikan tidak perlu buka menu ⋮.
                     quickActions = {
-                        rowQuickActions(item.kind == "AUDIO", available, favorite).forEach { kind ->
+                        quickActions.forEach { kind ->
                             RowIconAction(
                                 MediaCardPlan.icon(kind),
                                 MediaCardPlan.label(kind, item.kind == "AUDIO"),
@@ -277,6 +278,7 @@ fun MediaLibraryScreen(
                     MediaActionBar(
                         audio = item.kind == "AUDIO",
                         compact = true,
+                        omit = quickActions.toSet(),
                         specs = MediaCardPlan.library(
                             audio = item.kind == "AUDIO",
                             favorite = item.uri in favorites,
@@ -466,7 +468,7 @@ fun MediaLibraryScreen(
                         folderMenu = null
                         model.folderDetail(folder) { folderDetail = it }
                     }
-                    FolderMenuAction(Icons.Outlined.DriveFileRenameOutline, "Ganti nama tampilan") {
+                    FolderMenuAction(Icons.Outlined.DriveFileRenameOutline, "Ganti nama folder") {
                         folderMenu = null
                         folderRename = folder
                     }
@@ -475,7 +477,7 @@ fun MediaLibraryScreen(
                         folderDelete = folder
                     }
                     Text(
-                        "Ganti nama hanya mengubah label di TubeFlow. Nama folder di penyimpanan tidak berubah agar berkas, lirik, dan riwayat unduhan tetap terhubung.",
+                        "Ganti nama folder memindahkan berkas Koleksi dan liriknya ke folder fisik baru. Playlist serta riwayat unduhan diperbarui mengikuti nama baru.",
                         Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 18.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -500,7 +502,7 @@ fun MediaLibraryScreen(
                             if (summary.unknownSizes > 0) " + ${summary.unknownSizes} berkas tanpa ukuran" else "",
                     )
                     Text(
-                        "Nama tampilan hanya label TubeFlow; folder di penyimpanan tetap memakai lokasi di atas.",
+                        "Lokasi ini adalah folder nyata di penyimpanan. Ukuran hanya menghitung berkas yang tercatat di Koleksi.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -513,12 +515,12 @@ fun MediaLibraryScreen(
     folderRename?.let { folder ->
         val stored = SettingsStore.folderAliases[FolderAliases.normalize(folder)]
         var name by remember(folder, stored) {
-            mutableStateOf(stored ?: FolderAliases.label(folder, folderAliases).substringAfterLast('/'))
+            mutableStateOf(FolderRename.leaf(folder))
         }
-        val problem = FolderAliases.validate(name, folder, folderAliases)
+        val problem = FolderAliases.validateStorageName(name)
         AlertDialog(
             onDismissRequest = { folderRename = null },
-            title = { DialogTitle("Ganti nama tampilan", icon = Icons.Outlined.DriveFileRenameOutline, subtitle = folder) },
+            title = { DialogTitle("Ganti nama folder", icon = Icons.Outlined.DriveFileRenameOutline, subtitle = folder) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -527,22 +529,26 @@ fun MediaLibraryScreen(
                         label = { Text("Nama folder") },
                         singleLine = true,
                         isError = problem != null,
-                        supportingText = { Text(problem ?: "Hanya label di TubeFlow; nama di penyimpanan tidak berubah.") },
+                        supportingText = {
+                            Text(problem ?: "Berkas Koleksi dan liriknya dipindahkan ke folder fisik baru; playlist dan riwayat unduhan ikut diperbarui.")
+                        },
                         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
                     )
                     if (stored != null) {
-                        ActionButton(
-                            "Kembalikan nama penyimpanan",
-                            { model.resetFolderName(folder); folderRename = null },
-                            emphasis = ActionEmphasis.Quiet,
-                            fillWidth = true,
+                        Text(
+                            "Folder ini masih memakai nama tampilan lama. Mengganti nama akan melepas nama tampilan itu.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        TextButton(onClick = { model.resetFolderName(folder); folderRename = null }) {
+                            Text("Lepas nama tampilan lama")
+                        }
                     }
                 }
             },
             confirmButton = {
                 TextButton(enabled = problem == null, onClick = { model.renameFolder(folder, name); folderRename = null }) {
-                    Text("Simpan")
+                    Text("Ganti nama")
                 }
             },
             dismissButton = { TextButton(onClick = { folderRename = null }) { Text("Batal") } },
@@ -567,7 +573,7 @@ private fun FolderSectionHeading(count: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SectionBanner("Daftar folder", icon = Icons.Outlined.Folder, trailing = "$count folder")
         Text(
-            "Tekan lama folder untuk detail, ganti nama tampilan, atau hapus isinya.",
+            "Tekan lama folder untuk detail, ganti nama folder, atau hapus isinya.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

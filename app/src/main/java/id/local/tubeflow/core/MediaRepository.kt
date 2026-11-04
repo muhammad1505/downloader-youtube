@@ -3,6 +3,7 @@ package id.local.tubeflow.core
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.media.MediaMetadataRetriever
 import android.provider.DocumentsContract
 import android.provider.MediaStore
@@ -122,6 +123,263 @@ class MediaRepository(private val context: Context) {
     }
 
     suspend fun import(raw: String) = withContext(Dispatchers.IO) { operations.withLock { recoverRename(); index(raw, null, "File pilihan") } }
+
+    /**
+     * Ganti nama folder di penyimpanan, bukan sekadar label. Folder SAF diganti lewat
+     * `DocumentsContract.renameDocument` (satu operasi untuk seluruh isi, termasuk subfolder),
+     * sedangkan folder MediaStore dipindahkan per berkas lewat `RELATIVE_PATH` agar URI tetap
+     * stabil. Baris katalog, playlist, lirik, lampiran, dan riwayat unduhan dipetakan ulang dalam
+     * satu transaksi. Bila pemetaan gagal setelah folder SAF berubah, nama lama dipulihkan.
+     */
+    suspend fun renameFolder(folder: String, rawName: String): String = withContext(Dispatchers.IO) { operations.withLock {
+        recoverRename()
+        val key = FolderRename.normalize(folder)
+        require(key.isNotBlank() && FolderRename.parent(key).isNotBlank()) { "Folder akar tidak dapat diganti dari sini." }
+        FolderAliases.validateStorageName(rawName)?.let { error(it) }
+        val oldLeaf = FolderRename.leaf(key)
+        val newLeaf = rawName.trim()
+        require(oldLeaf != newLeaf) { "Nama folder tidak berubah." }
+        val newFolder = FolderRename.target(key, newLeaf)
+        val defaultRoot = "Download/${SettingsStore.storageFolder}"
+        require(key != defaultRoot) {
+            "Folder utama Downloads/${SettingsStore.storageFolder} tidak dapat diganti dari Koleksi; ubah lewat Pengaturan → Penyimpanan."
+        }
+        val sources = CollectionFolders.sources(
+            defaultTree = StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString(),
+            defaultLabel = defaultRoot,
+            outputTree = SettingsStore.storageTree,
+            extras = SettingsStore.collectionFolders,
+        )
+        val outputRoot = SettingsStore.storageTree?.takeIf { it.isNotBlank() }?.let { tree ->
+            sources.firstOrNull { it.tree == CollectionFolders.normalize(tree) }?.label
+        } ?: defaultRoot
+        val subfolderRename = FolderRename.parent(key) == outputRoot
+        require(sources.none { FolderRename.normalize(it.label) == key }) {
+            "Folder akar sumber koleksi tidak dapat diganti dari sini. Lepas lalu tambahkan ulang folder dengan nama baru."
+        }
+        require(database.downloads().activeInSubfolder(oldLeaf) == 0) {
+            "Masih ada unduhan berjalan ke folder ini. Selesaikan atau batalkan dulu."
+        }
+        require(dao.countInTree(newFolder, FolderRename.likePrefix(newFolder)) == 0) {
+            "Folder tujuan sudah ada di Koleksi."
+        }
+        val items = dao.folderTree(key, FolderRename.likePrefix(key))
+        require(items.isNotEmpty()) { "Folder ini tidak memiliki file." }
+        require(items.size < 4000) { "Folder terlalu besar untuk diganti dari Koleksi; ubah nama lewat aplikasi file." }
+        val documents = items.count { DocumentsContract.isDocumentUri(context, it.location.toUri()) }
+        val media = items.count { it.location.toUri().authority == "media" }
+        require(documents == items.size || media == items.size) {
+            "Folder berisi campuran dokumen dan MediaStore; rename belum didukung."
+        }
+        if (documents == items.size) {
+            require(items.any { FolderRename.normalize(it.folder) == key }) {
+                "Folder ini hanya berisi subfolder. Buka subfoldernya untuk mengganti nama."
+            }
+        }
+        if (documents != items.size) {
+            // RELATIVE_PATH hanya dapat dipindahkan di dalam koleksi yang sama; folder impor dari
+            // Music/DCIM tidak dapat diganti nama dengan aman lewat MediaStore.
+            require(key.startsWith("Download/")) {
+                "Hanya folder di Downloads yang dapat diganti dari Koleksi. Folder lain ubah lewat aplikasi file."
+            }
+        }
+        val jobs = database.downloads().completed()
+        if (documents == items.size) renameDocumentFolder(key, newFolder, newLeaf, items, jobs, subfolderRename)
+        else renameMediaFolder(key, newFolder, items, jobs, subfolderRename)
+        newFolder
+    } }
+
+    private suspend fun renameDocumentFolder(
+        oldFolder: String,
+        newFolder: String,
+        newLeaf: String,
+        items: List<MediaItem>,
+        jobs: List<DownloadJob>,
+        subfolderRename: Boolean,
+    ) {
+        val direct = items.firstOrNull { FolderRename.normalize(it.folder) == oldFolder }
+            ?: error("Lokasi folder tidak dapat ditentukan.")
+        val directUri = direct.location.toUri()
+        val authority = directUri.authority ?: error("Lokasi folder tidak valid.")
+        val tree = DocumentsContract.isTreeUri(directUri)
+        fun documentUri(id: String): Uri = if (tree) DocumentsContract.buildDocumentUriUsingTree(directUri, id)
+            else DocumentsContract.buildDocumentUri(authority, id)
+        fun childUri(parent: String): Uri = if (tree) DocumentsContract.buildChildDocumentsUriUsingTree(documentUri(parent), parent)
+            else DocumentsContract.buildChildDocumentsUri(authority, parent)
+        val fileId = DocumentsContract.getDocumentId(directUri)
+        val folderId = fileId.substringBeforeLast('/', "")
+        val parentId = folderId.substringBeforeLast('/', "")
+        require(folderId.isNotBlank() && parentId.isNotBlank() && !parentId.endsWith(':')) {
+            "Folder akar volume atau sumber koleksi tidak dapat diganti dari sini."
+        }
+        val folderUri = documentUri(folderId)
+        require(!StorageUris.lacksWriteGrant(context, folderUri)) {
+            "Folder ini hanya memberi izin baca. Lepas lalu tambahkan ulang folder itu di Pengaturan → Koleksi."
+        }
+        resolver.query(
+            childUri(parentId),
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                require(cursor.getString(0) != newLeaf || cursor.getString(1) == folderId) {
+                    "Folder dengan nama itu sudah ada."
+                }
+            }
+        } ?: error("Isi folder induk belum dapat dibaca.")
+        val renamed = try {
+            DocumentsContract.renameDocument(resolver, folderUri, newLeaf)
+        } catch (failure: SecurityException) {
+            error("Folder ini tidak memberi izin tulis. Lepas lalu tambahkan ulang folder itu dengan izin tulis.")
+        } ?: error("Provider menolak mengganti nama folder.")
+        val actual = runCatching { displayName(renamed.toString()) }.getOrNull()
+        if (actual != newLeaf) {
+            runCatching { DocumentsContract.renameDocument(resolver, renamed, FolderRename.leaf(oldFolder)) }
+            error("Provider tidak memakai nama folder yang diminta; nama lama dipulihkan.")
+        }
+        val newFolderId = DocumentsContract.getDocumentId(renamed)
+        fun remapDocument(raw: String?): String? {
+            if (raw.isNullOrBlank()) return null
+            val uri = raw.toUri()
+            if (!DocumentsContract.isDocumentUri(context, uri)) return null
+            val documentId = runCatching { DocumentsContract.getDocumentId(uri) }.getOrNull() ?: return null
+            val nextId = FolderRename.documentIdAfter(documentId, folderId, newFolderId) ?: return null
+            return if (DocumentsContract.isTreeUri(uri)) DocumentsContract.buildDocumentUriUsingTree(uri, nextId).toString()
+            else DocumentsContract.buildDocumentUri(uri.authority ?: authority, nextId).toString()
+        }
+        try {
+            remapFolderRows(items, jobs, oldFolder, newFolder, subfolderRename, ::remapDocument)
+        } catch (error: Exception) {
+            runCatching { DocumentsContract.renameDocument(resolver, renamed, FolderRename.leaf(oldFolder)) }
+            throw error
+        }
+    }
+
+    private suspend fun renameMediaFolder(
+        oldFolder: String,
+        newFolder: String,
+        items: List<MediaItem>,
+        jobs: List<DownloadJob>,
+        subfolderRename: Boolean,
+    ) {
+        data class Move(val uri: Uri, val before: String, val after: String)
+        val moves = LinkedHashMap<String, Move>()
+        fun queue(raw: String?) {
+            if (raw.isNullOrBlank()) return
+            val uri = raw.toUri()
+            if (uri.authority != "media") return
+            val current = runCatching { mediaFolder(raw) }.getOrNull() ?: return
+            if (current != oldFolder && !current.startsWith("$oldFolder/")) return
+            val next = FolderRename.remap(current, oldFolder, newFolder)
+            if (next == current) return
+            moves.putIfAbsent(raw, Move(uri, current, next))
+        }
+        items.forEach { queue(it.location); queue(it.lyricUri) }
+        jobs.forEach { job ->
+            queue(job.outputUri)
+            job.sidecarUris?.lines()?.forEach { line -> queue(line.substringAfter('|', "")) }
+        }
+        require(moves.isNotEmpty()) { "Tidak ada berkas MediaStore yang dapat dipindahkan." }
+        require(mediaFolderCount(newFolder) == 0) { "Folder tujuan sudah ada di penyimpanan." }
+        val done = mutableListOf<Move>()
+        fun restore() {
+            for (move in done.asReversed()) runCatching {
+                resolver.update(
+                    move.uri,
+                    ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, move.before + "/") },
+                    null,
+                    null,
+                )
+            }
+        }
+        try {
+            for (move in moves.values) {
+                require(
+                    resolver.update(
+                        move.uri,
+                        ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, move.after + "/") },
+                        null,
+                        null,
+                    ) > 0,
+                ) { "Provider menolak memindahkan berkas di folder ini." }
+                done += move
+            }
+        } catch (failure: Exception) {
+            restore()
+            if (failure is SecurityException) {
+                error("Penyimpanan tidak mengizinkan TubeFlow memindahkan berkas ini. Berkas tetap di folder lama.")
+            }
+            throw failure
+        }
+        try {
+            remapFolderRows(items, jobs, oldFolder, newFolder, subfolderRename) { null }
+        } catch (failure: Exception) {
+            // Baris katalog belum berubah karena transaksi Room dibatalkan; kembalikan berkas fisik
+            // agar label folder lama tetap sesuai dengan isi penyimpanan.
+            restore()
+            throw failure
+        }
+    }
+
+    private fun mediaFolderCount(folder: String): Int =
+        resolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.RELATIVE_PATH} = ?",
+            arrayOf(folder.trimEnd('/') + "/"),
+            null,
+        )?.use { it.count } ?: error("Folder tujuan belum dapat diperiksa.")
+
+    private suspend fun remapFolderRows(
+        items: List<MediaItem>,
+        jobs: List<DownloadJob>,
+        oldFolder: String,
+        newFolder: String,
+        subfolderRename: Boolean,
+        remapDocument: (String?) -> String?,
+    ) {
+        val oldLeaf = FolderRename.leaf(oldFolder)
+        val newLeaf = FolderRename.leaf(newFolder)
+        database.withTransaction {
+            if (subfolderRename) database.downloads().renamedPendingSubfolder(oldLeaf, newLeaf)
+            for (item in items) {
+                val nextAccess = remapDocument(item.location) ?: item.location
+                val nextUri = if (nextAccess == item.location) item.uri else canonical(nextAccess)
+                val changed = item.copy(
+                    uri = nextUri,
+                    accessUri = nextAccess,
+                    folder = FolderRename.remap(item.folder, oldFolder, newFolder),
+                    lyricUri = remapDocument(item.lyricUri) ?: item.lyricUri,
+                )
+                if (nextUri != item.uri) {
+                    database.personal().relink(item.uri, nextUri)
+                    database.personal().removeMedia(item.uri)
+                    dao.remove(item.uri)
+                }
+                dao.put(changed)
+            }
+            for (job in jobs) {
+                job.sidecarUris?.let { sidecars ->
+                    val next = sidecars.lines().joinToString("\n") { line ->
+                        val raw = line.substringAfter('|', "")
+                        if (raw.isBlank()) line
+                        else remapDocument(raw)?.let { line.substringBefore('|') + "|" + it } ?: line
+                    }
+                    if (next != sidecars) database.downloads().renamedSidecars(job.id, next)
+                }
+                val nextOutput = remapDocument(job.outputUri)
+                if (nextOutput != null) database.downloads().renamedOutput(job.id, nextOutput)
+                if ((subfolderRename || nextOutput != null) && job.subfolder == oldLeaf) {
+                    database.downloads().renamedSubfolder(job.id, newLeaf)
+                }
+            }
+        }
+    }
 
     private suspend fun index(raw: String, job: DownloadJob?, fallbackFolder: String, lrc: String? = null) {
         val computedKey = canonical(raw)

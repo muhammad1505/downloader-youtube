@@ -99,7 +99,12 @@ def prepare_audio_tags(info, probe):
     info["meta_artist"] = first(info.get("meta_artist"), info.get("artist"), info.get("artists"), native.get("artist"))
     info["meta_album"] = first(info.get("album"), native.get("album"))
     info["meta_album_artist"] = first(info.get("album_artist"), info.get("album_artists"), native.get("album_artist"))
-    info["meta_genre"] = first(info.get("genre"), info.get("genres"), native.get("genre"))
+    genre = first(info.get("meta_genre"), info.get("genre"), info.get("genres"), native.get("genre"))
+    if genre:
+        info["meta_genre"] = genre
+    else:
+        # An empty meta_genre wins over yt-dlp's category/tag fallback and writes a blank genre.
+        info.pop("meta_genre", None)
     release = first(info.get("release_year"), info.get("release_date"))
     info["meta_date"] = release if re.fullmatch(r"\d{4}(?:\d{4}|-\d{2}-\d{2})?", release) else first(native.get("date"), native.get("year"))
     info["meta_track"] = first(info.get("track_number"), native.get("track"))

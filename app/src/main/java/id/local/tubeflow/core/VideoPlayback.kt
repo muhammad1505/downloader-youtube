@@ -11,13 +11,13 @@ import java.util.Locale
 
 /**
  * Mode tampilan video di dalam PlayerView; urutannya adalah urutan tombol.
- * FIT memuat seluruh frame, FILL memotong tepi agar memenuhi layar tanpa distorsi,
+ * FIT menampilkan seluruh frame tanpa distorsi, FILL memenuhi layar dengan memotong tepi,
  * dan ZOOM melakukan hal yang sama dengan pembesaran tambahan.
  */
-enum class VideoAspect(val label: String) {
-    FIT("Pas"),
-    FILL("Penuh"),
-    ZOOM("Zoom");
+enum class VideoAspect(val label: String, val crops: Boolean) {
+    FIT("Utuh", false),
+    FILL("Isi layar", true),
+    ZOOM("Zoom", true);
 
     fun next(): VideoAspect = entries[(ordinal + 1) % entries.size]
 }

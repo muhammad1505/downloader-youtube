@@ -1,12 +1,11 @@
 # Matriks uji perangkat TubeFlow
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
-seluruh skenario sudah lulus. Status terakhir diperbarui **3 November 2026**
-untuk kandidat **1.1.72/code 87** (dibangun CI dari tag; build lokal
-dibatalkan sehingga belum terpasang di perangkat). Build 1.1.71 sempat
-terpasang lewat ADB (bukti hash di [PROGRESS.md](PROGRESS.md)) tetapi belum
-ada skenario di bawah yang dijalankan pada build ini; semua baris masih
-**belum dijalankan**.
+seluruh skenario sudah lulus. Status terakhir diperbarui **4 November 2026**
+untuk kandidat **1.1.76/code 91** (host lulus; belum terpasang di perangkat
+karena `adb devices` kosong). Build 1.1.71 sempat terpasang lewat ADB (bukti
+hash di [PROGRESS.md](PROGRESS.md)) tetapi belum ada skenario di bawah yang
+dijalankan pada build ini; semua baris masih **belum dijalankan**.
 
 Gunakan hanya konten milik sendiri atau yang diizinkan. Hasil lama pada
 [DEVICE_TEST.md](DEVICE_TEST.md) tetap berlaku untuk versi yang disebut di sana
@@ -65,6 +64,9 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-14 | Penyimpanan hampir penuh | Isi penyimpanan sampai tersisa sedikit, mulai unduhan dan publikasi, lalu batalkan. | Pesan jelas; tidak ada file selesai yang rusak; ruang kembali setelah pembatalan; antrean dapat dicoba lagi setelah ruang tersedia. |
 | DTM-15 | Baris ringkas Koleksi & Riwayat | Buka Koleksi: cari file yang judulnya berbeda dari nama file dan file berlirik/subtitle. Lalu buka tab Download → Riwayat. | Nama file tampil di baris keterangan bila tidak mengulang judul; ikon lirik/CC muncul di ujung baris tanpa baris tambahan; kartu Riwayat memakai baris ringkas tapi tanggal selesai, `AttachmentInfo`, dan status lirik tetap tampil; semua aksi tersedia di menu ⋮; tap baris tetap memutar. |
 | DTM-16 | Favorit, teks bergulir, antrean seragam | Tandai beberapa item sebagai favorit di Koleksi; buka item berjudul panjang/nama file panjang; buka antrean putar audio (pemutar lagu) dan antrean video (pemutar video). | Hati favorit tampil hanya pada item di playlist Favorit; judul/baris keterangan yang terpotong bergulir kanan ke kiri (diam bila muat); kedua antrean memakai kartu sama: sampul 48 dp, judul, `AttachmentInfo`, label "Sedang diputar" + aksen pada item aktif; menu ⋮ tetap ada di audio; tap baris melompat ke item tersebut. |
+| DTM-17 | Ganti nama folder fisik | Ganti nama folder hasil unduhan (MediaStore) dan folder SAF bertingkat; periksa Files, Koleksi, playlist, lirik, dan Riwayat. Coba juga folder baca-saja, folder akar, dan nama yang sudah dipakai. | Direktori benar-benar berubah nama; berkas tetap dapat diputar; lirik, playlist, dan riwayat menunjuk lokasi baru; job yang belum selesai memakai subfolder baru; kasus yang ditolak memberi pesan jelas dan tidak meninggalkan folder setengah pindah. |
+| DTM-18 | Rasio video Utuh/Isi layar/Zoom | Putar video 16:9 di layar 20:9; ganti mode lewat tombol dan sheet opsi; periksa notice serta TalkBack. | Utuh menampilkan seluruh frame (bilah hitam boleh muncul); Isi layar memenuhi layar dengan tepi terpotong; Zoom lebih besar; hint dan notice menjelaskan potongan; label aksesibilitas menyebut mode berikutnya. |
+| DTM-19 | RAM katalog, tema awal, menu audio, genre | Buka aplikasi dengan katalog 1.000+ item dan ukur memori/waktu buka; pasang baru tanpa data untuk memeriksa tema; buka baris audio Koleksi; unduh audio tanpa genre eksplisit lalu periksa tag. | Pemeriksaan awal tidak memuat ribuan baris dan RAM tidak terus naik; instalasi baru memakai tema Sistem tanpa menimpa pilihan lama; menu ⋮ tidak mengulang Favorit/Bagikan; genre kosong tidak menjadi tag kosong dan fallback kategori/tag tetap bekerja. |
 
 ## Format hasil
 
@@ -88,6 +90,9 @@ Salin tabel ini ke laporan sesi dan isi satu baris per percobaan:
 | DTM-14 |  |  | Belum dijalankan |  |  |
 | DTM-15 |  |  | Belum dijalankan |  |  |
 | DTM-16 |  |  | Belum dijalankan |  |  |
+| DTM-17 |  |  | Belum dijalankan |  |  |
+| DTM-18 |  |  | Belum dijalankan |  |  |
+| DTM-19 |  |  | Belum dijalankan |  |  |
 
 ## Batas
 

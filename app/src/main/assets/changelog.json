@@ -1,5 +1,19 @@
 [
   {
+    "versionCode": 91,
+    "versionName": "1.1.76",
+    "highlights": [
+      "Pemeriksaan katalog saat aplikasi dibuka dibatasi 100 berkas dan indeks ulang dilewati untuk berkas yang sudah sehat, jadi RAM dan waktu buka lebih ringan pada katalog besar.",
+      "Panel ringkasan Antrean dan Riwayat kini memakai satu kartu yang sama: ikon, judul, rincian, dan aksi massal di kanan; tema hanya mengganti warna, bukan susunannya.",
+      "Ganti nama folder di Koleksi kini memindahkan berkas ke direktori baru lewat MediaStore atau mengganti nama direktori SAF, lalu memetakan lirik, playlist, dan riwayat.",
+      "Rename folder menolak folder akar, folder campuran, dan folder baca-saja dengan pesan yang jelas; kegagalan pemetaan mengembalikan nama folder atau berkas yang sudah dipindah.",
+      "Label rasio video dibuat jujur: Utuh menampilkan seluruh gambar, Isi layar memotong tepi, dan Zoom memperbesar; sheet serta pemberitahuan menjelaskan efek potongnya.",
+      "Instalasi baru memakai tema Sistem, bukan Transformers, sehingga warna mengikuti pengaturan Android; pilihan tema pengguna lama tetap dipertahankan.",
+      "Menu titik tiga pada baris audio Koleksi tidak lagi mengulang Favorit dan Bagikan yang sudah tampil sebagai tombol cepat, jadi daftar aksi lebih ringkas.",
+      "Genre kosong tidak lagi ditulis ke tag audio, sehingga yt-dlp dapat mengisi genre dari kategori atau tag sumber; genre eksplisit tetap dipertahankan."
+    ]
+  },
+  {
     "versionCode": 90,
     "versionName": "1.1.75",
     "highlights": [

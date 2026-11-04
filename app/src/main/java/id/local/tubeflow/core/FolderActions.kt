@@ -3,12 +3,12 @@ package id.local.tubeflow.core
 import org.json.JSONObject
 
 /**
- * Nama tampilan folder Koleksi. Rename di sini hanya mengubah label yang dilihat pengguna, bukan
- * direktori di penyimpanan: rename direktori lewat MediaStore/SAF akan mengubah URI semua berkas
- * dan memutus riwayat unduhan, lirik, serta thumbnail yang sudah tercatat.
+ * Nama tampilan folder Koleksi. Alias adalah fitur lama: rename folder saat ini mengganti direktori
+ * fisik, sedangkan alias yang tersisa tetap dipakai sebagai label sampai pengguna mengembalikannya.
  */
 object FolderAliases {
     const val MAX_NAME = 60
+    const val MAX_STORAGE_NAME = 40
     private const val MAX_ENTRIES = 500
 
     fun normalize(folder: String): String = folder.trim().trimEnd('/')
@@ -29,6 +29,18 @@ object FolderAliases {
             other != key && value.trim().equals(name, ignoreCase = true)
         }
         return if (duplicate) "Nama itu sudah dipakai folder lain." else null
+    }
+
+    /** Null berarti nama folder fisik dapat dipakai; selain itu pesan yang siap ditampilkan. */
+    fun validateStorageName(raw: String): String? {
+        val name = raw.trim()
+        if (name.isEmpty()) return "Nama folder tidak boleh kosong."
+        if (name.length > MAX_STORAGE_NAME) return "Nama folder maksimal $MAX_STORAGE_NAME karakter."
+        if (name.any { it == '/' || it == '\\' }) return "Nama folder tidak boleh memakai garis miring."
+        if (Selection.safeFolder(name) == null) {
+            return "Nama folder harus diawali huruf atau angka dan hanya memakai huruf, angka, spasi, titik, garis, atau tanda kurung."
+        }
+        return null
     }
 
     /** Menambah alias, atau menghapusnya bila [raw] kosong; kunci selalu dinormalisasi. */

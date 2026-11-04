@@ -88,9 +88,13 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "covers"), 32L * 1024 * 1024)
             CacheBudget.prune(java.io.File(app.noBackupFilesDir, "library-covers"), 24L * 1024 * 1024)
             MediaFileOperations.mutex.withLock { runCatching { LyricPublisher(app).recover(); MediaBackup(app).recoverLocked() } }
-            repository.validateRecent(force=true)
+            repository.validateRecent()
             database.downloads().observe().map { list -> list.filter { it.state == JobState.COMPLETED && it.autoLibrary }.map { it.id to it.outputUri } }.distinctUntilChanged().collect { jobs ->
-                for ((id, _) in jobs.take(200)) runCatching { repository.indexDownload(id) }
+                for ((id, _) in jobs.take(200)) {
+                    // Jangan indeks ulang seluruh riwayat setiap peluncuran; hanya baris yang belum
+                    // punya entri katalog sehat yang perlu disentuh.
+                    if (dao.byJob(id)?.availability != "AVAILABLE") runCatching { repository.indexDownload(id) }
+                }
             }
         }
         viewModelScope.launch {
@@ -116,7 +120,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 do {
                     availabilityRequested = false
-                    repository.validateRecent(force = true)
+                    repository.validateRecent()
                 } while (availabilityRequested)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia." }
@@ -317,15 +321,26 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(item: MediaItem) = operation { repository.delete(item); "File dihapus." }
 
     /**
-     * Ganti nama folder hanya mengubah label di TubeFlow. Direktori penyimpanan tidak disentuh agar
-     * URI berkas, lirik, dan riwayat unduhan tetap valid.
+     * Ganti nama folder beserta direktorinya di penyimpanan. Repository memetakan URI katalog,
+     * playlist, lirik, lampiran, dan riwayat unduhan; alias lama untuk folder ini dilepas agar
+     * label mengikuti nama folder yang baru.
      */
     fun renameFolder(folder: String, rawName: String) = operation {
         val key = FolderAliases.normalize(folder)
         require(key.isNotBlank()) { "Folder tidak valid." }
-        FolderAliases.validate(rawName, key, SettingsStore.folderAliases)?.let { error(it) }
-        SettingsStore.setFolderAliases(getApplication(), FolderAliases.withAlias(SettingsStore.folderAliases, key, rawName))
-        "Nama tampilan folder diperbarui. Nama di penyimpanan tidak berubah."
+        val next = repository.renameFolder(key, rawName)
+        val aliases = SettingsStore.folderAliases.entries.mapNotNull { (name, label) ->
+            when {
+                name == key -> null
+                name.startsWith("$key/") -> FolderRename.remap(name, key, next) to label
+                else -> name to label
+            }
+        }.toMap()
+        SettingsStore.setFolderAliases(getApplication(), aliases)
+        if (filter.value.folder == key || filter.value.folder.startsWith("$key/")) {
+            filter.value = filter.value.copy(folder = FolderRename.remap(filter.value.folder, key, next))
+        }
+        "Folder diganti menjadi \"${FolderRename.leaf(next)}\". Berkas, lirik, dan playlist ikut dipindahkan."
     }
 
     fun resetFolderName(folder: String) = operation {

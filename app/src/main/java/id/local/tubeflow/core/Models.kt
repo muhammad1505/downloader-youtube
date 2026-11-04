@@ -170,6 +170,9 @@ class Converters {
  @Query("SELECT COUNT(*) FROM downloads WHERE state IN ('QUEUED','RUNNING')") suspend fun activeCount(): Int
  @Query("SELECT * FROM downloads ORDER BY createdAt DESC") fun observe(): Flow<List<DownloadJob>>
  @Query("SELECT * FROM downloads WHERE id = :id") suspend fun get(id: String): DownloadJob?
+ /** Snapshot baris selesai untuk memetakan ulang URI setelah folder fisik diganti nama. */
+ @Query("SELECT * FROM downloads WHERE state = 'COMPLETED'") suspend fun completed(): List<DownloadJob>
+ @Query("SELECT COUNT(*) FROM downloads WHERE state IN ('QUEUED','RUNNING','PAUSED') AND subfolder = :folder") suspend fun activeInSubfolder(folder: String): Int
  @Query("UPDATE downloads SET rawTitle = :rawTitle, trackTitle = :trackTitle, title = :title, artist = :artist, creator = :creator, remixer = :remixer, versionTag = :versionTag, artistEvidence = :evidence, platformId = :platform, thumbnailUrl = :thumb, sourceId = :source, extractor = :extractor, subfolder = :folder, durationSeconds = :duration WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING')")
  suspend fun metadata(id: String, gen: Int, rawTitle: String, trackTitle: String, title: String, artist: String, creator: String, remixer: String, versionTag: String, evidence: String, platform: String, thumb: String, source: String, extractor: String, folder: String, duration: Long): Int
  @Query("UPDATE downloads SET partialBytes = 0, progress = 0, phase = 'PREPARING', resumeNotice = 'Berkas sementara dihapus. Lanjutkan/Coba lagi akan mulai dari awal.' WHERE id = :id AND generation = :gen AND state IN ('PAUSED','FAILED','CANCELLED')") suspend fun discardedPartial(id: String, gen: Int): Int
@@ -222,6 +225,10 @@ class Converters {
  /** Status lirik terakhir untuk ditampilkan di Riwayat (BUG-014). */
  @Query("UPDATE downloads SET processingNotice = :notice WHERE id = :id AND generation = :gen") suspend fun processingNotice(id: String, gen: Int, notice: String): Int
  @Query("UPDATE downloads SET outputUri = :uri WHERE id = :id AND state = 'COMPLETED'") suspend fun renamedOutput(id: String, uri: String)
+ @Query("UPDATE downloads SET sidecarUris = :uris WHERE id = :id AND state = 'COMPLETED'") suspend fun renamedSidecars(id: String, uris: String?)
+ @Query("UPDATE downloads SET subfolder = :folder WHERE id = :id AND state = 'COMPLETED'") suspend fun renamedSubfolder(id: String, folder: String)
+ /** Job yang belum selesai tetap memakai nama subfolder baru agar coba lagi tidak membuat folder lama. */
+ @Query("UPDATE downloads SET subfolder = :folder WHERE subfolder = :old AND state != 'COMPLETED'") suspend fun renamedPendingSubfolder(old: String, folder: String)
  @Query("UPDATE downloads SET lyricStatus = :status WHERE id = :id") suspend fun lyricStatus(id: String, status: String)
  /**
   * Antre ulang baris SELESAI memakai opsi yang sama ("Unduh lagi"): hasil lama sudah dihapus pemanggil,

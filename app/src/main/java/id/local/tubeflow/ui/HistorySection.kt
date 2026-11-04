@@ -13,13 +13,12 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.SearchOff
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,7 +116,7 @@ fun LazyListScope.historySection(
 }
 
 private fun historySummary(completed: List<DownloadJob>, filtered: List<DownloadJob>): String {
-    val detail = if (filtered.size != completed.size) {
+    return if (filtered.size != completed.size) {
         "${filtered.size} dari ${completed.size} entri"
     } else {
         val videos = completed.count { it.mode == MediaMode.VIDEO }
@@ -128,29 +127,12 @@ private fun historySummary(completed: List<DownloadJob>, filtered: List<Download
             if (audios > 0) add("$audios audio")
         }.joinToString(" · ")
     }
-    return "Riwayat · $detail"
 }
 
 @Composable
 private fun HistorySummary(summary: String, onClearRequest: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            summary,
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        TextButton(
-            onClick = onClearRequest,
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        ) {
-            Icon(Icons.Outlined.DeleteSweep, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Bersihkan")
-        }
+    SectionSummary(icon = Icons.Outlined.History, title = "Riwayat", detail = summary) {
+        IconAction(Icons.Outlined.DeleteSweep, "Bersihkan riwayat", onClearRequest, destructive = true)
     }
 }
 

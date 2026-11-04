@@ -305,6 +305,16 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun aspectLabelsSayWhetherTheFrameIsCropped() {
+        assertEquals("Utuh", VideoAspect.FIT.label)
+        assertFalse(VideoAspect.FIT.crops)
+        assertEquals("Isi layar", VideoAspect.FILL.label)
+        assertTrue(VideoAspect.FILL.crops)
+        assertEquals("Zoom", VideoAspect.ZOOM.label)
+        assertTrue(VideoAspect.ZOOM.crops)
+    }
+
+    @Test
     fun orientationCyclesAutoLandscapePortrait() {
         assertEquals(VideoOrientation.LANDSCAPE, VideoOrientation.AUTO.next())
         assertEquals(VideoOrientation.PORTRAIT, VideoOrientation.LANDSCAPE.next())

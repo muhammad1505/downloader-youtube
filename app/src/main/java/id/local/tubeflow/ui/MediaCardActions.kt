@@ -248,6 +248,8 @@ fun MediaActionBar(
     modifier: Modifier = Modifier,
     /** Baris ringkas: semua aksi pindah ke menu titik tiga agar tinggi item tetap kecil. */
     compact: Boolean = false,
+    /** Aksi yang sudah tampil sebagai tombol cepat di luar menu; jangan diulang di menu ⋮. */
+    omit: Set<MediaActionKind> = emptySet(),
     enabled: (MediaActionKind) -> Boolean = { true },
     onClick: (MediaActionKind) -> Unit,
 ) {
@@ -266,7 +268,8 @@ fun MediaActionBar(
                 destructive = MediaCardPlan.destructive(spec.kind),
             )
         }
-        val secondary = if (compact) specs else specs.filter { it.slot == MediaActionSlot.Menu }
+        val secondary = (if (compact) specs else specs.filter { it.slot == MediaActionSlot.Menu })
+            .filter { it.kind !in omit }
         if (secondary.isNotEmpty()) {
             Box {
                 IconAction(Icons.Outlined.MoreVert, "Aksi lainnya", { menuOpen = true })
