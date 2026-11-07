@@ -1077,7 +1077,7 @@ private fun JobRowMenu(
 }
 
 @Composable
-fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false, compact: Boolean = false) {
+fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: Modifier = Modifier, remove: (() -> Unit)? = null, pause: (() -> Unit)? = null, resume: (() -> Unit)? = null, refetchLyrics: ((String) -> Unit)? = null, play: (() -> Unit)? = null, searchLyrics: ((String) -> Unit)? = null, enqueue: (() -> Unit)? = null, playNext: (() -> Unit)? = null, editLyricTiming: (() -> Unit)? = null, highlighted: Boolean = false, compact: Boolean = false, queuedHint: String? = null) {
     val context = LocalContext.current
     var openError by remember { mutableStateOf<String?>(null) }
     // Cyberpunk memakai palet tetapnya: aksen sampul tidak mengganti warna tema.
@@ -1244,7 +1244,7 @@ fun JobCard(job: DownloadJob, cancel: () -> Unit, retry: () -> Unit, modifier: M
                     if (job.resumeNotice.isNotBlank()) Text(job.resumeNotice, style = MaterialTheme.typography.labelSmall)
 
                 }
-                JobState.QUEUED -> Text("Menunggu giliran · antrean berjalan otomatis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                JobState.QUEUED -> Text(queuedHint ?: "Menunggu giliran · antrean berjalan otomatis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 JobState.PAUSED -> {
                     if (job.progress >= 0f) {
                         LinearProgressIndicator(

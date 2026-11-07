@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 92,
+    "versionName": "1.1.77",
+    "highlights": [
+      "Antrean yang tertahan di \"Menunggu giliran\" kini mengganti jadwal WorkManager setelah 45 detik bila syarat jaringan atau daya sudah terpenuhi, bukan hanya menunggu pekerjaan yang dianggap hidup.",
+      "Mengubah pilihan \"Hanya lewat WiFi\" atau \"Hanya saat mengisi daya\" langsung menjadwalkan ulang unduhan yang belum berjalan agar tidak terus menunggu syarat lama.",
+      "Kartu antrean menyebut alasan tunggu yang sebenarnya: koneksi internet, WiFi tidak berbayar, pengisian daya, atau kombinasinya; teks umum hanya muncul bila tidak ada syarat yang tertahan."
+    ]
+  },
+  {
     "versionCode": 91,
     "versionName": "1.1.76",
     "highlights": [

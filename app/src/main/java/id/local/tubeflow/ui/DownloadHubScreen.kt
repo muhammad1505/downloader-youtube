@@ -151,6 +151,8 @@ fun DownloadScreen(
     val historyOnly = downloadTarget == DownloadTarget.HISTORY
     val showSections = !historyOnly && (hasQueue || hasHistory)
     val engineState by EngineUpdater.state.collectAsStateWithLifecycle()
+    // Alasan tunggu hanya dipantau saat ada baris QUEUED; teksnya mengikuti kondisi perangkat.
+    val queuedHint = rememberQueuedHint(enabled = jobs.any { it.state == JobState.QUEUED })
     // Posisi baris tab: heading, banner pembaruan (opsional), lalu composer.
     val tabsIndex = if (engineState is EngineUpdateState.Available) 3 else 2
     var previousHistoryOnly by remember { mutableStateOf(false) }
@@ -363,6 +365,7 @@ fun DownloadScreen(
                     onResumeAll = queueActions.resumeAll,
                     onCancelAllRequest = { confirmCancelAll = true },
                     onClearUnsuccessful = queueActions.clearUnsuccessful,
+                    queuedHint = queuedHint,
                 )
             } else if (hasHistory) {
                 item(key = "queue-empty") {

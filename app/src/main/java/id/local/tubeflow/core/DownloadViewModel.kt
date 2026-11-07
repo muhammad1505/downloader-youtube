@@ -2,7 +2,9 @@ package id.local.tubeflow.core
 
 import android.app.Application
 import android.content.ContentValues
+import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.compose.runtime.snapshotFlow
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +13,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class DownloadViewModel(application: Application) : AndroidViewModel(application) {
  private val dao = DownloadDatabase.get(application).downloads()
@@ -84,12 +87,21 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private var storageRefresh: Job? = null
  /** Percobaan penjadwalan ulang per job untuk penjaga antrean; dideklarasikan sebelum `init` karena
   * `viewModelScope.launch` memakai Main.immediate dan bisa menjalankan `watchQueue` saat konstruksi. */
- private val rescheduleAttempts = mutableMapOf<String, Int>()
+ private val rescheduleAttempts = ConcurrentHashMap<String, Int>()
+ /** Waktu pertama sebuah job terlihat QUEUED; dipakai untuk masa tenggang penggantian jadwal. */
+ private val queueWaitingSince = ConcurrentHashMap<String, Long>()
  init {
    refreshStorage()
    // Penjaga antrean: job QUEUED tanpa pekerjaan aktif dijadwalkan ulang agar playlist tidak
    // tertinggal di "Menunggu giliran" setelah enqueue terputus atau pekerjaannya dihentikan sistem.
    viewModelScope.launch { watchQueue() }
+   // Syarat WorkManager menempel pada request lama. Saat toggle WiFi/daya diubah, pasang ulang
+   // antrean yang belum berjalan agar tidak terus menunggu syarat yang sudah tidak dipilih.
+   viewModelScope.launch {
+    snapshotFlow { SettingsStore.downloadPolicyRevision }.drop(1).collect {
+     rescheduleQueued("Syarat unduhan berubah; antrean menunggu dijadwalkan ulang.")
+    }
+   }
    // Panaskan engine saat aplikasi dibuka supaya inspeksi pertama tidak menanggung seluruh biaya init.
    viewModelScope.launch {
     delay(800)
@@ -610,9 +622,22 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   catch(cancelled: CancellationException) { throw cancelled }
   catch(error: Exception) { dao.fail(id,failMessage); throw error }
  }
- /** WorkManager masih memegang pekerjaan hidup untuk job ini? Gagal membaca = anggap hidup (jangan diganggu). */
- private fun hasLiveWork(id: String): Boolean =
-  runCatching { work.getWorkInfosForUniqueWork("download-$id").get().any { !it.state.isFinished } }.getOrDefault(true)
+ /**
+  * Ganti jadwal job QUEUED dengan syarat terbaru. Generasi dinaikkan lebih dulu supaya worker lama
+  * yang mungkin baru mulai tidak menandai baris baru sebagai CANCELLED saat `REPLACE` membatalkannya.
+  * Mengembalikan false bila baris sudah bukan QUEUED lagi.
+  */
+ private suspend fun replaceQueuedWork(id: String): Boolean {
+  if (dao.bumpQueuedGeneration(id) == 0) return false
+  enqueueWork(id, ExistingWorkPolicy.REPLACE, "Antrean tidak dapat dijadwalkan ulang.")
+  return true
+ }
+ /**
+  * Pekerjaan WorkManager yang masih hidup untuk job ini. `Result.failure` berarti status belum
+  * dapat dibaca; pemanggil harus menganggapnya hidup agar pekerjaan berjalan tidak diganggu.
+  */
+ private fun liveWork(id: String): Result<WorkInfo?> =
+  runCatching { work.getWorkInfosForUniqueWork("download-$id").get().firstOrNull { !it.state.isFinished } }
  /**
   * Pemeriksaan berkala antrean: hanya job QUEUED yang diperiksa karena status lain memang tidak
   * punya pekerjaan aktif (dijeda/dibatalkan/gagal/selesai) atau sedang berjalan. Tanpa penjaga ini,
@@ -620,26 +645,80 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   */
  private suspend fun watchQueue() {
   while (true) {
-   val waiting = try { dao.observe().first().filter { it.state == JobState.QUEUED } }
+   val all = try { dao.observe().first() }
    catch (cancelled: CancellationException) { throw cancelled }
    catch (_: Exception) { emptyList() }
+   val waiting = all.filter { it.state == JobState.QUEUED }
    // Job yang sudah keluar dari QUEUED tidak lagi dihitung agar percobaan berikutnya tetap penuh.
-   rescheduleAttempts.keys.retainAll(waiting.mapTo(mutableSetOf()) { it.id })
-   if (waiting.isNotEmpty()) withContext(Dispatchers.IO) { waiting.forEach { rescheduleStalled(it) } }
+   val ids = waiting.mapTo(mutableSetOf()) { it.id }
+   rescheduleAttempts.keys.retainAll(ids)
+   queueWaitingSince.keys.retainAll(ids)
+   // Jangan menyentuh jadwal QUEUED saat unduhan lain masih berjalan: WorkManager memang boleh
+   // menahan job berikutnya sampai kapasitas tersedia.
+   val otherRunning = all.any { it.state == JobState.RUNNING }
+   if (waiting.isNotEmpty()) withContext(Dispatchers.IO) { waiting.forEach { rescheduleStalled(it, otherRunning) } }
    delay(if (waiting.isEmpty()) 15_000 else 4_000)
   }
  }
  /** Batas percobaan penjadwalan ulang per job mencegah loop 4 detik untuk job yang memang tak bisa jalan. */
- private suspend fun rescheduleStalled(job: DownloadJob) {
+ private suspend fun rescheduleStalled(job: DownloadJob, otherWorkRunning: Boolean) {
   val attempts = rescheduleAttempts[job.id] ?: 0
   if (attempts >= MAX_RESCHEDULES) return
-  if (!QueueWatchdog.stalled(job.state, hasLiveWork(job.id), Engine.isRunning(job.id))) return
+  val workInfo = liveWork(job.id).getOrElse { return }
+  val engine = Engine.isRunning(job.id)
+  val now = SystemClock.elapsedRealtime()
+  val since = queueWaitingSince.getOrPut(job.id) { now }
+  val waited = (now - since).coerceAtLeast(0)
+  val work = when (workInfo?.state) {
+   WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> QueueWork.WAITING
+   WorkInfo.State.RUNNING -> QueueWork.RUNNING
+   else -> QueueWork.NONE
+  }
+  val stale = QueueWatchdog.stalled(job.state, workInfo != null, engine)
+  val replace = QueueWatchdog.replaceWaiting(
+   state = job.state,
+   work = work,
+   engineRunning = engine,
+   constraintsMet = DownloadPolicy.conditionsMet(
+    getApplication(), SettingsStore.downloadWifiOnly, SettingsStore.downloadChargingOnly,
+   ),
+   otherWorkRunning = otherWorkRunning,
+   waitingMillis = waited,
+  )
+  if (!stale && !replace) return
   try {
-   enqueueWork(job.id, ExistingWorkPolicy.KEEP, "Antrean tidak dapat dijadwalkan ulang.")
+   val requeued = if (replace) replaceQueuedWork(job.id) else {
+    enqueueWork(job.id, ExistingWorkPolicy.KEEP, "Antrean tidak dapat dijadwalkan ulang.")
+    true
+   }
+   if (!requeued) return
    rescheduleAttempts[job.id] = attempts + 1
-   _notice.value="Antrean dilanjutkan otomatis."
+   queueWaitingSince[job.id] = now
+   _notice.value = if (replace) "Antrean yang tertahan dijadwalkan ulang." else "Antrean dilanjutkan otomatis."
   } catch(cancelled: CancellationException) { throw cancelled }
   catch(_: Exception) { /* Penyebab sudah dicatat enqueueWork sebagai status gagal. */ }
+ }
+ /** Memasang ulang seluruh job QUEUED setelah syarat WiFi/daya berubah. */
+ private suspend fun rescheduleQueued(message: String) {
+  val waiting = runCatching { dao.observe().first().filter { it.state == JobState.QUEUED } }.getOrDefault(emptyList())
+  if (waiting.isEmpty()) return
+  withContext(Dispatchers.IO) {
+   val now = SystemClock.elapsedRealtime()
+   waiting.forEach { job ->
+    if (Engine.isRunning(job.id)) return@forEach
+    val workInfo = liveWork(job.id).getOrElse { return@forEach }
+    if (workInfo?.state == WorkInfo.State.RUNNING) return@forEach
+    runCatching {
+     // Beri masa tenggang baru: penggantian ini sudah memakai syarat terbaru, jadi penjaga
+     // antrean tidak boleh langsung menggantinya lagi hanya karena timer lama masih berjalan.
+     if (replaceQueuedWork(job.id)) queueWaitingSince[job.id] = now
+    }
+   }
+  }
+  val ids = waiting.mapTo(mutableSetOf()) { it.id }
+  rescheduleAttempts.keys.retainAll(ids)
+  queueWaitingSince.keys.retainAll(ids)
+  _notice.value = message
  }
  private companion object { const val MAX_RESCHEDULES = 3 }
  /** True selama uri hasil unduhan masih bisa dibuka; row basi (file dihapus manual) dianggap tidak ada. */

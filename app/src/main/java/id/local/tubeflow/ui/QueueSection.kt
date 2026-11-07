@@ -25,12 +25,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.DownloadJob
+import id.local.tubeflow.core.DownloadPolicy
 import id.local.tubeflow.core.DownloadSections
 import id.local.tubeflow.core.JobState
+import id.local.tubeflow.core.QueueWait
+import id.local.tubeflow.core.SettingsStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** Isi tab Download bagian Antrean, dipakai di dalam satu LazyColumn host. */
 fun LazyListScope.queueSection(
@@ -47,6 +56,7 @@ fun LazyListScope.queueSection(
     onCancelAllRequest: () -> Unit,
     onClearUnsuccessful: () -> Unit,
     query: String = "",
+    queuedHint: String? = null,
 ) {
     val all = DownloadSections.queue(jobs)
     val active = if (query.isBlank()) all else all.filter { it.title.contains(query.trim(), ignoreCase = true) }
@@ -100,6 +110,7 @@ fun LazyListScope.queueSection(
             highlighted = job.id == highlightedJobId,
             // Antrean unduhan memakai baris ringkas yang sama dengan Riwayat dan Koleksi.
             compact = true,
+            queuedHint = queuedHint,
         )
     }
     if (query.isNotBlank() && active.isEmpty() && all.isNotEmpty()) {
@@ -113,6 +124,37 @@ fun LazyListScope.queueSection(
         }
     }
     item(key = "queue-spacer") { Spacer(Modifier.height(4.dp)) }
+}
+
+private data class QueueConditions(val networkReady: Boolean, val charging: Boolean)
+
+/**
+ * Alasan tunggu untuk baris QUEUED, dipantau hanya selama ada antrean. Teks memakai kondisi
+ * perangkat saat ini supaya tidak menyuruh menunggu WiFi ketika WiFi sudah tersambung.
+ */
+@Composable
+fun rememberQueuedHint(enabled: Boolean): String? {
+    if (!enabled) return null
+    val context = LocalContext.current
+    val wifiOnly = SettingsStore.downloadWifiOnly
+    val chargingOnly = SettingsStore.downloadChargingOnly
+    val conditions by produceState(
+        QueueConditions(
+            networkReady = DownloadPolicy.networkReady(context, wifiOnly),
+            charging = DownloadPolicy.charging(context),
+        ),
+        context,
+        wifiOnly,
+    ) {
+        while (true) {
+            value = QueueConditions(
+                networkReady = withContext(Dispatchers.IO) { DownloadPolicy.networkReady(context, SettingsStore.downloadWifiOnly) },
+                charging = withContext(Dispatchers.IO) { DownloadPolicy.charging(context) },
+            )
+            delay(3_000)
+        }
+    }
+    return QueueWait.hint(wifiOnly, chargingOnly, conditions.networkReady, conditions.charging)
 }
 
 @Composable

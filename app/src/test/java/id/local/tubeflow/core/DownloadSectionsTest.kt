@@ -48,6 +48,45 @@ class DownloadSectionsTest {
     }
 
     @Test
+    fun waitingWorkThatNeverStartsIsReplacedOnlyWhenConstraintsAreMet() {
+        // WorkInfo hidup tetapi ENQUEUED: setelah masa tenggang dan syarat terpenuhi, ganti jadwal.
+        assertTrue(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.WAITING, engineRunning = false, constraintsMet = true, otherWorkRunning = false, waitingMillis = 45_000))
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.WAITING, engineRunning = false, constraintsMet = true, otherWorkRunning = false, waitingMillis = 44_999))
+        // Syarat belum terpenuhi atau worker masih berjalan: menunggu adalah perilaku yang benar.
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.WAITING, engineRunning = false, constraintsMet = false, otherWorkRunning = false, waitingMillis = 120_000))
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.RUNNING, engineRunning = false, constraintsMet = true, otherWorkRunning = false, waitingMillis = 120_000))
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.WAITING, engineRunning = true, constraintsMet = true, otherWorkRunning = false, waitingMillis = 120_000))
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.RUNNING, QueueWork.WAITING, engineRunning = false, constraintsMet = true, otherWorkRunning = false, waitingMillis = 120_000))
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.NONE, engineRunning = false, constraintsMet = true, otherWorkRunning = false, waitingMillis = 120_000))
+        // Unduhan lain masih berjalan: jangan ganggu antrean paralel yang menunggu kapasitas.
+        assertFalse(QueueWatchdog.replaceWaiting(JobState.QUEUED, QueueWork.WAITING, engineRunning = false, constraintsMet = true, otherWorkRunning = true, waitingMillis = 120_000))
+    }
+
+    @Test
+    fun queueHintExplainsTheConditionThatIsActuallyMissing() {
+        assertEquals(
+            "Menunggu koneksi WiFi tidak berbayar · mulai otomatis",
+            QueueWait.hint(wifiOnly = true, chargingOnly = false, networkReady = false, charging = false),
+        )
+        assertEquals(
+            "Menunggu koneksi internet · mulai otomatis",
+            QueueWait.hint(wifiOnly = false, chargingOnly = false, networkReady = false, charging = true),
+        )
+        assertEquals(
+            "Menunggu pengisian daya · mulai otomatis",
+            QueueWait.hint(wifiOnly = false, chargingOnly = true, networkReady = true, charging = false),
+        )
+        assertEquals(
+            "Menunggu koneksi internet dan pengisian daya · mulai otomatis",
+            QueueWait.hint(wifiOnly = false, chargingOnly = true, networkReady = false, charging = false),
+        )
+        // Syarat sudah terpenuhi atau tidak dipilih: jangan menampilkan alasan yang menyesatkan.
+        assertEquals(null, QueueWait.hint(wifiOnly = true, chargingOnly = false, networkReady = true, charging = false))
+        assertEquals(null, QueueWait.hint(wifiOnly = false, chargingOnly = false, networkReady = true, charging = false))
+        assertEquals(null, QueueWait.hint(wifiOnly = false, chargingOnly = true, networkReady = true, charging = true))
+    }
+
+    @Test
     fun watchdogOnlyReschedulesQueuedJobsWithoutLiveWork() {
         // Tertinggal: masih menunggu padahal WorkManager dan mesin sama-sama tidak memegangnya.
         assertTrue(QueueWatchdog.stalled(JobState.QUEUED, hasLiveWork = false, engineRunning = false))

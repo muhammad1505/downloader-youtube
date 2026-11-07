@@ -1,6 +1,6 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 3 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 7 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
 ## Antrean playlist macet, panel aksi seragam, dialog folder, dan sesi YouTube — 1.1.75, 3 November 2026
 
@@ -1618,3 +1618,43 @@ kode menurun, delapan sorotan 148–175 karakter. `git diff --check` bersih.
 Batas: `adb devices` kosong, jadi rename fisik, rollback provider, pemotongan gambar, RAM,
 tema, menu, dan genre belum diuji di perangkat. Build rilis ber-minify, audit native/ZIP, dan
 APK 1.1.76 belum dijalankan. Verifikasi perangkat mengikuti matriks DTM-17 sampai DTM-19.
+
+## Antrean tertahan "Menunggu giliran" — 1.1.77/code92, 7 November 2026
+
+Batch ini menutup keluhan unduhan (misalnya video Facebook) yang tetap **Menunggu giliran**
+meski hanya satu job di antrean dan tidak ada unduhan yang berjalan. Jeda lalu lanjutkan
+memang berhasil karena jalur itu memakai `ExistingWorkPolicy.REPLACE`; penjaga antrean lama
+memakai `KEEP` dan menganggap semua `WorkInfo` hidup sebagai sehat.
+
+- **Syarat lama menempel pada request.** WorkManager menyimpan `Constraints` pada request yang
+  sudah dibuat, jadi mematikan **Hanya lewat WiFi** atau **Hanya saat mengisi daya** tidak
+  mengubah job yang sudah `ENQUEUED`. `SettingsStore.downloadPolicyRevision` naik saat toggle
+  berubah; `DownloadViewModel` mengoleksi `snapshotFlow` dan memanggil `rescheduleQueued` untuk
+  memasang ulang job QUEUED dengan `REPLACE`, kecuali worker/engine-nya sedang berjalan.
+- **`WorkInfo` hidup bukan bukti pekerjaan akan mulai.** `QueueWork` membedakan `NONE`,
+  `WAITING` (`ENQUEUED`/`BLOCKED`), dan `RUNNING`. `QueueWatchdog.replaceWaiting` mengganti
+  jadwal job QUEUED yang masih menunggu setelah masa tenggang **45 detik** bila
+  `DownloadPolicy.conditionsMet` sudah benar dan tidak ada job `RUNNING` lain. Batasnya tiga
+  percobaan per job per sesi; saat syarat belum terpenuhi atau unduhan lain berjalan, menunggu
+  adalah perilaku yang benar dan tidak memicu penggantian. Sebelum `REPLACE`, generasi baris
+  dinaikkan agar worker lama yang mungkin baru mulai tidak menandai job baru sebagai batal.
+- **Alasan tunggu yang jujur.** `DownloadPolicy.networkReady` memeriksa
+  `NET_CAPABILITY_INTERNET` dan, untuk mode WiFi, `NET_CAPABILITY_NOT_METERED`;
+  `DownloadPolicy.charging` memakai `BatteryManager.isCharging`. `QueueWait.hint` memakai
+  kondisi perangkat aktual sehingga kartu menyebut koneksi internet, WiFi tidak berbayar,
+  pengisian daya, atau kombinasinya; teks umum hanya dipakai bila tidak ada syarat tertahan.
+  `rememberQueuedHint` memantau setiap 3 detik hanya selama ada baris QUEUED.
+- **Penjelasan Pengaturan.** Teks kedua toggle menyebut bahwa perubahan menjadwalkan ulang
+  antrean yang belum berjalan tanpa menghentikan unduhan yang sedang berjalan.
+
+Verifikasi host: `./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+--max-workers=2` **BUILD SUCCESSFUL** — **688 tes Kotlin** (0 gagal/error/skipped), termasuk
+`waitingWorkThatNeverStartsIsReplacedOnlyWhenConstraintsAreMet` dan
+`queueHintExplainsTheConditionThatIsActuallyMissing`; lint **0 error/6 warning** baseline; tiga
+APK debug (arm64-v8a, armeabi-v7a, x86_64). `python3 -m unittest discover -s scripts -p
+"test_*.py"` **103 tes OK**. `changelog.json` divalidasi: 23 entri, code92/1.1.77 di atas, kode
+menurun, tiga sorotan 161–194 karakter. `git diff --check` bersih.
+
+Batas: `adb devices` kosong, jadi perilaku WorkManager pada scheduler OEM, perubahan toggle saat
+job QUEUED, dan teks alasan belum diuji di perangkat. Build rilis ber-minify, audit native/ZIP,
+dan APK 1.1.77 belum dijalankan. Verifikasi perangkat mengikuti matriks **DTM-20**.

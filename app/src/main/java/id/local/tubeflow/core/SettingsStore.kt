@@ -74,6 +74,13 @@ object SettingsStore {
     var downloadChargingOnly by mutableStateOf(false)
         private set
 
+    /**
+     * Naik ketika syarat jaringan/daya berubah. WorkManager menyimpan syarat pada request yang
+     * sudah dibuat, jadi antrean QUEUED perlu dipasang ulang agar tidak terus menunggu syarat lama.
+     */
+    var downloadPolicyRevision by mutableIntStateOf(0)
+        private set
+
     /** Hapus catatan riwayat selesai yang lebih lama dari N hari; 0 = nonaktif. File media tidak disentuh. */
     var historyAutoDays by mutableIntStateOf(0)
         private set
@@ -175,13 +182,17 @@ object SettingsStore {
     }
 
     fun setDownloadWifiOnly(context: Context, enabled: Boolean) {
+        if (downloadWifiOnly == enabled) return
         downloadWifiOnly = enabled
+        downloadPolicyRevision++
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit { putBoolean("download_wifi_only", enabled) }
     }
 
     fun setDownloadChargingOnly(context: Context, enabled: Boolean) {
+        if (downloadChargingOnly == enabled) return
         downloadChargingOnly = enabled
+        downloadPolicyRevision++
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit { putBoolean("download_charging_only", enabled) }
     }

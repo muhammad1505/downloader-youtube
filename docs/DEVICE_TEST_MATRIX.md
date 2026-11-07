@@ -1,8 +1,8 @@
 # Matriks uji perangkat TubeFlow
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
-seluruh skenario sudah lulus. Status terakhir diperbarui **4 November 2026**
-untuk kandidat **1.1.76/code 91** (host lulus; belum terpasang di perangkat
+seluruh skenario sudah lulus. Status terakhir diperbarui **7 November 2026**
+untuk kandidat **1.1.77/code 92** (host lulus; belum terpasang di perangkat
 karena `adb devices` kosong). Build 1.1.71 sempat terpasang lewat ADB (bukti
 hash di [PROGRESS.md](PROGRESS.md)) tetapi belum ada skenario di bawah yang
 dijalankan pada build ini; semua baris masih **belum dijalankan**.
@@ -67,6 +67,7 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-17 | Ganti nama folder fisik | Ganti nama folder hasil unduhan (MediaStore) dan folder SAF bertingkat; periksa Files, Koleksi, playlist, lirik, dan Riwayat. Coba juga folder baca-saja, folder akar, dan nama yang sudah dipakai. | Direktori benar-benar berubah nama; berkas tetap dapat diputar; lirik, playlist, dan riwayat menunjuk lokasi baru; job yang belum selesai memakai subfolder baru; kasus yang ditolak memberi pesan jelas dan tidak meninggalkan folder setengah pindah. |
 | DTM-18 | Rasio video Utuh/Isi layar/Zoom | Putar video 16:9 di layar 20:9; ganti mode lewat tombol dan sheet opsi; periksa notice serta TalkBack. | Utuh menampilkan seluruh frame (bilah hitam boleh muncul); Isi layar memenuhi layar dengan tepi terpotong; Zoom lebih besar; hint dan notice menjelaskan potongan; label aksesibilitas menyebut mode berikutnya. |
 | DTM-19 | RAM katalog, tema awal, menu audio, genre | Buka aplikasi dengan katalog 1.000+ item dan ukur memori/waktu buka; pasang baru tanpa data untuk memeriksa tema; buka baris audio Koleksi; unduh audio tanpa genre eksplisit lalu periksa tag. | Pemeriksaan awal tidak memuat ribuan baris dan RAM tidak terus naik; instalasi baru memakai tema Sistem tanpa menimpa pilihan lama; menu ⋮ tidak mengulang Favorit/Bagikan; genre kosong tidak menjadi tag kosong dan fallback kategori/tag tetap bekerja. |
+| DTM-20 | Antrean tertahan "Menunggu giliran" | Antrekan satu video dengan **Hanya lewat WiFi** aktif saat hanya data seluler, lalu sambungkan WiFi; ulangi dengan **Hanya saat mengisi daya** lalu sambungkan charger; matikan salah satu toggle saat job masih QUEUED; biarkan satu job QUEUED lebih dari 45 detik tanpa unduhan lain berjalan. | Kartu menyebut alasan tunggu yang benar (internet/WiFi tidak berbayar/pengisian daya/kombinasi); setelah syarat terpenuhi dan tidak ada job lain berjalan, job mulai dalam ±45 detik tanpa perlu jeda→lanjutkan; mengubah toggle langsung menjadwal ulang job QUEUED; tidak ada output ganda atau job lain ikut berhenti. |
 
 ## Format hasil
 
@@ -93,6 +94,7 @@ Salin tabel ini ke laporan sesi dan isi satu baris per percobaan:
 | DTM-17 |  |  | Belum dijalankan |  |  |
 | DTM-18 |  |  | Belum dijalankan |  |  |
 | DTM-19 |  |  | Belum dijalankan |  |  |
+| DTM-20 |  |  | Belum dijalankan |  |  |
 
 ## Batas
 

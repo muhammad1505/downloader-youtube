@@ -202,6 +202,8 @@ class Converters {
  @Query("UPDATE downloads SET state = 'PAUSED', speed = '', eta = '' WHERE id = :id AND state IN ('QUEUED','RUNNING')") suspend fun pause(id: String): Int
  @Query("UPDATE downloads SET state = 'PAUSED', speed = '', eta = '' WHERE state IN ('QUEUED','RUNNING')") suspend fun pauseAll(): Int
  @Query("UPDATE downloads SET state = 'QUEUED', speed = '', eta = '', error = NULL, generation = generation + 1 WHERE id = :id AND state = 'PAUSED'") suspend fun resume(id: String): Int
+ /** Naikkan generasi job QUEUED sebelum jadwalnya diganti agar worker lama tidak menandai job baru sebagai batal. */
+ @Query("UPDATE downloads SET generation = generation + 1 WHERE id = :id AND state = 'QUEUED'") suspend fun bumpQueuedGeneration(id: String): Int
  @Query("UPDATE downloads SET state = 'CANCELLED' WHERE id = :id AND state IN ('QUEUED','RUNNING','PAUSED')") suspend fun cancel(id: String): Int
  /** Versi milik worker untuk handleStop; lihat [failOwned]. */
  @Query("UPDATE downloads SET state = 'CANCELLED' WHERE id = :id AND generation = :gen AND state IN ('QUEUED','RUNNING','PAUSED')") suspend fun cancelOwned(id: String, gen: Int): Int

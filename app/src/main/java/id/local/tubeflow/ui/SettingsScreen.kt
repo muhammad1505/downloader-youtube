@@ -714,13 +714,13 @@ fun SettingsScreen(
             HorizontalDivider()
             ToggleRow(
                 title = "Hanya lewat WiFi",
-                description = "Unduhan baru menunggu koneksi tidak berbayar. Unduhan yang sedang berjalan tidak dihentikan.",
+                description = "Unduhan yang belum berjalan menunggu koneksi tidak berbayar. Mengubah pilihan ini menjadwalkan ulang antrean; unduhan yang sedang berjalan tidak dihentikan.",
                 checked = SettingsStore.downloadWifiOnly,
                 onCheckedChange = { SettingsStore.setDownloadWifiOnly(context, it) },
             )
             ToggleRow(
                 title = "Hanya saat mengisi daya",
-                description = "Hemat baterai untuk unduhan besar; syarat ini digabung dengan pilihan jaringan di atas.",
+                description = "Hemat baterai untuk unduhan besar; syarat ini digabung dengan pilihan jaringan di atas dan menjadwalkan ulang antrean yang belum berjalan.",
                 checked = SettingsStore.downloadChargingOnly,
                 onCheckedChange = { SettingsStore.setDownloadChargingOnly(context, it) },
             )
