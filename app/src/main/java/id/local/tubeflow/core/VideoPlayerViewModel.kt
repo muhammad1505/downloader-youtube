@@ -20,7 +20,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
-import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import java.net.URLEncoder
@@ -932,25 +931,25 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             playerVersion = _state.value.playerVersion,
         )
         if (signature == effectsSignature) return
-        val layout = when (aspect) {
-            VideoAspect.FIT -> Presentation.LAYOUT_SCALE_TO_FIT
-            // FILL and ZOOM keep the source aspect ratio while covering the viewport; FILL no
-            // longer stretches the frame. ZOOM adds magnification before the crop.
-            VideoAspect.FILL, VideoAspect.ZOOM -> Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
-        }
-        val zoom = if (aspect == VideoAspect.ZOOM) {
-            ScaleAndRotateTransformation.Builder()
-                .setScale(VideoViewport.ZOOM_FACTOR, VideoViewport.ZOOM_FACTOR)
-                .build()
+        // FIT memakai letterbox bawaan Media3. FILL/ZOOM memakai efek potong sendiri yang
+        // mengunci tepi bawah frame, sehingga hardsub di dasar video tidak hilang saat layar
+        // lebih lebar dari video. Keduanya tetap menghasilkan frame seukuran viewport.
+        val presentation: Effect? = if (viewportWidth > 0 && viewportHeight > 0) {
+            when (aspect) {
+                VideoAspect.FIT -> Presentation.createForWidthAndHeight(
+                    viewportWidth,
+                    viewportHeight,
+                    Presentation.LAYOUT_SCALE_TO_FIT,
+                )
+                VideoAspect.FILL -> VideoCropEffect(viewportWidth, viewportHeight)
+                VideoAspect.ZOOM -> VideoCropEffect(viewportWidth, viewportHeight, VideoViewport.ZOOM_FACTOR)
+            }
         } else null
-        // The GL pipeline letterboxes independently of PlayerView.resizeMode.
-        val presentation = if (viewportWidth > 0 && viewportHeight > 0)
-            Presentation.createForWidthAndHeight(viewportWidth, viewportHeight, layout) else null
         // `effectPresentation` berarti permukaan boleh memenuhi seluruh viewport karena pipeline GL
         // sudah mengurus letterbox/crop. Tanpa `presentation` anggapan itu salah: permukaan selebar
-        // layar akan memotong gambar. Karena itu pemasangan tanpa Presentation dihitung gagal.
+        // layar akan memotong gambar. Karena itu pemasangan tanpa efek presentasi dihitung gagal.
         val applied = presentation != null &&
-            runCatching { exo.setVideoEffects(effects + listOfNotNull(zoom, presentation)) }.isSuccess
+            runCatching { exo.setVideoEffects(effects + presentation) }.isSuccess
         VideoDiagnostics.effects(signature, applied)
         effectsSignature = signature
         _state.value = _state.value.copy(effectPresentation = applied)

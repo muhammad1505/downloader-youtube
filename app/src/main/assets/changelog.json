@@ -1,5 +1,13 @@
 [
   {
+    "versionCode": 93,
+    "versionName": "1.1.78",
+    "highlights": [
+      "Mode Isi layar dan Zoom tidak lagi memotong hardsub di bagian bawah: area potong dikunci ke tepi bawah frame, jadi baris subtitle yang menempel di dasar video tetap terlihat di layar lebar.",
+      "Pemberitahuan dan hint rasio layar menjelaskan tepi mana yang hilang; mode Utuh tetap menampilkan seluruh gambar tanpa potongan."
+    ]
+  },
+  {
     "versionCode": 92,
     "versionName": "1.1.77",
     "highlights": [

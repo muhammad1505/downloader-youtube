@@ -455,7 +455,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                 val (surfaceWidth, surfaceHeight) = if (state.effectPresentation) maxWidth.value to maxHeight.value else id.local.tubeflow.core.VideoViewport.size(
                     maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
                 )
-                LaunchedEffect(surfaceWidth, surfaceHeight, videoAspect, state.videoWidth, state.videoHeight, state.pixelRatio, state.effectPresentation) {
+                // Jalur software tidak memakai efek GL yang mengunci crop ke bawah; permukaan yang
+                // lebih tinggi dari wadah ditempel ke tepi bawah agar hardsub tetap terlihat.
+                val anchoredBottom = !state.effectPresentation && id.local.tubeflow.core.VideoViewport.anchorsBottom(
+                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
+                )
+                LaunchedEffect(surfaceWidth, surfaceHeight, anchoredBottom, videoAspect, state.videoWidth, state.videoHeight, state.pixelRatio, state.effectPresentation) {
                     id.local.tubeflow.core.VideoDiagnostics.geometry(
                         aspect = videoAspect.name,
                         containerWidth = maxWidth.value,
@@ -466,6 +471,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         surfaceWidth = surfaceWidth,
                         surfaceHeight = surfaceHeight,
                         presenting = state.effectPresentation,
+                        anchoredBottom = anchoredBottom,
                     )
                 }
             // `update` berjalan setiap tick progres. setStyle/setTextSize memicu layout ulang
@@ -496,7 +502,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     view.player = null
                     if (playerView === view) playerView = null
                 },
-                modifier = Modifier.wrapContentSize(Alignment.Center, unbounded = true)
+                modifier = Modifier
+                    .align(if (anchoredBottom) Alignment.BottomCenter else Alignment.Center)
+                    // Permukaan software bisa lebih tinggi dari wadah. `wrapContentSize` yang
+                    // memusatkan anak membuat separuh luberan jatuh ke bawah layar dan memotong
+                    // hardsub; saat anchor bawah aktif, luberan harus keluar lewat tepi atas.
+                    .wrapContentSize(if (anchoredBottom) Alignment.BottomCenter else Alignment.Center, unbounded = true)
                     .requiredSize(surfaceWidth.dp, surfaceHeight.dp),
             )
             }
@@ -693,12 +704,17 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                             onScreenshot = ::takeScreenshot,
                             onDisplay = {
                                 video.cycleAspect()
-                                val aspect = video.state.value.aspect
+                                val current = video.state.value
                                 notify(
                                     PlayerNotice(
                                         Icons.Outlined.AspectRatio,
                                         "Tampilan video",
-                                        aspect.label + if (aspect.crops) " · tepi video terpotong" else " · seluruh gambar terlihat",
+                                        id.local.tubeflow.core.VideoPlayback.aspectDetail(
+                                            current.aspect,
+                                            current.videoWidth,
+                                            current.videoHeight,
+                                            current.pixelRatio,
+                                        ),
                                     ),
                                 )
                             },
@@ -1781,11 +1797,21 @@ private fun VideoOptionsSheet(
                             ChoicePill(aspect.label, state.aspect == aspect) { video.setAspect(aspect) }
                         }
                     }
+                    val wideSource = state.videoWidth <= 0 || state.videoHeight <= 0 ||
+                        state.videoWidth * (state.pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= state.videoHeight
                     SheetHint(
                         when (state.aspect) {
                             VideoAspect.FIT -> "Seluruh gambar terlihat. Bilah hitam hanya muncul bila bentuk video berbeda dari layar."
-                            VideoAspect.FILL -> "Isi layar memotong tepi video agar memenuhi layar. Pilih Utuh untuk melihat seluruh gambar."
-                            VideoAspect.ZOOM -> "Zoom memperbesar gambar dan memotong lebih banyak tepi. Pilih Utuh untuk melihat seluruh gambar."
+                            VideoAspect.FILL -> if (wideSource) {
+                                "Isi layar memenuhi layar; tepi atas terpotong, tetapi subtitle hardsub di bagian bawah tetap terlihat. Pilih Utuh untuk seluruh gambar."
+                            } else {
+                                "Isi layar memenuhi layar; tepi kiri dan kanan terpotong. Pilih Utuh untuk melihat seluruh gambar."
+                            }
+                            VideoAspect.ZOOM -> if (wideSource) {
+                                "Zoom memperbesar gambar; tepi atas terpotong lebih banyak, sedangkan subtitle hardsub di bawah tetap terlihat. Pilih Utuh untuk seluruh gambar."
+                            } else {
+                                "Zoom memperbesar gambar dan memotong tepi kiri-kanan. Pilih Utuh untuk melihat seluruh gambar."
+                            }
                         },
                     )
                     SheetSection("Rotasi layar")

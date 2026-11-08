@@ -81,4 +81,62 @@ class VideoViewportTest {
             assertTrue("ZOOM harus lebih besar dari FILL", zoom.second > fill.second)
         }
     }
+
+    @Test fun landscapeCropAnchorsBottomEdgeSoHardSubsSurvive() {
+        val transform = VideoViewport.cropTransform(848, 480, 1520, 720)
+        assertEquals(1f, transform.scaleX, .001f)
+        assertEquals((1520f / 720f) / (848f / 480f), transform.scaleY, .001f)
+        assertEquals(transform.scaleY - 1f, transform.translateY, .001f)
+        assertEquals(0f, transform.translateX, .001f)
+        // Tepi bawah sumber (-1) mendarat tepat di tepi bawah layar; tepi atas terpotong.
+        assertEquals(-1f, -transform.scaleY + transform.translateY, .001f)
+        assertTrue(transform.scaleY + transform.translateY > 1f)
+    }
+
+    @Test fun horizontalCropStaysCenteredBecauseBottomAnchorCannotHelp() {
+        val transform = VideoViewport.cropTransform(848, 480, 720, 1520)
+        assertEquals((848f / 480f) / (720f / 1520f), transform.scaleX, .001f)
+        assertEquals(1f, transform.scaleY, .001f)
+        assertEquals(0f, transform.translateX, .001f)
+        assertEquals(0f, transform.translateY, .001f)
+    }
+
+    @Test fun zoomKeepsTheSameBottomAnchorAndScalesBothAxes() {
+        val fill = VideoViewport.cropTransform(848, 480, 1520, 720)
+        val zoom = VideoViewport.cropTransform(848, 480, 1520, 720, VideoViewport.ZOOM_FACTOR)
+        assertEquals(fill.scaleX * VideoViewport.ZOOM_FACTOR, zoom.scaleX, .001f)
+        assertEquals(fill.scaleY * VideoViewport.ZOOM_FACTOR, zoom.scaleY, .001f)
+        assertEquals(-1f, -zoom.scaleY + zoom.translateY, .001f)
+        assertTrue(zoom.scaleY > fill.scaleY)
+    }
+
+    @Test fun portraitSourceIsNotBottomAnchoredInLandscape() {
+        val transform = VideoViewport.cropTransform(480, 848, 1520, 720)
+        assertTrue(transform.scaleY > 3f)
+        assertEquals(0f, transform.translateY, .001f)
+        assertTrue(transform.scaleX < 1.01f)
+    }
+
+    @Test fun cropMatrixUsesColumnMajorTranslationAndCanBeDisabled() {
+        val anchored = VideoViewport.cropTransform(848, 480, 1520, 720)
+        val matrix = anchored.toGlMatrix()
+        assertEquals(anchored.scaleX, matrix[0], .001f)
+        assertEquals(anchored.scaleY, matrix[5], .001f)
+        assertEquals(anchored.translateX, matrix[12], .001f)
+        assertEquals(anchored.translateY, matrix[13], .001f)
+        // Terapkan matriks ke tepi bawah NDC (0, -1): y' = scaleY * -1 + translateY.
+        assertEquals(-1f, matrix[5] * -1f + matrix[13], .001f)
+
+        val centered = VideoViewport.cropTransform(848, 480, 1520, 720, anchorBottom = false)
+        assertEquals(0f, centered.translateY, .001f)
+    }
+
+    @Test fun onlyLandscapeSourcesWithVerticalOverflowNeedTheSoftwareBottomAnchor() {
+        assertTrue(VideoViewport.anchorsBottom(1520f, 720f, 848, 480, VideoAspect.FILL))
+        assertTrue(VideoViewport.anchorsBottom(720f, 1520f, 848, 480, VideoAspect.ZOOM))
+        assertFalse(VideoViewport.anchorsBottom(720f, 1520f, 848, 480, VideoAspect.FILL))
+        assertFalse(VideoViewport.anchorsBottom(1520f, 720f, 848, 480, VideoAspect.FIT))
+        assertFalse(VideoViewport.anchorsBottom(1520f, 720f, 480, 848, VideoAspect.FILL))
+        assertFalse(VideoViewport.anchorsBottom(1520f, 720f, 0, 0, VideoAspect.FILL))
+    }
 }

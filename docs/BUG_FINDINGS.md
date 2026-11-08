@@ -27,6 +27,7 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-089/090/091 | Rasio video, ketukan Riwayat dan info lampiran diperbaiki pada 1.1.45; bukti serta batas uji ada di [laporan](MEDIA_POLISH_1_1_45.md). |
 | BUG-092 | Mitigasi 27 Okt: error MediaPlayer transien (IO/timeout/unknown/server mati) dimuat ulang sekali pada posisi yang sama; error codec/format tidak diulang. Reproduksi perangkat dan kode `what`/`extra` belum terbukti. |
 | BUG-093 | Kasus uji teratasi: pengguna mengonfirmasi +6 dB jelas/bersih pada volume HP terlapor50%. Penguat PCM1.1.46 teruji; tidak mengklaim semua sumber/rute sama dengan pemutar lain. |
+| BUG-095 | Hardsub terpotong di mode Isi layar/Zoom pada layar lanskap; perbaikan 1.1.78 mengunci crop ke tepi bawah frame. Verifikasi perangkat dicatat di [PROGRESS](PROGRESS.md). |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
@@ -1122,3 +1123,25 @@ encode. Pratinjau sudah menerima `startMs`/`endMs` sehingga ikut berubah.
 
 Regresi `StatusClipTest` 9 kasus lulus di harness kotlinc/JUnit. Build Gradle,
 lint, dan uji perangkat belum dijalankan pada sesi ini.
+
+## BUG-095 — P2: Hardsub terpotong di mode Isi layar/Zoom pada layar lebar
+
+Dilaporkan 8 November 2026 pada RMX1821 (720×1520, Android 10). Video 16:9
+diputar lanskap; mode **Isi layar** dan **Zoom** memotong tepi atas dan bawah
+secara simetris. Baris hardsub Samehadaku yang menempel sekitar 5–10 px di atas
+tepi bawah frame ikut terpotong, sedangkan mode **Utuh** tetap menampilkan
+seluruh gambar.
+
+Reproduksi memakai episode `tensei-shitara-ken-deshita-s2` (848×480, hardsub
+terbakar, tanpa track subtitle) pada adegan dialog. Penyebabnya
+`Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP` yang memotong dari tengah; pada
+layar 1520×720 crop vertikal sekitar 140 px, cukup untuk menghapus baris teks
+terbawah.
+
+Perbaikan 1.1.78 memakai `VideoCropEffect`: skala cover tanpa distorsi, lalu
+area pandang digeser ke bawah untuk sumber lanskap sehingga tepi bawah frame
+menempel ke tepi bawah layar. Jalur software memakai `VideoViewport.anchorsBottom`
+dan `Alignment.BottomCenter`; sumber portrait tetap center karena crop vertikalnya
+terlalu ekstrem. Notice dan hint rasio layar menyebut tepi atas yang hilang serta
+subtitle bawah yang aman. Regresi: `VideoViewportTest`, `VideoCropEffectTest`,
+dan `VideoPlaybackTest`.

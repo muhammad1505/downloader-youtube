@@ -1,6 +1,6 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 7 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 8 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
 ## Antrean playlist macet, panel aksi seragam, dialog folder, dan sesi YouTube — 1.1.75, 3 November 2026
 
@@ -1658,3 +1658,59 @@ menurun, tiga sorotan 161–194 karakter. `git diff --check` bersih.
 Batas: `adb devices` kosong, jadi perilaku WorkManager pada scheduler OEM, perubahan toggle saat
 job QUEUED, dan teks alasan belum diuji di perangkat. Build rilis ber-minify, audit native/ZIP,
 dan APK 1.1.77 belum dijalankan. Verifikasi perangkat mengikuti matriks **DTM-20**.
+
+## Hardsub terpotong di Isi layar/Zoom lanskap — 1.1.78/code93, 8 November 2026
+
+Keluhan pengguna: video 16:9 ber-hardsub diputar lanskap, baris teks paling bawah hilang di mode
+**Isi layar** dan **Zoom** (BUG-095). Reproduksi memakai `tensei-shitara-ken-deshita-s2`
+episode 1 (848×480, hardsub terbakar, tanpa track subtitle).
+
+- **Akar masalah.** `Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP` memperbesar gambar sampai
+  menutup layar lalu memotong sisa secara simetris dari tengah. Di viewport 1520×720, video
+  16:9 kelebihan tinggi ±140 px; 70 px dibuang dari atas dan 70 px dari bawah, tepat di area
+  hardsub Samehadaku.
+- **Jalur hardware.** `VideoCropEffect` menghitung matriks cover tanpa distorsi lalu menggeser
+  `translateY` sebesar kelebihan skala, sehingga tepi bawah frame menempel ke tepi bawah layar.
+  Hanya sumber lanskap yang memakai anchor bawah; video portrait tetap di tengah karena crop
+  vertikalnya terlalu ekstrem. Mode **Utuh** tetap `LAYOUT_SCALE_TO_FIT`.
+- **Jalur software.** Tanpa pipeline GL, `VideoViewport.anchorsBottom` mendeteksi permukaan yang
+  lebih tinggi dari wadah; `PlayerView` diberi tinggi hasil hitung dan ditempel ke bawah.
+  `wrapContentSize` juga harus memakai `BottomCenter` — dengan `Center`, luberan 140 px dibagi
+  dua dan 70 px tetap jatuh di bawah layar. Ini yang membuat percobaan pertama masih memotong
+  hardsub meski permukaan sudah di-align ke bawah.
+- **Komunikasi UI.** Notice dan hint di sheet rasio menyebut tepi atas yang hilang dan bahwa
+  hardsub bawah tetap aman; label tetap **Utuh**, **Isi layar**, dan **Zoom**.
+
+Verifikasi perangkat (Realme RMX1821, Android 10/API 29, 720×1520; APK rilis produksi
+arm64-v8a dengan `versionCode=93`/`versionName=1.1.78`, dipasang menimpa 1.1.77 dengan data
+utuh):
+
+- `tensei-shitara-ken-deshita-s2` episode 1, lanskap, hardware: **Isi layar** memenuhi layar
+  dengan hardsub bawah utuh; **Zoom** memperbesar lebih jauh dan hardsub tetap utuh; **Utuh**
+  menampilkan seluruh frame dengan bilah samping dan hardsub terlihat.
+- `black-clover-season-2` episode 6, lanskap, **Isi layar** hardware: baris "Aku benar-benar tak
+  sabar bertarung denganmu suatu saat nanti!" utuh.
+- `shuiro-no-kamen` episode 5, lanskap, **Isi layar**: hardware menampilkan lirik "One mighty
+  fate beyond our hands" dan "From the emotion and your soul" utuh; software menampilkan
+  hardsub dua baris "Dia memakai topeng agar menjadi tembus pandang / lalu menghancurkan
+  topeng-topeng Gaston." utuh.
+- `tensei-shitara-ken-deshita-s2` episode 1, lanskap, software **Zoom**: permukaan
+  `pos=(-190,-355), size=(1900,1075)` dengan tepi bawah tepat 720 px; hardsub dua baris
+  "Pertarungan panjang / akan buruk bagi kita." utuh.
+- Bukti software sebelum/sesudah dari `dumpsys SurfaceFlinger`: `pos=(0,-70), size=(1520,860)`
+  (bawah 790 px, terpotong 70 px) menjadi `pos=(0,-140), size=(1520,860)` (bawah tepat 720 px).
+  Log diagnostik menambahkan `anchor=bawah`.
+
+Verifikasi host dan paket: `./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+--max-workers=2` **BUILD SUCCESSFUL (6m 32s)** — **697 tes Kotlin** dari 93 berkas, 0
+gagal/error/skipped; lint **0 error/6 warning** (baseline); tiga APK debug terbentuk.
+`python3 -m unittest discover -s scripts -p "test_*.py"` **103 tes OK**. `:app:assembleRelease`
+dengan keystore produksi **BUILD SUCCESSFUL**; APK arm64-v8a 78.465.294 byte, SHA-256
+`2bdbd5481e8759d1146ee843505688b840ac1c52bab550b421e9c74682a127fd`, ditandatangani
+`CN=TubeFlow Release`. `audit_native.py` 262 ELF 0 gagal (alignment 16 KB),
+`audit_release_zip_fields.py` 13 kelas 0 gagal, `git diff --check` bersih.
+
+Batas: uji ini memakai video 848×480 tanpa track subtitle dan satu perangkat 720×1520; rasio
+lain, sumber portrait pada layar lanskap, subtitle track, decoder lain, dan OEM lain belum diuji
+pada build ini. Tes host dan emulator tidak membuktikan perilaku codec. Matriks **DTM-18**
+diperbarui dengan kriteria ini.

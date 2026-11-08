@@ -1,11 +1,12 @@
 # Matriks uji perangkat TubeFlow
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
-seluruh skenario sudah lulus. Status terakhir diperbarui **7 November 2026**
-untuk kandidat **1.1.77/code 92** (host lulus; belum terpasang di perangkat
-karena `adb devices` kosong). Build 1.1.71 sempat terpasang lewat ADB (bukti
-hash di [PROGRESS.md](PROGRESS.md)) tetapi belum ada skenario di bawah yang
-dijalankan pada build ini; semua baris masih **belum dijalankan**.
+seluruh skenario sudah lulus. Status terakhir diperbarui **8 November 2026**
+untuk kandidat **1.1.78/code 93**, terpasang di Realme RMX1821 (Android 10,
+720×1520). **DTM-18** sudah dijalankan untuk mode Utuh/Isi layar/Zoom lanskap
+pada jalur decoder hardware dan software dengan video ber-hardsub; skenario
+lain dan baris lain masih **belum dijalankan** pada build ini. Bukti rinci ada
+di [PROGRESS.md](PROGRESS.md).
 
 Gunakan hanya konten milik sendiri atau yang diizinkan. Hasil lama pada
 [DEVICE_TEST.md](DEVICE_TEST.md) tetap berlaku untuk versi yang disebut di sana
@@ -65,7 +66,7 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-15 | Baris ringkas Koleksi & Riwayat | Buka Koleksi: cari file yang judulnya berbeda dari nama file dan file berlirik/subtitle. Lalu buka tab Download → Riwayat. | Nama file tampil di baris keterangan bila tidak mengulang judul; ikon lirik/CC muncul di ujung baris tanpa baris tambahan; kartu Riwayat memakai baris ringkas tapi tanggal selesai, `AttachmentInfo`, dan status lirik tetap tampil; semua aksi tersedia di menu ⋮; tap baris tetap memutar. |
 | DTM-16 | Favorit, teks bergulir, antrean seragam | Tandai beberapa item sebagai favorit di Koleksi; buka item berjudul panjang/nama file panjang; buka antrean putar audio (pemutar lagu) dan antrean video (pemutar video). | Hati favorit tampil hanya pada item di playlist Favorit; judul/baris keterangan yang terpotong bergulir kanan ke kiri (diam bila muat); kedua antrean memakai kartu sama: sampul 48 dp, judul, `AttachmentInfo`, label "Sedang diputar" + aksen pada item aktif; menu ⋮ tetap ada di audio; tap baris melompat ke item tersebut. |
 | DTM-17 | Ganti nama folder fisik | Ganti nama folder hasil unduhan (MediaStore) dan folder SAF bertingkat; periksa Files, Koleksi, playlist, lirik, dan Riwayat. Coba juga folder baca-saja, folder akar, dan nama yang sudah dipakai. | Direktori benar-benar berubah nama; berkas tetap dapat diputar; lirik, playlist, dan riwayat menunjuk lokasi baru; job yang belum selesai memakai subfolder baru; kasus yang ditolak memberi pesan jelas dan tidak meninggalkan folder setengah pindah. |
-| DTM-18 | Rasio video Utuh/Isi layar/Zoom | Putar video 16:9 di layar 20:9; ganti mode lewat tombol dan sheet opsi; periksa notice serta TalkBack. | Utuh menampilkan seluruh frame (bilah hitam boleh muncul); Isi layar memenuhi layar dengan tepi terpotong; Zoom lebih besar; hint dan notice menjelaskan potongan; label aksesibilitas menyebut mode berikutnya. |
+| DTM-18 | Rasio video Utuh/Isi layar/Zoom + hardsub | Putar video 16:9 ber-hardsub di layar 20:9, lanskap dan portrait; ganti mode lewat tombol dan sheet opsi; periksa notice serta TalkBack. | Utuh menampilkan seluruh frame (bilah hitam boleh muncul); Isi layar memenuhi layar, tepi atas terpotong, tetapi baris hardsub di bawah tetap utuh; Zoom lebih besar dan tetap mempertahankan tepi bawah; hint dan notice menjelaskan tepi yang hilang; label aksesibilitas menyebut mode berikutnya. |
 | DTM-19 | RAM katalog, tema awal, menu audio, genre | Buka aplikasi dengan katalog 1.000+ item dan ukur memori/waktu buka; pasang baru tanpa data untuk memeriksa tema; buka baris audio Koleksi; unduh audio tanpa genre eksplisit lalu periksa tag. | Pemeriksaan awal tidak memuat ribuan baris dan RAM tidak terus naik; instalasi baru memakai tema Sistem tanpa menimpa pilihan lama; menu ⋮ tidak mengulang Favorit/Bagikan; genre kosong tidak menjadi tag kosong dan fallback kategori/tag tetap bekerja. |
 | DTM-20 | Antrean tertahan "Menunggu giliran" | Antrekan satu video dengan **Hanya lewat WiFi** aktif saat hanya data seluler, lalu sambungkan WiFi; ulangi dengan **Hanya saat mengisi daya** lalu sambungkan charger; matikan salah satu toggle saat job masih QUEUED; biarkan satu job QUEUED lebih dari 45 detik tanpa unduhan lain berjalan. | Kartu menyebut alasan tunggu yang benar (internet/WiFi tidak berbayar/pengisian daya/kombinasi); setelah syarat terpenuhi dan tidak ada job lain berjalan, job mulai dalam ±45 detik tanpa perlu jeda→lanjutkan; mengubah toggle langsung menjadwal ulang job QUEUED; tidak ada output ganda atau job lain ikut berhenti. |
 

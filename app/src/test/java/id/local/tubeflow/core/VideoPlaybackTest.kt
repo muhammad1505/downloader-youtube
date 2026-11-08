@@ -315,6 +315,32 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun aspectDetailExplainsWhichEdgeIsCutAndKeepsHardSubsVisible() {
+        assertEquals("seluruh gambar terlihat", VideoPlayback.aspectDetail(VideoAspect.FIT, 848, 480))
+        assertEquals(
+            "memenuhi layar, tepi atas terpotong, subtitle bawah aman",
+            VideoPlayback.aspectDetail(VideoAspect.FILL, 848, 480),
+        )
+        assertEquals(
+            "diperbesar, tepi atas terpotong, subtitle bawah aman",
+            VideoPlayback.aspectDetail(VideoAspect.ZOOM, 848, 480),
+        )
+        assertEquals(
+            "memenuhi layar, tepi kiri dan kanan terpotong",
+            VideoPlayback.aspectDetail(VideoAspect.FILL, 480, 848),
+        )
+        assertEquals(
+            "memenuhi layar, tepi video terpotong",
+            VideoPlayback.aspectDetail(VideoAspect.FILL, 0, 0),
+        )
+        // Rasio piksel non-persegi ikut menentukan orientasi tampilan.
+        assertEquals(
+            "memenuhi layar, tepi kiri dan kanan terpotong",
+            VideoPlayback.aspectDetail(VideoAspect.FILL, 500, 400, 0.5f),
+        )
+    }
+
+    @Test
     fun orientationCyclesAutoLandscapePortrait() {
         assertEquals(VideoOrientation.LANDSCAPE, VideoOrientation.AUTO.next())
         assertEquals(VideoOrientation.PORTRAIT, VideoOrientation.LANDSCAPE.next())

@@ -67,12 +67,14 @@ object VideoDiagnostics {
         surfaceWidth: Float,
         surfaceHeight: Float,
         presenting: Boolean,
+        anchoredBottom: Boolean = false,
     ) {
         Log.d(
             TAG,
             "geometri aspek=$aspect wadah=${containerWidth.toInt()}x${containerHeight.toInt()} " +
                 "video=${videoWidth}x$videoHeight par=$pixelRatio " +
-                "permukaan=${surfaceWidth.toInt()}x${surfaceHeight.toInt()} presentasi=$presenting",
+                "permukaan=${surfaceWidth.toInt()}x${surfaceHeight.toInt()} presentasi=$presenting" +
+                if (anchoredBottom) " anchor=bawah" else "",
         )
     }
 

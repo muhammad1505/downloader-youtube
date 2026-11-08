@@ -299,6 +299,32 @@ object VideoPlayback {
         playerVersion: Int,
     ): String = "${if (saving) VideoEnhance.OFF else enhance}|$aspect|$width|$height|$playerVersion"
 
+    /**
+     * Ringkasan singkat mode tampilan untuk pemberitahuan dan hint. Sumber lanskap yang dipotong
+     * vertikal memakai crop bawah, jadi yang hilang hanya tepi atas; sumber portrait dipotong
+     * kiri-kanan dan tidak bisa menyelamatkan subtitle selebar layar.
+     */
+    fun aspectDetail(
+        aspect: VideoAspect,
+        videoWidth: Int,
+        videoHeight: Int,
+        pixelRatio: Float = 1f,
+    ): String = when (aspect) {
+        VideoAspect.FIT -> "seluruh gambar terlihat"
+        VideoAspect.FILL -> when {
+            videoWidth <= 0 || videoHeight <= 0 -> "memenuhi layar, tepi video terpotong"
+            videoWidth * (pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= videoHeight ->
+                "memenuhi layar, tepi atas terpotong, subtitle bawah aman"
+            else -> "memenuhi layar, tepi kiri dan kanan terpotong"
+        }
+        VideoAspect.ZOOM -> when {
+            videoWidth <= 0 || videoHeight <= 0 -> "diperbesar, tepi video terpotong"
+            videoWidth * (pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= videoHeight ->
+                "diperbesar, tepi atas terpotong, subtitle bawah aman"
+            else -> "diperbesar, tepi kiri dan kanan terpotong"
+        }
+    }
+
     /** Delay subtitle positif menampilkan teks lebih lambat; batasnya menjaga hasil tetap masuk akal. */
     fun adjustSubtitleDelay(currentMs: Int, deltaMs: Int): Int =
         (currentMs + deltaMs).coerceIn(-SUBTITLE_DELAY_LIMIT_MS, SUBTITLE_DELAY_LIMIT_MS)
