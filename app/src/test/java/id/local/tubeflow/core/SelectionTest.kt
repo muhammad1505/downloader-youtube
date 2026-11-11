@@ -229,6 +229,18 @@ class SelectionTest {
   Selection.validate(DownloadOptions("https://youtu.be/x",mode=MediaMode.AUDIO,format="vorbis"))
   Selection.validate(DownloadOptions("https://youtu.be/x",quality=4320))
  }
+ @Test fun validationAcceptsRealPixelHeightsFromEverySourceShape() {
+  // Kualitas di job adalah tinggi piksel nyata, bukan label tier: portrait 720p = 1280 dan
+  // video bioskop 1080p = 818. Daftar tier tetap pernah membuang pilihan Instagram yang sah.
+  Selection.validate(DownloadOptions("https://www.instagram.com/reel/ABC/",quality=1280))
+  Selection.validate(DownloadOptions("https://youtu.be/x",quality=818))
+  Selection.validate(DownloadOptions("https://youtu.be/x",quality=1920))
+  Selection.validate(DownloadOptions("https://youtu.be/x",quality=Selection.MAX_VIDEO_HEIGHT))
+  val error = assertThrows(IllegalArgumentException::class.java) {
+   Selection.validate(DownloadOptions("https://youtu.be/x",quality=Selection.MAX_VIDEO_HEIGHT + 1))
+  }
+  assertEquals("Resolusi video tidak didukung.", error.message)
+ }
  @Test fun subtitleChoicesAreWhitelisted() {
   Selection.validate(DownloadOptions("https://youtu.be/x",subtitles="asli"))
   Selection.validate(DownloadOptions("https://youtu.be/x",subtitles="id"))

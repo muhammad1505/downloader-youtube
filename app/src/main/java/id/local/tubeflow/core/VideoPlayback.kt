@@ -11,13 +11,15 @@ import java.util.Locale
 
 /**
  * Mode tampilan video di dalam PlayerView; urutannya adalah urutan tombol.
- * FIT menampilkan seluruh frame tanpa distorsi, FILL memenuhi layar dengan memotong tepi,
- * dan ZOOM melakukan hal yang sama dengan pembesaran tambahan.
+ * 100% memetakan satu piksel sumber ke satu piksel layar, FIT menampilkan seluruh frame tanpa
+ * distorsi, STRETCH memenuhi layar tanpa membuang isi, dan CROP memenuhi layar dengan memotong
+ * tepi secara simetris di tengah.
  */
 enum class VideoAspect(val label: String, val crops: Boolean) {
-    FIT("Utuh", false),
-    FILL("Isi layar", true),
-    ZOOM("Zoom", true);
+    PERCENT_100("100%", false),
+    FIT("Pas ke layar", false),
+    STRETCH("Rentangkan", false),
+    CROP("Potong", true);
 
     fun next(): VideoAspect = entries[(ordinal + 1) % entries.size]
 }
@@ -171,6 +173,20 @@ object VideoPlayback {
     const val SUBTITLE_DELAY_LIMIT_MS = 10_000
     /** Buffer sekejap saat refill normal tidak boleh memunculkan spinner. */
     const val BUFFERING_INDICATOR_DELAY_MS = 300L
+    /** Batas buffer lokal sebelum dianggap macet dan pemutar dibuka ulang otomatis. */
+    const val STALL_TIMEOUT_MS = 12_000L
+    /** Maksimal pemulihan otomatis per episode macet; setelah itu pengguna diberi pilihan. */
+    const val STALL_MAX_RECOVERIES = 2
+    /** Pemutaran stabil selama ini dianggap pulih dan hitungan macet direset. */
+    const val STALL_STEADY_PLAY_MS = 8_000L
+    /** Panel antrean video memakai 76% lebar layar, tetapi tidak lebih dari 320 dp. */
+    const val QUEUE_PANEL_FRACTION = 0.76f
+    const val QUEUE_PANEL_MAX_DP = 320f
+
+    /** Lebar panel antrean dalam dp; dipisah agar batas lanskap bisa diuji tanpa UI. */
+    fun queuePanelWidthDp(containerDp: Float): Float =
+        if (containerDp <= 0f) 0f
+        else minOf(containerDp * QUEUE_PANEL_FRACTION, QUEUE_PANEL_MAX_DP)
 
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
@@ -280,6 +296,22 @@ object VideoPlayback {
     fun shouldRevealBuffering(buffering: Boolean, hasError: Boolean, waitedMs: Long): Boolean =
         buffering && !hasError && waitedMs >= BUFFERING_INDICATOR_DELAY_MS
 
+    /**
+     * Buffer lokal yang bertahan lama saat playWhenReady bukan refill normal. ExoPlayer tidak
+     * selalu melaporkan error ketika dekoder berhenti merespons, jadi watchdog harus turun tangan
+     * supaya indikator loading tidak berputar selamanya.
+     */
+    fun shouldRecoverStall(
+        bufferingSinceMs: Long,
+        nowMs: Long,
+        playWhenReady: Boolean,
+        hasError: Boolean,
+    ): Boolean = !hasError && playWhenReady && bufferingSinceMs > 0L &&
+        nowMs - bufferingSinceMs >= STALL_TIMEOUT_MS
+
+    /** Pemulihan otomatis dibatasi agar berkas yang benar-benar rusak tidak direstart selamanya. */
+    fun canRecoverStall(recoveries: Int): Boolean = recoveries < STALL_MAX_RECOVERIES
+
     /** Setelah fallback software gagal, pemutar harus dibuat ulang agar percobaan berikutnya bisa hardware. */
     fun needsDecoderRestart(hasPlayer: Boolean, softwareFallbackUsed: Boolean): Boolean =
         !hasPlayer || softwareFallbackUsed
@@ -293,36 +325,18 @@ object VideoPlayback {
     fun effectsKey(
         enhance: VideoEnhance,
         saving: Boolean,
-        aspect: VideoAspect,
-        width: Int,
-        height: Int,
         playerVersion: Int,
-    ): String = "${if (saving) VideoEnhance.OFF else enhance}|$aspect|$width|$height|$playerVersion"
+    ): String = "${if (saving) VideoEnhance.OFF else enhance}|$playerVersion"
 
     /**
-     * Ringkasan singkat mode tampilan untuk pemberitahuan dan hint. Sumber lanskap yang dipotong
-     * vertikal memakai crop bawah, jadi yang hilang hanya tepi atas; sumber portrait dipotong
-     * kiri-kanan dan tidak bisa menyelamatkan subtitle selebar layar.
+     * Ringkasan singkat mode tampilan untuk pemberitahuan dan hint. Mode Pas dan Rentangkan
+     * tidak membuang isi frame; hanya Potong yang memangkas tepi gambar.
      */
-    fun aspectDetail(
-        aspect: VideoAspect,
-        videoWidth: Int,
-        videoHeight: Int,
-        pixelRatio: Float = 1f,
-    ): String = when (aspect) {
-        VideoAspect.FIT -> "seluruh gambar terlihat"
-        VideoAspect.FILL -> when {
-            videoWidth <= 0 || videoHeight <= 0 -> "memenuhi layar, tepi video terpotong"
-            videoWidth * (pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= videoHeight ->
-                "memenuhi layar, tepi atas terpotong, subtitle bawah aman"
-            else -> "memenuhi layar, tepi kiri dan kanan terpotong"
-        }
-        VideoAspect.ZOOM -> when {
-            videoWidth <= 0 || videoHeight <= 0 -> "diperbesar, tepi video terpotong"
-            videoWidth * (pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= videoHeight ->
-                "diperbesar, tepi atas terpotong, subtitle bawah aman"
-            else -> "diperbesar, tepi kiri dan kanan terpotong"
-        }
+    fun aspectDetail(aspect: VideoAspect): String = when (aspect) {
+        VideoAspect.PERCENT_100 -> "ukuran piksel asli; gambar bisa melebihi layar"
+        VideoAspect.FIT -> "seluruh gambar terlihat tanpa dipotong"
+        VideoAspect.STRETCH -> "memenuhi layar, gambar direntangkan tanpa dipotong"
+        VideoAspect.CROP -> "memenuhi layar, tepi gambar terpotong"
     }
 
     /** Delay subtitle positif menampilkan teks lebih lambat; batasnya menjaga hasil tetap masuk akal. */

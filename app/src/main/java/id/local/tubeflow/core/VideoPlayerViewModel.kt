@@ -17,7 +17,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.Presentation
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -79,7 +78,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val videoWidth: Int = 0,
         val videoHeight: Int = 0,
         val pixelRatio: Float = 1f,
-        val effectPresentation: Boolean = false,
         val brightnessMode: VideoBrightnessMode = VideoBrightnessMode.AUTO,
         val manualBrightness: Float = 0.5f,
         val volumeBoostDb: Int = 0,
@@ -107,6 +105,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var ticker: Job? = null
     private var fallbackJob: Job? = null
     private var attachmentJob: Job? = null
+    /** Waktu masuk STATE_BUFFERING; nol berarti tidak sedang menunggu buffer. */
+    private var bufferingSince = 0L
+    /** Pemulihan otomatis yang sudah dipakai pada episode macet ini. */
+    private var stallRecoveries = 0
+    /** Waktu mulai pemutaran stabil, dipakai untuk mereset hitungan macet. */
+    private var playingSince = 0L
     private val attachmentChecked = mutableSetOf<String>()
     private var softwareFallbackUsed = false
     private var pendingSubtitleLabel: String? = null
@@ -125,6 +129,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             val current = _state.value
             _state.value = current.copy(playing = isPlaying)
+            // Waktu mulai dipakai watchdog untuk mereset hitungan macet hanya setelah pemutaran
+            // benar-benar stabil, bukan sekejap setelah pemutar dibuka ulang.
+            playingSince = if (isPlaying) SystemClock.elapsedRealtime() else 0L
             if (!isPlaying) saveNow()
         }
 
@@ -133,6 +140,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         // mengikuti STATE_BUFFERING agar tidak berkedip setiap buffer refill (~50 detik).
         override fun onPlaybackStateChanged(playbackState: Int) {
             val current = _state.value
+            if (playbackState == Player.STATE_BUFFERING) {
+                if (bufferingSince == 0L) bufferingSince = SystemClock.elapsedRealtime()
+            } else {
+                bufferingSince = 0L
+            }
             _state.value = when (playbackState) {
                 Player.STATE_READY -> current.copy(
                     ready = true,
@@ -176,6 +188,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED -> _state.value.positionMs
                 resumeAt != null -> resumeAt
                 else -> player?.currentPosition?.coerceAtLeast(0) ?: 0
+            }
+            // Pindah video (manual atau auto-lanjut) memulai episode macet baru. Daftar awal
+            // yang baru dipasang bukan perpindahan, jadi hitungan pemulihan tidak direset.
+            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                stallRecoveries = 0
+                bufferingSince = 0L
             }
             lastPositionMs = position
             lastDurationMs = 0
@@ -229,6 +247,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
+        // Argumen copy() multi-baris di bawah if panjang adalah pola yang sudah dipakai di file
+        // ini; lint salah membacanya sebagai statement terpisah.
+        @Suppress("SuspiciousIndentation")
         override fun onPlayerError(error: PlaybackException) {
             val current = _state.value
             VideoDiagnostics.failure(error.errorCode, VideoPlayback.isCodecFailure(error.errorCode))
@@ -253,6 +274,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             ) {
                 softwareFallbackUsed = true
                 fallbackJob?.cancel()
+                // Jangan biarkan watchdog ikut campur saat fallback dekoder sedang berjalan.
+                bufferingSince = 0L
+                stallRecoveries = 0
                 // Error tidak boleh mengubah niat pengguna: video yang dijeda tetap dijeda
                 // setelah fallback, sedangkan video yang berjalan tetap diputar.
                 val startPlaying = player?.playWhenReady ?: current.playing
@@ -277,6 +301,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 return
             }
+            bufferingSince = 0L
             _state.value = _state.value.copy(
                 playing = false,
                 buffering = false,
@@ -296,6 +321,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val saved = resume.position(entries[start].uri)
         val startPosition = if (VideoPlayback.shouldResume(saved, 0)) saved ?: 0 else 0
         softwareFallbackUsed = false
+        stallRecoveries = 0
         openInternal(
             entries.map(::withStoredSubtitles),
             start,
@@ -318,6 +344,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         return true
     }
 
+    @Suppress("SuspiciousIndentation")
     private fun rememberLast(entry: VideoEntry) {
         lastSession.edit {
             putString(KEY_LAST_URI, entry.uri)
@@ -389,6 +416,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             resumeFromMs = resumeFromMs,
             playerVersion = playerVersion,
         )
+        // Setiap sesi baru mulai menghitung dari awal, termasuk sesi hasil pemulihan macet.
+        bufferingSince = SystemClock.elapsedRealtime()
+        playingSince = 0L
         currentUri = entries[start].uri
         rememberLast(entries[start])
         lastPositionMs = startPosition
@@ -433,7 +463,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
             player = exo
             exo.addAnalyticsListener(VideoDiagnostics.analytics())
-            _state.value = _state.value.copy(effectPresentation = false)
             audioFx.attach(exo.audioSessionId, preferences.equalizer, preferences.audioEffect)
             VideoDiagnostics.session(
                 reason = if (preferSoftware) "buka-software" else "buka",
@@ -469,7 +498,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 exo.play()
             }
             exo.isPlaying -> exo.pause()
-            else -> exo.play()
+            else -> {
+                // Lanjut setelah jeda saat buffer memberi jendela watchdog baru.
+                if (exo.playbackState == Player.STATE_BUFFERING) bufferingSince = SystemClock.elapsedRealtime()
+                exo.play()
+            }
         }
     }
 
@@ -482,6 +515,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val exo = player ?: return
         val target = VideoPlayback.seekTarget(positionMs, 0, _state.value.durationMs)
         exo.seekTo(target)
+        // Seek besar pada berkas lokal boleh menunggu buffer lagi; beri jendela baru sebelum
+        // watchdog menganggapnya macet.
+        if (exo.playbackState == Player.STATE_BUFFERING) bufferingSince = SystemClock.elapsedRealtime()
         _state.value = _state.value.copy(positionMs = target, ended = false)
     }
 
@@ -516,6 +552,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun retry() {
         val current = _state.value
         if (current.entries.isEmpty()) return
+        // Percobaan manual memberi anggaran pemulihan otomatis baru.
+        stallRecoveries = 0
+        bufferingSince = 0L
         val exo = player
         val target = VideoPlayback.reopenPosition(current.positionMs, exo?.currentPosition ?: 0)
         // Jika fallback software otomatis sudah gagal, mengulang renderer yang sama hanya akan
@@ -560,7 +599,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun setAspect(value: VideoAspect) {
         preferences.edit { putString(KEY_ASPECT, value.name) }
         _state.value = _state.value.copy(aspect = value)
-        refreshPowerPolicy()
+        // Mode tampilan hanya mengubah skala layer; jangan buka ulang player yang sedang dijeda
+        // hanya untuk menerapkan efek warna yang tidak berubah.
     }
 
     fun cycleAspect() = setAspect(_state.value.aspect.next())
@@ -599,6 +639,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         // Pilihan manual membatalkan fallback otomatis sebelumnya; kalau tidak, memilih
         // "Perangkat" tetap membuka renderer software dari kegagalan video sebelumnya.
         softwareFallbackUsed = false
+        stallRecoveries = 0
+        bufferingSince = 0L
         _state.value = current.copy(decoderMode = value)
         if (current.active) {
             reopenAtCurrent(forceSoftware = value == VideoDecoderMode.SOFTWARE)
@@ -621,32 +663,26 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewportWidth = width
         viewportHeight = height
         VideoDiagnostics.viewport(width, height)
-        refreshPowerPolicy()
-        // Permukaan SurfaceView berukuran baru, tetapi hanya terisi ketika pemutar menggambar
-        // frame berikutnya. Pemutar yang sedang berjalan melakukannya sendiri; pemutar yang
-        // berhenti tidak, sehingga frame lama tetap tampil dengan geometri lama (video menempel
-        // di satu sisi layar). Sebab itu pemutar yang berhenti dibuka ulang:
-        // - diakhiri: seek tidak menggambar apa pun, jadi buka ulang 1 ms sebelum akhir tanpa
-        //   memulai pemutaran agar frame terakhir muncul di permukaan baru;
-        // - sesi software yang dijeda: refreshPowerPolicy() sengaja tidak membuka ulang, jadi
-        //   pemutar dibuka ulang di posisi yang sama.
+        // Viewport berubah saat rotasi atau masuk/keluar layar penuh. TextureView yang berubah
+        // ukuran bisa mempertahankan transform lama di Android 10, dan pemutar yang berhenti tidak
+        // menggambar frame baru. Buka ulang di posisi yang sama tanpa memaksa pemutaran; untuk
+        // video yang sudah berakhir, buka 1 ms sebelum akhir agar frame terakhir muncul dengan
+        // geometri baru.
         val state = _state.value
         val exo = player ?: return
-        if (exo.isPlaying || exo.playbackState == Player.STATE_BUFFERING) return
-        val softwareSession = state.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed
-        when {
-            exo.playbackState == Player.STATE_ENDED && state.entries.isNotEmpty() -> {
-                val start = state.index.coerceIn(state.entries.indices)
-                releasePlayer()
-                openInternal(
-                    entries = state.entries,
-                    start = start,
-                    startPosition = (state.durationMs - 1).coerceAtLeast(0),
-                    preferSoftware = softwareSession,
-                    startPlaying = false,
-                )
-            }
-            softwareSession -> reopenAtCurrent(forceSoftware = false)
+        if (state.entries.isEmpty() || exo.isPlaying || exo.playbackState == Player.STATE_BUFFERING) return
+        if (exo.playbackState == Player.STATE_ENDED) {
+            val start = state.index.coerceIn(state.entries.indices)
+            releasePlayer()
+            openInternal(
+                entries = state.entries,
+                start = start,
+                startPosition = (state.durationMs - 1).coerceAtLeast(0),
+                preferSoftware = state.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed,
+                startPlaying = false,
+            )
+        } else {
+            reopenAtCurrent(forceSoftware = false)
         }
     }
 
@@ -859,6 +895,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         lastPositionMs = 0
         lastDurationMs = 0
         softwareFallbackUsed = false
+        bufferingSince = 0L
+        playingSince = 0L
+        stallRecoveries = 0
         _state.value = preferencesState()
     }
 
@@ -919,40 +958,20 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 HslAdjustment.Builder().adjustSaturation(8f).adjustLightness(-2f).build(),
             )
         }
-        // Efek GL tidak didukung semua kombinasi dekoder/GPU; kegagalan efek tidak boleh
-        // menghentikan pemutaran video.
-        val aspect = _state.value.aspect
+        // Efek hanya mengubah warna; letterbox/crop selalu diurus permukaan VideoViewport. Pipeline
+        // GL karena itu tidak pernah mengganti ukuran frame, sehingga rotasi layar atau pergantian
+        // mode tampilan tidak memicu ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED.
         val signature = VideoPlayback.effectsKey(
             enhance = enhance,
             saving = PlaybackPower.saving,
-            aspect = aspect,
-            width = viewportWidth,
-            height = viewportHeight,
             playerVersion = _state.value.playerVersion,
         )
         if (signature == effectsSignature) return
-        // FIT memakai letterbox bawaan Media3. FILL/ZOOM memakai efek potong sendiri yang
-        // mengunci tepi bawah frame, sehingga hardsub di dasar video tidak hilang saat layar
-        // lebih lebar dari video. Keduanya tetap menghasilkan frame seukuran viewport.
-        val presentation: Effect? = if (viewportWidth > 0 && viewportHeight > 0) {
-            when (aspect) {
-                VideoAspect.FIT -> Presentation.createForWidthAndHeight(
-                    viewportWidth,
-                    viewportHeight,
-                    Presentation.LAYOUT_SCALE_TO_FIT,
-                )
-                VideoAspect.FILL -> VideoCropEffect(viewportWidth, viewportHeight)
-                VideoAspect.ZOOM -> VideoCropEffect(viewportWidth, viewportHeight, VideoViewport.ZOOM_FACTOR)
-            }
-        } else null
-        // `effectPresentation` berarti permukaan boleh memenuhi seluruh viewport karena pipeline GL
-        // sudah mengurus letterbox/crop. Tanpa `presentation` anggapan itu salah: permukaan selebar
-        // layar akan memotong gambar. Karena itu pemasangan tanpa efek presentasi dihitung gagal.
-        val applied = presentation != null &&
-            runCatching { exo.setVideoEffects(effects + presentation) }.isSuccess
+        // Efek GL tidak didukung semua kombinasi dekoder/GPU; kegagalan efek tidak boleh
+        // menghentikan pemutaran video.
+        val applied = runCatching { exo.setVideoEffects(effects) }.isSuccess
         VideoDiagnostics.effects(signature, applied)
         effectsSignature = signature
-        _state.value = _state.value.copy(effectPresentation = applied)
     }
 
     private fun saveNow() {
@@ -1001,9 +1020,84 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
         val now = SystemClock.elapsedRealtime()
+        if (exo.isPlaying) {
+            if (playingSince == 0L) playingSince = now
+            // Pemutaran yang bertahan cukup lama menandakan pemulihan berhasil; episode macet
+            // berikutnya boleh memakai anggaran otomatis lagi.
+            if (stallRecoveries > 0 && now - playingSince >= VideoPlayback.STALL_STEADY_PLAY_MS) {
+                stallRecoveries = 0
+            }
+        } else {
+            playingSince = 0L
+        }
         if (exo.isPlaying && currentUri != null && now - lastResumeSaveAt >= 5_000) {
             resume.save(currentUri!!, position, duration)
             lastResumeSaveAt = now
+        }
+        recoverStalledPlayback(exo, now)
+    }
+
+    /**
+     * ExoPlayer tidak selalu melempar error saat dekoder berhenti merespons; ia bisa bertahan di
+     * STATE_BUFFERING selamanya. Setelah [VideoPlayback.STALL_TIMEOUT_MS], buka ulang pada posisi
+     * yang sama. Percobaan kedua beralih ke software (kecuali pengguna memilih Perangkat saja),
+     * dan bila masih macet spinner dihentikan agar pengguna bisa memilih tindakan.
+     */
+    private fun recoverStalledPlayback(exo: ExoPlayer, now: Long) {
+        val current = _state.value
+        if (!current.active) return
+        if (!VideoPlayback.shouldRecoverStall(
+                bufferingSinceMs = bufferingSince,
+                nowMs = now,
+                playWhenReady = exo.playWhenReady,
+                hasError = current.error != null,
+            )
+        ) return
+        if (exo.playbackState != Player.STATE_BUFFERING) return
+        val position = VideoPlayback.reopenPosition(current.positionMs, exo.currentPosition)
+        bufferingSince = 0L
+        if (!VideoPlayback.canRecoverStall(stallRecoveries)) {
+            VideoDiagnostics.stallFailed(position)
+            _state.value = current.copy(
+                playing = false,
+                buffering = false,
+                ready = false,
+                positionMs = position,
+                error = "Pemutaran berhenti merespons. Coba lagi atau ganti dekoder.",
+            )
+            return
+        }
+        val softwareActive = current.decoderMode == VideoDecoderMode.SOFTWARE || softwareFallbackUsed
+        // Mode Perangkat adalah pilihan manual, jadi watchdog tidak boleh menggantinya diam-diam.
+        val forceSoftware = stallRecoveries >= 1 && !softwareActive &&
+            current.decoderMode != VideoDecoderMode.HARDWARE
+        stallRecoveries += 1
+        VideoDiagnostics.stall(stallRecoveries, position, software = softwareActive || forceSoftware)
+        if (forceSoftware) softwareFallbackUsed = true
+        val startPlaying = exo.playWhenReady
+        val entries = current.entries
+        val index = current.index.coerceIn(entries.indices)
+        _state.value = current.copy(
+            playing = false,
+            buffering = true,
+            ready = false,
+            positionMs = position,
+            error = null,
+        )
+        // Jangan melepas pemutar dari dalam ticker yang sedang berjalan: releasePlayer()
+        // membatalkan ticker. Jalankan pemulihan di coroutine terpisah, lalu ticker baru dibuat
+        // oleh openInternal().
+        viewModelScope.launch {
+            delay(1)
+            if (!_state.value.active) return@launch
+            releasePlayer()
+            openInternal(
+                entries = entries,
+                start = index,
+                startPosition = position,
+                preferSoftware = softwareActive || forceSoftware,
+                startPlaying = startPlaying,
+            )
         }
     }
 

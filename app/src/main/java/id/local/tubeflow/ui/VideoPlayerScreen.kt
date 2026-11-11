@@ -10,7 +10,9 @@ import android.media.AudioManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.view.LayoutInflater
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -28,8 +30,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Column
@@ -119,10 +119,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.semantics.contentDescription
@@ -443,6 +445,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
     LaunchedEffect(saving) { video.refreshPowerPolicy() }
 
     val videoAspect = state.aspect
+    val density = LocalDensity.current.density
     val subtitleSize = state.subtitleSize
     val subtitleStyle = state.subtitleStyle
     val subtitlePosition = state.subtitlePosition
@@ -452,15 +455,18 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
         // ulang agar video tidak tertinggal di surface milik player lama (audio tetap jalan).
         key(state.playerVersion) {
             BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().onSizeChanged { video.setViewport(it.width, it.height) }, contentAlignment = Alignment.Center) {
-                val (surfaceWidth, surfaceHeight) = if (state.effectPresentation) maxWidth.value to maxHeight.value else id.local.tubeflow.core.VideoViewport.size(
-                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
+                // Geometri selalu dihitung di permukaan, termasuk saat efek warna GL aktif. Pipeline
+                // GL yang ikut mengubah ukuran frame membuat rotasi/rasio salah dan pernah memicu
+                // ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED; efek kini hanya mengubah warna.
+                val (surfaceWidth, surfaceHeight) = id.local.tubeflow.core.VideoViewport.size(
+                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect,
+                    state.pixelRatio, density,
                 )
-                // Jalur software tidak memakai efek GL yang mengunci crop ke bawah; permukaan yang
-                // lebih tinggi dari wadah ditempel ke tepi bawah agar hardsub tetap terlihat.
-                val anchoredBottom = !state.effectPresentation && id.local.tubeflow.core.VideoViewport.anchorsBottom(
-                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight, videoAspect, state.pixelRatio,
+                val (modeScaleX, modeScaleY) = id.local.tubeflow.core.VideoViewport.modeScale(
+                    maxWidth.value, maxHeight.value, state.videoWidth, state.videoHeight,
+                    videoAspect, state.pixelRatio, density,
                 )
-                LaunchedEffect(surfaceWidth, surfaceHeight, anchoredBottom, videoAspect, state.videoWidth, state.videoHeight, state.pixelRatio, state.effectPresentation) {
+                LaunchedEffect(surfaceWidth, surfaceHeight, modeScaleX, modeScaleY, videoAspect, state.videoWidth, state.videoHeight, state.pixelRatio) {
                     id.local.tubeflow.core.VideoDiagnostics.geometry(
                         aspect = videoAspect.name,
                         containerWidth = maxWidth.value,
@@ -470,8 +476,9 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                         pixelRatio = state.pixelRatio,
                         surfaceWidth = surfaceWidth,
                         surfaceHeight = surfaceHeight,
-                        presenting = state.effectPresentation,
-                        anchoredBottom = anchoredBottom,
+                        scaleX = modeScaleX,
+                        scaleY = modeScaleY,
+                        presenting = false,
                     )
                 }
             // `update` berjalan setiap tick progres. setStyle/setTextSize memicu layout ulang
@@ -479,18 +486,29 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
             val appliedSubtitle = remember { mutableStateOf<String?>(null) }
             AndroidView(
                 factory = { viewContext ->
-                    PlayerView(viewContext).apply {
+                    // TextureView dipakai agar transform Compose (mode Rentangkan) benar-benar
+                    // ikut merenggangkan gambar. SurfaceView mengabaikan skala view di Android 10.
+                    // Parent sementara memberi layout params yang valid; ukuran akhir diatur
+                    // Modifier.fillMaxSize() di Compose.
+                    (LayoutInflater.from(viewContext)
+                        .inflate(id.local.tubeflow.R.layout.player_view, FrameLayout(viewContext), false) as PlayerView).apply {
                         useController = false
                         keepScreenOn = false
                     }.also { playerView = it }
                 },
                 update = { view ->
                     view.player = video.exoPlayer
-                    // Permukaan sudah berukuran tepat, jadi FIT tidak menambah letterbox. Bila
-                    // pipeline GL ternyata tidak mengurus rasio, FIT berletterbox benar alih-alih
-                    // memotong tepi seperti FILL.
+                    // PlayerView selalu full-screen; AspectRatioFrameLayout yang memasang gambar
+                    // FIT di tengah. Mode lain dicapai lewat graphicsLayer di bawah, bukan dengan
+                    // mengubah ukuran TextureView atau resizeMode.
                     view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     view.keepScreenOn = state.playing && !inPip
+                    // Seluruh PlayerView diskalakan sesuai mode; subtitle dikembalikan ke skala
+                    // layar supaya teks tidak ikut melebar, mengecil, atau terpotong.
+                    view.subtitleView?.let { subtitles ->
+                        subtitles.scaleX = if (modeScaleX > 0f) 1f / modeScaleX else 1f
+                        subtitles.scaleY = if (modeScaleY > 0f) 1f / modeScaleY else 1f
+                    }
                     val subtitleKey = "${subtitleSize.name}|${subtitleStyle.name}|${subtitlePosition.name}|${subtitleBackground.name}"
                     if (appliedSubtitle.value != subtitleKey) {
                         applySubtitleSettings(view, subtitleSize, subtitleStyle, subtitlePosition, subtitleBackground)
@@ -503,12 +521,12 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                     if (playerView === view) playerView = null
                 },
                 modifier = Modifier
-                    .align(if (anchoredBottom) Alignment.BottomCenter else Alignment.Center)
-                    // Permukaan software bisa lebih tinggi dari wadah. `wrapContentSize` yang
-                    // memusatkan anak membuat separuh luberan jatuh ke bawah layar dan memotong
-                    // hardsub; saat anchor bawah aktif, luberan harus keluar lewat tepi atas.
-                    .wrapContentSize(if (anchoredBottom) Alignment.BottomCenter else Alignment.Center, unbounded = true)
-                    .requiredSize(surfaceWidth.dp, surfaceHeight.dp),
+                    .align(Alignment.Center)
+                    // PlayerView selalu full-screen; ukuran gambar FIT diatur AspectRatioFrameLayout
+                    // di dalamnya, lalu mode lain cukup diskalakan sebagai satu layer. TextureView
+                    // tidak pernah di-resize antar-mode sehingga transform-nya tidak basi.
+                    .fillMaxSize()
+                    .graphicsLayer(scaleX = modeScaleX, scaleY = modeScaleY),
             )
             }
         }
@@ -709,12 +727,7 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
                                     PlayerNotice(
                                         Icons.Outlined.AspectRatio,
                                         "Tampilan video",
-                                        id.local.tubeflow.core.VideoPlayback.aspectDetail(
-                                            current.aspect,
-                                            current.videoWidth,
-                                            current.videoHeight,
-                                            current.pixelRatio,
-                                        ),
+                                        id.local.tubeflow.core.VideoPlayback.aspectDetail(current.aspect),
                                     ),
                                 )
                             },
@@ -1797,21 +1810,12 @@ private fun VideoOptionsSheet(
                             ChoicePill(aspect.label, state.aspect == aspect) { video.setAspect(aspect) }
                         }
                     }
-                    val wideSource = state.videoWidth <= 0 || state.videoHeight <= 0 ||
-                        state.videoWidth * (state.pixelRatio.takeIf { it.isFinite() && it > 0f } ?: 1f) >= state.videoHeight
                     SheetHint(
                         when (state.aspect) {
+                            VideoAspect.PERCENT_100 -> "Ukuran piksel asli 1:1. Pada video beresolusi tinggi, sebagian gambar bisa keluar dari layar."
                             VideoAspect.FIT -> "Seluruh gambar terlihat. Bilah hitam hanya muncul bila bentuk video berbeda dari layar."
-                            VideoAspect.FILL -> if (wideSource) {
-                                "Isi layar memenuhi layar; tepi atas terpotong, tetapi subtitle hardsub di bagian bawah tetap terlihat. Pilih Utuh untuk seluruh gambar."
-                            } else {
-                                "Isi layar memenuhi layar; tepi kiri dan kanan terpotong. Pilih Utuh untuk melihat seluruh gambar."
-                            }
-                            VideoAspect.ZOOM -> if (wideSource) {
-                                "Zoom memperbesar gambar; tepi atas terpotong lebih banyak, sedangkan subtitle hardsub di bawah tetap terlihat. Pilih Utuh untuk seluruh gambar."
-                            } else {
-                                "Zoom memperbesar gambar dan memotong tepi kiri-kanan. Pilih Utuh untuk melihat seluruh gambar."
-                            }
+                            VideoAspect.STRETCH -> "Memenuhi seluruh layar tanpa memotong gambar; rasio video ikut direntangkan."
+                            VideoAspect.CROP -> "Memenuhi seluruh layar dengan memotong tepi gambar secara merata di tengah."
                         },
                     )
                     SheetSection("Rotasi layar")
@@ -1976,7 +1980,10 @@ private fun VideoQueuePanel(
     onJump: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Lebar harus dihitung sebelum modifier width; `fillMaxWidth().widthIn(max=...)`
+        // tidak bisa mengecilkan lagi karena fillMaxWidth sudah mengunci minimum.
+        val panelWidth = id.local.tubeflow.core.VideoPlayback.queuePanelWidthDp(maxWidth.value).dp
         Box(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(onClick = onDismiss),
         )
@@ -1984,8 +1991,9 @@ private fun VideoQueuePanel(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .fillMaxWidth(0.88f)
-                .widthIn(max = 400.dp)
+                // Panel ringkas: di portrait memakai 76% layar, sedangkan di lanskap lebarnya
+                // dibatasi 320 dp supaya gambar yang sedang diputar tidak tertutup separuh layar.
+                .width(panelWidth)
                 .padding(horizontal = 12.dp, vertical = 16.dp)
                 .pointerInput(Unit) { detectTapGestures { } },
             color = PlayerSheet(),

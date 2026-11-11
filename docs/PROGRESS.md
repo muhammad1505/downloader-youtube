@@ -1,6 +1,87 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 8 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 11 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Empat mode rasio, Instagram, lirik, panel antrean, dan watchdog buffer — 1.1.79/code94, 11 November 2026
+
+Lima keluhan pengguna pada pemutar dan unduhan. Versi dinaikkan ke
+**1.1.79/code94** dan changelog memuat tujuh sorotan.
+
+- **Mode rasio ala MX Player.** `VideoAspect` sekarang berisi `PERCENT_100`,
+  `FIT` (**Pas ke layar**), `STRETCH` (**Rentangkan**), dan `CROP` (**Potong**).
+  Pas ke layar menjadi default dan menampilkan seluruh frame; Rentangkan
+  memenuhi layar tanpa membuang isi (rasio berubah); Potong memenuhi layar dan
+  memangkas tepi secara merata di tengah. Preferensi `FILL`/`ZOOM` lama jatuh
+  kembali ke Pas ke layar lewat `getOrDefault`, jadi pembaruan tidak mewarisi
+  potongan yang tidak diinginkan. `VideoCropEffect`, `anchorsBottom`, dan
+  `effectPresentation` dihapus.
+- **Rendering TextureView + layer.** `res/layout/player_view.xml` memakai
+  `surface_type="texture_view"`. `PlayerView` selalu full-screen dengan
+  `RESIZE_MODE_FIT`; mode lain dicapai lewat `graphicsLayer` yang dihitung
+  `VideoViewport.modeScale`, bukan dengan mengubah ukuran TextureView. Ini
+  menghindari transform basi di Android 10 dan membuat ganti mode saat video
+  dijeda tidak perlu membuka ulang pemutar. Subtitle dikembalikan ke skala
+  layar agar teks tidak ikut merenggang atau mengecil.
+- **100%.** `VideoViewport.size` membagi ukuran sumber dengan density untuk
+  mode ini, sehingga satu piksel sumber dipetakan ke satu piksel layar.
+- **Instagram portrait.** `Selection.validate` menerima tinggi piksel nyata
+  `1..8192`, bukan hanya label tier. `TubeFlowApp` membersihkan URL/kartu
+  hanya dari callback `onQueued`; kegagalan validasi, duplikat, atau WorkManager
+  mempertahankan hasil inspeksi. `DownloadViewModel` memberi pesan galat yang
+  tidak kosong dan menolak submit ganda dengan pesan jelas.
+- **Lirik reset.** `FullPlayer` memakai `key(track.uri) { rememberLazyListState() }`
+  dan `LaunchedEffect(track.uri) { list.scrollToItem(0) }`, jadi posisi gulir
+  lagu sebelumnya tidak terbawa, termasuk saat lagu baru belum punya lirik
+  tersinkron.
+- **Panel antrean video.** Lebar dihitung `VideoPlayback.queuePanelWidthDp` =
+  `min(76% × lebar, 320 dp)` lalu dipasang dengan `Modifier.width`. Percobaan
+  pertama memakai `fillMaxWidth(0.76f).widthIn(max = 320.dp)` dan uji perangkat
+  menunjukkan panel tetap 76% layar: `fillMaxWidth` sudah mengunci minimum
+  sehingga `widthIn` tidak bisa mengecilkannya. `QueueRow` memakai judul satu
+  baris `basicMarquee` agar judul panjang berjalan.
+- **Watchdog buffer.** Ticker mencatat `bufferingSince`. Setelah 12 detik
+  `STATE_BUFFERING` dengan `playWhenReady` dan tanpa error, pemutar dibuka ulang
+  di posisi yang sama; percobaan kedua memakai software kecuali mode Perangkat
+  manual. Setelah dua pemulihan beruntun, spinner berhenti dan pengguna diberi
+  pesan. Hitungan direset setelah 8 detik pemutaran stabil; seek dan toggle
+  play memberi jendela buffer baru. Log: `macet pemulihan=<n>`,
+  `macet menyerah`.
+
+Verifikasi host final: `bash scripts/build_release.sh --no-daemon`
+**BUILD SUCCESSFUL (13m 43s)** — **696 tes Kotlin** dari 92 berkas, 0
+gagal/error/skipped; lint debug dan release **0 error/6 warning/1 hint**
+(baseline);
+`python3 -m unittest discover -s scripts -p "test_*.py"` **103 tes OK**;
+signed APK arm64-v8a **78.474.366 byte**, SHA-256
+`b0e3329a5b46b545eb349834dcda298c6fc561ac454cd8d540c88512af8cc380`;
+signed AAB **261.572.835 byte**, SHA-256
+`1de101062527812478e65d1ae6242f02d40d7a94415f51bad1b9e87586c106c4`.
+`audit_native.py` 262 ELF 0 gagal, `audit_release_zip_fields.py` 13 kelas 0
+gagal, `zipalign -c -P 16 4` dan `apksigner verify` lulus dengan sertifikat
+produksi. Build final ini belum dipasang ulang ke HP karena perangkat
+terputus saat rebuild; pada artefak build sebelumnya (kode sama sebelum rebase)
+`adb install -r` berhasil dan `base.apk` yang ditarik dari HP ber-SHA-256
+identik dengan artefak build saat itu.
+
+Verifikasi perangkat (Realme RMX1821, Android 10/API 29, 720×1520, density
+1,7): video 848×480 dari `content://media/external/video/media/199795`.
+**Rentangkan** menghasilkan `wadah=894x423 video=848x480 skala=1,195x1,000`;
+**Potong** menghasilkan `permukaan=894x506 skala=1,195x1,195`. Keduanya
+diterapkan saat video dijeda tanpa log `sesi=buka` baru. Pemutaran normal 15
+detik tidak menghasilkan log `macet`. Dua file Instagram di
+`/sdcard/Download/TubeFlow/` masing-masing 6.830.931 byte dan `ffprobe`
+menunjukkan H.264 720×1280. Pengguna memutar lagu dari Koleksi dan
+mengonfirmasi lirik aman.
+
+Batas: mode **100%** dan **Pas ke layar** sudah diukur pada iterasi build
+sebelumnya (848×480 terpusat; 1272×720), tetapi belum diulang pada APK final.
+Lebar panel hasil perbaikan `Modifier.width` belum diukur ulang di HP karena
+pengguna meminta pengujian dihentikan; regresi host mengunci perhitungan
+320 dp. Stall buffer nyata belum berhasil direproduksi, jadi jalur pemulihan
+otomatis baru terbukti lewat logika host dan watchdog tidak memicu false
+positive pada pemutaran normal. Uji ini memakai satu perangkat dan satu video
+848×480; rasio lain, decoder/OEM lain, dan subtitle track belum diuji pada
+build ini. Matriks **DTM-18, DTM-21–DTM-24** diperbarui dengan hasil ini.
 
 ## Antrean playlist macet, panel aksi seragam, dialog folder, dan sesi YouTube — 1.1.75, 3 November 2026
 

@@ -335,7 +335,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      if (current.collection?.id == collection.id) _spotifyCollection.value=current.copy(done=done,matches=matched.toMap(),failures=failures.toMap())
     }
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally {
     if (collectionMatchToken == token) {
      collectionMatchToken=null
@@ -352,7 +352,8 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  }
  /** Antrekan track terpilih yang sudah punya kandidat; satu job per lagu, satu folder koleksi. */
  fun enqueueSpotifyCollection(options: DownloadOptions, collection: SpotifyCollection, tracks: List<SpotifyTrack>, onQueued: ((String) -> Unit)? = null) {
-  if(submitting) return; submitting=true
+  if(submitting) { _error.value="Masih memproses permintaan sebelumnya. Coba lagi sebentar."; return }
+  submitting=true
   // Ditangkap SEBELUM state dibersihkan pemanggil; coroutine belum tentu berjalan saat itu.
   val matches=_spotifyCollection.value.matches
   viewModelScope.launch {
@@ -375,20 +376,22 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     _notice.value="${collection.title}: $queued lagu diantrekan" + (if (folder.isNotBlank()) " ke folder $folder" else "") + (if(skipped > 0) "; $skipped dilewati." else ".")
     if (queued == 0) _error.value="Tidak ada lagu yang bisa diantrekan dari ${collection.title}."
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
   }
  }
  /** Satu track Spotify diantrekan memakai video YouTube pilihan pengguna, dengan tag metadata Spotify. */
  fun enqueueSpotify(options: DownloadOptions, track: SpotifyTrack, candidate: SpotifyCandidate, onQueued: ((String) -> Unit)? = null) {
-  if(submitting) return; submitting=true; viewModelScope.launch {
+  if(submitting) { _error.value="Masih memproses permintaan sebelumnya. Coba lagi sebentar."; return }
+  submitting=true
+  viewModelScope.launch {
    try {
     require(Selection.videoId(candidate.video.url) != null) { "Video YouTube hasil pencocokan tidak valid." }
     submit(options.copy(url=candidate.video.url), durationSeconds=candidate.video.durationSeconds.takeIf { it > 0 },
       entryMetadata=Spotify.toMetadata(track,candidate.video), onQueued=onQueued)
    }
    catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
   }
  }
@@ -442,6 +445,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  private fun hasActiveWork(id: String): Boolean = runCatching { work.getWorkInfosByTag(id).get().any { !it.state.isFinished } }.getOrDefault(false)
  fun clearError() { _error.value=null }
  fun clearNotice() { _notice.value=null }
+ /** Exception tanpa pesan (mis. `require` tanpa lambda) tidak boleh hilang sebagai snackbar kosong. */
+ private fun userMessage(error: Throwable, fallback: String = "Tindakan belum dapat diselesaikan. Coba lagi."): String =
+  error.message?.takeIf { it.isNotBlank() } ?: fallback
   fun inspect(url: String) {
    inspectionId?.let(Engine::cancel); inspection?.cancel()
    lastInspectPlaylist=false
@@ -517,7 +523,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  /** Coba lagi memakai jenis inspeksi terakhir: watch+list yang gagal sebagai playlist harus mengulang
   * playlist, bukan inspeksi video (BUG-006/R6). */
  fun retryInspect(url: String) { if(lastInspectPlaylist) inspectPlaylist(url) else inspect(url) }
- /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
+ /** Freeze one collection folder before enqueueing; song identities remain independent. */ fun queuePlaylist(playlist: PlaylistMetadata, entries: List<PlaylistEntry>, options: DownloadOptions, onQueued: ((String) -> Unit)? = null) {
+  if(submitting) { _error.value="Masih memproses permintaan sebelumnya. Coba lagi sebentar."; return }
+  submitting=true
+  viewModelScope.launch {
   try {
    val season = BstationUrls.isSeasonOnly(playlist.url)
    // Satu judul yang dipilih dari playlist bukan koleksi: jangan buat folder playlist khusus.
@@ -552,16 +561,23 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     if (premiumSkipped > 0) append(" $premiumSkipped Premium terkunci — masuk ke Bstation dulu.")
    }
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
  } }
  @Volatile private var submitting=false
- fun enqueue(options: DownloadOptions, onQueued: ((String) -> Unit)? = null) { if(submitting) return; submitting=true; viewModelScope.launch {
-   try { submit(options, onQueued = onQueued) }
-   catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
-   finally { submitting=false }
- } }
+ fun enqueue(options: DownloadOptions, onQueued: ((String) -> Unit)? = null) {
+   if(submitting) {
+     _error.value="Masih memproses permintaan sebelumnya. Coba lagi sebentar."
+     return
+   }
+   submitting=true
+   viewModelScope.launch {
+     try { submit(options, onQueued = onQueued) }
+     catch(cancelled: CancellationException) { throw cancelled }
+     catch(error: Exception) { _error.value=userMessage(error, "Unduhan belum dapat diantrekan. Coba lagi.") }
+     finally { submitting=false }
+   }
+ }
  /** Resubmits every failed entry in one pass (the submitting guard only spans this coroutine). */
  fun retryFailed() { if(submitting) return; submitting=true; viewModelScope.launch {
    try {
@@ -580,7 +596,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      else -> "$queued unduhan diantrekan ulang." + if(skipped > 0) " $skipped dilewati." else ""
     }
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
  } }
  private suspend fun submit(options: DownloadOptions, keepId: String? = null, titleHint: String? = null, durationSeconds: Long? = null, subfolder: String? = null, entryMetadata: VideoMetadata? = null, autoFolder: String = "", onQueued: ((String) -> Unit)? = null) {
@@ -755,7 +771,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
  fun pause(id: String) { viewModelScope.launch {
   try { if(pauseOne(id)) _notice.value="Unduhan dijeda." }
   catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { _error.value=error.message }
+  catch(error: Exception) { _error.value=userMessage(error) }
  } }
  private suspend fun pauseOne(id: String): Boolean {
   if(dao.pause(id) == 0) return false
@@ -770,7 +786,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    ids.forEach { Engine.cancel(it); work.cancelAllWorkByTag(it) }
    _notice.value="${ids.size} unduhan dijeda."
   } catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { _error.value=error.message }
+  catch(error: Exception) { _error.value=userMessage(error) }
  } }
  /** Melanjutkan unduhan yang dijeda; unduhan parsial dilanjutkan, bukan diulang. */
  fun resume(id: String) { viewModelScope.launch {
@@ -780,7 +796,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    enqueueWork(id, ExistingWorkPolicy.REPLACE, "Tidak dapat melanjutkan unduhan.")
    _notice.value="Unduhan dilanjutkan."
   } catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { _error.value=error.message }
+  catch(error: Exception) { _error.value=userMessage(error) }
  } }
  fun resumeAll() { viewModelScope.launch {
   try {
@@ -790,7 +806,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    ids.forEach { id -> awaitIdle(id); if(dao.resume(id) > 0) { enqueueWork(id, ExistingWorkPolicy.REPLACE, "Tidak dapat melanjutkan unduhan."); done++ } }
    _notice.value="${done} unduhan dilanjutkan."
   } catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { _error.value=error.message }
+  catch(error: Exception) { _error.value=userMessage(error) }
  } }
  private fun DownloadJob.toOptions() = DownloadOptions(url,mode,format,quality,bitrate,subtitles,embedSubs,thumbnail,embedThumb)
  /**
@@ -822,14 +838,14 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     enqueueWork(job.id, ExistingWorkPolicy.KEEP, "Tidak dapat mengunduh ulang.")
     _notice.value="Mengunduh ulang…"
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
   }
  }
  private fun enqueueRevive(job: DownloadJob) { if(submitting) return; submitting=true; viewModelScope.launch {
    try { submit(job.toOptions(), keepId = job.id) }
    catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=error.message }
+   catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
  } }
  fun remove(id: String) { viewModelScope.launch { MediaFileOperations.mutex.withLock {
@@ -888,7 +904,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     "${result.files} file dan ${result.folders} subfolder dihapus; pembersihan belum lengkap (${result.failures} kegagalan). Periksa akses folder lalu coba lagi."
    }
   } catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { _error.value=error.message ?: "Pembersihan folder gagal." }
+  catch(error: Exception) { _error.value=userMessage(error, "Pembersihan folder gagal.") }
   finally { _clearing.value=false; refreshStorage() }
  } }
  @Suppress("DEPRECATION")

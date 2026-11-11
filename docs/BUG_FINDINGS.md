@@ -6,11 +6,12 @@ Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, 
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
-## Status aktual — 27 Oktober 2026
+## Status aktual — 11 November 2026
 
-Terbaru **1.1.46/code61** menambahkan kontrol kecerahan dan menangani kasus
-volume video pelan lewat penguat opsional (BUG-093, terkonfirmasi pengguna).
-[Bukti dan batas](PLAYER_BRIGHTNESS_VOLUME_1_1_46.md).
+Kandidat **1.1.79/code94** mengganti mode rasio video dengan empat pilihan ala
+MX Player, memperbaiki unduhan Instagram portrait, mengembalikan lirik ke awal
+saat lagu berganti, merampingkan panel antrean video, dan menambahkan watchdog
+buffer. Bukti host serta batas perangkat dicatat di [PROGRESS](PROGRESS.md).
 
 Baseline sebelum pekerjaan ini: **1.1.44/code58** (`08a893b`). Bagian bertanggal
 9/13 Oktober dan pembaruan 1.1.30 di bawah adalah sejarah; status per bug serta
@@ -27,7 +28,11 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-089/090/091 | Rasio video, ketukan Riwayat dan info lampiran diperbaiki pada 1.1.45; bukti serta batas uji ada di [laporan](MEDIA_POLISH_1_1_45.md). |
 | BUG-092 | Mitigasi 27 Okt: error MediaPlayer transien (IO/timeout/unknown/server mati) dimuat ulang sekali pada posisi yang sama; error codec/format tidak diulang. Reproduksi perangkat dan kode `what`/`extra` belum terbukti. |
 | BUG-093 | Kasus uji teratasi: pengguna mengonfirmasi +6 dB jelas/bersih pada volume HP terlapor50%. Penguat PCM1.1.46 teruji; tidak mengklaim semua sumber/rute sama dengan pemutar lain. |
-| BUG-095 | Hardsub terpotong di mode Isi layar/Zoom pada layar lanskap; perbaikan 1.1.78 mengunci crop ke tepi bawah frame. Verifikasi perangkat dicatat di [PROGRESS](PROGRESS.md). |
+| BUG-095 | Mode rasio diganti 1.1.79: **100%**, **Pas ke layar**, **Rentangkan**, **Potong**. Pas ke layar menjadi default tanpa potongan; Potong memangkas tepi secara merata di tengah. Nilai lama Isi layar/Zoom dimigrasikan ke Pas ke layar. |
+| BUG-096 | Unduhan Instagram portrait 720×1280 ditolak karena validasi hanya menerima label tier. 1.1.79 menerima tinggi piksel nyata 1–8192 dan baru membersihkan kartu setelah antrean terkonfirmasi. |
+| BUG-097 | Posisi gulir lirik terbawa saat lagu berganti. 1.1.79 mengunci state daftar per `track.uri` dan langsung menggulir ke baris awal. |
+| BUG-098 | Panel antrean video terlalu lebar di lanskap dan judul terpotong dua baris. 1.1.79 membatasi panel 320 dp serta memakai judul satu baris berjalan (marquee). |
+| BUG-099 | Indikator buffer bisa berputar tanpa batas saat ExoPlayer bertahan di `STATE_BUFFERING` tanpa error. 1.1.79 menambahkan watchdog 12 detik dengan maksimal dua pemulihan otomatis, lalu berhenti dengan pesan galat. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
@@ -1145,3 +1150,96 @@ dan `Alignment.BottomCenter`; sumber portrait tetap center karena crop vertikaln
 terlalu ekstrem. Notice dan hint rasio layar menyebut tepi atas yang hilang serta
 subtitle bawah yang aman. Regresi: `VideoViewportTest`, `VideoCropEffectTest`,
 dan `VideoPlaybackTest`.
+
+**Pembaruan 1.1.79.** Atas permintaan pengguna, mode Isi layar/Zoom diganti
+empat mode ala MX Player: **100%**, **Pas ke layar**, **Rentangkan**, dan
+**Potong**. Pas ke layar menjadi default dan tidak memotong apa pun; Potong
+memangkas tepi secara merata di tengah, bukan mengunci ke bawah. Nilai
+tersimpan `FILL`/`ZOOM` jatuh kembali ke Pas ke layar. Rendering memakai
+`TextureView` penuh layar dari `res/layout/player_view.xml` dan `graphicsLayer`
+per mode, sehingga pergantian mode saat video dijeda tidak membuka ulang
+pemutar. `VideoCropEffect`, `anchorsBottom`, dan `effectPresentation` dihapus.
+Regresi baru: `VideoViewportTest.modeScaleMapsTheFitSurfaceToEachModesTarget`,
+`percentHundredMapsSourcePixelsOneToOne`, dan `VideoPlaybackTest` untuk label,
+siklus, serta detail mode.
+
+## BUG-096 — P2: Unduhan video vertikal Instagram ditolak validasi
+
+Dilaporkan 11 November 2026. Reel Instagram portrait 720×1280 berhasil
+diinspeksi, tetapi pengantrean gagal dengan pesan "Resolusi video tidak
+didukung." `Selection.heightForTier` memang mengirim tinggi piksel NYATA dari
+resolusi sumber (720p portrait = 1280), sedangkan `Selection.validate` masih
+membatasi `quality` ke daftar label tier 360/480/720/1080/1440/2160/4320.
+Akibatnya video vertikal dan sebagian video bioskop (mis. 818) ditolak.
+
+Perbaikan 1.1.79 menerima `quality == 0` atau `1..MAX_VIDEO_HEIGHT (8192)`.
+Regresi `SelectionTest.validationAcceptsRealPixelHeightsFromEverySourceShape`
+menguji 1280, 818, 1920, batas 8192, dan penolakan 8193. `TubeFlowApp` juga
+baru membersihkan URL dan kartu inspeksi dari callback `onQueued`, jadi
+validasi/duplikat/WorkManager yang gagal tidak lagi menghapus hasil inspeksi.
+`DownloadViewModel` memberi pesan galat yang tidak kosong dan menolak submit
+ganda dengan pesan yang jelas.
+
+Bukti perangkat: dua berkas hasil uji di `/sdcard/Download/TubeFlow/`
+(`Video by instagram.mp4` dan `Video by instagram (1).mp4`, masing-masing
+6.830.931 byte) diperiksa dengan `ffprobe`: H.264 **720×1280**, bukan file
+kosong atau audio saja. Keduanya berasal dari percobaan unduhan sebelum build
+final; pengantrean baru pada build final belum diulang.
+
+## BUG-097 — P3: Posisi lirik terbawa saat lagu berganti
+
+Dilaporkan 11 November 2026. Setelah menggulir lirik lagu pertama, lagu
+berikutnya mewarisi posisi gulir yang sama. `FullPlayer` memakai satu
+`rememberLazyListState()` untuk seluruh komposisi, sedangkan auto-scroll hanya
+mengikuti baris aktif; lagu tanpa lirik tersinkron atau baris aktif yang
+kebetulan sama tidak mengembalikan daftar ke atas.
+
+Perbaikan 1.1.79 mengunci state daftar per lagu dengan
+`key(track.uri) { rememberLazyListState() }` dan menambahkan
+`LaunchedEffect(track.uri) { list.scrollToItem(0) }`, sehingga daftar langsung
+berada di baris awal tanpa menunggu baris aktif. Pengguna mengonfirmasi lirik
+"aman" pada uji perangkat 11 November 2026 setelah memutar lagu dari Koleksi.
+
+## BUG-098 — P2: Panel antrean video terlalu lebar di lanskap
+
+Dilaporkan 11 November 2026. Panel antrean video memakai 88% lebar layar dengan
+batas 400 dp; pada layar 1520 px panel menutupi hampir separuh gambar dan judul
+dua baris memakan ruang.
+
+Perbaikan 1.1.79 membatasi panel ke **320 dp** (sekitar 544 px pada density
+1,7) sambil mempertahankan 76% pada layar sempit. `VideoPlayback.queuePanelWidthDp`
+murni menghitung `min(76% × lebar, 320 dp)` dan diuji
+`queuePanelWidthIsCappedForLandscape` (894 dp → 320 dp, 300 dp → 228 dp).
+`QueueRow` memakai judul satu baris dengan `basicMarquee`, jadi judul panjang
+bergulir alih-alih terpotong elipsis.
+
+Uji perangkat pada percobaan pertama menemukan implementasi
+`fillMaxWidth(0.76f).widthIn(max = 320.dp)` tetap menghasilkan panel 76% layar:
+`fillMaxWidth` sudah mengunci lebar minimum sehingga `widthIn` tidak bisa
+mengecilkannya. Implementasi final menghitung lebar lebih dulu lalu memakai
+`Modifier.width(panelWidth)`. Lebar panel pada APK final belum diukur ulang di
+HP karena pengguna meminta pengujian dihentikan; regresi host memastikan
+perhitungan batasnya.
+
+## BUG-099 — P2: Indikator buffer berputar tanpa batas
+
+Dilaporkan 11 November 2026. Video kadang berhenti di indikator loading dan
+tidak pernah lanjut. ExoPlayer dapat bertahan di `STATE_BUFFERING` tanpa
+melempar `PlaybackException`, sehingga jalur fallback dekoder yang ada tidak
+pernah dipanggil.
+
+Perbaikan 1.1.79 menambahkan watchdog di ticker: buffer yang berlangsung
+**12 detik** saat `playWhenReady` membuka ulang pemutar pada posisi yang sama.
+Pemulihan otomatis dibatasi dua kali beruntun; percobaan kedua beralih ke
+dekoder software kecuali pengguna memilih mode Perangkat secara manual. Setelah
+anggaran habis, spinner dihentikan dan pengguna mendapat pesan "Pemutaran
+berhenti merespons. Coba lagi atau ganti dekoder." Hitungan direset setelah
+8 detik pemutaran stabil, dan seek/toggle play memberi jendela buffer baru.
+Log diagnostik: `macet pemulihan=<n>` dan `macet menyerah`.
+
+Regresi `VideoPlaybackTest.stallWatchdogOnlyFiresForLongBufferingWhilePlaying`
+dan `stallWatchdogGivesUpAfterBoundedRecoveries`. Uji perangkat build final:
+video 848×480 diputar dari posisi 6:45 selama 15 detik tanpa satu pun log
+`macet`, jadi watchdog tidak menghasilkan false positive pada pemutaran normal.
+Stall nyata belum berhasil direproduksi; jalur pemulihan otomatis baru terbukti
+lewat logika host, bukan kejadian buffer nyata.

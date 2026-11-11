@@ -49,6 +49,20 @@ object VideoDiagnostics {
         Log.d(TAG, "galat kode=$code codec=$codec")
     }
 
+    /** Buffer lokal melewati batas; watchdog membuka ulang pemutar pada posisi yang sama. */
+    fun stall(attempt: Int, positionMs: Long, software: Boolean) {
+        Log.w(
+            TAG,
+            "macet pemulihan=$attempt pos=${VideoPlayback.timeLabel(positionMs)} " +
+                "dekoder=${if (software) "SOFTWARE" else "PERANGKAT"}",
+        )
+    }
+
+    /** Pemulihan otomatis habis; spinner dihentikan dan pengguna mendapat pilihan manual. */
+    fun stallFailed(positionMs: Long) {
+        Log.w(TAG, "macet menyerah pos=${VideoPlayback.timeLabel(positionMs)}")
+    }
+
     fun pip(entering: Boolean) {
         Log.d(TAG, "pip=${if (entering) "masuk" else "keluar"}")
     }
@@ -66,15 +80,16 @@ object VideoDiagnostics {
         pixelRatio: Float,
         surfaceWidth: Float,
         surfaceHeight: Float,
+        scaleX: Float = 1f,
+        scaleY: Float = 1f,
         presenting: Boolean,
-        anchoredBottom: Boolean = false,
     ) {
         Log.d(
             TAG,
             "geometri aspek=$aspect wadah=${containerWidth.toInt()}x${containerHeight.toInt()} " +
                 "video=${videoWidth}x$videoHeight par=$pixelRatio " +
-                "permukaan=${surfaceWidth.toInt()}x${surfaceHeight.toInt()} presentasi=$presenting" +
-                if (anchoredBottom) " anchor=bawah" else "",
+                "permukaan=${surfaceWidth.toInt()}x${surfaceHeight.toInt()} " +
+                "skala=%.3fx%.3f presentasi=$presenting".format(scaleX, scaleY),
         )
     }
 

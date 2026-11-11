@@ -340,6 +340,8 @@ abstract class DownloadDatabase : RoomDatabase() {
 object Selection {
  val videoFormats = setOf("auto", "mp4", "mkv", "webm", "mov", "avi")
  val audioFormats = setOf("auto", "mp3", "m4a", "opus", "flac", "wav", "aac", "vorbis")
+ /** Batas atas tinggi piksel nyata yang masih masuk akal (8K portrait = 7680). */
+ const val MAX_VIDEO_HEIGHT = 8192
  val subtitleChoices = setOf("", "asli", "id", "en", ".*")
  /** Tag bahasa ISO 639 (mis. `id`, `en`, `th`, `pt-BR`) — sumber seperti Bstation punya track yang tidak ada di daftar lama. */
  private val subtitleLangTag = Regex("[a-z]{2,3}(?:-[a-z0-9]{2,8})?")
@@ -462,7 +464,10 @@ object Selection {
  fun validate(options: DownloadOptions) {
   require(validUrl(options.url)) { "Gunakan tautan video dari platform yang didukung." }
   require(options.format in if (options.mode == MediaMode.VIDEO) videoFormats else audioFormats) { "Format tidak didukung." }
-  require(options.quality in setOf(0,360,480,720,1080,1440,2160,4320))
+  // Kualitas video adalah tinggi piksel NYATA dari resolusi yang dipilih (lihat
+  // Selection.heightForTier), bukan label tier. Video vertikal 720p memakai tinggi 1280 dan
+  // video bioskop 1080p bisa memakai 818, jadi daftar tier tetap akan membuang pilihan yang sah.
+  require(options.quality == 0 || options.quality in 1..MAX_VIDEO_HEIGHT) { "Resolusi video tidak didukung." }
   require(options.bitrate in setOf(0,64,128,192,256,320))
   require(validSubtitleChoice(options.subtitles)) { "Pilihan subtitle tidak didukung." }
   require(!options.embedSubs || options.mode == MediaMode.VIDEO) { "Sematkan subtitle hanya untuk video." }

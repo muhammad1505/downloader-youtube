@@ -1,5 +1,18 @@
 [
   {
+    "versionCode": 94,
+    "versionName": "1.1.79",
+    "highlights": [
+      "Mode rasio video kini mengikuti MX Player: 100%, Pas ke layar, Rentangkan, dan Potong. Tidak ada lagi mode Isi layar yang otomatis memotong tepi atas.",
+      "Pas ke layar menampilkan seluruh frame tanpa potongan, Rentangkan memenuhi layar tanpa membuang isi gambar, dan hanya Potong yang memangkas tepi secara merata di tengah.",
+      "Nilai mode lama Isi layar dan Zoom kembali ke Pas ke layar, jadi pembaruan ini tidak mewarisi potongan yang tidak diinginkan.",
+      "Unduhan video vertikal seperti Instagram tidak lagi ditolak karena tinggi piksel nyata; isian link baru dibersihkan setelah antrean benar-benar dibuat dan kegagalan menampilkan pesan yang jelas.",
+      "Lirik audio kembali ke baris awal begitu lagu berganti, termasuk saat lagu baru belum punya lirik tersinkron; posisi gulir lagu sebelumnya tidak terbawa.",
+      "Panel antrean video di ponsel kini lebih ringkas dan judul panjang berjalan otomatis, jadi daftar tidak lagi menutupi hampir seluruh layar.",
+      "Pemutaran video yang berhenti di indikator buffer dipulihkan otomatis: pemutar dibuka ulang di posisi yang sama, lalu beralih ke dekoder software bila perlu."
+    ]
+  },
+  {
     "versionCode": 93,
     "versionName": "1.1.78",
     "highlights": [

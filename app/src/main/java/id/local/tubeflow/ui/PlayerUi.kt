@@ -123,7 +123,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     val coverAccent=rememberCoverAccent(track.cover)
     val pageAccent=if (transformers||LocalCyberpunkTheme.current) scheme.primary else coverAccent
     val speedDescription=stringResource(id.local.tubeflow.R.string.player_speed_description, speedLabel(state.speed))
-    val list=rememberLazyListState()
+    // State daftar dikunci per lagu: pindah lagu membuat daftar baru yang langsung di posisi
+    // awal, bukan mewarisi posisi gulir lagu sebelumnya.
+    val list=key(track.uri) { rememberLazyListState() }
     val active=LrcLines.activeIndex(state.lines,state.positionMs)
     var userChoseView by remember(track.uri) { mutableStateOf(false) }
     var dragging by remember(track.uri) { mutableStateOf<Float?>(null) }
@@ -151,6 +153,9 @@ fun FullPlayer(state: PlayerViewModel.State, player: PlayerViewModel, library: M
     val seekLine: (Long) -> Unit = remember(player) { { player.seek(it) } }
     // Swipe pengguna menang atas pemilihan otomatis; lagu baru kembali memakai aturan otomatis.
     LaunchedEffect(dragged) { if (dragged) userChoseView=true }
+    // Pindah lagu harus langsung kembali ke baris awal, bukan menunggu baris aktif yang mungkin
+    // masih bernilai -1 (belum ada lirik tersinkron) atau indeks yang sama dengan lagu sebelumnya.
+    LaunchedEffect(track.uri) { list.scrollToItem(0) }
     LaunchedEffect(track.uri) { pager.scrollToPage(if (state.lines.isNotEmpty()) 1 else 0) }
     LaunchedEffect(state.lines) { if (!userChoseView && state.lines.isNotEmpty() && pager.settledPage==0) pager.animateScrollToPage(1) }
     // Lirik mengikuti baris aktif juga saat landscape tidak memakai pager.

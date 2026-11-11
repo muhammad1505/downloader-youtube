@@ -296,9 +296,10 @@ class VideoPlaybackTest {
 
     @Test
     fun aspectAndRepeatCycleThroughAllChoices() {
-        assertEquals(VideoAspect.FILL, VideoAspect.FIT.next())
-        assertEquals(VideoAspect.ZOOM, VideoAspect.FILL.next())
-        assertEquals(VideoAspect.FIT, VideoAspect.ZOOM.next())
+        assertEquals(VideoAspect.STRETCH, VideoAspect.FIT.next())
+        assertEquals(VideoAspect.CROP, VideoAspect.STRETCH.next())
+        assertEquals(VideoAspect.PERCENT_100, VideoAspect.CROP.next())
+        assertEquals(VideoAspect.FIT, VideoAspect.PERCENT_100.next())
         assertEquals(VideoRepeat.ALL, VideoRepeat.OFF.next())
         assertEquals(VideoRepeat.ONE, VideoRepeat.ALL.next())
         assertEquals(VideoRepeat.OFF, VideoRepeat.ONE.next())
@@ -306,37 +307,27 @@ class VideoPlaybackTest {
 
     @Test
     fun aspectLabelsSayWhetherTheFrameIsCropped() {
-        assertEquals("Utuh", VideoAspect.FIT.label)
+        assertEquals("100%", VideoAspect.PERCENT_100.label)
+        assertFalse(VideoAspect.PERCENT_100.crops)
+        assertEquals("Pas ke layar", VideoAspect.FIT.label)
         assertFalse(VideoAspect.FIT.crops)
-        assertEquals("Isi layar", VideoAspect.FILL.label)
-        assertTrue(VideoAspect.FILL.crops)
-        assertEquals("Zoom", VideoAspect.ZOOM.label)
-        assertTrue(VideoAspect.ZOOM.crops)
+        assertEquals("Rentangkan", VideoAspect.STRETCH.label)
+        assertFalse(VideoAspect.STRETCH.crops)
+        assertEquals("Potong", VideoAspect.CROP.label)
+        assertTrue(VideoAspect.CROP.crops)
     }
 
     @Test
-    fun aspectDetailExplainsWhichEdgeIsCutAndKeepsHardSubsVisible() {
-        assertEquals("seluruh gambar terlihat", VideoPlayback.aspectDetail(VideoAspect.FIT, 848, 480))
+    fun aspectDetailExplainsEachModeWithoutClaimingUnwantedCrop() {
+        assertEquals("seluruh gambar terlihat tanpa dipotong", VideoPlayback.aspectDetail(VideoAspect.FIT))
         assertEquals(
-            "memenuhi layar, tepi atas terpotong, subtitle bawah aman",
-            VideoPlayback.aspectDetail(VideoAspect.FILL, 848, 480),
+            "memenuhi layar, gambar direntangkan tanpa dipotong",
+            VideoPlayback.aspectDetail(VideoAspect.STRETCH),
         )
+        assertEquals("memenuhi layar, tepi gambar terpotong", VideoPlayback.aspectDetail(VideoAspect.CROP))
         assertEquals(
-            "diperbesar, tepi atas terpotong, subtitle bawah aman",
-            VideoPlayback.aspectDetail(VideoAspect.ZOOM, 848, 480),
-        )
-        assertEquals(
-            "memenuhi layar, tepi kiri dan kanan terpotong",
-            VideoPlayback.aspectDetail(VideoAspect.FILL, 480, 848),
-        )
-        assertEquals(
-            "memenuhi layar, tepi video terpotong",
-            VideoPlayback.aspectDetail(VideoAspect.FILL, 0, 0),
-        )
-        // Rasio piksel non-persegi ikut menentukan orientasi tampilan.
-        assertEquals(
-            "memenuhi layar, tepi kiri dan kanan terpotong",
-            VideoPlayback.aspectDetail(VideoAspect.FILL, 500, 400, 0.5f),
+            "ukuran piksel asli; gambar bisa melebihi layar",
+            VideoPlayback.aspectDetail(VideoAspect.PERCENT_100),
         )
     }
 
@@ -497,6 +488,47 @@ class VideoPlaybackTest {
     }
 
     @Test
+    fun stallWatchdogOnlyFiresForLongBufferingWhilePlaying() {
+        val start = 10_000L
+        assertFalse(
+            "Buffer baru sekejap bukan macet",
+            VideoPlayback.shouldRecoverStall(start, start + VideoPlayback.STALL_TIMEOUT_MS - 1, true, false),
+        )
+        assertTrue(
+            VideoPlayback.shouldRecoverStall(start, start + VideoPlayback.STALL_TIMEOUT_MS, true, false),
+        )
+        assertFalse(
+            "Video yang dijeda tidak boleh dibuka ulang",
+            VideoPlayback.shouldRecoverStall(start, start + VideoPlayback.STALL_TIMEOUT_MS, false, false),
+        )
+        assertFalse(
+            "Error sudah ditangani jalur fallback",
+            VideoPlayback.shouldRecoverStall(start, start + VideoPlayback.STALL_TIMEOUT_MS, true, true),
+        )
+        assertFalse(
+            "Tidak ada buffer yang sedang berjalan",
+            VideoPlayback.shouldRecoverStall(0, start + VideoPlayback.STALL_TIMEOUT_MS, true, false),
+        )
+    }
+
+    @Test
+    fun stallWatchdogGivesUpAfterBoundedRecoveries() {
+        assertTrue(VideoPlayback.canRecoverStall(0))
+        assertTrue(VideoPlayback.canRecoverStall(VideoPlayback.STALL_MAX_RECOVERIES - 1))
+        assertFalse(VideoPlayback.canRecoverStall(VideoPlayback.STALL_MAX_RECOVERIES))
+    }
+
+    @Test
+    fun queuePanelWidthIsCappedForLandscape() {
+        // Lanskap 1520 px pada density 1,7 adalah 894 dp; cap 320 dp mencegah panel menutupi
+        // hampir separuh gambar. Di layar sempit, 76% tetap dipakai agar tidak terlalu lebar.
+        assertEquals(320f, VideoPlayback.queuePanelWidthDp(894f), 0.001f)
+        assertEquals(320f, VideoPlayback.queuePanelWidthDp(423f), 0.001f)
+        assertEquals(228f, VideoPlayback.queuePanelWidthDp(300f), 0.001f)
+        assertEquals(0f, VideoPlayback.queuePanelWidthDp(0f), 0.001f)
+    }
+
+    @Test
     fun subtitleSizesGrowFromSmallToHuge() {
         assertTrue(VideoSubtitleSize.SMALL.scale < VideoSubtitleSize.NORMAL.scale)
         assertTrue(VideoSubtitleSize.NORMAL.scale < VideoSubtitleSize.LARGE.scale)
@@ -516,34 +548,31 @@ class VideoPlaybackTest {
     }
 
     @Test
-    fun effectsKeyOnlyChangesWhenPipelineInputsChange() {
+    fun effectsKeyOnlyChangesWhenColorPipelineInputsChange() {
         // Tick progres dan recomposition biasa tidak boleh membangun ulang pipeline GL.
         assertEquals(
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
         )
-        // Setiap input yang benar-benar berubah menghasilkan kunci berbeda.
+        // Preset warna dan pemutar baru memang mengganti pipeline.
         assertNotEquals(
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.VIVID, false, VideoAspect.FIT, 1080, 1920, 3),
-        )
-        assertNotEquals(
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FILL, 1080, 1920, 3),
-        )
-        assertNotEquals(
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 720, 1280, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
+            VideoPlayback.effectsKey(VideoEnhance.VIVID, false, 3),
         )
         assertNotEquals(
             "Pemutar baru wajib menerima efek lagi",
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, VideoAspect.FIT, 1080, 1920, 4),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 4),
         )
         // Mode hemat baterai melepas efek, jadi kuncinya sama dengan enhance OFF.
         assertEquals(
-            VideoPlayback.effectsKey(VideoEnhance.OFF, false, VideoAspect.FIT, 1080, 1920, 3),
-            VideoPlayback.effectsKey(VideoEnhance.SHARP, true, VideoAspect.FIT, 1080, 1920, 3),
+            VideoPlayback.effectsKey(VideoEnhance.OFF, false, 3),
+            VideoPlayback.effectsKey(VideoEnhance.SHARP, true, 3),
+        )
+        // Aspek dan ukuran viewport tidak lagi menjadi input pipeline warna.
+        assertEquals(
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
+            VideoPlayback.effectsKey(VideoEnhance.LIGHT, false, 3),
         )
     }
 }

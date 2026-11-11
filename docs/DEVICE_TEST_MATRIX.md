@@ -1,12 +1,11 @@
 # Matriks uji perangkat TubeFlow
 
 Dokumen ini adalah checklist bukti untuk kandidat rilis, bukan klaim bahwa
-seluruh skenario sudah lulus. Status terakhir diperbarui **8 November 2026**
-untuk kandidat **1.1.78/code 93**, terpasang di Realme RMX1821 (Android 10,
-720×1520). **DTM-18** sudah dijalankan untuk mode Utuh/Isi layar/Zoom lanskap
-pada jalur decoder hardware dan software dengan video ber-hardsub; skenario
-lain dan baris lain masih **belum dijalankan** pada build ini. Bukti rinci ada
-di [PROGRESS.md](PROGRESS.md).
+seluruh skenario sudah lulus. Status terakhir diperbarui **11 November 2026**
+untuk kandidat **1.1.79/code 94** di Realme RMX1821 (Android 10,
+720×1520). **DTM-18/21/23/24** sudah dicoba sebagian pada iterasi build
+1.1.79; baris lain dan pengukuran ulang panel pada APK final masih **belum
+dijalankan**. Bukti rinci ada di [PROGRESS.md](PROGRESS.md).
 
 Gunakan hanya konten milik sendiri atau yang diizinkan. Hasil lama pada
 [DEVICE_TEST.md](DEVICE_TEST.md) tetap berlaku untuk versi yang disebut di sana
@@ -66,9 +65,13 @@ pemutar memakai tag `TubeFlow-video` (`adb logcat -s TubeFlow-video`).
 | DTM-15 | Baris ringkas Koleksi & Riwayat | Buka Koleksi: cari file yang judulnya berbeda dari nama file dan file berlirik/subtitle. Lalu buka tab Download → Riwayat. | Nama file tampil di baris keterangan bila tidak mengulang judul; ikon lirik/CC muncul di ujung baris tanpa baris tambahan; kartu Riwayat memakai baris ringkas tapi tanggal selesai, `AttachmentInfo`, dan status lirik tetap tampil; semua aksi tersedia di menu ⋮; tap baris tetap memutar. |
 | DTM-16 | Favorit, teks bergulir, antrean seragam | Tandai beberapa item sebagai favorit di Koleksi; buka item berjudul panjang/nama file panjang; buka antrean putar audio (pemutar lagu) dan antrean video (pemutar video). | Hati favorit tampil hanya pada item di playlist Favorit; judul/baris keterangan yang terpotong bergulir kanan ke kiri (diam bila muat); kedua antrean memakai kartu sama: sampul 48 dp, judul, `AttachmentInfo`, label "Sedang diputar" + aksen pada item aktif; menu ⋮ tetap ada di audio; tap baris melompat ke item tersebut. |
 | DTM-17 | Ganti nama folder fisik | Ganti nama folder hasil unduhan (MediaStore) dan folder SAF bertingkat; periksa Files, Koleksi, playlist, lirik, dan Riwayat. Coba juga folder baca-saja, folder akar, dan nama yang sudah dipakai. | Direktori benar-benar berubah nama; berkas tetap dapat diputar; lirik, playlist, dan riwayat menunjuk lokasi baru; job yang belum selesai memakai subfolder baru; kasus yang ditolak memberi pesan jelas dan tidak meninggalkan folder setengah pindah. |
-| DTM-18 | Rasio video Utuh/Isi layar/Zoom + hardsub | Putar video 16:9 ber-hardsub di layar 20:9, lanskap dan portrait; ganti mode lewat tombol dan sheet opsi; periksa notice serta TalkBack. | Utuh menampilkan seluruh frame (bilah hitam boleh muncul); Isi layar memenuhi layar, tepi atas terpotong, tetapi baris hardsub di bawah tetap utuh; Zoom lebih besar dan tetap mempertahankan tepi bawah; hint dan notice menjelaskan tepi yang hilang; label aksesibilitas menyebut mode berikutnya. |
+| DTM-18 | Empat mode rasio | Putar video 16:9 ber-hardsub di layar 20:9, lanskap dan portrait; ganti mode **100%**, **Pas ke layar**, **Rentangkan**, **Potong** lewat ikon cepat dan sheet; ulangi saat video dijeda; periksa notice, hint, dan TalkBack. | **100%** memetakan satu piksel sumber ke satu piksel layar dan boleh keluar layar; **Pas ke layar** menampilkan seluruh frame tanpa potongan; **Rentangkan** memenuhi layar tanpa membuang isi (rasio berubah); **Potong** memenuhi layar dengan tepi terpangkas merata di tengah. Ganti mode saat dijeda tidak membuka ulang pemutar; nilai lama Isi layar/Zoom tampil sebagai Pas ke layar. |
 | DTM-19 | RAM katalog, tema awal, menu audio, genre | Buka aplikasi dengan katalog 1.000+ item dan ukur memori/waktu buka; pasang baru tanpa data untuk memeriksa tema; buka baris audio Koleksi; unduh audio tanpa genre eksplisit lalu periksa tag. | Pemeriksaan awal tidak memuat ribuan baris dan RAM tidak terus naik; instalasi baru memakai tema Sistem tanpa menimpa pilihan lama; menu ⋮ tidak mengulang Favorit/Bagikan; genre kosong tidak menjadi tag kosong dan fallback kategori/tag tetap bekerja. |
 | DTM-20 | Antrean tertahan "Menunggu giliran" | Antrekan satu video dengan **Hanya lewat WiFi** aktif saat hanya data seluler, lalu sambungkan WiFi; ulangi dengan **Hanya saat mengisi daya** lalu sambungkan charger; matikan salah satu toggle saat job masih QUEUED; biarkan satu job QUEUED lebih dari 45 detik tanpa unduhan lain berjalan. | Kartu menyebut alasan tunggu yang benar (internet/WiFi tidak berbayar/pengisian daya/kombinasi); setelah syarat terpenuhi dan tidak ada job lain berjalan, job mulai dalam ±45 detik tanpa perlu jeda→lanjutkan; mengubah toggle langsung menjadwal ulang job QUEUED; tidak ada output ganda atau job lain ikut berhenti. |
+| DTM-21 | Posisi lirik saat ganti lagu | Buka Koleksi → cari artis berlirik (mis. Skillet) → putar lagu pertama → buka pemutar penuh → gulir lirik ke bawah → tekan lagu berikutnya. Ulangi dari lagu tanpa lirik tersinkron. | Daftar lirik langsung kembali ke baris awal untuk lagu baru, tidak mewarisi posisi gulir lagu sebelumnya; pager tetap membuka halaman lirik bila tersedia. |
+| DTM-22 | Panel antrean video di lanskap | Putar video berjudul panjang, masuk lanskap lewat kontrol orientasi pemutar, buka panel antrean, ukur lebar panel dan amati judul. | Panel tidak menutupi separuh layar (maksimum 320 dp / ±544 px pada density 1,7); judul panjang bergulir satu baris; item aktif tetap ditandai dan dapat diketuk. |
+| DTM-23 | Watchdog buffer | Putar video lokal >12 detik dan seek beberapa kali; periksa log `TubeFlow-video` untuk memastikan tidak ada `macet` palsu. Bila stall nyata dapat direproduksi, biarkan >12 detik. | Pemutaran normal tidak memicu pemulihan; stall nyata membuka ulang di posisi yang sama, percobaan kedua memakai software (kecuali mode Perangkat manual), dan setelah dua pemulihan beruntun spinner berhenti dengan pesan galat yang dapat ditindaklanjuti. |
+| DTM-24 | Unduhan video vertikal Instagram | Inspeksi reel Instagram portrait, pilih kualitas yang tersedia, antrekan, lalu periksa file keluaran dengan `ffprobe`. Ulangi saat inspeksi/antrean gagal. | Tinggi piksel nyata (mis. 1280) diterima; file 720×1280 diputar; kartu dan isian baru dibersihkan setelah antrean terkonfirmasi, sedangkan kegagalan mempertahankan hasil inspeksi dan menampilkan pesan jelas. |
 
 ## Format hasil
 
@@ -93,9 +96,13 @@ Salin tabel ini ke laporan sesi dan isi satu baris per percobaan:
 | DTM-15 |  |  | Belum dijalankan |  |  |
 | DTM-16 |  |  | Belum dijalankan |  |  |
 | DTM-17 |  |  | Belum dijalankan |  |  |
-| DTM-18 |  |  | Belum dijalankan |  |  |
+| DTM-18 | Realme RMX1821 / API 29 | 1.1.79/94 iterasi 18:58 | Sebagian | log `TubeFlow-video`, tangkapan layar | **Rentangkan** 894×423 dp skala 1,195×1,000 dan **Potong** 894×506 dp skala 1,195×1,195; ganti mode saat dijeda tidak memicu `sesi=buka`. **100%** dan **Pas ke layar** sudah diukur pada iterasi build sebelumnya (848×480 terpusat; 1272×720), belum diulang pada APK final. |
 | DTM-19 |  |  | Belum dijalankan |  |  |
 | DTM-20 |  |  | Belum dijalankan |  |  |
+| DTM-21 | Realme RMX1821 / API 29 | 1.1.79/94 iterasi 18:58 | Lulus (konfirmasi pengguna) | tangkapan pemutar lirik | Pengguna memutar lagu dari Koleksi dan mengonfirmasi lirik "aman"; pengujian lanjutan dihentikan atas permintaan pengguna. |
+| DTM-22 | Realme RMX1821 / API 29 | 1.1.79/94 iterasi 18:58 | Gagal pada iterasi, diperbaiki | tangkapan panel + log | Panel masih 76% layar karena `fillMaxWidth().widthIn()` mengunci minimum; implementasi diganti `Modifier.width(queuePanelWidthDp(...))` dan regresi host ditambahkan. Lebar pada APK final belum diukur ulang di HP. |
+| DTM-23 | Realme RMX1821 / API 29 | 1.1.79/94 iterasi 18:58 | Sebagian | log `TubeFlow-video` | Pemutaran normal 848×480 selama 15 detik tidak menghasilkan log `macet`; stall nyata belum berhasil direproduksi sehingga jalur pemulihan belum terbukti di perangkat. |
+| DTM-24 | Realme RMX1821 / API 29 | sebelum build final | Sebagian | `ffprobe` dua file | Dua file `Video by instagram*.mp4` masing-masing 6.830.931 byte, H.264 720×1280. Pengantrean ulang pada APK final belum dijalankan. |
 
 ## Batas
 

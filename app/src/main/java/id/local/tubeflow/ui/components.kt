@@ -927,10 +927,11 @@ fun QueueRow(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         title,
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
                         color = contentColor,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (meta != null) Text(

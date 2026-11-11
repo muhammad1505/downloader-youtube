@@ -488,19 +488,34 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     cancelInspect = { model.cancelInspection() },
                     download = { opts ->
                         requestNotifications()
-                        model.enqueue(opts.copy(url = url.trim()), onQueued = { id -> highlightedJobId = id })
-                        url = ""
-                        model.clearPlaylist()
-                        tab = 1
+                        // Isian hanya dibersihkan setelah baris antrean benar-benar dibuat. Bila
+                        // validasi/duplikat/WorkManager gagal, kartu hasil inspeksi tetap tampil
+                        // dan pengguna bisa memperbaiki pilihan tanpa mengulang inspeksi.
+                        val submitted = url.trim()
+                        model.enqueue(opts.copy(url = submitted), onQueued = { id ->
+                            highlightedJobId = id
+                            if (url.trim() == submitted) {
+                                url = ""
+                                model.clearPlaylist()
+                            }
+                            // Tetap di kartu unduhan bila pengantrean gagal, supaya pesan galat
+                            // dan pilihan resolusi masih terlihat.
+                            tab = 1
+                        })
                     },
                     downloadPlaylist = { entries, opts ->
                         requestNotifications()
                         // Judul playlist diambil SEBELUM panel dibersihkan agar subfolder tetap benar.
                         val target = playlist
-                        if (target != null) model.queuePlaylist(target, entries, opts, onQueued = { id -> highlightedJobId = id })
-                        url = ""
-                        model.clearPlaylist()
-                        tab = 1
+                        val submitted = url.trim()
+                        if (target != null) model.queuePlaylist(target, entries, opts, onQueued = { id ->
+                            highlightedJobId = id
+                            if (url.trim() == submitted) {
+                                url = ""
+                                model.clearPlaylist()
+                            }
+                            tab = 1
+                        })
                     },
                     spotify = spotifyPreview,
                     inspectSpotify = { model.inspectSpotify(url.trim()) },
@@ -508,13 +523,18 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     downloadSpotify = { opts, candidate ->
                         requestNotifications()
                         // Track diambil SEBELUM state dibersihkan; URL job memakai video YouTube pilihan.
+                        val submitted = url.trim()
                         spotifyPreview.track?.let { track ->
-                            model.enqueueSpotify(opts, track, candidate, onQueued = { id -> highlightedJobId = id })
+                            model.enqueueSpotify(opts, track, candidate, onQueued = { id ->
+                                highlightedJobId = id
+                                if (url.trim() == submitted) {
+                                    url = ""
+                                    model.clearSpotify()
+                                    model.clearPlaylist()
+                                }
+                                tab = 1
+                            })
                         }
-                        url = ""
-                        model.clearSpotify()
-                        model.clearPlaylist()
-                        tab = 1
                     },
                     spotifyCollection = spotifyCollectionPreview,
                     inspectSpotifyCollection = { model.inspectSpotifyCollection(url.trim()) },
@@ -524,13 +544,18 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                     downloadSpotifyCollection = { opts, tracks ->
                         requestNotifications()
                         // Koleksi diambil SEBELUM state dibersihkan; tiap lagu memakai video YouTube hasil pencocokan.
+                        val submitted = url.trim()
                         spotifyCollectionPreview.collection?.let { collection ->
-                            model.enqueueSpotifyCollection(opts, collection, tracks, onQueued = { id -> highlightedJobId = id })
+                            model.enqueueSpotifyCollection(opts, collection, tracks, onQueued = { id ->
+                                highlightedJobId = id
+                                if (url.trim() == submitted) {
+                                    url = ""
+                                    model.clearSpotifyCollection()
+                                    model.clearPlaylist()
+                                }
+                                tab = 1
+                            })
                         }
-                        url = ""
-                        model.clearSpotifyCollection()
-                        model.clearPlaylist()
-                        tab = 1
                     },
                     queueActions = QueueActions(
                         cancel = { model.cancel(it) },
