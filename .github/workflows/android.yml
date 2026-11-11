@@ -25,7 +25,10 @@ jobs:
       - name: Verify bundled engine manifest and checksum
         run: python3 scripts/verify_engine_asset.py
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease --no-daemon
+      # Tanpa assembleDebug/lintDebug: CI hanya perlu tes, lint rilis, dan APK rilis.
+      # Build debug menghasilkan tiga APK ~70 MB dan tidak dipakai gate mana pun.
+      - name: Unit tests, lint, and release build
+        run: ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
       # Tes host memakai binary ffmpeg/ffprobe sungguhan (kompresi sampul dan
       # pemrosesan opsional). Tanpa ini runner melewati 5 tes dan satu tes gagal.
       - name: Install host media tools
@@ -33,7 +36,7 @@ jobs:
       - run: python3 -m unittest discover -s scripts -p "test_*.py"
       - name: Audit native 16 KB compatibility
         run: |
-          for apk in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
+          for apk in app/build/outputs/apk/release/*.apk; do
             python3 scripts/audit_native.py "$apk"
           done
       - name: Audit optimized reflective ZIP constructors
@@ -46,7 +49,7 @@ jobs:
       - name: Publish unit-test summary
         if: always()
         run: python3 scripts/ci_summary.py
-      # Laporan teks saja (bukan APK debug ~70 MB) agar tidak menghabiskan kuota
+      # Laporan teks saja (tanpa APK) agar tidak menghabiskan kuota
       # penyimpanan artifact akun. Kegagalan kuota bukan bagian dari gate
       # kebenaran: tes, lint, dan audit di atas tetap menentukan hasil job.
       - uses: actions/upload-artifact@v4
