@@ -33,6 +33,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var player: PlayerViewModel
     private lateinit var video: VideoPlayerViewModel
     private val incomingUrl = mutableStateOf("")
+    // String yang sama tidak mengubah mutableStateOf (equality), jadi tautan yang dibagikan
+    // ulang perlu penanda baru agar LaunchedEffect di TubeFlowApp tetap berjalan.
+    private val incomingUrlId = mutableStateOf(0L)
     private val incomingMedia = mutableStateOf<IncomingMedia?>(null)
     private val navigation = mutableStateOf<AppNavigationRequest?>(null)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -62,7 +65,9 @@ class MainActivity : ComponentActivity() {
                 cyberpunk = SettingsStore.themeMode == SettingsStore.MODE_CYBERPUNK,
                 transformers = SettingsStore.themeMode == SettingsStore.MODE_TRANSFORMERS,
             ) {
-                TubeFlowApp(model, library, player, karaoke, video, incomingUrl.value, ::requestDownloadNotifications,
+                TubeFlowApp(model, library, player, karaoke, video, incomingUrl.value,
+                    requestNotifications = ::requestDownloadNotifications,
+                    incomingUrlId = incomingUrlId.value,
                     navigation = navigation.value,
                     incomingMedia = incomingMedia.value,
                     onMediaHandled = { incomingMedia.value = null },
@@ -127,5 +132,6 @@ class MainActivity : ComponentActivity() {
         } ?: return
         navigation.value = AppNavigationRequest(AppDestination.DOWNLOAD)
         incomingUrl.value = Regex("https?://[^\\s]+").find(text)?.value ?: text.trim()
+        incomingUrlId.value += 1
     }
 }

@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, video: VideoPlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, incomingMedia: IncomingMedia? = null, onMediaHandled: () -> Unit = {}, onNavigationHandled: (String) -> Unit = {}) {
+fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player: PlayerViewModel, karaoke: KaraokeViewModel, video: VideoPlayerViewModel, incomingUrl: String, requestNotifications: () -> Unit = {}, navigation: AppNavigationRequest? = null, incomingMedia: IncomingMedia? = null, onMediaHandled: () -> Unit = {}, onNavigationHandled: (String) -> Unit = {}, incomingUrlId: Long = 0L) {
     val playback by player.state.collectAsStateWithLifecycle()
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var previousTab by rememberSaveable { mutableIntStateOf(1) }
@@ -153,7 +153,8 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         }
         onMediaHandled()
     }
-    LaunchedEffect(incomingUrl) {
+    // Kunci memakai incomingUrlId supaya tautan yang sama tetap diproses saat dibagikan ulang.
+    LaunchedEffect(incomingUrlId, incomingUrl) {
         if (incomingUrl.isNotBlank()) {
             fullPlayer = false
             video.close()
