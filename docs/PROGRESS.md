@@ -58,10 +58,9 @@ signed AAB **261.572.835 byte**, SHA-256
 `1de101062527812478e65d1ae6242f02d40d7a94415f51bad1b9e87586c106c4`.
 `audit_native.py` 262 ELF 0 gagal, `audit_release_zip_fields.py` 13 kelas 0
 gagal, `zipalign -c -P 16 4` dan `apksigner verify` lulus dengan sertifikat
-produksi. Build final ini belum dipasang ulang ke HP karena perangkat
-terputus saat rebuild; pada artefak build sebelumnya (kode sama sebelum rebase)
-`adb install -r` berhasil dan `base.apk` yang ditarik dari HP ber-SHA-256
-identik dengan artefak build saat itu.
+produksi. APK final dipasang menimpa versi sebelumnya (`adb install -r`) pada
+12 November 2026; `base.apk` yang ditarik dari HP ber-SHA-256 identik dengan
+artefak build (`b0e3329a…`), dan paket terpasang melaporkan 1.1.79 (94).
 
 Verifikasi perangkat (Realme RMX1821, Android 10/API 29, 720×1520, density
 1,7): video 848×480 dari `content://media/external/video/media/199795`.
