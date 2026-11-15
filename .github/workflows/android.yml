@@ -47,19 +47,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: python3 -m unittest discover -s scripts -p "test_*.py"
       # Ringkasan angka tes ditulis ke halaman run, jadi hasilnya tetap terbaca
-      # walau unggahan artifact ditolak kuota penyimpanan akun.
+      # tanpa menyimpan artifact apa pun.
       - name: Publish unit-test summary
         if: always()
         run: python3 scripts/ci_summary.py
-      # Laporan teks saja (tanpa APK) agar tidak menghabiskan kuota
-      # penyimpanan artifact akun. Kegagalan kuota bukan bagian dari gate
-      # kebenaran: tes dan lint di atas tetap menentukan hasil job.
-      - uses: actions/upload-artifact@v4
-        if: always()
-        continue-on-error: true
-        with:
-          name: android-reports
-          retention-days: 7
-          path: |
-            app/build/reports/
-            app/build/test-results/

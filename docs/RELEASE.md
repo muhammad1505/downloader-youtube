@@ -37,7 +37,7 @@ Gunakan konten pengujian milik sendiri/diizinkan. Catat model HP, versi Android,
 
 CI dipisah menjadi dua workflow agar pekerjaan tidak berulang:
 
-- **Android tests** berjalan pada push branch dan pull request. Isinya unit test Kotlin, `lintRelease`, verifikasi aset engine, tes host Python, dan ringkasan tes. Workflow ini tidak membangun APK.
+- **Android tests** berjalan pada push branch dan pull request. Isinya unit test Kotlin, `lintRelease`, verifikasi aset engine, tes host Python, dan ringkasan tes. Workflow ini tidak membangun APK dan tidak menyimpan artifact; ringkasan tes ditulis ke halaman run.
 - **Release APK arm64** hanya berjalan pada tag `v*` atau dispatch manual. Isinya build APK rilis bertanda tangan, audit native/ZIP, zipalign, verifikasi signature, lalu publikasi. Unit test dan lint tidak diulang karena sudah menjadi gate pada commit yang sama.
 
 Tag rilis harus dibuat dari commit `main` yang sudah lolos **Android tests**. Pada rilis tag, APK dilampirkan langsung ke GitHub Release tanpa membuat artifact Actions. Workflow juga menghapus aset dari rilis yang lebih lama dari tiga rilis terbaru dan menghapus seluruh artifact Actions lama; halaman rilis tetap disimpan agar tautan dan riwayatnya tidak rusak. Dispatch manual tetap menyimpan artifact Actions selama satu hari untuk pengujian.
