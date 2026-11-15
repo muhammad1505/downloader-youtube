@@ -33,6 +33,15 @@ Gunakan konten pengujian milik sendiri/diizinkan. Catat model HP, versi Android,
 - Tinjau kebijakan target API dan distribusi toko yang dipilih pada tanggal rilis.
 - Sertakan inventaris lisensi dan source/notice runtime sesuai konfigurasi binary sebenarnya.
 
+## CI dan retensi artefak
+
+CI dipisah menjadi dua workflow agar pekerjaan tidak berulang:
+
+- **Android tests** berjalan pada push branch dan pull request. Isinya unit test Kotlin, `lintRelease`, verifikasi aset engine, tes host Python, dan ringkasan tes. Workflow ini tidak membangun APK.
+- **Release APK arm64** hanya berjalan pada tag `v*` atau dispatch manual. Isinya build APK rilis bertanda tangan, audit native/ZIP, zipalign, verifikasi signature, lalu publikasi. Unit test dan lint tidak diulang karena sudah menjadi gate pada commit yang sama.
+
+Tag rilis harus dibuat dari commit `main` yang sudah lolos **Android tests**. Pada rilis tag, APK dilampirkan langsung ke GitHub Release tanpa membuat artifact Actions. Workflow juga menghapus aset dari rilis yang lebih lama dari tiga rilis terbaru dan menghapus seluruh artifact Actions lama; halaman rilis tetap disimpan agar tautan dan riwayatnya tidak rusak. Dispatch manual tetap menyimpan artifact Actions selama satu hari untuk pengujian.
+
 Status 3 November 2026: produksi signed **1.1.71/code86** dibangun lokal (`build_release.sh`), 654 Kotlin + 101 Python tes lulus, lint debug/release 0 error, audit native/ZIP/zipalign/apksigner lulus, dan terpasang di Realme RMX1821 Android 10 lewat `adb install -r` dengan `base.apk` SHA-256 `3837dc902d12245537ecacfb95cdf8d71eed088d34720f6f612b1c5f05b1c2fa` (cocok build lokal). Skenario [matriks perangkat](DEVICE_TEST_MATRIX.md) belum dijalankan pada build ini.
 
 Status terbaru 13 Oktober 2026: produksi signed **1.1.1/code15** sudah terpasang di Realme Android 10, hash base.apk cocok ARM64 final `437d42759c2b953587f885d70b0a5ffd44fee21dc47dd0774fa088ee847405c0`. 145 Kotlin/76 Python (Python dijalankan ulang sesi dokumentasi), lint debug/release, audit APK×3/AAB lulus pada batch ini; [laporan dashboard 1.1.1](DASHBOARD_LYRICS_2026-10-13.md), [laporan Smart Media 1.1.0](SMART_MEDIA_UPGRADE_2026-10-13.md) dan [hasil perangkat](DEVICE_TEST.md) memisahkan bukti host/perangkat. Catatan lama soal kunci testing berbeda adalah sejarah, bukan blocker instalasi saat ini.

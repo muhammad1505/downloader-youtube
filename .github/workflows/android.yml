@@ -1,14 +1,26 @@
-name: Android checks
+name: Android tests
+
+# Workflow ini hanya menguji: unit test, lint rilis, tes host Python, dan
+# verifikasi aset engine. Build APK rilis, audit paket, dan publikasi berada
+# di release-apk.yml agar pekerjaan rilis tidak dijalankan berulang di sini.
 on:
   push:
-    # Tag rilis ditangani release-apk.yml agar job pemeriksaan tidak berjalan ganda.
+    # Tag rilis sengaja tidak memicu workflow ini; release-apk.yml yang menanganinya.
     branches: ['**']
   pull_request:
+
 permissions:
   contents: read
+
+concurrency:
+  group: android-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
+    name: Unit, lint, and host tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,25 +37,15 @@ jobs:
       - name: Verify bundled engine manifest and checksum
         run: python3 scripts/verify_engine_asset.py
       - uses: gradle/actions/setup-gradle@v4
-      # Tanpa assembleDebug/lintDebug: CI hanya perlu tes, lint rilis, dan APK rilis.
-      # Build debug menghasilkan tiga APK ~70 MB dan tidak dipakai gate mana pun.
-      - name: Unit tests, lint, and release build
-        run: ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
+      # Tanpa assembleRelease: APK rilis hanya dibangun sekali di release-apk.yml.
+      # Lint tetap di sini agar masalah rilis tertangkap sebelum tag dibuat.
+      - name: Unit tests and release lint
+        run: ./gradlew testDebugUnitTest lintRelease --no-daemon
       # Tes host memakai binary ffmpeg/ffprobe sungguhan (kompresi sampul dan
       # pemrosesan opsional). Tanpa ini runner melewati 5 tes dan satu tes gagal.
       - name: Install host media tools
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: python3 -m unittest discover -s scripts -p "test_*.py"
-      - name: Audit native 16 KB compatibility
-        run: |
-          for apk in app/build/outputs/apk/release/*.apk; do
-            python3 scripts/audit_native.py "$apk"
-          done
-      - name: Audit optimized reflective ZIP constructors
-        run: |
-          for apk in app/build/outputs/apk/release/*.apk; do
-            python3 scripts/audit_release_zip_fields.py "$apk"
-          done
       # Ringkasan angka tes ditulis ke halaman run, jadi hasilnya tetap terbaca
       # walau unggahan artifact ditolak kuota penyimpanan akun.
       - name: Publish unit-test summary
@@ -51,7 +53,7 @@ jobs:
         run: python3 scripts/ci_summary.py
       # Laporan teks saja (tanpa APK) agar tidak menghabiskan kuota
       # penyimpanan artifact akun. Kegagalan kuota bukan bagian dari gate
-      # kebenaran: tes, lint, dan audit di atas tetap menentukan hasil job.
+      # kebenaran: tes dan lint di atas tetap menentukan hasil job.
       - uses: actions/upload-artifact@v4
         if: always()
         continue-on-error: true

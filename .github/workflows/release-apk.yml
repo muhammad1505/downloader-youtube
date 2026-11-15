@@ -3,6 +3,10 @@ name: Release APK arm64
 # Build satu APK release bertanda tangan untuk HP (arm64-v8a) lalu lampirkan ke GitHub Release.
 # Hanya APK ARM64 yang dipublikasikan; APK ABI lain dan AAB tidak diunggah.
 #
+# Workflow ini tidak menjalankan unit test atau lint: keduanya sudah menjadi gate
+# di workflow "Android tests" pada commit yang sama sebelum tag dibuat. Fokus di
+# sini hanya build, audit paket, publikasi, dan pembersihan artefak lama.
+#
 # Rahasia yang dibutuhkan (Settings -> Secrets and variables -> Actions):
 #   TUBEFLOW_KEYSTORE_BASE64   isi berkas TubeFlow-release.p12 yang di-encode base64 (satu baris)
 #   TUBEFLOW_KEYSTORE_PASSWORD
@@ -20,6 +24,8 @@ on:
 
 permissions:
   contents: write
+  # Dibutuhkan langkah pembersihan artifact Actions pada rilis tag.
+  actions: write
 
 concurrency:
   group: release-apk-${{ github.ref }}
@@ -67,13 +73,15 @@ jobs:
           chmod 600 "$signing/TubeFlow-release.p12"
           test -s "$signing/TubeFlow-release.p12"
 
-      - name: Unit tests and signed release build
+      # Tes dan lint tidak diulang di sini; keduanya sudah lulus di Android tests
+      # sebelum tag. Build rilis tetap menjalankan lintVital/R8 sebagai bagian AGP.
+      - name: Signed release build
         env:
           TUBEFLOW_KEYSTORE_PATH: ${{ runner.temp }}/tubeflow-signing/TubeFlow-release.p12
           TUBEFLOW_KEYSTORE_PASSWORD: ${{ secrets.TUBEFLOW_KEYSTORE_PASSWORD }}
           TUBEFLOW_KEY_ALIAS: ${{ secrets.TUBEFLOW_KEY_ALIAS }}
           TUBEFLOW_KEY_PASSWORD: ${{ secrets.TUBEFLOW_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify and collect the ARM64 APK
         id: collect
@@ -99,14 +107,19 @@ jobs:
             echo "sha=$(cut -d' ' -f1 "$out.sha256")"
           } >> "$GITHUB_OUTPUT"
 
-      # Artifact berisi satu APK ARM64 saja, tanpa AAB dan tanpa ABI lain.
-      - uses: actions/upload-artifact@v4
+      # Hanya dispatch manual yang menyimpan artifact Actions (1 hari). Rilis tag
+      # tidak membuat artifact terpisah karena APK langsung dilampirkan ke Release.
+      - name: Upload release APK (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
         with:
           name: tubeflow-arm64-release
-          retention-days: 14
+          retention-days: 1
           path: |
             TubeFlow-*-arm64-v8a-release.apk
             TubeFlow-*-arm64-v8a-release.apk.sha256
+          if-no-files-found: error
 
       - name: Attach APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -124,3 +137,45 @@ jobs:
           else
             gh release create "$tag" "${files[@]}" --title "TubeFlow $tag" --notes "$notes"
           fi
+
+      - name: Prune old release assets and Actions artifacts
+        if: startsWith(github.ref, 'refs/tags/')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_RELEASES: "3"
+        run: |
+          set -euo pipefail
+
+          # Halaman rilis lama tetap ada agar tautan/riwayat tidak rusak, tetapi
+          # berkas APK-nya dihapus. Tiga rilis terbaru tetap lengkap.
+          gh release list --limit 100 --exclude-drafts \
+            --json tagName,publishedAt \
+            --jq 'sort_by(.publishedAt) | reverse | .[] | [.tagName, .publishedAt] | @tsv' \
+          | awk -v keep="$KEEP_RELEASES" 'NR > keep { print $1 }' \
+          | while IFS= read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "Membersihkan aset rilis lama: $tag"
+              if ! assets=$(gh release view "$tag" --json assets --jq '.assets[].name'); then
+                echo "  lewati $tag (tidak bisa dibaca)"
+                continue
+              fi
+              printf '%s\n' "$assets" | while IFS= read -r asset; do
+                [ -n "$asset" ] || continue
+                echo "  hapus $asset"
+                gh release delete-asset "$tag" "$asset" --yes \
+                  || echo "  gagal menghapus $asset"
+              done
+            done
+
+          # Artifact Actions terpisah dari aset GitHub Release dan memakan kuota
+          # penyimpanan akun. Rilis tag tidak membutuhkannya karena APK sudah
+          # dilampirkan langsung ke Release.
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[].id' \
+          | while IFS= read -r id; do
+              [ -n "$id" ] || continue
+              echo "Menghapus artifact Actions $id"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/$id" \
+                || echo "  gagal menghapus artifact $id"
+            done
