@@ -21,7 +21,7 @@
  <!-- requestLegacyExternalStorage dihormati di perangkat Android 10 apa pun targetSdk (penegakan
       scoped-storage untuk targetSdk 30+ ada di platform Android 11+). Di API 29 tanpa mode ini,
       baris MediaStore milik versi/SAF lama (owner kosong) tidak terbaca meski izin diberikan. -->
- <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="@string/app_name" android:theme="@style/Theme.TubeFlow" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true" android:requestLegacyExternalStorage="true">
+ <application android:name=".TubeFlowApplication" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="@string/app_name" android:theme="@style/Theme.TubeFlow" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true" android:requestLegacyExternalStorage="true">
   <!-- configChanges mencegah Activity dibangun ulang saat rotasi/PiP; ExoPlayer tetap di ViewModel. -->
   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" android:theme="@style/Theme.TubeFlow.Splash">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>

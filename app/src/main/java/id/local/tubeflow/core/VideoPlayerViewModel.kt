@@ -253,6 +253,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         override fun onPlayerError(error: PlaybackException) {
             val current = _state.value
             VideoDiagnostics.failure(error.errorCode, VideoPlayback.isCodecFailure(error.errorCode))
+            AppLog.error(LogCategory.PLAYER, "Pemutar video melaporkan error ${error.errorCodeName}.", error)
             // Jangan memakai currentPosition mentah: ExoPlayer dapat melaporkan 0 setelah
             // dekoder gagal, sehingga fallback/retry akan memutar ulang dari awal.
             val position = VideoPlayback.reopenPosition(current.positionMs, player?.currentPosition ?: 0)
@@ -274,6 +275,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             ) {
                 softwareFallbackUsed = true
                 fallbackJob?.cancel()
+                AppLog.warn(LogCategory.PLAYER, "Mencoba dekoder software setelah ${error.errorCodeName}.")
                 // Jangan biarkan watchdog ikut campur saat fallback dekoder sedang berjalan.
                 bufferingSince = 0L
                 stallRecoveries = 0
@@ -309,6 +311,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 positionMs = position,
                 error = playbackError(error),
             )
+            AppLog.error(LogCategory.PLAYER, "Pemutaran video berhenti: ${playbackError(error)}")
         }
     }
 
@@ -479,7 +482,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             exo.prepare()
             exo.playWhenReady = startPlaying
             startTicker()
+            AppLog.info(LogCategory.PLAYER, "Video dibuka: ${entries.size} item, dekoder ${_state.value.decoderMode.name.lowercase()}.")
         } catch (failure: Exception) {
+            AppLog.error(LogCategory.PLAYER, "Video gagal dibuka.", failure)
             audioFx.release()
             player?.release()
             player = null
@@ -642,6 +647,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         stallRecoveries = 0
         bufferingSince = 0L
         _state.value = current.copy(decoderMode = value)
+        AppLog.info(LogCategory.PLAYER, "Dekoder video diatur ke ${value.name.lowercase()}.")
         if (current.active) {
             reopenAtCurrent(forceSoftware = value == VideoDecoderMode.SOFTWARE)
         }
@@ -1026,6 +1032,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             // berikutnya boleh memakai anggaran otomatis lagi.
             if (stallRecoveries > 0 && now - playingSince >= VideoPlayback.STALL_STEADY_PLAY_MS) {
                 stallRecoveries = 0
+                AppLog.info(LogCategory.PLAYER, "Pemutaran video pulih setelah macet.")
             }
         } else {
             playingSince = 0L
@@ -1058,6 +1065,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         bufferingSince = 0L
         if (!VideoPlayback.canRecoverStall(stallRecoveries)) {
             VideoDiagnostics.stallFailed(position)
+            AppLog.error(LogCategory.PLAYER, "Pemutaran video macet dan tidak dapat dipulihkan otomatis.")
             _state.value = current.copy(
                 playing = false,
                 buffering = false,
@@ -1073,6 +1081,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             current.decoderMode != VideoDecoderMode.HARDWARE
         stallRecoveries += 1
         VideoDiagnostics.stall(stallRecoveries, position, software = softwareActive || forceSoftware)
+        AppLog.warn(LogCategory.PLAYER, "Pemutaran video macet; membuka ulang otomatis (percobaan $stallRecoveries).")
         if (forceSoftware) softwareFallbackUsed = true
         val startPlaying = exo.playWhenReady
         val entries = current.entries

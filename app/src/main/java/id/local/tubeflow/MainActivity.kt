@@ -15,8 +15,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.mutableStateOf
+import id.local.tubeflow.core.AppLog
 import id.local.tubeflow.core.BstationAuth
 import id.local.tubeflow.core.DownloadViewModel
+import id.local.tubeflow.core.LogCategory
 import id.local.tubeflow.core.SettingsStore
 import id.local.tubeflow.core.YouTubeAuth
 import id.local.tubeflow.core.PlayerViewModel
@@ -42,6 +44,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        AppLog.info(LogCategory.APP, "Aktivitas utama dibuka.")
         enableEdgeToEdge()
         if (savedInstanceState == null) readLaunchIntent(intent)
         else AppDestination.fromAction(savedInstanceState.getString("pending_destination"))?.let {

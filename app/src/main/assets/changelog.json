@@ -1,5 +1,14 @@
 [
   {
+    "versionCode": 95,
+    "versionName": "1.1.80",
+    "highlights": [
+      "Menu Pengaturan → Log aplikasi menampilkan aktivitas mesin, unduhan, serta pemutar audio/video di satu tempat, dengan tingkat, kategori, waktu, dan detail galat yang dapat diperluas.",
+      "Log disimpan lokal sebagai berkas bergilir dan dibatasi ukurannya; URL, path, token, serta cookie disamarkan sebelum ditulis maupun dibagikan.",
+      "Galat tak tertangani ikut dicatat sebelum aplikasi berhenti, sehingga penyebab masalah tetap terbaca saat TubeFlow dibuka kembali."
+    ]
+  },
+  {
     "versionCode": 94,
     "versionName": "1.1.79",
     "highlights": [

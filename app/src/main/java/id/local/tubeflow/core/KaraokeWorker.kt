@@ -48,6 +48,7 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
         setForeground(foreground(label, percent))
     }
     override suspend fun doWork(): Result = coroutineScope {
+        AppLog.info(LogCategory.KARAOKE, "Pemrosesan karaoke dimulai.")
         val cancellation = launch(Dispatchers.IO) { try { awaitCancellation() } finally { engine.cancel() } }
         try { withContext(Dispatchers.IO) { lock.withLock {
         val directory = directory(applicationContext, id.toString())
@@ -122,17 +123,24 @@ class KaraokeWorker(context: Context, parameters: WorkerParameters) : CoroutineW
             File(directory, "result.json").writeText(manifest.toString())
             currentCoroutineContext().ensureActive()
             complete = true
+            AppLog.info(LogCategory.KARAOKE, "Pemrosesan karaoke selesai.")
             Result.success(resultData("path" to result.path, "name" to name, "resultBytes" to result.length(), "durationMs" to actual, "sample" to sample, "startMs" to startMs))
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { Result.failure(resultData("error" to (failure.message ?: "Pemrosesan karaoke gagal.").take(500))) }
-        catch (_: LinkageError) { Result.failure(resultData("error" to "Runtime karaoke tidak dapat dimuat pada perangkat ini.")) }
+        catch (failure: Exception) {
+            AppLog.error(LogCategory.KARAOKE, "Pemrosesan karaoke gagal.", failure)
+            Result.failure(resultData("error" to (failure.message ?: "Pemrosesan karaoke gagal.").take(500)))
+        }
+        catch (failure: LinkageError) {
+            AppLog.error(LogCategory.KARAOKE, "Runtime karaoke tidak dapat dimuat.", failure)
+            Result.failure(resultData("error" to "Runtime karaoke tidak dapat dimuat pada perangkat ini."))
+        }
         finally {
             engine.cancel()
             if (!KaraokeResult.discardModelPartials(KaraokeModel.directory(applicationContext)))
-                android.util.Log.w("KaraokeCleanup", "Model fragments need another cleanup attempt")
+                AppLog.warn(LogCategory.KARAOKE, "Fragmen model karaoke belum dapat dibersihkan sepenuhnya.")
             if (!complete || isStopped || !currentCoroutineContext().isActive) {
                 if (!KaraokeResult.discard(root(applicationContext), id.toString()))
-                    android.util.Log.w("KaraokeCleanup", "Private job data needs another cleanup attempt")
+                    AppLog.warn(LogCategory.KARAOKE, "Data privat karaoke belum dapat dibersihkan sepenuhnya.")
             }
             else directory.listFiles()?.filter { it.name !in setOf("instrumental.flac", "result.json") }?.forEach { it.delete() }
         }

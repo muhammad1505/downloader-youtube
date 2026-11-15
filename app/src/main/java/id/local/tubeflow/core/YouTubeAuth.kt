@@ -86,16 +86,22 @@ object YouTubeAuth {
 
     internal fun save(context: Context, cookies: Map<String, String>) {
         require(YouTubeCookies.isSignedIn(cookies)) { "Cookie login YouTube tidak lengkap." }
-        synchronized(lock) {
-            val now = System.currentTimeMillis()
-            val payload = JSONObject()
-                .put("v", VERSION)
-                .put("savedAt", now)
-                .put("cookies", JSONObject(cookies))
-            writeEncrypted(context.applicationContext, payload.toString())
-            session = Session(cookies, now)
-            loaded = true
+        try {
+            synchronized(lock) {
+                val now = System.currentTimeMillis()
+                val payload = JSONObject()
+                    .put("v", VERSION)
+                    .put("savedAt", now)
+                    .put("cookies", JSONObject(cookies))
+                writeEncrypted(context.applicationContext, payload.toString())
+                session = Session(cookies, now)
+                loaded = true
+            }
+        } catch (error: Exception) {
+            AppLog.error(LogCategory.ACCOUNT, "Sesi YouTube gagal disimpan.", error)
+            throw error
         }
+        AppLog.info(LogCategory.ACCOUNT, "Sesi YouTube tersimpan di perangkat.")
     }
 
     /** File cookie sementara untuk `yt-dlp --cookies`; pemanggil/engine menghapusnya. */
@@ -137,6 +143,7 @@ object YouTubeAuth {
             manager.removeAllCookies { manager.flush() }
             android.webkit.WebStorage.getInstance().deleteAllData()
         }
+        AppLog.info(LogCategory.ACCOUNT, "Sesi YouTube dihapus dari perangkat.")
     }
 
     private fun sessionFile(context: Context) = File(context.noBackupFilesDir, FILE)

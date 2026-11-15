@@ -238,6 +238,11 @@ fun SettingsScreen(
                     icon = Icons.Outlined.AccountCircle,
                 ) { onSection("accounts") },
                 SettingsCategory(
+                    title = "Log aplikasi",
+                    summary = "Aktivitas, peringatan, dan galat semua proses",
+                    icon = Icons.Outlined.Article,
+                ) { onSection("logs") },
+                SettingsCategory(
                     title = "Tentang",
                     summary = "Versi ${BuildConfig.VERSION_NAME} · privasi dan ketentuan",
                     icon = Icons.Outlined.Info,
@@ -790,6 +795,7 @@ private fun settingsSectionIcon(section: String): ImageVector = when (section) {
     "history" -> Icons.Outlined.History
     "media" -> Icons.Outlined.Build
     "accounts" -> Icons.Outlined.AccountCircle
+    "logs" -> Icons.Outlined.Article
     else -> Icons.Outlined.Info
 }
 
@@ -801,6 +807,7 @@ private fun settingsSectionInfo(section: String): Pair<String, String> = when (s
     "history" -> "Riwayat" to "Batas umur catatan unduhan; file media tidak ikut dihapus."
     "media" -> "Media & alat" to "Karaoke, cadangan lirik, dan mesin media."
     "accounts" -> "Akun Bstation" to "Login untuk episode Premium; cookie disimpan terenkripsi di perangkat."
+    "logs" -> "Log aplikasi" to "Aktivitas, peringatan, dan galat semua proses di perangkat ini."
     else -> "Tentang TubeFlow" to "Versi, privasi, dan ketentuan pemakaian."
 }
 

@@ -60,15 +60,18 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   // Generasi eksekusi diambil SEBELUM antre slot: worker yang digantikan (jeda→lanjut) memakai generasi lamanya,
   // sehingga semua update bersyaratnya otomatis tidak mengenai baris yang sudah dilanjutkan (BUG-002).
   val generation = inputData.getInt("generation", -1).takeIf { it >= 0 } ?: jobId?.let { dao.get(it)?.generation } ?: -1
+  AppLog.info(LogCategory.DOWNLOAD, "Pekerjaan unduhan ${jobId?.take(8) ?: "-"} dimulai.")
   try {
    setForeground(getForegroundInfo())
    SettingsStore.load(applicationContext)
    acquireSlot()
    try { return DownloadFileAccess.lock(jobId.orEmpty()).withLock { executeDownload(generation) } } finally { releaseSlot() }
   } catch(cancelled: CancellationException) {
+   AppLog.info(LogCategory.DOWNLOAD, "Pekerjaan unduhan dihentikan karena jeda, batal, atau digantikan pekerjaan lain.")
    jobId?.let { withContext(NonCancellable) { handleStop(it, generation) } }
    throw cancelled
   } catch(error: Exception) {
+   if (jobId == null) AppLog.error(LogCategory.DOWNLOAD, "Pekerjaan unduhan gagal sebelum status dapat dicatat.", error)
    jobId?.let { recordFailure(it, generation, error) }
    return Result.success()
   } finally {
@@ -87,9 +90,15 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
   val current = dao.get(jobId) ?: return@withContext null
   val store = FailureDetailsStore(applicationContext)
   val details = store.capture(error, current.phase)
+  AppLog.error(
+   LogCategory.DOWNLOAD,
+   "Unduhan gagal pada tahap ${details.phase} (${details.category}).",
+   detail = details.message,
+  )
   // Video playlist yang sudah hilang di sumber bukan kegagalan unduhan pengguna: hapus barisnya
   // supaya tidak muncul sebagai "Gagal" dan tidak mengotori antrean playlist lainnya.
   if (skipUnavailableCollection && CollectionSkip.shouldSkip(current, details.category)) {
+   AppLog.info(LogCategory.DOWNLOAD, "Entri playlist dilewati karena video tidak tersedia di sumbernya.")
    dao.skipOwned(jobId, generation)
    return@withContext null
   }
@@ -139,6 +148,7 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     }
    }
    publish(lastProgress, force = true)
+   AppLog.info(LogCategory.DOWNLOAD, "Unduhan mulai diproses: ${job.mode.name.lowercase()} ${job.format}.")
    var sourceTrackAvailable = false
    // Refresh source metadata on every attempt: playlist entries and expired URLs need the same identity path.
    try {
@@ -274,14 +284,18 @@ import java.io.File class DownloadWorker(context: Context, params: WorkerParamet
     // Completed only after media, requested sidecars and their outcomes are recorded.
     if(dao.finish(jobId,generation,published.toString(),System.currentTimeMillis()) == 0) throw CancellationException()
     completed=true
-    if (FailureDetails.isLyricFailure(lyricStatus)) runCatching {
-     FailureDetailsStore(applicationContext).let { it.put("$jobId-lyrics",generation,it.captureLyrics(lyricStatus,lyricOutcome?.httpCode)) }
+    if (FailureDetails.isLyricFailure(lyricStatus)) {
+     AppLog.warn(LogCategory.DOWNLOAD, "Lirik tidak tersimpan: ${LyricStatus.label(lyricStatus)}.")
+     runCatching {
+      FailureDetailsStore(applicationContext).let { it.put("$jobId-lyrics",generation,it.captureLyrics(lyricStatus,lyricOutcome?.httpCode)) }
+     }
     }
     pending=null
     dao.get(jobId)?.processingNotice?.takeIf { it.isNotBlank() }?.let {
      DownloadDatabase.get(applicationContext).media().event(MediaEvent(jobId = jobId, action = "PROCESSING_FAILED", kind = job.mode.name, platformId = job.platformId, at = System.currentTimeMillis()))
     }
     runCatching { MediaIndexWorker.enqueue(applicationContext, jobId) }
+    AppLog.info(LogCategory.DOWNLOAD, "Unduhan selesai dan file berhasil diterbitkan.")
     notifyResult(job, published, null, lyricStatus)
    }
    Result.success()

@@ -446,6 +446,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun load(planned: PlaybackQueue<Track>, playWhenReady: Boolean = true, startPositionMs: Long = 0, retryOnError: Boolean = true) {
         queue = planned
         val track = planned.current
+        AppLog.info(LogCategory.PLAYER, "Memuat audio ke pemutar (${planned.tracks.size} lagu di antrean).")
         rememberLast(track)
         val id = token.incrementAndGet()
         _state.value = State(track=track, loading=true, positionMs=startPositionMs.coerceAtLeast(0), speed=speed, queueTracks=planned.tracks, queueIndex=planned.index,
@@ -518,6 +519,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         if (!autoplay && !_state.value.playing && AudioErrorPolicy.benignWhilePaused(what)) {
                             android.util.Log.w("TubeFlow-audio",
                                 "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; perintah diabaikan saat jeda")
+                            AppLog.debug(LogCategory.PLAYER, "Perintah pemutar diabaikan saat jeda (${AudioErrorPolicy.label(what, extra)}).")
                             return@setOnErrorListener true
                         }
                         val position = runCatching { failed.currentPosition.toLong() }
@@ -528,6 +530,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             retryScheduled = true
                             android.util.Log.w("TubeFlow-audio",
                                 "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; memuat ulang sekali")
+                            AppLog.warn(LogCategory.PLAYER, "Pemutar audio mencoba memuat ulang setelah ${AudioErrorPolicy.label(what, extra)}.")
                             handler.post {
                                 if (token.get() == id) {
                                     load(planned, playWhenReady = autoplay, startPositionMs = position, retryOnError = false)
@@ -536,6 +539,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         } else {
                             android.util.Log.w("TubeFlow-audio",
                                 "MediaPlayer ${AudioErrorPolicy.label(what, extra)}; berhenti")
+                            AppLog.error(LogCategory.PLAYER, "Pemutar audio berhenti: ${AudioErrorPolicy.label(what, extra)}.")
                             fail("Audio tidak dapat diputar. Periksa file atau codec perangkat.")
                         }
                     }
@@ -550,7 +554,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Data-source I/O and every MediaPlayer method stay off the UI thread.
                 current.setDataSource(getApplication<Application>(), track.uri.toUri())
                 current.prepareAsync()
-            } catch (_: Exception) { if (token.get() == id) fail("File audio tidak tersedia atau aksesnya berubah.") else release() }
+            } catch (error: Exception) {
+                if (token.get() == id) {
+                    AppLog.error(LogCategory.PLAYER, "Berkas audio tidak dapat dibuka.", error)
+                    fail("File audio tidak tersedia atau aksesnya berubah.")
+                } else release()
+            }
         }
     }
     /** Kecepatan putar (0,25–3×) berlaku untuk track aktif dan track berikutnya. */

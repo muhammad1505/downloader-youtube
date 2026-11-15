@@ -608,7 +608,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                 )
                 // Alat memakai dialog waktu lirik yang sama dengan Koleksi/player, bukan salinannya.
                 toolsTab -> ToolsScreen(library, player, karaoke, onEditTiming = { item -> lyricTiming = item })
-                else -> SettingsScreen(
+                else -> if (settingsSection == "logs") AppLogScreen() else SettingsScreen(
                     karaoke = karaoke,
                     player = player,
                     library = library,

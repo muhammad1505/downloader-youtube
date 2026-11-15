@@ -25,8 +25,14 @@ object Engine {
     installBundledEngine(context)
     YoutubeDL.getInstance().init(context)
     FFmpeg.getInstance().init(context)
+   } catch (cancelled: CancellationException) {
+    throw cancelled
    } catch (failure: LinkageError) {
+    AppLog.error(LogCategory.ENGINE, "Mesin download gagal disiapkan.", failure)
     throw IllegalStateException("Mesin download gagal disiapkan. Pasang pembaruan aplikasi lalu coba lagi.", failure)
+   } catch (failure: Exception) {
+    AppLog.error(LogCategory.ENGINE, "Mesin download gagal disiapkan.", failure)
+    throw failure
    }
   }
  }
@@ -100,7 +106,10 @@ object Engine {
   }
  }
  fun cancel(id: String) {
-  activeThreads[id]?.let(::cancelExecution)
+  activeThreads[id]?.let {
+   AppLog.debug(LogCategory.ENGINE, "Permintaan penghentian proses mesin dikirim.")
+   cancelExecution(it)
+  }
  }
  private fun signalOwned(controlFile: File, token: String) {
   runCatching {
@@ -133,7 +142,10 @@ object Engine {
      val output = YoutubeDL.getInstance().execute(request,token,callback).out
      if(continuation.isActive) continuation.resumeWith(Result.success(output))
     }
-   } catch(error: Exception) { if(continuation.isActive) continuation.resumeWith(Result.failure(error)) }
+   } catch(error: Exception) {
+    AppLog.error(LogCategory.ENGINE, "Perintah mesin gagal dijalankan.", error)
+    if(continuation.isActive) continuation.resumeWith(Result.failure(error))
+   }
    finally { execution?.let { activeThreads.remove(id,it) }; controlFile.delete(); File(controlFile.path+".tmp").delete() }
   }
   executionThread=thread

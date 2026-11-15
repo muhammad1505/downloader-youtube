@@ -123,7 +123,10 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                     repository.validateRecent()
                 } while (availabilityRequested)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia." }
+            catch (error: Exception) {
+                AppLog.warn(LogCategory.LIBRARY, "Validasi ketersediaan media gagal.", error)
+                _message.value="Koleksi belum dapat diperiksa; coba lagi setelah akses penyimpanan tersedia."
+            }
         }
     }
     private var playbackRequest: Job? = null
@@ -161,6 +164,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             catch (error: CancellationException) { throw error }
             catch (error: Exception) {
                 val message = error.message ?: "Operasi media gagal."
+                AppLog.error(LogCategory.LIBRARY, message, error)
                 _message.value = message
                 withContext(Dispatchers.Main) { onResult?.invoke(message) }
             }
@@ -169,6 +173,7 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     private suspend fun scanCatalog(): String {
         val (count, failed, discovered, unreadable) = repository.scan()
+        AppLog.info(LogCategory.LIBRARY, "Pemindaian koleksi selesai: $count terlihat, $discovered baru, $failed gagal dibaca, $unreadable folder tidak dapat diakses.")
         _lastScan.value = System.currentTimeMillis()
         getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
         if (count == 0 && discovered == 0) return "Tidak ada media terlihat di folder. Bila file memang ada, periksa izin baca atau tambahkan folder lewat Pengaturan → Penyimpanan."
@@ -201,7 +206,10 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                         "$count media dipindai otomatis" + if (failed > 0) "; $failed file tidak dapat dibaca." else "."
                 }
             } catch (error: CancellationException) { throw error }
-            catch (error: Exception) { _message.value = error.message ?: "Pemindaian otomatis gagal; buka kembali aplikasi untuk mencoba lagi." }
+            catch (error: Exception) {
+                AppLog.error(LogCategory.LIBRARY, "Pemindaian otomatis koleksi gagal.", error)
+                _message.value = error.message ?: "Pemindaian otomatis gagal; buka kembali aplikasi untuk mencoba lagi."
+            }
             finally { _busy.value = false; updateDeviceStorage() }
         }
     }
@@ -221,7 +229,10 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
                 _lastScan.value = System.currentTimeMillis()
                 getApplication<Application>().getSharedPreferences("library", 0).edit { putLong("lastScan", _lastScan.value) }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { lastAutoScanAt = 0 }
+            catch (error: Exception) {
+                AppLog.warn(LogCategory.LIBRARY, "Pemindaian koleksi otomatis singkat gagal.", error)
+                lastAutoScanAt = 0
+            }
         }
     }
     fun grantFolder(uri: android.net.Uri?) {

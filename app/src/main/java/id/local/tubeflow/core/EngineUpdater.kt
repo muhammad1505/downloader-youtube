@@ -101,23 +101,28 @@ object EngineUpdater {
         _state.value = EngineUpdateState.Checking
         val installed = installed(app)
         val release = fetchLatestRelease()
-        _state.value = if (compareVersions(release.version, installed.version) > 0) {
-            EngineUpdateState.Available(release)
+        if (compareVersions(release.version, installed.version) > 0) {
+            _state.value = EngineUpdateState.Available(release)
+            AppLog.info(LogCategory.UPDATE, "Pembaruan mesin tersedia: ${release.version}.")
         } else {
-            EngineUpdateState.UpToDate(installed.version)
+            _state.value = EngineUpdateState.UpToDate(installed.version)
+            AppLog.info(LogCategory.UPDATE, "Mesin sudah terbaru: ${installed.version}.")
         }
     }
 
     fun install(context: Context, release: EngineRelease, blockedReason: String? = null) {
         if (blockedReason != null) {
+            AppLog.warn(LogCategory.UPDATE, "Pemasangan mesin ditahan: $blockedReason")
             _state.value = EngineUpdateState.Failed(blockedReason)
             return
         }
         if (Engine.isBusy()) {
+            AppLog.warn(LogCategory.UPDATE, "Pemasangan mesin ditahan karena mesin sedang dipakai.")
             _state.value = EngineUpdateState.Failed("Mesin media sedang dipakai. Selesaikan unduhan atau pemeriksaan aktif lalu coba lagi.")
             return
         }
         start(context) { app ->
+            AppLog.info(LogCategory.UPDATE, "Memasang pembaruan mesin ${release.version}.")
             _state.value = EngineUpdateState.Downloading(release, 0)
             val directory = updateDirectory(app)
             directory.mkdirs()
@@ -148,6 +153,7 @@ object EngineUpdater {
                 invalidateInstalledCache()
                 runCatching { removeOldBinaries(directory, target.name) }
                 _state.value = EngineUpdateState.Updated(release.version)
+                AppLog.info(LogCategory.UPDATE, "Pembaruan mesin ${release.version} aktif.")
             } finally {
                 temporary.delete()
             }
@@ -156,10 +162,12 @@ object EngineUpdater {
 
     fun rollback(context: Context, blockedReason: String? = null) {
         if (blockedReason != null) {
+            AppLog.warn(LogCategory.UPDATE, "Pengembalian mesin ditahan: $blockedReason")
             _state.value = EngineUpdateState.Failed(blockedReason)
             return
         }
         if (Engine.isBusy()) {
+            AppLog.warn(LogCategory.UPDATE, "Pengembalian mesin ditahan karena mesin sedang dipakai.")
             _state.value = EngineUpdateState.Failed("Mesin media sedang dipakai. Selesaikan unduhan atau pemeriksaan aktif lalu coba lagi.")
             return
         }
@@ -168,6 +176,7 @@ object EngineUpdater {
             invalidateInstalledCache()
             Engine.activateStoredEngine(app)
             _state.value = EngineUpdateState.RolledBack(installed(app).version)
+            AppLog.info(LogCategory.UPDATE, "Mesin dikembalikan ke versi ${installed(app).version}.")
         }
     }
 
@@ -342,9 +351,11 @@ object EngineUpdater {
             try {
                 operation(application)
             } catch (cancelled: CancellationException) {
+                AppLog.info(LogCategory.UPDATE, "Operasi pembaruan mesin dibatalkan.")
                 _state.value = EngineUpdateState.Idle
                 throw cancelled
             } catch (error: Throwable) {
+                AppLog.error(LogCategory.UPDATE, "Operasi pembaruan mesin gagal.", error)
                 _state.value = EngineUpdateState.Failed(userMessage(error))
             } finally {
                 running.set(false)

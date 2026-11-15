@@ -10,10 +10,15 @@ class MediaIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val id = inputData.getString("jobId") ?: return Result.failure()
         return try {
             MediaRepository(applicationContext).indexDownload(id)
+            AppLog.info(LogCategory.LIBRARY, "Indeks media selesai untuk ${id.take(8)}.")
             Result.success()
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) {
-            if (runAttemptCount < 2) Result.retry() else {
+        catch (error: Exception) {
+            if (runAttemptCount < 2) {
+                AppLog.warn(LogCategory.LIBRARY, "Indeks media gagal; akan mencoba lagi.", error)
+                Result.retry()
+            } else {
+                AppLog.error(LogCategory.LIBRARY, "Indeks media gagal setelah percobaan ulang.", error)
                 val database = DownloadDatabase.get(applicationContext)
                 database.downloads().get(id)?.let { job -> database.media().event(MediaEvent(jobId = id, action = "INDEX_FAILED", kind = job.mode.name, platformId = job.platformId, at = System.currentTimeMillis())) }
                 Result.failure()

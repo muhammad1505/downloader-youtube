@@ -99,16 +99,22 @@ object BstationAuth {
     /** Simpan hanya cookie dengan sesi valid; enkripsi wajib berhasil. */
     internal fun save(context: Context, cookies: Map<String, String>) {
         require(BstationCookies.isSignedIn(cookies)) { "Cookie login Bstation tidak lengkap." }
-        synchronized(lock) {
-            val now = System.currentTimeMillis()
-            val payload = JSONObject()
-                .put("v", VERSION)
-                .put("savedAt", now)
-                .put("cookies", JSONObject(cookies))
-            writeEncrypted(context.applicationContext, payload.toString())
-            session = Session(cookies, now)
-            loaded = true
+        try {
+            synchronized(lock) {
+                val now = System.currentTimeMillis()
+                val payload = JSONObject()
+                    .put("v", VERSION)
+                    .put("savedAt", now)
+                    .put("cookies", JSONObject(cookies))
+                writeEncrypted(context.applicationContext, payload.toString())
+                session = Session(cookies, now)
+                loaded = true
+            }
+        } catch (error: Exception) {
+            AppLog.error(LogCategory.ACCOUNT, "Sesi Bstation gagal disimpan.", error)
+            throw error
         }
+        AppLog.info(LogCategory.ACCOUNT, "Sesi Bstation tersimpan di perangkat.")
     }
 
     /**
@@ -160,6 +166,7 @@ object BstationAuth {
             // WebView ini hanya dipakai untuk login, jadi data situs lokal ikut dibersihkan.
             android.webkit.WebStorage.getInstance().deleteAllData()
         }
+        AppLog.info(LogCategory.ACCOUNT, "Sesi Bstation dihapus dari perangkat.")
     }
 
     private fun sessionFile(context: Context) = File(context.noBackupFilesDir, FILE)

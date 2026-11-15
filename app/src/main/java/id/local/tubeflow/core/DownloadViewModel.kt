@@ -79,8 +79,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      } finally { lease.unlock() }
     }
     _notice.value="$removed folder sementara dibersihkan; $skipped job aktif/dilindungi dilewati; $failed gagal. Media hasil download tetap tersimpan."
+    AppLog.info(LogCategory.STORAGE, "Pembersihan berkas sementara selesai: $removed dihapus, $skipped dilewati, $failed gagal.")
    } catch (cancelled: CancellationException) { throw cancelled }
-   catch (_: Exception) { _error.value="Berkas sementara belum dapat dibersihkan seluruhnya. Coba lagi." }
+   catch (error: Exception) {
+    AppLog.error(LogCategory.STORAGE, "Berkas sementara belum dapat dibersihkan seluruhnya.", error)
+    _error.value="Berkas sementara belum dapat dibersihkan seluruhnya. Coba lagi."
+   }
    finally { _cleaningPartial.value=false; refreshStorage() }
   }
  }
@@ -232,10 +236,13 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      if (_spotify.value.url == trimmed) _spotify.value=_spotify.value.copy(phase=phase)
     }
     if (_spotify.value.url != trimmed) return@launch
-    _spotify.value=SpotifyPreview(url=trimmed,track=track,candidates=SpotifyMatch.rank(track,videos))
+    val candidates=SpotifyMatch.rank(track,videos)
+    _spotify.value=SpotifyPreview(url=trimmed,track=track,candidates=candidates)
+    AppLog.info(LogCategory.DOWNLOAD, "Pratinjau Spotify siap dengan ${candidates.size} kandidat.")
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
     val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error,"SPOTIFY_INSPECTION") }
+    AppLog.error(LogCategory.DOWNLOAD, "Pratinjau Spotify gagal dibaca (${details.category}).", detail=details.message)
     val message=error.message?.takeIf { it.isNotBlank() } ?: details.userMessage
     // Pratinjau yang sudah dibersihkan/diganti tidak boleh memunculkan error tertinggal.
     if (_spotify.value.url == trimmed) {
@@ -279,9 +286,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     val collection=Spotify.fetchCollection(getApplication(),trimmed)
     if (_spotifyCollection.value.url != trimmed) return@launch
     _spotifyCollection.value=SpotifyCollectionPreview(url=trimmed,collection=collection)
+    AppLog.info(LogCategory.DOWNLOAD, "Koleksi Spotify siap dibaca.")
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
     val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error,"SPOTIFY_COLLECTION") }
+    AppLog.error(LogCategory.DOWNLOAD, "Koleksi Spotify gagal dibaca (${details.category}).", detail=details.message)
     val message=error.message?.takeIf { it.isNotBlank() } ?: details.userMessage
     if (_spotifyCollection.value.url == trimmed) {
      _spotifyCollection.value=_spotifyCollection.value.copy(error=message)
@@ -462,10 +471,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      val result=Engine.inspect(getApplication(),url,id) { phase -> inspectionState.phase(id,phase) }
      withContext(Dispatchers.IO) { runCatching { inspectionCache.write(url,result) } }
      inspectionState.video(id,result)
+     AppLog.info(LogCategory.DOWNLOAD, "Pemeriksaan tautan video selesai.")
     }
     catch(cancelled: CancellationException) { throw cancelled }
     catch(error: Exception) {
      val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "INSPECTION") }
+     AppLog.error(LogCategory.DOWNLOAD, "Pemeriksaan tautan video gagal (${details.category}).", detail=details.message)
      val message=inspectErrorMessage(url,details)
      if (inspectionState.fail(id,message,details)) _error.value=message
     }
@@ -495,10 +506,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      else Selection.collectionFolder(result, seed)
     }
     inspectionState.playlist(id,result.copy(folderName=folder, seedMetadata=seed))
+    AppLog.info(LogCategory.DOWNLOAD, "Pemeriksaan playlist selesai: ${result.entries.size} entri.")
    }
    catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) {
     val details=withContext(Dispatchers.IO) { FailureDetailsStore(getApplication()).capture(error, "PLAYLIST_INSPECTION") }
+    AppLog.error(LogCategory.DOWNLOAD, "Pemeriksaan playlist gagal (${details.category}).", detail=details.message)
     val message=inspectErrorMessage(url,details)
     if (inspectionState.fail(id,message,details)) _error.value=message
    }
@@ -560,8 +573,12 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     if (skipped > 0) append(" $skipped dilewati.")
     if (premiumSkipped > 0) append(" $premiumSkipped Premium terkunci — masuk ke Bstation dulu.")
    }
+   AppLog.info(LogCategory.DOWNLOAD, "Antrean playlist diproses: $queued diantrekan, $skipped dilewati, $premiumSkipped Premium terkunci.")
    } catch(cancelled: CancellationException) { throw cancelled }
-   catch(error: Exception) { _error.value=userMessage(error) }
+   catch(error: Exception) {
+    AppLog.error(LogCategory.DOWNLOAD, "Playlist gagal diantrekan.", error)
+    _error.value=userMessage(error)
+   }
    finally { submitting=false }
  } }
  @Volatile private var submitting=false
@@ -574,7 +591,10 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
    viewModelScope.launch {
      try { submit(options, onQueued = onQueued) }
      catch(cancelled: CancellationException) { throw cancelled }
-     catch(error: Exception) { _error.value=userMessage(error, "Unduhan belum dapat diantrekan. Coba lagi.") }
+     catch(error: Exception) {
+       AppLog.error(LogCategory.DOWNLOAD, "Unduhan gagal dimasukkan ke antrean.", error)
+       _error.value=userMessage(error, "Unduhan belum dapat diantrekan. Coba lagi.")
+     }
      finally { submitting=false }
    }
  }
@@ -595,6 +615,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
      queued == 0 -> "$skipped unduhan tidak dapat diantrekan ulang."
      else -> "$queued unduhan diantrekan ulang." + if(skipped > 0) " $skipped dilewati." else ""
     }
+    AppLog.info(LogCategory.DOWNLOAD, "Coba lagi massal selesai: $queued diantrekan, $skipped dilewati.")
    } catch(cancelled: CancellationException) { throw cancelled }
    catch(error: Exception) { _error.value=userMessage(error) }
    finally { submitting=false }
@@ -636,7 +657,11 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
   val request=OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(workDataOf("jobId" to id, "generation" to (dao.get(id)?.generation ?: -1))).setConstraints(DownloadPolicy.constraints(SettingsStore.downloadWifiOnly, SettingsStore.downloadChargingOnly)).addTag(id).build()
   try { withContext(Dispatchers.IO) { work.enqueueUniqueWork("download-$id",policy,request).result.get() } }
   catch(cancelled: CancellationException) { throw cancelled }
-  catch(error: Exception) { dao.fail(id,failMessage); throw error }
+  catch(error: Exception) {
+   AppLog.error(LogCategory.DOWNLOAD, failMessage, error)
+   dao.fail(id,failMessage)
+   throw error
+  }
  }
  /**
   * Ganti jadwal job QUEUED dengan syarat terbaru. Generasi dinaikkan lebih dulu supaya worker lama
