@@ -1181,7 +1181,21 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         return builder.build()
     }
 
-    private fun playbackError(error: PlaybackException): String = when (error.errorCode) {
+    private fun playbackError(error: PlaybackException): String {
+        // MediaStore pada Android 10-11 melempar IllegalArgumentException("Failed to determine if … is
+        // child of …") ketika berkasnya sudah dihapus, dan ExoPlayer membungkusnya sebagai
+        // ERROR_CODE_IO_UNSPECIFIED. Pesan generik menyembunyikan penyebab yang sebenarnya.
+        var cause: Throwable? = error.cause
+        while (cause != null) {
+            if (cause is java.io.FileNotFoundException) {
+                return "File video tidak ditemukan. Mungkin sudah dipindah atau dihapus."
+            }
+            cause = cause.cause
+        }
+        return errorMessage(error)
+    }
+
+    private fun errorMessage(error: PlaybackException): String = when (error.errorCode) {
         PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
             "File video tidak ditemukan. Mungkin sudah dipindah atau dihapus."
         PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->

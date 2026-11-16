@@ -51,6 +51,8 @@ class MainActivity : ComponentActivity() {
             navigation.value = AppNavigationRequest(it)
         }
         SettingsStore.load(this)
+        // Filter interupsi yang tertinggal karena proses berhenti saat video masih diputar.
+        id.local.tubeflow.core.WatchAlerts.restoreLeftover(this)
         BstationAuth.load(this)
         // Sesi YouTube wajib dipulihkan saat aplikasi dibuka. Tanpa ini `YouTubeAuth.session` tetap
         // null sampai ada unduhan/engine yang memicunya, sehingga akun yang sudah login tampak logout

@@ -47,6 +47,17 @@ object SettingsStore {
         PlayerViewModel.active?.setInterruptionResume(enabled)
     }
 
+    /** Tahan notifikasi aplikasi lain selama video penuh lewat filter interupsi (Jangan Ganggu). */
+    var hideAlertsWhileWatching by mutableStateOf(false); private set
+
+    fun setHideAlertsWhileWatching(context: Context, enabled: Boolean) {
+        hideAlertsWhileWatching = enabled
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .edit { putBoolean("hide_alerts_watching", enabled) }
+        // Mematikan pilihan langsung mengembalikan filter bila video masih terbuka.
+        if (!enabled) WatchAlerts.restore(context)
+    }
+
     var storageFolder by mutableStateOf(DEFAULT_FOLDER)
         private set
 
@@ -117,6 +128,7 @@ object SettingsStore {
             ?.takeIf { it in setOf(PlaybackPolicy.SYSTEM, PlaybackPolicy.ON, PlaybackPolicy.OFF) } ?: PlaybackPolicy.SYSTEM
         PlaybackPower.initialize(context)
         resumeAfterInterruption = prefs.getBoolean("resume_interruption", true)
+        hideAlertsWhileWatching = prefs.getBoolean("hide_alerts_watching", false)
         autoRename = prefs.getBoolean("smart_rename", true)
         autoTag = prefs.getBoolean("smart_tag", true)
         autoArtwork = prefs.getBoolean("smart_artwork", true)

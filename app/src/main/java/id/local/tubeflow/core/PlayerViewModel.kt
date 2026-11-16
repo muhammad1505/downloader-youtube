@@ -21,6 +21,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         const val FOCUS_RETRY_MS = 700L
         const val ACTION_BT_HEADSET = "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED"
         const val ACTION_BT_A2DP = "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"
+        /** Batas tunggu pemulihan sesi jeda agar permintaan auto-play tidak dibuang sia-sia. */
+        private const val RESTORE_SETTLE_MS = 3_000L
+        private const val RESTORE_POLL_MS = 100L
         /** Engine aktif untuk PlaybackService (notifikasi/MediaSession); selalu satu per proses. */
         @Volatile var active: PlayerViewModel? = null
         @Volatile private var built: PlayerViewModel? = null
@@ -191,6 +195,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
             if (addedDevices.any { it.isSink && it.type in AUTOPLAY_OUTPUTS && it.id !in initialOutputs }) {
                 android.util.Log.i("TubeFlow-autoload", "audio output connected")
+                AppLog.info(LogCategory.PLAYER, "Output audio tersambung: auto-play diminta.")
                 PlaybackService.requestAutoPlay(getApplication<Application>())
             }
         }
@@ -201,7 +206,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onReceive(context: Context?, intent: Intent?) {
             android.util.Log.d("TubeFlow-autoload", "runtime connection action=${intent?.action}")
             when (intent?.action) {
-                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && intent.getIntExtra("state", -1) == 1) PlaybackService.requestAutoPlay(getApplication<Application>())
+                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && intent.getIntExtra("state", -1) == 1) {
+                    AppLog.info(LogCategory.PLAYER, "Headset kabel tersambung: auto-play diminta.")
+                    PlaybackService.requestAutoPlay(getApplication<Application>())
+                }
                 ACTION_BT_A2DP, ACTION_BT_HEADSET -> if (intent.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1) ==
                     android.bluetooth.BluetoothProfile.STATE_CONNECTED) PlaybackService.requestAutoPlay(getApplication<Application>())
             }
@@ -209,7 +217,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     /** Called only after PlaybackService has entered the foreground. */
     internal suspend fun resumeForConnectedDevice() {
-        if (_state.value.playing || _state.value.loading) return
+        // Proses baru memulihkan sesi dalam keadaan jeda. Dulu permintaan ini langsung dibuang
+        // ketika state masih "loading", sehingga headset tersambung tanpa suara sama sekali.
+        // Tunggu pemulihan selesai sebentar, lalu putar lagu yang sudah siap.
+        var waited = 0L
+        while (_state.value.loading && waited < RESTORE_SETTLE_MS) {
+            delay(RESTORE_POLL_MS)
+            waited += RESTORE_POLL_MS
+        }
+        val pending = _state.value
+        if (pending.playing || pending.loading) {
+            AppLog.warn(LogCategory.PLAYER, "Auto-play dilewati: " +
+                if (pending.playing) "pemutar sudah memutar." else "pemutar masih memuat sesi.")
+            return
+        }
         val collection = withContext(Dispatchers.IO) {
             DownloadDatabase.get(getApplication()).media().availableAudio().mapNotNull(::trackOf)
         }
@@ -222,6 +243,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 ?: preview.previous?.current ?: lastTrack() else current.track ?: lastTrack()
             comparison = null; _comparing.value = false
             val planned = AutoPlayQueue.plan(collection, last?.uri) { it.uri }
+            AppLog.info(LogCategory.PLAYER, when {
+                collection.isEmpty() -> "Auto-play headset: belum ada audio di Koleksi."
+                planned == null -> "Auto-play headset: antrean tidak dapat disusun."
+                else -> "Auto-play headset: ${planned.first.size} lagu di antrean, mulai dari ${planned.second + 1}."
+            })
             when {
                 planned == null && preview != null -> if (last != null) {
                     load(PlaybackQueue(listOf(last)).withPreferences(shufflePref, repeatPref))

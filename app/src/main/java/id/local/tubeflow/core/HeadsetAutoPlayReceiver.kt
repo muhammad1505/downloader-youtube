@@ -23,6 +23,7 @@ class HeadsetAutoPlayReceiver : BroadcastReceiver() {
         }
         android.util.Log.d("TubeFlow-autoload", "receiver action=${intent?.action} connected=$connected")
         if (!connected) return
+        AppLog.info(LogCategory.PLAYER, "Sambungan perangkat audio diterima: auto-play diminta.")
         PlaybackService.requestAutoPlay(context.applicationContext)
     }
 }

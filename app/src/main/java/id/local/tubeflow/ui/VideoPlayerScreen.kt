@@ -159,7 +159,9 @@ import id.local.tubeflow.core.VideoDecoderMode
 import id.local.tubeflow.core.VideoEnhance
 import id.local.tubeflow.core.VideoEqualizer
 import id.local.tubeflow.core.VideoOrientation
+import id.local.tubeflow.core.SettingsStore
 import id.local.tubeflow.core.VideoPip
+import id.local.tubeflow.core.WatchAlerts
 import id.local.tubeflow.core.VideoPlayback
 import id.local.tubeflow.core.VideoPlayerViewModel
 import id.local.tubeflow.core.VideoRepeat
@@ -421,6 +423,16 @@ fun VideoPlayerScreen(video: VideoPlayerViewModel) {
             activity?.requestedOrientation = originalOrientation
             VideoPip.disableAutoEnter(activity)
         }
+    }
+
+    // Notifikasi aplikasi lain tetap masuk, tetapi tidak boleh melayang di atas film. Filter
+    // interupsi hanya diubah bila pilihan di Pengaturan → Pemutaran aktif dan izinnya tersedia;
+    // filter sebelumnya dipulihkan saat jeda, PiP, atau keluar dari pemutar.
+    val muteAlerts = SettingsStore.hideAlertsWhileWatching
+    DisposableEffect(muteAlerts, state.playing, inPip) {
+        val suppressed = muteAlerts && state.playing && !inPip
+        if (suppressed) WatchAlerts.suppress(context) else WatchAlerts.restore(context)
+        onDispose { if (suppressed) WatchAlerts.restore(context) }
     }
 
     DisposableEffect(lifecycleOwner, activity) {

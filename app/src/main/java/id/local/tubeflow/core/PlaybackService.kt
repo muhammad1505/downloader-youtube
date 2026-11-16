@@ -151,7 +151,10 @@ class PlaybackService : Service() {
                     android.util.Log.w("TubeFlow-autoload", "restore failed: ${error.javaClass.simpleName}")
                     showAutoPlayRetry(this@PlaybackService)
                 } finally {
-                    if (PlayerViewModel.active?.state?.value?.track == null) {
+                    // Jangan menutup foreground saat track masih dimuat: notifikasi dan wake lock
+                    // akan hilang meski musik langsung berbunyi setelah siap.
+                    val latest = PlayerViewModel.active?.state?.value
+                    if (latest?.track == null && latest?.loading != true) {
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
