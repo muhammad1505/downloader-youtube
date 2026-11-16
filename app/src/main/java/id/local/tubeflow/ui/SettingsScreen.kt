@@ -416,7 +416,7 @@ fun SettingsScreen(
                 mutableStateOf(id.local.tubeflow.core.WatchAlerts.canControl(context))
             }
             val alertsOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-            DisposableEffect(alertsOwner) {
+            androidx.compose.runtime.DisposableEffect(alertsOwner) {
                 val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                     if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                         alertsAllowed = id.local.tubeflow.core.WatchAlerts.canControl(context)
