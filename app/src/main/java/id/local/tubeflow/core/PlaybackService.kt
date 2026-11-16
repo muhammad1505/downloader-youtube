@@ -131,13 +131,19 @@ class PlaybackService : Service() {
             PlayerViewModel.hasRestorableSession(this)
         if (intent?.action == ACTION_AUTO_PLAY || restoring) {
             getSystemService(NotificationManager::class.java).cancel(AUTOPLAY_NOTICE_ID)
+            AppLog.info(LogCategory.PLAYER, if (restoring) "Layanan memulihkan sesi terakhir."
+                else "Permintaan auto-play diterima layanan.")
             val state = PlayerViewModel.active?.state?.value
             // Foreground first: no Room query or audio-focus request may precede this point.
             startForeground(NOTIFICATION_ID, if (state?.track != null) build(state) else
                 Notification.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_stat_playback)
                     .setContentTitle(getString(R.string.player_autoplay_prepare))
                     .setContentIntent(AppIntents.pending(this, AppDestination.PLAYER)).setOngoing(true).build())
-            if (autoStart?.isActive != true) autoStart = scope.launch {
+            if (autoStart?.isActive == true) {
+                AppLog.info(LogCategory.PLAYER, "Auto-play diabaikan: permintaan sebelumnya masih berjalan.")
+                return START_STICKY
+            }
+            autoStart = scope.launch {
                 try {
                     withTimeout(10000) {
                         val player = PlayerViewModel.obtain(application)

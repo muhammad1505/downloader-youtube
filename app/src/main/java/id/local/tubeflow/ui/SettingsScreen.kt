@@ -411,7 +411,20 @@ fun SettingsScreen(
                 modifier = Modifier.semantics { contentDescription = resumeLabel },
             )
             HorizontalDivider()
-            val alertsAllowed = id.local.tubeflow.core.WatchAlerts.canControl(context)
+            // Status izin dibaca ulang saat layar kembali aktif: pengguna memberikannya di setelan sistem.
+            var alertsAllowed by remember {
+                mutableStateOf(id.local.tubeflow.core.WatchAlerts.canControl(context))
+            }
+            val alertsOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+            DisposableEffect(alertsOwner) {
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                        alertsAllowed = id.local.tubeflow.core.WatchAlerts.canControl(context)
+                    }
+                }
+                alertsOwner.lifecycle.addObserver(observer)
+                onDispose { alertsOwner.lifecycle.removeObserver(observer) }
+            }
             ToggleRow(
                 title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.watch_alerts_title),
                 description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.watch_alerts_description),

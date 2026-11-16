@@ -193,9 +193,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Headset/TWS baru tersambung: musik yang sedang berhenti dilanjutkan otomatis tanpa sentuhan layar. */
     private val devices = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
-            if (addedDevices.any { it.isSink && it.type in AUTOPLAY_OUTPUTS && it.id !in initialOutputs }) {
+            val added = addedDevices.filter { it.isSink && it.type in AUTOPLAY_OUTPUTS && it.id !in initialOutputs }
+            if (added.isNotEmpty()) {
                 android.util.Log.i("TubeFlow-autoload", "audio output connected")
-                AppLog.info(LogCategory.PLAYER, "Output audio tersambung: auto-play diminta.")
+                AppLog.info(LogCategory.PLAYER,
+                    "Output audio tersambung (tipe ${added.joinToString { it.type.toString() }}): auto-play diminta.")
                 PlaybackService.requestAutoPlay(getApplication<Application>())
             }
         }
@@ -204,39 +206,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Pemicu cadangan: sebagian perangkat lebih cepat melaporkan aksi headset/Bluetooth daripada AudioDeviceCallback. */
     private val devicePlug = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            android.util.Log.d("TubeFlow-autoload", "runtime connection action=${intent?.action}")
-            when (intent?.action) {
-                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && intent.getIntExtra("state", -1) == 1) {
+            val action = intent?.action
+            val plugState = intent?.getIntExtra("state", -1) ?: -1
+            val profileState = intent?.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1) ?: -1
+            android.util.Log.d("TubeFlow-autoload", "runtime connection action=$action state=$plugState/$profileState sticky=$isInitialStickyBroadcast")
+            AppLog.info(LogCategory.PLAYER,
+                "Broadcast sambungan $action (state=$plugState/$profileState, sticky=$isInitialStickyBroadcast).")
+            when (action) {
+                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && plugState == 1) {
                     AppLog.info(LogCategory.PLAYER, "Headset kabel tersambung: auto-play diminta.")
                     PlaybackService.requestAutoPlay(getApplication<Application>())
                 }
-                ACTION_BT_A2DP, ACTION_BT_HEADSET -> if (intent.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1) ==
-                    android.bluetooth.BluetoothProfile.STATE_CONNECTED) PlaybackService.requestAutoPlay(getApplication<Application>())
+                ACTION_BT_A2DP, ACTION_BT_HEADSET -> if (profileState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+                    AppLog.info(LogCategory.PLAYER, "Bluetooth tersambung: auto-play diminta.")
+                    PlaybackService.requestAutoPlay(getApplication<Application>())
+                }
             }
         }
     }
     /** Called only after PlaybackService has entered the foreground. */
     internal suspend fun resumeForConnectedDevice() {
-        // Proses baru memulihkan sesi dalam keadaan jeda. Dulu permintaan ini langsung dibuang
-        // ketika state masih "loading", sehingga headset tersambung tanpa suara sama sekali.
-        // Tunggu pemulihan selesai sebentar, lalu putar lagu yang sudah siap.
-        var waited = 0L
-        while (_state.value.loading && waited < RESTORE_SETTLE_MS) {
-            delay(RESTORE_POLL_MS)
-            waited += RESTORE_POLL_MS
-        }
-        val pending = _state.value
-        if (pending.playing || pending.loading) {
-            AppLog.warn(LogCategory.PLAYER, "Auto-play dilewati: " +
-                if (pending.playing) "pemutar sudah memutar." else "pemutar masih memuat sesi.")
+        if (_state.value.playing) {
+            AppLog.info(LogCategory.PLAYER, "Auto-play dilewati: pemutar sudah memutar.")
             return
         }
         val collection = withContext(Dispatchers.IO) {
             DownloadDatabase.get(getApplication()).media().availableAudio().mapNotNull(::trackOf)
         }
-        withContext(engineDispatcher) {
+        // Proses baru memulihkan sesi dalam keadaan jeda, dan pemulihan itu bisa selesai di tengah
+        // perencanaan. Satu pemeriksaan saja pernah membuang permintaan headset; perencanaan kini
+        // diulang sampai pemulihan selesai atau batas tunggu habis.
+        var waited = 0L
+        while (!tryResumeForConnectedDevice(collection)) {
+            if (waited >= RESTORE_SETTLE_MS) {
+                AppLog.warn(LogCategory.PLAYER,
+                    "Auto-play dilewati: sesi masih dipulihkan setelah ${RESTORE_SETTLE_MS} ms.")
+                return
+            }
+            delay(RESTORE_POLL_MS)
+            waited += RESTORE_POLL_MS
+        }
+    }
+
+    /**
+     * Satu percobaan perencanaan antrean. `false` berarti pemulihan sesi masih berjalan dan pemanggil
+     * mengulanginya; `true` berarti permintaan sudah ditangani atau memang tidak ada yang diputar.
+     */
+    private suspend fun tryResumeForConnectedDevice(collection: List<Track>): Boolean = withContext(engineDispatcher) {
             val current = _state.value
-            if (current.playing || current.loading) return@withContext
+            if (current.playing) return@withContext true
+            if (current.loading) return@withContext false
             // A fresh headset connection returns to public playback, never a looping private preview.
             val preview = comparison
             val last = if (preview != null) collection.firstOrNull { it.uri == preview.source }
@@ -266,7 +285,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     startPositionMs = if (preview != null && current.track?.uri == preview.instrumental && last?.uri == preview.source)
                         KaraokeComparison.target(current.positionMs, true, false, preview.startMs, preview.durationMs) else 0)
             }
-        }
+            true
     }
 
     /**

@@ -32,6 +32,14 @@ class PlaybackReceiversTest(unittest.TestCase):
         self.assertEqual('false', service.get(ANDROID + 'exported'))
         self.assertEqual('mediaPlayback', service.get(ANDROID + 'foregroundServiceType'))
 
+    def test_battery_and_notification_policy_permissions_are_declared(self):
+        # Tanpa ACCESS_NOTIFICATION_POLICY aplikasi tidak muncul di daftar akses Jangan Ganggu
+        # sehingga opsi menahan notifikasi saat menonton tidak pernah bisa aktif.
+        manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
+        permissions = {p.get(ANDROID + 'name') for p in manifest.findall('uses-permission')}
+        self.assertIn('android.permission.ACCESS_NOTIFICATION_POLICY', permissions)
+        self.assertIn('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', permissions)
+
     def test_connection_permissions_cover_old_and_new_bluetooth_without_discovery(self):
         manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
         permissions = {p.get(ANDROID + 'name'): p for p in manifest.findall('uses-permission')}

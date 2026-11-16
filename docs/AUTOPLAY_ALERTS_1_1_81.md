@@ -114,3 +114,27 @@ otomatis; pengguna tetap dapat memindai ulang atau menghapusnya dari Koleksi.
   Android/OEM; pengecualian baterai hanya mengurangi kemungkinan proses dihentikan.
 - Pemetaan galat berkas hilang hanya diuji lewat pembacaan rantai `cause` pada kode; belum ada
   reproduksi perangkat pada 1.1.81.
+
+## 9. Perbaikan susulan setelah 1.1.81 terpasang
+
+Dua laporan pengguna pada APK rilis 1.1.81:
+
+1. **TubeFlow tidak ada di daftar akses Jangan Ganggu.** Manifest belum mendeklarasikan
+   `android.permission.ACCESS_NOTIFICATION_POLICY`. Tanpa izin itu Android tidak menampilkan
+   aplikasi di daftar akses Jangan Ganggu dan `isNotificationPolicyAccessGranted` selalu false,
+   sehingga opsi tahan notifikasi tidak pernah bisa aktif. Perbaikan: izin ditambahkan beserta
+   komentar alasannya, status izin di Pengaturan dibaca ulang pada `ON_RESUME`, dan
+   `scripts/test_playback_receivers.py` memeriksa izin Jangan Ganggu serta baterai.
+2. **Headset kabel tetap tidak auto-play.** Selain batas platform (proses mati tidak menerima
+   `ACTION_HEADSET_PLUG`), perencanaan antrean masih punya satu jalur keluar tanpa percobaan
+   ulang: pemeriksaan `loading` di dalam `withContext(engineDispatcher)`. Bila pemulihan sesi baru
+   dimulai setelah batas tunggu pertama, permintaan hilang lagi. Perbaikan: perencanaan dipindah
+   ke `tryResumeForConnectedDevice()` yang mengembalikan `false` selama sesi masih dipulihkan,
+   diulang tiap 100 ms sampai 3 detik, dengan koleksi dibaca sekali di awal. Setiap broadcast
+   sambungan kini dicatat dengan `action`, `state` plug/profil, dan `sticky`, dan `PlaybackService`
+   mencatat permintaan yang diterima maupun yang diabaikan karena permintaan sebelumnya masih
+   berjalan. Log itu yang membedakan proses mati (broadcast tidak sampai) dari permintaan yang
+   sampai tetapi sesi masih dipulihkan.
+
+Kedua perbaikan ini belum masuk ke APK 1.1.81 yang sudah dipublikasikan; keduanya perlu rilis
+berikutnya (mis. 1.1.82) agar sampai ke perangkat.

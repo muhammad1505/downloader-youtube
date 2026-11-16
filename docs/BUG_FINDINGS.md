@@ -45,6 +45,8 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-101 | Tidak ada jejak auto-play pada log pengguna karena jalur ini hanya memakai `android.util.Log`. 1.1.81 menulis pemicu sambungan dan hasil perencanaan antrean ke Log aplikasi kategori Pemutar. |
 | BUG-102 | Notifikasi aplikasi lain melayang di atas pemutar video penuh. 1.1.81 menyediakan opsi Jangan Ganggu yang menahan heads-up/bunyi, mempertahankan notifikasi di panel, dan memulihkan filter sebelumnya saat jeda/PiP/keluar serta setelah proses mati. Butuh izin kebijakan notifikasi dan default mati. |
 | BUG-103 | Berkas video yang sudah dihapus berhenti dengan `ERROR_CODE_IO_UNSPECIFIED` dan pesan umum karena MediaStore Android 10 membungkus `FileNotFoundException`. 1.1.81 menelusuri rantai `cause` dan menampilkan pesan file hilang. |
+| BUG-104 | TubeFlow tidak muncul di daftar akses Jangan Ganggu Android karena `ACCESS_NOTIFICATION_POLICY` belum dideklarasikan di manifest, sehingga `isNotificationPolicyAccessGranted` selalu false dan opsi tahan notifikasi tidak pernah bekerja pada APK 1.1.81. Diperbaiki setelah rilis: izin ditambahkan, status di Pengaturan dibaca ulang saat layar kembali aktif, dan regresi host memeriksa manifest. |
+| BUG-105 | Auto-play headset kabel masih bisa hilang karena pemeriksaan `loading` kedua di dalam perencanaan (`withContext(engineDispatcher)`) kembali tanpa percobaan ulang, saat pemulihan sesi baru dimulai setelah batas tunggu awal. Perencanaan kini diulang (poll 100 ms, maksimal 3 detik) dan setiap broadcast sambungan dicatat beserta `action`/`state`/`sticky`. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan

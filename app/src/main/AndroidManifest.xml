@@ -8,6 +8,9 @@
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
  <!-- Auto-play headset butuh proses yang boleh dibangunkan; tombolnya hanya membuka dialog sistem. -->
  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+ <!-- Tanpa izin ini TubeFlow tidak muncul di daftar akses Jangan Ganggu Android dan
+      isNotificationPolicyAccessGranted selalu false, sehingga opsi tahan notifikasi tidak bekerja. -->
+ <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
  <!-- Gesturvolume sisi kanan pemutar video mengubah volume musik sistem. -->
  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
