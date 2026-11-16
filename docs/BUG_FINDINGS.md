@@ -6,7 +6,15 @@ Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, 
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
-## Status aktual — 11 November 2026
+## Status aktual — 16 November 2026
+
+Kandidat **1.1.81/code96** memperbaiki auto-play sambungan headset yang hilang saat sesi baru
+dipulihkan, menambahkan jejak auto-play di Log aplikasi, menyediakan opsi menahan notifikasi
+melayang selama video penuh, menambahkan status pengecualian baterai, dan membuat galat IO berkas
+hilang menyebut penyebabnya. Bukti host dan batas perangkat ada di [PROGRESS](PROGRESS.md) serta
+[laporan 1.1.81](AUTOPLAY_ALERTS_1_1_81.md).
+
+## Status sebelumnya — 11 November 2026
 
 Kandidat **1.1.79/code94** mengganti mode rasio video dengan empat pilihan ala
 MX Player, memperbaiki unduhan Instagram portrait, mengembalikan lirik ke awal
@@ -33,6 +41,10 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-097 | Posisi gulir lirik terbawa saat lagu berganti. 1.1.79 mengunci state daftar per `track.uri` dan langsung menggulir ke baris awal. |
 | BUG-098 | Panel antrean video terlalu lebar di lanskap dan judul terpotong dua baris. 1.1.79 membatasi panel 320 dp serta memakai judul satu baris berjalan (marquee). |
 | BUG-099 | Indikator buffer bisa berputar tanpa batas saat ExoPlayer bertahan di `STATE_BUFFERING` tanpa error. 1.1.79 menambahkan watchdog 12 detik dengan maksimal dua pemulihan otomatis, lalu berhenti dengan pesan galat. |
+| BUG-100 | Auto-play headset dibuang saat proses baru memulihkan sesi jeda: `resumeForConnectedDevice` kembali lebih awal karena `state.loading`, tanpa percobaan ulang, dan service menutup foreground. 1.1.81 menunggu pemulihan selesai maksimal 3 detik sebelum merencanakan antrean. |
+| BUG-101 | Tidak ada jejak auto-play pada log pengguna karena jalur ini hanya memakai `android.util.Log`. 1.1.81 menulis pemicu sambungan dan hasil perencanaan antrean ke Log aplikasi kategori Pemutar. |
+| BUG-102 | Notifikasi aplikasi lain melayang di atas pemutar video penuh. 1.1.81 menyediakan opsi Jangan Ganggu yang menahan heads-up/bunyi, mempertahankan notifikasi di panel, dan memulihkan filter sebelumnya saat jeda/PiP/keluar serta setelah proses mati. Butuh izin kebijakan notifikasi dan default mati. |
+| BUG-103 | Berkas video yang sudah dihapus berhenti dengan `ERROR_CODE_IO_UNSPECIFIED` dan pesan umum karena MediaStore Android 10 membungkus `FileNotFoundException`. 1.1.81 menelusuri rantai `cause` dan menampilkan pesan file hilang. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan

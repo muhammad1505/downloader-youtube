@@ -1,6 +1,49 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 11 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 16 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Auto-play headset, notifikasi saat menonton, dan pengecualian baterai — 1.1.81/code96, 16 November 2026
+
+Keluhan pengguna dari log 1.1.80/code95 (Realme RMX1821, Android 10, 117 catatan): auto-play
+kadang terlambat atau tidak jalan pada headset (TWS dan speaker Bluetooth lancar), notifikasi
+melayang di atas film, dan pertanyaan apakah perlu menu pengecualian baterai. Versi dinaikkan ke
+**1.1.81/code96** dan changelog memuat lima sorotan.
+
+- **Akar auto-play yang hilang.** `PlayerViewModel.resumeForConnectedDevice()` langsung `return`
+  bila `state.loading` benar. Pada proses baru, `init` menjalankan `restorePlaybackSession()`
+  (state jeda) tepat saat permintaan headset tiba, sehingga permintaan dibuang tanpa percobaan
+  ulang dan `PlaybackService` menutup foreground karena `track` masih null. Perbaikan: tunggu
+  `loading` selesai maksimal 3 detik (poll 100 ms) sebelum merencanakan antrean, dan `finally`
+  service tidak lagi menutup foreground selama track masih dimuat.
+- **TWS versus kabel.** Bluetooth punya jalur receiver manifest
+  (`BluetoothA2dp.CONNECTION_STATE_CHANGED`, dikecualikan dari batas implicit broadcast) sehingga
+  dapat membangunkan proses mati; `ACTION_HEADSET_PLUG` kabel hanya sampai ke receiver runtime.
+  Batas platform itu tidak berubah pada 1.1.81; yang berubah adalah permintaan yang sudah masuk
+  tidak lagi dibuang.
+- **Log auto-play.** `AudioDeviceCallback`, receiver runtime, dan `HeadsetAutoPlayReceiver`
+  menulis `AppLog` kategori Pemutar; perencanaan antrean mencatat jumlah lagu, posisi mulai,
+  koleksi kosong, atau alasan dilewati. Sebelumnya hanya `android.util.Log` bertag
+  `TubeFlow-autoload` yang tidak ikut ekspor log pengguna, sehingga laporan tidak dapat diperiksa.
+- **Notifikasi di atas video.** Tanpa izin kebijakan notifikasi, heads-up aplikasi lain tidak dapat
+  ditahan. `WatchAlerts` menyimpan `currentInterruptionFilter` sekali, memasang
+  `INTERRUPTION_FILTER_PRIORITY` selama video penuh diputar, dan mengembalikannya saat jeda, PiP,
+  atau keluar; `MainActivity` memulihkan filter yang tertinggal bila proses berhenti saat
+  menonton. `hide_alerts_watching` default mati dan menyalakannya membuka halaman akses Jangan
+  Ganggu bila izin belum ada.
+- **Pengecualian baterai.** `BatteryExemption` membaca `isIgnoringBatteryOptimizations` dan membuka
+  dialog `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (izin manifest ditambahkan), dengan fallback
+  daftar pengaturan baterai lalu detail aplikasi. Status dibaca ulang pada `ON_RESUME`.
+- **Galat video berkas hilang.** `playbackError` kini menelusuri rantai `cause`: MediaStore Android
+  10 membungkus `FileNotFoundException` sebagai `IllegalArgumentException` yang dipetakan ExoPlayer
+  ke `ERROR_CODE_IO_UNSPECIFIED`, sehingga berkas yang sudah dihapus dulu berhenti dengan pesan
+  generik. Pesannya sekarang menyebut file yang hilang.
+- **Verifikasi.** CI **Android tests** lulus untuk commit kode `7f793c5` (unit test Kotlin termasuk
+  `AppChangelogTest`, `lintRelease`, verifikasi aset engine, tes host Python). Build lokal tidak
+  dapat diselesaikan di host ini: `app/libs/ffmpeg-0.18.1-webp16k.aar` belum dibangun dan
+  NDK/CMake tidak terpasang.
+- **Batas.** Belum ada uji perangkat 1.1.81: perilaku Jangan Ganggu beserta pemulihan filter,
+  auto-play headset kabel/TWS fisik, dan skenario proses dihentikan OEM belum diukur. Rincian di
+  [laporan 1.1.81](AUTOPLAY_ALERTS_1_1_81.md).
 
 ## Empat mode rasio, Instagram, lirik, panel antrean, dan watchdog buffer — 1.1.79/code94, 11 November 2026
 

@@ -1,5 +1,16 @@
 [
   {
+    "versionCode": 96,
+    "versionName": "1.1.81",
+    "highlights": [
+      "Auto-play headset kabel/TWS tidak lagi dibuang saat aplikasi baru dibuka: permintaan menunggu pemulihan sesi jeda selesai sebelum memutar lagu terakhir.",
+      "Sambungan headset, output audio, dan hasil perencanaan antrean auto-play kini tercatat di Pengaturan → Log aplikasi, jadi penyebab musik tidak berbunyi bisa dilacak.",
+      "Notifikasi aplikasi lain tidak lagi melayang di atas film: pilihan opsional di Pengaturan → Pemutaran memakai Jangan Ganggu, notifikasi tetap masuk ke panel, dan setelan lama dipulihkan setelah menonton.",
+      "Pengaturan → Pemutaran menampilkan status pengecualian baterai beserta tombol dialog sistemnya, karena penghemat baterai HP sering menghentikan proses sehingga auto-play headset tertunda.",
+      "Video yang berkasnya sudah dihapus tidak lagi berhenti dengan galat IO umum: MediaStore Android 10–11 membungkus FileNotFoundException, dan pesannya kini menyebut file yang hilang."
+    ]
+  },
+  {
     "versionCode": 95,
     "versionName": "1.1.80",
     "highlights": [
