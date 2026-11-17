@@ -52,7 +52,6 @@ import id.local.tubeflow.core.PlaylistEntry
 import id.local.tubeflow.core.PlaylistMetadata
 import id.local.tubeflow.core.Selection
 import id.local.tubeflow.core.SettingsStore
-import id.local.tubeflow.core.SourcePlatform
 import id.local.tubeflow.core.SourcePlatforms
 import id.local.tubeflow.core.Spotify
 import id.local.tubeflow.core.SpotifyCandidate

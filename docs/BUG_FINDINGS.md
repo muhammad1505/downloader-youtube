@@ -6,7 +6,16 @@ Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, 
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
-## Status aktual — 16 November 2026
+## Status aktual — 18 November 2026
+
+Kandidat **1.1.82/code97** menggabungkan tiga perbaikan yang belum masuk APK 1.1.81: hapus folder
+Koleksi kini menghapus direktorinya setelah berkas dan subfolder dibersihkan (BUG-106), izin
+`ACCESS_NOTIFICATION_POLICY` membuat TubeFlow muncul lagi di daftar akses Jangan Ganggu (BUG-104),
+dan auto-play headset kabel diulang sampai sesi selesai dipulihkan (BUG-105). Gate rilis
+diserahkan ke CI pada tag `v1.1.82`; build rilis lokal tidak dijalankan. Bukti host dan emulator
+ada di [PROGRESS](PROGRESS.md), [DEVICE_TEST](DEVICE_TEST.md), serta [laporan 1.1.82](RELEASE_1_1_82.md).
+
+## Status sebelumnya — 16 November 2026
 
 Kandidat **1.1.81/code96** memperbaiki auto-play sambungan headset yang hilang saat sesi baru
 dipulihkan, menambahkan jejak auto-play di Log aplikasi, menyediakan opsi menahan notifikasi
@@ -47,6 +56,7 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-103 | Berkas video yang sudah dihapus berhenti dengan `ERROR_CODE_IO_UNSPECIFIED` dan pesan umum karena MediaStore Android 10 membungkus `FileNotFoundException`. 1.1.81 menelusuri rantai `cause` dan menampilkan pesan file hilang. |
 | BUG-104 | TubeFlow tidak muncul di daftar akses Jangan Ganggu Android karena `ACCESS_NOTIFICATION_POLICY` belum dideklarasikan di manifest, sehingga `isNotificationPolicyAccessGranted` selalu false dan opsi tahan notifikasi tidak pernah bekerja pada APK 1.1.81. Diperbaiki setelah rilis: izin ditambahkan, status di Pengaturan dibaca ulang saat layar kembali aktif, dan regresi host memeriksa manifest. |
 | BUG-105 | Auto-play headset kabel masih bisa hilang karena pemeriksaan `loading` kedua di dalam perencanaan (`withContext(engineDispatcher)`) kembali tanpa percobaan ulang, saat pemulihan sesi baru dimulai setelah batas tunggu awal. Perencanaan kini diulang (poll 100 ms, maksimal 3 detik) dan setiap broadcast sambungan dicatat beserta `action`/`state`/`sticky`. |
+| BUG-106 | Hapus folder di Koleksi hanya menghapus berkas sehingga direktori kosong tertinggal di penyimpanan. 18 Nov: `deleteFolder` kini menghapus berkas folder beserta subfoldernya, lalu menghapus direktori lewat grant SAF bila ada izin tulis dan direktorinya terbukti tidak berisi berkas lain. Uji host dan emulator Pixel 4 (Android 10) lulus; lihat [DEVICE_TEST](DEVICE_TEST.md). |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
@@ -1257,3 +1267,27 @@ video 848×480 diputar dari posisi 6:45 selama 15 detik tanpa satu pun log
 `macet`, jadi watchdog tidak menghasilkan false positive pada pemutaran normal.
 Stall nyata belum berhasil direproduksi; jalur pemulihan otomatis baru terbukti
 lewat logika host, bukan kejadian buffer nyata.
+
+## BUG-106 — P2: Hapus folder Koleksi meninggalkan direktori kosong
+
+Dilaporkan 18 November 2026. Menghapus folder dari Koleksi menghapus semua
+berkasnya, tetapi direktorinya tetap ada di penyimpanan; pesan hasil bahkan
+menyebut "Folder fisik tidak dihapus". Penyebabnya bukan kegagalan provider:
+`MediaLibraryViewModel.deleteFolder` hanya memanggil `repository.delete` per
+berkas dan tidak pernah menyentuh direktori.
+
+Perbaikan: `MediaRepository.deleteFolder` menghapus berkas di folder itu dan
+seluruh subfoldernya, lalu memetakan folder katalog ke direktori sumber SAF lewat
+`FolderDelete` (label sumber + jalur relatif, tanpa menebak dari URI berkas
+pertama). Direktori hanya dihapus bila ada grant tulis dan isinya terbukti tidak
+berisi berkas; subfolder kosong dibersihkan bottom-up, sedangkan berkas yang
+tidak terindeks TubeFlow membuat direktori dipertahankan dan pengguna diberi
+alasan yang jelas. Akar sumber koleksi dan folder dengan unduhan berjalan tetap
+ditolak. Regresi: `FolderDeleteTest`.
+
+Status host: tes Kotlin dan kompilasi debug lulus. Uji emulator Pixel 4 (Android
+10/API 29) lulus untuk folder SAF bertulis, folder bertingkat, dan folder
+MediaStore tanpa grant — direktori benar-benar hilang pada dua kasus pertama,
+sedangkan kasus ketiga mempertahankan direktori dengan pesan yang jujur. Provider
+selain external storage, folder baca-saja, berkas non-media di dalam folder, dan
+unduhan berjalan belum diuji. Rincian: [DEVICE_TEST](DEVICE_TEST.md).

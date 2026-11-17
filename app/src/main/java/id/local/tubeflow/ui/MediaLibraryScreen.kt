@@ -1,19 +1,18 @@
 package id.local.tubeflow.ui
 
-import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -172,7 +171,7 @@ fun MediaLibraryScreen(
                 icon = if (searchOpen) Icons.Outlined.Close else Icons.Outlined.Search,
             )
             if (filter.kind != "VIDEO") {
-                ActionChip(stringResource(R.string.library_manage_playlists), { managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd)
+                ActionChip(stringResource(R.string.library_manage_playlists), { managePlaylists = true }, icon = Icons.AutoMirrored.Outlined.PlaylistAdd)
             }
         } }
         openError?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
@@ -366,13 +365,13 @@ fun MediaLibraryScreen(
     )
     if (managePlaylists) PersonalPlaylistDialog(model) { managePlaylists = false }
     addPlaylist?.let { selected -> AlertDialog(onDismissRequest = { addPlaylist = null },
-        title = { DialogTitle(stringResource(R.string.library_add_playlist), icon = Icons.Outlined.PlaylistAdd, subtitle = selected.title) }, text = {
+        title = { DialogTitle(stringResource(R.string.library_add_playlist), icon = Icons.AutoMirrored.Outlined.PlaylistAdd, subtitle = selected.title) }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(selected.title)
                 playlists.filter { it.id != PersonalLibrary.FAVORITES }.forEach { entry ->
                     ActionButton(entry.name, { model.addToPlaylist(selected, entry.id); addPlaylist = null }, fillWidth = true)
                 }
-                ActionButton(stringResource(R.string.library_create_playlist), { addPlaylist = null; managePlaylists = true }, icon = Icons.Outlined.PlaylistAdd, emphasis = ActionEmphasis.Quiet)
+                ActionButton(stringResource(R.string.library_create_playlist), { addPlaylist = null; managePlaylists = true }, icon = Icons.AutoMirrored.Outlined.PlaylistAdd, emphasis = ActionEmphasis.Quiet)
             }
         }, confirmButton = { TextButton(onClick = { addPlaylist = null }) { Text(stringResource(R.string.action_cancel)) } }) }
     detail?.let { item -> AlertDialog(onDismissRequest = { detail = null }, title = { DialogTitle("Detail media", icon = Icons.Outlined.Info) }, text = {
@@ -472,7 +471,7 @@ fun MediaLibraryScreen(
                         folderMenu = null
                         folderRename = folder
                     }
-                    FolderMenuAction(Icons.Outlined.DeleteForever, "Hapus isi folder", destructive = true) {
+                    FolderMenuAction(Icons.Outlined.DeleteForever, "Hapus folder", destructive = true) {
                         folderMenu = null
                         folderDelete = folder
                     }
@@ -558,9 +557,9 @@ fun MediaLibraryScreen(
     folderDelete?.let { folder ->
         val label = FolderAliases.label(folder, folderAliases)
         ConfirmDialog(
-            title = "Hapus isi folder?",
-            text = "Semua file tersedia di \"$label\" (termasuk lirik dan thumbnail terkait) akan dihapus permanen. Folder fisik dan nama folder di penyimpanan tetap ada.",
-            confirmLabel = "Hapus isi",
+            title = "Hapus folder?",
+            text = "Semua file tersedia di \"$label\" dan subfoldernya (termasuk lirik serta thumbnail terkait) akan dihapus permanen. Foldernya ikut dihapus dari penyimpanan bila TubeFlow memiliki izin tulis; bila tidak, hanya berkasnya yang dihapus.",
+            confirmLabel = "Hapus folder",
             onConfirm = { model.deleteFolder(folder); folderDelete = null },
             onDismiss = { folderDelete = null },
             destructive = true,
@@ -573,7 +572,7 @@ private fun FolderSectionHeading(count: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SectionBanner("Daftar folder", icon = Icons.Outlined.Folder, trailing = "$count folder")
         Text(
-            "Tekan lama folder untuk detail, ganti nama folder, atau hapus isinya.",
+            "Tekan lama folder untuk detail, ganti nama folder, atau menghapusnya.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -582,7 +581,7 @@ private fun FolderSectionHeading(count: Int) {
 
 /**
  * Folder menampilkan ikon, nama tampilan, letak, dan jumlah file — tanpa kartu dan tanpa panah.
- * Ketuk membuka folder; tekan lama membuka aksi folder (detail, nama tampilan, hapus isi).
+ * Ketuk membuka folder; tekan lama membuka aksi folder (detail, nama tampilan, hapus folder).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

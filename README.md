@@ -48,7 +48,7 @@ Auto memilih format sumber/kualitas tersedia. Bitrate manual dengan format audio
 
 ## Build
 
-JDK 17, Android SDK 37, Build Tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1. Gradle wrapper memakai 9.8.1 dengan AGP 9.1.1, Kotlin bawaan AGP, dan Compose compiler 2.4.21. FFmpeg AAR lokal merupakan artefak build (135 MB), tidak disimpan dalam Git. Untuk checkout baru, bangun payload dengan source WebP yang sudah dipin dan diaudit:
+JDK 17, Android SDK 37, Build Tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1. Gradle wrapper memakai 9.8.1 dengan AGP 9.5.1, Kotlin bawaan AGP, dan Compose compiler 2.4.21. FFmpeg AAR lokal merupakan artefak build (135 MB), tidak disimpan dalam Git. Untuk checkout baru, bangun payload dengan source WebP yang sudah dipin dan diaudit:
 
 Gunakan Android SDK Command-line Tools 23.0 atau lebih baru agar paket platform `android-37.0` dikenali. Minimum perangkat tetap Android 10 (`minSdk = 29`).
 

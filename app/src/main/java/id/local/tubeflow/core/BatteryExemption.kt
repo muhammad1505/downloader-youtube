@@ -1,10 +1,11 @@
 package id.local.tubeflow.core
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.net.toUri
 
 /**
  * Auto-play saat headset tersambung membutuhkan proses yang masih boleh dibangunkan sistem.
@@ -20,16 +21,23 @@ object BatteryExemption {
             ?.isIgnoringBatteryOptimizations(context.packageName) == true
     }.getOrDefault(false)
 
-    /** Dialog sistem "Izinkan TubeFlow tetap berjalan di latar"; butuh izin manifest terkait. */
+    /**
+     * Dialog sistem "Izinkan TubeFlow tetap berjalan di latar"; butuh izin manifest terkait.
+     *
+     * Pengecualian hanya dibuka dari aksi eksplisit pengguna di Setelan, bukan otomatis, dan
+     * aplikasi tetap berjalan normal bila ditolak. TubeFlow dipasang langsung, bukan lewat Play
+     * Store, sehingga kebijakan penggunaan API ini tidak berlaku.
+     */
+    @SuppressLint("BatteryLife")
     fun open(context: Context) {
         val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-            Uri.parse("package:${context.packageName}"))
+            "package:${context.packageName}".toUri())
         val list = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         runCatching { context.startActivity(request) }
             .recoverCatching { context.startActivity(list) }
             .recoverCatching {
                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:${context.packageName}")))
+                    "package:${context.packageName}".toUri()))
             }
     }
 }

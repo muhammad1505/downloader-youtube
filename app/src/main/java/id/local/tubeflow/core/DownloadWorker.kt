@@ -16,7 +16,9 @@ import androidx.core.net.toUri
 import androidx.work.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.withLock
-import java.io.File class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context,params) {
+import java.io.File
+
+class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
  companion object {
   /**
    * Gerbang adisi tunggal untuk semua worker. Batas dibaca ulang dari pengaturan pada tiap percobaan masuk,

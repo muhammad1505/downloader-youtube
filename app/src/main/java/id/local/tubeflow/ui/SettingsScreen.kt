@@ -8,13 +8,13 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.*
@@ -240,7 +240,7 @@ fun SettingsScreen(
                 SettingsCategory(
                     title = "Log aplikasi",
                     summary = "Aktivitas, peringatan, dan galat semua proses",
-                    icon = Icons.Outlined.Article,
+                    icon = Icons.AutoMirrored.Outlined.Article,
                 ) { onSection("logs") },
                 SettingsCategory(
                     title = "Tentang",
@@ -832,7 +832,7 @@ private fun settingsSectionIcon(section: String): ImageVector = when (section) {
     "history" -> Icons.Outlined.History
     "media" -> Icons.Outlined.Build
     "accounts" -> Icons.Outlined.AccountCircle
-    "logs" -> Icons.Outlined.Article
+    "logs" -> Icons.AutoMirrored.Outlined.Article
     else -> Icons.Outlined.Info
 }
 

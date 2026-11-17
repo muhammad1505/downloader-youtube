@@ -3,14 +3,14 @@ android {
  namespace = "id.local.tubeflow"
  compileSdk = 37
  ndkVersion = "27.1.12297006"
- defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 96; versionName = "1.1.81" }
+ defaultConfig { applicationId = "id.local.tubeflow"; minSdk = 29; targetSdk = 37; versionCode = 97; versionName = "1.1.82" }
  splits { abi { isEnable = true; reset(); include("arm64-v8a", "armeabi-v7a", "x86_64"); isUniversalApk = false } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += "**/*.zip.so" } }
  val signingValues = listOf("TUBEFLOW_KEYSTORE_PATH", "TUBEFLOW_KEYSTORE_PASSWORD", "TUBEFLOW_KEY_ALIAS", "TUBEFLOW_KEY_PASSWORD").map { System.getenv(it) }
  if (signingValues.all { !it.isNullOrBlank() }) { signingConfigs { create("production") { storeFile = file(signingValues[0]!!); storePassword = signingValues[1]; keyAlias = signingValues[2]; keyPassword = signingValues[3] } } }
- buildTypes { release { if (signingValues.all { !it.isNullOrBlank() }) signingConfig = signingConfigs.getByName("production"); isMinifyEnabled = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
+ buildTypes { release { if (signingValues.all { !it.isNullOrBlank() }) signingConfig = signingConfigs.getByName("production"); isMinifyEnabled = true; isShrinkResources = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
@@ -37,7 +37,7 @@ dependencies {
  implementation("androidx.media3:media3-effect:1.11.1")
  // Dekoder software Media3 (FFmpeg video/audio + dav1d AV1) untuk codec yang tidak didukung
  // GPU perangkat. Versi mengikuti media3 1.11.1 dan AAR-nya sudah selaras 16 KB.
- implementation("io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0")
+ implementation("io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.18.0")
  // Pinned after target-device JNI startup failed with 1.31.0; audit a replacement on Android 10 first.
  //noinspection NewerVersionAvailable
  implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")

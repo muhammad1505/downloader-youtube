@@ -3,8 +3,8 @@ package id.local.tubeflow.core
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.media.audiofx.Equalizer
-import android.net.Uri
 import androidx.core.content.edit
+import androidx.core.net.toUri
 
 /**
  * Equalizer bawaan Android pada audio session MediaPlayer. Ketersediaan bergantung perangkat/ROM;
@@ -57,7 +57,7 @@ class PlayerEqualizer(context: Context) {
     @Synchronized
     fun followGenre(rawUri: String?) {
         genre = null
-        val uri = runCatching { Uri.parse(rawUri.orEmpty()) }.getOrNull() ?: return
+        val uri = runCatching { rawUri.orEmpty().toUri() }.getOrNull() ?: return
         Thread {
             val value = runCatching {
                 MediaMetadataRetriever().use { retriever ->

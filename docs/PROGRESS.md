@@ -1,6 +1,30 @@
 # Catatan Kemajuan Pengembangan TubeFlow
 
-Dimulai **9 Oktober 2026**, diperbarui sampai 16 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+Dimulai **9 Oktober 2026**, diperbarui sampai 18 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
+
+## Hapus folder Koleksi dan rilis 1.1.82/code97 — 18 November 2026
+
+Pengguna melaporkan "gagal hapus folder di Koleksi": berkas terhapus tetapi direktorinya tetap ada.
+Penyebabnya bukan penolakan provider — `deleteFolder` hanya memanggil `delete` per berkas dan
+memang tidak pernah menyentuh direktori (pesannya bahkan menyebut "Folder fisik tidak dihapus").
+
+- **Perbaikan.** `MediaRepository.deleteFolder` menghapus berkas di folder dan subfoldernya, lalu
+  memetakan folder katalog ke direktori sumber SAF lewat helper murni `FolderDelete` (label sumber
+  + jalur relatif, dengan batas `/` agar `Download/A` tidak menelan `Download/AB`). Direktori hanya
+  dihapus bila grant tulis tersedia dan isinya terbukti tidak berisi berkas; subfolder kosong
+  dibersihkan bottom-up. Akar sumber, folder baca-saja, folder dengan unduhan berjalan, dan folder
+  dengan berkas non-media mempertahankan direktori beserta alasannya.
+- **UI.** Menu dan dialog menjadi "Hapus folder", dengan peringatan bahwa subfolder, lirik, dan
+  thumbnail ikut terhapus permanen.
+- **Bukti.** Regresi `FolderDeleteTest`; uji emulator Pixel 4 (Android 10/API 29) atas permintaan
+  pengguna membuktikan direktori benar-benar hilang pada folder SAF bertulis dan folder bertingkat,
+  serta direktori dipertahankan dengan pesan jujur saat tidak ada grant tulis. Rincian di
+  [DEVICE_TEST](DEVICE_TEST.md).
+- **Rilis.** Versi dinaikkan ke **1.1.82/code97** dengan empat sorotan changelog, menggabungkan
+  perbaikan BUG-106 (hapus folder), BUG-104 (akses Jangan Ganggu), dan BUG-105 (auto-play kabel).
+  Build rilis lokal tidak dijalankan atas permintaan pengguna; gate rilis (unit test, lint,
+  assembleRelease/bundleRelease, signing, audit) dijalankan CI pada tag `v1.1.82`. Batas cakupan
+  ada di [laporan 1.1.82](RELEASE_1_1_82.md).
 
 ## Auto-play headset, notifikasi saat menonton, dan pengecualian baterai — 1.1.81/code96, 16 November 2026
 
@@ -148,7 +172,7 @@ Keluhan pengguna setelah 1.1.73: kartu Antrean di tab Download masih memakai kar
 - **Lebar baris.** Hati favorit audio tidak lagi digambar sebagai penanda agar tidak dobel; ikon lirik 14 dp tetap menjadi penanda "info lirik" di samping tombol. Aksi cepat dan menu memakai satu `onAction` yang sama supaya perilakunya tidak bercabang.
 
 - **Tab Antrean/Riwayat.** Tab Download kini memakai `PrimaryTabRow` berisi Antrean dan Riwayat dengan jumlah item di judulnya; hanya tab aktif yang dirender, jadi daftar tidak lagi ditumpuk dan tidak perlu menggulir melewati bagian lain. Tiap tab punya kata kunci sendiri, pencarian hanya berlaku untuk tab aktif, dan tab tetap menempel di atas saat daftar digulir. Tautan `DownloadTarget.HISTORY` tetap membuka Riwayat langsung, sedangkan `COMPOSER` kembali ke Antrean.
-- **Aksi folder Koleksi.** `FolderTile` memakai `combinedClickable`: ketuk membuka folder, tekan lama membuka lembar aksi berisi Buka folder, Putar semua lagu, Detail folder, Ganti nama tampilan, dan Hapus isi folder. Detail dan hapus memakai `MediaDao.inFolder` sehingga mencakup seluruh isi folder (bukan hanya halaman pertama); putar semua menyaring audio tersedia dan mengurutkan judul. **Ganti nama hanya label TubeFlow** (`FolderAliases`, disimpan di `SettingsStore`) karena rename direktori lewat MediaStore/SAF akan mengubah URI berkas dan memutus lirik, thumbnail, serta riwayat unduhan; dialognya menyebutkan batas ini dan menyediakan tombol kembali ke nama penyimpanan. **Hapus isi folder** menghapus file tersedia satu per satu lewat jalur `repository.delete` yang sama (termasuk lirik/thumbnail) lalu melaporkan jumlah berhasil/gagal/dilewati; folder fisik dan namanya di penyimpanan tidak dihapus.
+- **Aksi folder Koleksi.** `FolderTile` memakai `combinedClickable`: ketuk membuka folder, tekan lama membuka lembar aksi berisi Buka folder, Putar semua lagu, Detail folder, Ganti nama tampilan, dan Hapus isi folder. Detail dan hapus memakai `MediaDao.inFolder` sehingga mencakup seluruh isi folder (bukan hanya halaman pertama); putar semua menyaring audio tersedia dan mengurutkan judul. **Ganti nama hanya label TubeFlow** (`FolderAliases`, disimpan di `SettingsStore`) karena rename direktori lewat MediaStore/SAF akan mengubah URI berkas dan memutus lirik, thumbnail, serta riwayat unduhan; dialognya menyebutkan batas ini dan menyediakan tombol kembali ke nama penyimpanan. **Hapus folder** (dulu "Hapus isi folder") menghapus file tersedia di folder dan subfoldernya satu per satu lewat jalur `repository.delete` yang sama (termasuk lirik/thumbnail) lalu melaporkan jumlah berhasil/gagal/dilewati. Sejak BUG-106 direktorinya ikut dihapus bila folder berada di sumber SAF yang memberi izin tulis dan isinya terbukti tidak berisi berkas lain; subfolder kosong dibersihkan bottom-up, sedangkan akar sumber koleksi, folder baca-saja, dan folder dengan berkas tak terindeks mempertahankan direktori beserta alasannya.
 
 - **Rilis gabungan.** Versi dinaikkan ke 1.1.75/code 90. Entri `changelog.json` 1.1.70–1.1.75 dilebur menjadi satu daftar **13 sorotan** supaya pengguna yang melewatkan rilis antara tetap melihat seluruh perubahan; README memakai satu kandidat 1.1.75 dan entri terpisah 1.1.70/1.1.74 dihapus.
 

@@ -186,7 +186,7 @@ private val AccentBlue = Color(0xFF8AB4F8)
  * aktif di pengaturan cepat, lencana, dan tanda pilih tidak tertinggal di biru generik.
  */
 @Composable
-private fun PlayerAccent(): Color =
+private fun playerAccent(): Color =
     if (LocalTransformersTheme.current) MaterialTheme.colorScheme.primary else AccentBlue
 
 /**
@@ -194,7 +194,7 @@ private fun PlayerAccent(): Color =
  * panel baja navy paletnya agar lembar opsi dan galat tidak tampil sebagai hitam generik.
  */
 @Composable
-private fun PlayerSheet(): Color =
+private fun playerSheet(): Color =
     if (LocalTransformersTheme.current) MaterialTheme.colorScheme.surfaceContainer else SheetBackground
 
 private enum class VideoSheet { SPEED, SUBTITLES, AUDIO, DISPLAY, EFFECTS, DECODER, QUEUE, MORE }
@@ -1089,7 +1089,7 @@ private fun PlayerTopBar(
             onClick = onToggleQuickSettings,
             modifier = Modifier.size(44.dp),
             colors = IconButtonDefaults.iconButtonColors(
-                contentColor = if (quickSettingsVisible) PlayerAccent() else PlayerContent,
+                contentColor = if (quickSettingsVisible) playerAccent() else PlayerContent,
             ),
         ) {
             Icon(
@@ -1393,7 +1393,7 @@ private fun PlayerNoticeOverlay(notice: PlayerNotice, modifier: Modifier = Modif
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(notice.icon, null, Modifier.size(22.dp), tint = PlayerAccent())
+            Icon(notice.icon, null, Modifier.size(22.dp), tint = playerAccent())
             Column {
                 Text(notice.title, color = PlayerMuted, style = MaterialTheme.typography.labelSmall)
                 Text(notice.value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -1526,7 +1526,7 @@ private fun PlayerErrorOverlay(
         Surface(
             Modifier.padding(24.dp).widthIn(max = 460.dp),
             shape = MaterialTheme.shapes.large,
-            color = PlayerSheet(),
+            color = playerSheet(),
             contentColor = PlayerContent,
         ) {
             Column(
@@ -1594,7 +1594,7 @@ private fun VideoOptionsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = if (transformers) CutCornerShape(topStart = 28.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp) else BottomSheetDefaults.ExpandedShape,
-        containerColor = PlayerSheet(),
+        containerColor = playerSheet(),
         contentColor = PlayerContent,
         dragHandle = {
             if (transformers) {
@@ -1934,8 +1934,8 @@ private fun VideoOptionsSheet(
                                 mode = MediaMode.VIDEO,
                                 title = entry.displayTitle,
                                 current = index == state.index,
-                                accent = PlayerAccent(),
-                                containerColor = PlayerSheet(),
+                                accent = playerAccent(),
+                                containerColor = playerSheet(),
                                 contentColor = PlayerContent,
                                 metaColor = PlayerMuted,
                                 onClick = {
@@ -2008,7 +2008,7 @@ private fun VideoQueuePanel(
                 .width(panelWidth)
                 .padding(horizontal = 12.dp, vertical = 16.dp)
                 .pointerInput(Unit) { detectTapGestures { } },
-            color = PlayerSheet(),
+            color = playerSheet(),
             contentColor = PlayerContent,
             shape = MaterialTheme.shapes.large,
             shadowElevation = 18.dp,
@@ -2046,8 +2046,8 @@ private fun VideoQueuePanel(
                             mode = MediaMode.VIDEO,
                             title = entry.displayTitle,
                             current = index == state.index,
-                            accent = PlayerAccent(),
-                            containerColor = PlayerSheet(),
+                            accent = playerAccent(),
+                            containerColor = playerSheet(),
                             contentColor = PlayerContent,
                             metaColor = PlayerMuted,
                             onClick = { onJump(index) },
@@ -2096,7 +2096,7 @@ private fun SheetChoice(label: String, selected: Boolean, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (selected) Icon(Icons.Outlined.Check, null, tint = PlayerAccent())
+        if (selected) Icon(Icons.Outlined.Check, null, tint = playerAccent())
     }
 }
 

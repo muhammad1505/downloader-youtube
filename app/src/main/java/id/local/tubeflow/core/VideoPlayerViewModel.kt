@@ -234,10 +234,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             // Fallback saat videoFormat belum tersedia. Jangan pakai width/height mentah:
             // rekaman portrait sering membawa rotasi 90/270 derajat, sehingga sumbu dan
             // rasio pikselnya harus dinormalisasi sama seperti jalur format di atas.
+            // Media3 1.11 selalu melaporkan unappliedRotationDegrees = 0 karena rotasi
+            // diterapkan player, jadi nilainya tidak dibaca lagi.
             val geometry = VideoViewport.sourceSize(
                 videoSize.width,
                 videoSize.height,
-                videoSize.unappliedRotationDegrees,
+                0,
                 videoSize.pixelWidthHeightRatio,
             ) ?: return
             _state.value = _state.value.copy(

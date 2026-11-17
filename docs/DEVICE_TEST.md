@@ -1148,3 +1148,28 @@ TalkBack pada dialog baru, tampilan long-press launcher, video luar folder, dan 
 tema/font belum diuji.
 
 [Bukti, batas dan file terdampak](EXTERNAL_QUEUE_AND_SHORTCUTS.md).
+
+## Hapus folder Koleksi (BUG-106) — 18 November 2026, emulator Pixel 4
+
+Pengguna meminta pengujian di emulator, bukan HP fisik. AVD `Pixel_4` (Android 10/API 29,
+`Android SDK built for x86_64`) menjalankan `app-x86_64-debug.apk` 158.036.921 byte, SHA256
+`4dfab1b36a0f96506f5ba172f75e8c91ad1f5727c3382036a7dff76829eea070`. Berkas uji berupa WAV 44.144
+byte; tidak ada unduhan jaringan.
+
+- **Folder SAF bertulis.** `Download/UjiSumber` ditambahkan lewat pemilih folder (grant baca+tulis),
+  berisi `UjiAnak/lagu_uji2.wav`. Tekan lama → Hapus folder → konfirmasi. Hasil UI: "1 file dihapus.
+  Folder dihapus dari penyimpanan."; `adb shell ls` menunjukkan `UjiAnak` tidak ada dan baris
+  MediaStore-nya hilang.
+- **Folder bertingkat.** `Album/a.wav` dan `Album/Disc1/b.wav` dalam sumber yang sama. Hapus `Album`
+  menghasilkan "2 file dihapus. Folder dihapus dari penyimpanan."; `Album`, `Disc1`, dan kedua baris
+  MediaStore hilang.
+- **Folder tanpa grant tulis.** `Download/TubeFlow/UjiFolder` (dibuat lewat adb, pemilih folder
+  menolak memberi grant karena tumpang tindih dengan folder bawaan). Hapus folder menghasilkan
+  "1 file dihapus. Direktori tidak dihapus karena letaknya di luar folder yang dapat ditulis
+  TubeFlow."; berkas hilang, direktori kosong tetap ada — sesuai perilaku yang dilaporkan, bukan
+  klaim sukses palsu.
+
+Data uji dan izin di emulator dihapus kembali (`pm clear`). Yang belum teruji: provider selain
+`com.android.externalstorage.documents` (mis. kartu memori/USB), folder baca-saja pada Android 11+,
+folder yang masih berisi berkas non-media, dan folder dengan unduhan berjalan. Uji ini memakai
+emulator, jadi tidak menggantikan validasi HP fisik pada `RELEASE.md`.

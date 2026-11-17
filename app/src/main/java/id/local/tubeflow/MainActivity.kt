@@ -14,6 +14,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import id.local.tubeflow.core.AppLog
 import id.local.tubeflow.core.BstationAuth
@@ -37,7 +38,7 @@ class MainActivity : ComponentActivity() {
     private val incomingUrl = mutableStateOf("")
     // String yang sama tidak mengubah mutableStateOf (equality), jadi tautan yang dibagikan
     // ulang perlu penanda baru agar LaunchedEffect di TubeFlowApp tetap berjalan.
-    private val incomingUrlId = mutableStateOf(0L)
+    private val incomingUrlId = mutableLongStateOf(0L)
     private val incomingMedia = mutableStateOf<IncomingMedia?>(null)
     private val navigation = mutableStateOf<AppNavigationRequest?>(null)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 TubeFlowApp(model, library, player, karaoke, video, incomingUrl.value,
                     requestNotifications = ::requestDownloadNotifications,
-                    incomingUrlId = incomingUrlId.value,
+                    incomingUrlId = incomingUrlId.longValue,
                     navigation = navigation.value,
                     incomingMedia = incomingMedia.value,
                     onMediaHandled = { incomingMedia.value = null },

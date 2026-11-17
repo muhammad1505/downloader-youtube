@@ -9,7 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.media.AudioManager
+import android.graphics.drawable.Icon
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -84,7 +84,11 @@ class PlaybackService : Service() {
                     .setSmallIcon(R.drawable.ic_stat_playback)
                     .setContentTitle(context.getString(R.string.player_autoplay_retry))
                     .setContentIntent(AppIntents.pending(context, AppDestination.PLAYER))
-                    .addAction(android.R.drawable.ic_media_play, context.getString(R.string.notification_retry_play), retry)
+                    .addAction(Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_media_play),
+                        context.getString(R.string.notification_retry_play),
+                        retry,
+                    ).build())
                     .setAutoCancel(true).build())
             }
         }
@@ -109,7 +113,6 @@ class PlaybackService : Service() {
                 description = "Kontrol pemutaran musik"
             })
         session = MediaSession(this, "TubeFlow").apply {
-            setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
             setCallback(object : MediaSession.Callback() {
                 override fun onPlay() { command(ACTION_PLAY_PAUSE, wantPlaying = true) }
                 override fun onPause() { command(ACTION_PLAY_PAUSE, wantPlaying = false) }
@@ -277,7 +280,7 @@ class PlaybackService : Service() {
         PendingIntent.getService(this, action.hashCode(), Intent(this, PlaybackService::class.java).setAction(action), PendingIntent.FLAG_IMMUTABLE)
 
     private fun action(action: String, icon: Int, title: String): Notification.Action =
-        Notification.Action.Builder(icon, title, actionIntent(action)).build()
+        Notification.Action.Builder(Icon.createWithResource(this, icon), title, actionIntent(action)).build()
 
     override fun onDestroy() {
         scope.cancel()

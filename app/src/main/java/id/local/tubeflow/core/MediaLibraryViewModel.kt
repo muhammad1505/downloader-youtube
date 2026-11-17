@@ -392,32 +392,18 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Hapus seluruh file di folder; folder fisik dan namanya di penyimpanan dibiarkan. */
+    /** Hapus seluruh file di folder beserta direktorinya bila TubeFlow punya izin tulis. */
     fun deleteFolder(folder: String) = operation {
-        val key = FolderAliases.normalize(folder)
-        val items = withContext(Dispatchers.IO) { dao.inFolder(key) }
-        require(items.isNotEmpty()) { "Folder ini tidak memiliki file." }
-        var removed = 0
-        var failed = 0
-        var skipped = 0
-        var firstError: String? = null
-        for (item in items) {
-            if (item.availability != "AVAILABLE") { skipped++; continue }
-            try {
-                repository.delete(item)
-                removed++
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) {
-                failed++
-                if (firstError == null) firstError = failure.message
-            }
+        val result = repository.deleteFolder(folder)
+        require(result.removed > 0 || result.failed > 0 || result.folderDeleted) {
+            result.firstError ?: result.folderNote ?: "Tidak ada file yang dapat dihapus di folder ini."
         }
-        if (removed == 0) error(firstError ?: "Tidak ada file yang dapat dihapus di folder ini.")
         buildString {
-            append("$removed file dihapus dari folder.")
-            if (failed > 0) append(" $failed gagal: ${firstError ?: "periksa izin penyimpanan"}.")
-            if (skipped > 0) append(" $skipped file tidak tersedia dilewati.")
-            append(" Folder fisik tidak dihapus.")
+            append("${result.removed} file dihapus.")
+            if (result.failed > 0) append(" ${result.failed} gagal: ${result.firstError ?: "periksa izin penyimpanan"}.")
+            if (result.skipped > 0) append(" ${result.skipped} file tidak tersedia dilewati.")
+            if (result.folderDeleted) append(" Folder dihapus dari penyimpanan.")
+            else result.folderNote?.let { append(" $it") }
         }
     }
 

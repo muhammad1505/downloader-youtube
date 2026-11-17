@@ -2,6 +2,7 @@ package id.local.tubeflow.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import android.view.Window
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -135,6 +136,14 @@ private val TransformersShapes = Shapes(
     extraLarge = CutCornerShape(topStart = 28.dp, bottomEnd = 28.dp),
 )
 
+// isStatusBarContrastEnforced sudah usang di API baru, tetapi masih berpengaruh pada
+// Android 10–14, jadi pemanggilannya dipertahankan dengan penekanan peringatan yang sempit.
+@Suppress("DEPRECATION")
+private fun applySystemBarContrast(window: Window, enforce: Boolean) {
+    window.isNavigationBarContrastEnforced = enforce
+    window.isStatusBarContrastEnforced = enforce
+}
+
 @Composable
 fun TubeFlowTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -151,8 +160,7 @@ fun TubeFlowTheme(
             isAppearanceLightStatusBars = !darkTheme
             isAppearanceLightNavigationBars = !darkTheme
         }
-        window.isNavigationBarContrastEnforced = !cyberpunk && !transformers
-        window.isStatusBarContrastEnforced = !cyberpunk && !transformers
+        applySystemBarContrast(window, enforce = !cyberpunk && !transformers)
     }
     val supportsDynamic = Build.VERSION.SDK_INT >= 31
     val useDynamicColor = dynamicColor && !cyberpunk && !transformers

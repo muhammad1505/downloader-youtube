@@ -42,6 +42,14 @@ CI dipisah menjadi dua workflow agar pekerjaan tidak berulang:
 
 Tag rilis harus dibuat dari commit `main` yang sudah lolos **Android tests**. Pada rilis tag, APK dilampirkan langsung ke GitHub Release tanpa membuat artifact Actions. Workflow juga menghapus aset dari rilis yang lebih lama dari tiga rilis terbaru dan menghapus seluruh artifact Actions lama; halaman rilis tetap disimpan agar tautan dan riwayatnya tidak rusak. Dispatch manual tetap menyimpan artifact Actions selama satu hari untuk pengujian.
 
+Status 18 November 2026: versi dan changelog dinaikkan ke **1.1.82/code97** (hapus folder Koleksi
+ikut menghapus direktori, akses Jangan Ganggu, auto-play headset kabel). Build rilis lokal **tidak
+dijalankan** atas permintaan pengguna; gate rilis diserahkan ke workflow tag `v1.1.82`. Bukti host
+705 tes Kotlin, regresi `FolderDeleteTest`, dan uji emulator Pixel 4/Android 10 ada di [laporan
+1.1.82](RELEASE_1_1_82.md) serta [DEVICE_TEST](DEVICE_TEST.md). APK/AAB bertanda tangan, audit
+native/ZIP, zipalign, dan apksigner untuk versi ini belum diperiksa di host; uji HP fisik juga
+belum dijalankan.
+
 Status 16 November 2026: versi dan changelog dinaikkan ke **1.1.81/code96** (auto-play headset, opsi menahan notifikasi saat menonton, status pengecualian baterai, pesan berkas video hilang). CI **Android tests** lulus pada commit kode `7f793c5`; commit dokumentasi ini harus lolos **Android tests** yang sama sebelum tag `v1.1.81` dibuat. Build rilis lokal, APK/AAB 1.1.81, audit native/ZIP/zipalign/apksigner, dan uji perangkat untuk Jangan Ganggu serta headset kabel/TWS **belum dijalankan** karena AAR FFmpeg 16 KB belum dibangun dan NDK/CMake tidak tersedia di host ini. Rincian dan batas cakupan ada di [laporan 1.1.81](AUTOPLAY_ALERTS_1_1_81.md).
 
 Status 3 November 2026: produksi signed **1.1.71/code86** dibangun lokal (`build_release.sh`), 654 Kotlin + 101 Python tes lulus, lint debug/release 0 error, audit native/ZIP/zipalign/apksigner lulus, dan terpasang di Realme RMX1821 Android 10 lewat `adb install -r` dengan `base.apk` SHA-256 `3837dc902d12245537ecacfb95cdf8d71eed088d34720f6f612b1c5f05b1c2fa` (cocok build lokal). Skenario [matriks perangkat](DEVICE_TEST_MATRIX.md) belum dijalankan pada build ini.

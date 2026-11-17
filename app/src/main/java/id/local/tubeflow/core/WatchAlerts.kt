@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.core.content.edit
 
 /**
  * Menahan notifikasi melayang selama video diputar penuh.
@@ -32,8 +33,10 @@ object WatchAlerts {
         return runCatching {
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!prefs.getBoolean(KEY_ACTIVE, false)) {
-                prefs.edit().putBoolean(KEY_ACTIVE, true)
-                    .putInt(KEY_PREVIOUS, manager.currentInterruptionFilter).apply()
+                prefs.edit {
+                    putBoolean(KEY_ACTIVE, true)
+                    putInt(KEY_PREVIOUS, manager.currentInterruptionFilter)
+                }
             }
             if (manager.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
                 manager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
@@ -47,7 +50,10 @@ object WatchAlerts {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(KEY_ACTIVE, false)) return
         val previous = prefs.getInt(KEY_PREVIOUS, NotificationManager.INTERRUPTION_FILTER_ALL)
-        prefs.edit().putBoolean(KEY_ACTIVE, false).remove(KEY_PREVIOUS).apply()
+        prefs.edit {
+            putBoolean(KEY_ACTIVE, false)
+            remove(KEY_PREVIOUS)
+        }
         runCatching {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             if (manager.isNotificationPolicyAccessGranted) manager.setInterruptionFilter(previous)

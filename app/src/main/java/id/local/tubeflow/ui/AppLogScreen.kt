@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,7 +89,7 @@ fun AppLogScreen() {
             PageHeading(
                 "Log aplikasi",
                 "Aktivitas, peringatan, dan galat semua proses TubeFlow di perangkat ini.",
-                Icons.Outlined.Article,
+                Icons.AutoMirrored.Outlined.Article,
             )
         }
         item {

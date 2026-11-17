@@ -30,6 +30,19 @@ data class ScanSummary(val checked: Int, val failed: Int, val discovered: Int, v
 /** Tag katalog yang diminta pengguna; nama tampilan diverifikasi ulang sebelum ditulis. */
 data class TagUpdate(val uri: String, val displayName: String, val title: String, val artist: String)
 
+/**
+ * Hasil hapus folder Koleksi. [folderNote] menjelaskan mengapa direktori fisik dipertahankan, dan
+ * [firstError] pesan kegagalan berkas pertama supaya pemanggil dapat melaporkannya apa adanya.
+ */
+data class FolderDeleteResult(
+    val removed: Int,
+    val failed: Int,
+    val skipped: Int,
+    val folderDeleted: Boolean,
+    val folderNote: String? = null,
+    val firstError: String? = null,
+)
+
 class MediaRepository(private val context: Context) {
     private val resolver = context.contentResolver
     private val database = DownloadDatabase.get(context)
@@ -711,7 +724,9 @@ class MediaRepository(private val context: Context) {
         true
     } }
 
-    suspend fun delete(item: MediaItem) = withContext(Dispatchers.IO) { operations.withLock {
+    suspend fun delete(item: MediaItem) = withContext(Dispatchers.IO) { operations.withLock { deleteLocked(item) } }
+
+    private suspend fun deleteLocked(item: MediaItem) {
         val location = item.location.toUri()
         // Folder koleksi lama bisa tersimpan dengan grant baca saja; hapusnya mustahil sampai pengguna
         // menambahkan ulang folder, jadi pesannya harus menyebut tindakan itu, bukan sekadar "izin".
@@ -728,5 +743,122 @@ class MediaRepository(private val context: Context) {
         removeCatalog(item.uri)
         dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "DELETED", kind = item.kind, platformId = item.platformId, at = System.currentTimeMillis()))
         require(!sidecarFailed) { "Media terhapus, tetapi lirik gagal dihapus." }
+    }
+
+    /**
+     * Hapus folder Koleksi beserta seluruh berkasnya di subfolder, lalu direktori fisiknya bila
+     * folder itu berada di sumber SAF yang memberi izin tulis. Direktori hanya dihapus setelah
+     * terbukti tidak berisi berkas (subfolder kosong ikut dibersihkan) supaya berkas yang tidak
+     * terindeks TubeFlow tidak ikut hilang. Akar sumber koleksi tidak pernah dihapus dari sini.
+     */
+    suspend fun deleteFolder(folder: String): FolderDeleteResult = withContext(Dispatchers.IO) { operations.withLock {
+        recoverRename()
+        val key = FolderAliases.normalize(folder)
+        require(key.isNotBlank()) { "Folder tidak valid." }
+        val sources = CollectionFolders.sources(
+            defaultTree = StorageFolderAccess.defaultTree(context, SettingsStore.storageFolder)?.toString(),
+            defaultLabel = "Download/${SettingsStore.storageFolder}",
+            outputTree = SettingsStore.storageTree,
+            extras = SettingsStore.collectionFolders,
+        )
+        require(!FolderDelete.isSourceRoot(key, sources)) {
+            "Folder akar sumber koleksi tidak dapat dihapus dari sini. Lepas folder itu di Pengaturan → Koleksi bila tidak ingin dipindai lagi."
+        }
+        require(database.downloads().activeInSubfolder(FolderRename.leaf(key)) == 0) {
+            "Masih ada unduhan berjalan ke folder ini. Selesaikan atau batalkan dulu."
+        }
+        val items = dao.folderTree(key, FolderRename.likePrefix(key))
+        require(items.isNotEmpty()) { "Folder ini tidak memiliki file." }
+        require(items.size < 4000) { "Folder terlalu besar untuk dihapus dari Koleksi; hapus lewat aplikasi file." }
+        var removed = 0
+        var failed = 0
+        var skipped = 0
+        var firstError: String? = null
+        for (item in items) {
+            if (item.availability != "AVAILABLE") { skipped++; continue }
+            try { deleteLocked(item); removed++ }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                failed++
+                if (firstError == null) firstError = failure.message ?: "Berkas tidak dapat dihapus."
+            }
+        }
+        val target = FolderDelete.target(key, sources)
+        val outcome: Pair<Boolean, String?> = if (target == null) {
+            false to "Direktori tidak dihapus karena letaknya di luar folder yang dapat ditulis TubeFlow."
+        } else removeEmptyFolder(target)
+        FolderDeleteResult(removed = removed, failed = failed, skipped = skipped, folderDeleted = outcome.first, folderNote = outcome.second, firstError = firstError)
     } }
+
+    /** Pair(folder terhapus, alasan bila dipertahankan). */
+    private fun removeEmptyFolder(target: FolderDelete.Target): Pair<Boolean, String?> {
+        val tree = target.source.tree.toUri()
+        val grant = resolver.persistedUriPermissions.firstOrNull { permission ->
+            permission.isReadPermission && permission.isWritePermission &&
+                CollectionFolders.normalize(permission.uri.toString()) == target.source.tree
+        } ?: return false to "Folder ini hanya memberi izin baca. Lepas lalu tambahkan ulang folder itu di Pengaturan → Koleksi dengan izin tulis agar foldernya dapat dihapus."
+        val rootId = runCatching { DocumentsContract.getTreeDocumentId(grant.uri) }.getOrNull()
+            ?: runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull()
+            ?: return false to "Folder tidak dapat diperiksa; direktori dibiarkan."
+        val directory = runCatching {
+            DocumentsContract.buildDocumentUriUsingTree(grant.uri, "$rootId/${target.suffix}")
+        }.getOrNull() ?: return false to "Folder tidak dapat diperiksa; direktori dibiarkan."
+        // Label sumber bisa berbeda dari nama direktori (mis. label unik "(2)"). Jangan melaporkan
+        // folder terhapus hanya karena URI turunan yang salah tidak menemukan apa pun.
+        if (!StorageUris.exists(context, directory)) {
+            return false to "Direktori folder tidak ditemukan dari sumber koleksi; berkasnya sudah terhapus."
+        }
+        val children = directoryChildren(directory)
+            ?: return false to "Isi folder tidak dapat dibaca; direktori dibiarkan supaya berkas lain tidak hilang."
+        if (children.any { !it.isDirectory }) {
+            return false to "Berkas media sudah dihapus, tetapi folder masih berisi berkas lain sehingga direktori tidak dihapus."
+        }
+        children.forEach { child ->
+            runCatching { removeEmptyDirectory(DocumentsContract.buildDocumentUriUsingTree(grant.uri, child.documentId), 1) }
+        }
+        val remaining = directoryChildren(directory).orEmpty()
+        if (remaining.isNotEmpty()) {
+            return false to "Berkas media sudah dihapus, tetapi masih ada subfolder berisi berkas lain sehingga direktori tidak dihapus."
+        }
+        val deleted = runCatching { DocumentsContract.deleteDocument(resolver, directory) }.getOrDefault(false)
+        return if (deleted || !StorageUris.exists(context, directory)) true to null
+        else false to "Provider menolak menghapus folder; berkasnya sudah terhapus."
+    }
+
+    private data class DirectoryChild(val documentId: String, val isDirectory: Boolean)
+
+    /** Anak direktori SAF; null bila provider tidak dapat dibaca (pemanggil wajib konservatif). */
+    private fun directoryChildren(directory: Uri): List<DirectoryChild>? = runCatching {
+        val id = DocumentsContract.getDocumentId(directory)
+        val query = if (DocumentsContract.isTreeUri(directory)) DocumentsContract.buildChildDocumentsUriUsingTree(directory, id)
+        else DocumentsContract.buildChildDocumentsUri(directory.authority ?: return null, id)
+        resolver.query(
+            query,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            buildList {
+                while (cursor.moveToNext() && size < 2000) {
+                    add(DirectoryChild(cursor.getString(0), cursor.getString(1) == DocumentsContract.Document.MIME_TYPE_DIR))
+                }
+            }
+        }
+    }.getOrNull()
+
+    /** Menghapus [directory] hanya bila tidak berisi berkas; subfolder kosong dibersihkan lebih dulu. */
+    private fun removeEmptyDirectory(directory: Uri, depth: Int): Boolean {
+        if (depth > 8) return false
+        val children = directoryChildren(directory) ?: return false
+        if (children.any { !it.isDirectory }) return false
+        children.forEach { child ->
+            runCatching { removeEmptyDirectory(DocumentsContract.buildDocumentUriUsingTree(directory, child.documentId), depth + 1) }
+        }
+        if (directoryChildren(directory).orEmpty().isNotEmpty()) return false
+        return runCatching { DocumentsContract.deleteDocument(resolver, directory) }.getOrDefault(false)
+    }
 }
