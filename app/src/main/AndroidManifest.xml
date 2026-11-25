@@ -15,6 +15,8 @@
  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
  <!-- Gesturvolume sisi kanan pemutar video mengubah volume musik sistem. -->
  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+ <!-- Pemutaran lagu memakai izin yang sama dengan tahan notifikasi saat menonton:
+      kedua filter Jangan Ganggu dikembalikan bila audio/video berhenti. -->
  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
  <!-- Baca koleksi: file yang dibuat versi/SAF lama tidak terlihat MediaStore tanpa izin baca,
@@ -28,6 +30,18 @@
  <!-- requestLegacyExternalStorage dihormati di perangkat Android 10 apa pun targetSdk (penegakan
       scoped-storage untuk targetSdk 30+ ada di platform Android 11+). Di API 29 tanpa mode ini,
       baris MediaStore milik versi/SAF lama (owner kosong) tidak terbaca meski izin diberikan. -->
+ <!-- Layar autostart/optimasi baterai OEM dibuka lewat komponen eksplisit; tanpa deklarasi ini
+      resolveActivity mengembalikan null di Android 11+ meski aplikasinya terpasang. -->
+ <queries>
+  <package android:name="com.coloros.safecenter"/>
+  <package android:name="com.oplus.safecenter"/>
+  <package android:name="com.oppo.safe"/>
+  <package android:name="com.miui.securitycenter"/>
+  <package android:name="com.vivo.permissionmanager"/>
+  <package android:name="com.iqoo.secure"/>
+  <package android:name="com.huawei.systemmanager"/>
+  <package android:name="com.samsung.android.lool"/>
+ </queries>
  <application android:name=".TubeFlowApplication" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="@string/app_name" android:theme="@style/Theme.TubeFlow" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true" android:requestLegacyExternalStorage="true">
   <!-- configChanges mencegah Activity dibangun ulang saat rotasi/PiP; ExoPlayer tetap di ViewModel. -->
   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" android:theme="@style/Theme.TubeFlow.Splash">

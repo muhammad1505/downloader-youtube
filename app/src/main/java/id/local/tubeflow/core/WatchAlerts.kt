@@ -56,7 +56,11 @@ object WatchAlerts {
         }
         runCatching {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
-            if (manager.isNotificationPolicyAccessGranted) manager.setInterruptionFilter(previous)
+            // Pemutaran lagu bisa memegang filter ALARMS; jangan menimpa DND yang bukan milik video.
+            if (manager.isNotificationPolicyAccessGranted &&
+                manager.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
+                manager.setInterruptionFilter(previous)
+            }
         }
     }
 

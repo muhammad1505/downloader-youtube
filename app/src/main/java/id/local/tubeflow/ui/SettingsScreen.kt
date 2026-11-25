@@ -220,6 +220,16 @@ fun SettingsScreen(
                     icon = Icons.Outlined.PlayCircle,
                 ) { onSection("playback") },
                 SettingsCategory(
+                    title = "Baterai & latar belakang",
+                    summary = "Optimasi baterai dan autostart sesuai merek HP",
+                    icon = Icons.Outlined.BatteryFull,
+                ) { onSection("battery") },
+                SettingsCategory(
+                    title = "Jaringan & DNS",
+                    summary = "DNS aktif, uji kecepatan, dan Private DNS",
+                    icon = Icons.Outlined.Wifi,
+                ) { onSection("network") },
+                SettingsCategory(
                     title = "Riwayat",
                     summary = if (SettingsStore.historyAutoDays == 0) "Hapus otomatis nonaktif"
                         else "Hapus otomatis setelah ${SettingsStore.historyAutoDays} hari",
@@ -445,6 +455,8 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            HorizontalDivider()
+            DndPlaybackControls()
         }
 
         if (section == "display") Panel(
@@ -782,6 +794,9 @@ fun SettingsScreen(
             Text("Video selalu ditambahkan ke koleksi. Impor/pindai manual hanya mengindeks file; tidak menulis tag, mengubah kualitas atau mengambil lirik.", style = MaterialTheme.typography.bodySmall)
         }
 
+        if (section == "battery") BatterySetupPanel()
+        if (section == "network") DnsSetupPanel()
+
         if (section == "media") EngineUpdatePanel(engineUpdateBlockedReason)
 
         if (section == "playback" && Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
@@ -829,6 +844,8 @@ private fun settingsSectionIcon(section: String): ImageVector = when (section) {
     "storage" -> Icons.Outlined.Folder
     "display" -> Icons.Outlined.Palette
     "playback" -> Icons.Outlined.PlayCircle
+    "battery" -> Icons.Outlined.BatteryFull
+    "network" -> Icons.Outlined.Wifi
     "history" -> Icons.Outlined.History
     "media" -> Icons.Outlined.Build
     "accounts" -> Icons.Outlined.AccountCircle
@@ -840,7 +857,9 @@ private fun settingsSectionInfo(section: String): Pair<String, String> = when (s
     "downloads" -> "Unduhan" to "Antrean, notifikasi, dan Smart Media untuk unduhan baru."
     "storage" -> "Penyimpanan" to "Tujuan file, pemakaian ruang, dan pembersihan."
     "display" -> "Tampilan" to "Tema, aksen, dan warna sistem."
-    "playback" -> "Pemutaran" to "Perilaku saat pemutaran terputus dan sambungan Bluetooth."
+    "playback" -> "Pemutaran" to "Perilaku saat pemutaran terputus, Jangan Ganggu, dan sambungan Bluetooth."
+    "battery" -> "Baterai & latar belakang" to "Pengecualian optimasi baterai dan autostart sesuai merek HP."
+    "network" -> "Jaringan & DNS" to "DNS yang dipakai sistem, uji latensi resolver, dan Private DNS."
     "history" -> "Riwayat" to "Batas umur catatan unduhan; file media tidak ikut dihapus."
     "media" -> "Media & alat" to "Karaoke, cadangan lirik, dan mesin media."
     "accounts" -> "Akun Bstation" to "Login untuk episode Premium; cookie disimpan terenkripsi di perangkat."

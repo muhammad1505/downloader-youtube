@@ -15,6 +15,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import id.local.tubeflow.R
 import kotlinx.coroutines.CancellationException
@@ -57,15 +58,23 @@ class PlaybackService : Service() {
         // Batas wajib agar OS selalu melepas lock yang tertinggal; diperpanjang selama audio berbunyi.
         private const val WAKELOCK_TIMEOUT_MS = 10 * 60 * 1000L
         private const val RENEW_MS = 5 * 60 * 1000L
+        /** Kabel mengirim HEADSET_PLUG dan AudioDeviceCallback sekaligus; satu permintaan cukup. */
+        private const val AUTOPLAY_DEDUPE_MS = 1_000L
         const val ACTION_PLAY_PAUSE = "id.local.tubeflow.action.PLAY_PAUSE"
         const val ACTION_PREVIOUS = "id.local.tubeflow.action.PREVIOUS"
         const val ACTION_NEXT = "id.local.tubeflow.action.NEXT"
         const val ACTION_STOP = "id.local.tubeflow.action.STOP"
         const val ACTION_AUTO_PLAY = "id.local.tubeflow.action.AUTO_PLAY_CONNECTED"
         @Volatile private var instance: PlaybackService? = null
+        private var lastAutoPlayAt = 0L
 
         /** Transfer ownership to a service before receiver return / asynchronous catalogue I/O. */
         fun requestAutoPlay(context: Context) {
+            val now = SystemClock.elapsedRealtime()
+            synchronized(this) {
+                if (now - lastAutoPlayAt < AUTOPLAY_DEDUPE_MS) return
+                lastAutoPlayAt = now
+            }
             try {
                 ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java).setAction(ACTION_AUTO_PLAY))
             } catch (error: RuntimeException) {
@@ -204,6 +213,8 @@ class PlaybackService : Service() {
     }
 
     private fun renderLock(state: PlayerViewModel.State) {
+        // Hanya lagu yang memegang Jangan Ganggu; jeda/stop dan proses mati mengembalikan filter.
+        if (state.playing) PlaybackDnd.hold(this) else PlaybackDnd.release(this)
         playing = state.playing
         handler.removeCallbacks(renew)
         if (state.playing) { holdWakeLock(); handler.postDelayed(renew, RENEW_MS) } else releaseWakeLock()
@@ -284,6 +295,7 @@ class PlaybackService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        PlaybackDnd.release(this)
         instance = null
         playing = false
         handler.removeCallbacks(renew)

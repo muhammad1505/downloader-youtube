@@ -46,6 +46,15 @@ class PlaybackReceiversTest(unittest.TestCase):
         self.assertEqual('30', permissions['android.permission.BLUETOOTH'].get(ANDROID + 'maxSdkVersion'))
         self.assertIn('android.permission.BLUETOOTH_CONNECT', permissions)
         self.assertNotIn('android.permission.BLUETOOTH_SCAN', permissions)
+    def test_process_wide_headset_monitor_is_registered_at_startup(self):
+        source = (ROOT / 'app/src/main/java/id/local/tubeflow/TubeFlowApplication.kt').read_text(encoding='utf-8')
+        self.assertIn('HeadsetAutoPlayMonitor.start(this)', source)
+
+    def test_dnd_and_battery_permissions_are_declared(self):
+        manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
+        permissions = {p.get(ANDROID + 'name') for p in manifest.findall('uses-permission')}
+        self.assertIn('android.permission.ACCESS_NOTIFICATION_POLICY', permissions)
+        self.assertIn('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', permissions)
 
 
 if __name__ == '__main__':
