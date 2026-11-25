@@ -18,8 +18,10 @@ class NetworkDnsTest {
         assertEquals(0, query[11].toInt()) // ARCOUNT
         assertEquals(3, query[12].toInt()) // label "www"
         assertEquals('w'.code.toByte(), query[13])
-        // 12 header + 3 label panjang + 15 isi + 1 akar + 4 QTYPE/QCLASS
-        assertEquals(12 + 3 + "www.youtube.com".length + 1 + 4, query.size)
+        // 12 header + (panjang+isi tiap label) + 1 akar + 4 QTYPE/QCLASS
+        val labels = "www.youtube.com".split('.')
+        assertEquals(12 + labels.sumOf { it.length + 1 } + 1 + 4, query.size)
+        assertEquals(33, query.size)
     }
 
     @Test
