@@ -1,5 +1,15 @@
 [
   {
+    "versionCode": 98,
+    "versionName": "1.1.83",
+    "highlights": [
+      "Jangan Ganggu kini hanya bekerja di pemutar video: opsi Sembunyikan notifikasi saat menonton tidak lagi menyentuh pemutaran lagu, sehingga notifikasi seperti WhatsApp tetap masuk saat musik diputar.",
+      "Pengaturan → Baterai menampilkan status pengecualian optimasi baterai, tombol dialog sistem, dan langkah autostart sesuai merek HP, termasuk Realme, OPPO, Xiaomi, dan Samsung.",
+      "Pengaturan → Jaringan menampilkan DNS aktif, menguji latensi resolver, dan membuka Private DNS; tanpa VPN TubeFlow tidak mengganti DNS seluruh perangkat secara diam-diam.",
+      "Auto-play headset tetap berjalan proses-wide dan setiap sambungan tercatat di Pengaturan → Log aplikasi untuk memudahkan penelusuran."
+    ]
+  },
+  {
     "versionCode": 97,
     "versionName": "1.1.82",
     "highlights": [

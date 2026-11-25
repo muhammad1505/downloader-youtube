@@ -42,6 +42,11 @@ CI dipisah menjadi dua workflow agar pekerjaan tidak berulang:
 
 Tag rilis harus dibuat dari commit `main` yang sudah lolos **Android tests**. Pada rilis tag, APK dilampirkan langsung ke GitHub Release tanpa membuat artifact Actions. Workflow juga menghapus aset dari rilis yang lebih lama dari tiga rilis terbaru dan menghapus seluruh artifact Actions lama; halaman rilis tetap disimpan agar tautan dan riwayatnya tidak rusak. Dispatch manual tetap menyimpan artifact Actions selama satu hari untuk pengujian.
 
+Status 25 November 2026: versi dan changelog dinaikkan ke **1.1.83/code98** (Jangan Ganggu khusus
+Pemutar video, panduan baterai/autostart per merek, dan panel DNS). DND audio pemutaran lagu yang
+sempat ditambahkan dicabut agar notifikasi tetap masuk saat musik diputar. Build rilis lokal dan uji
+perangkat **belum dijalankan**; gate rilis diserahkan ke workflow **Android tests** pada commit ini.
+
 Status 18 November 2026: versi dan changelog dinaikkan ke **1.1.82/code97** (hapus folder Koleksi
 ikut menghapus direktori, akses Jangan Ganggu, auto-play headset kabel). Build rilis lokal **tidak
 dijalankan** atas permintaan pengguna; gate rilis diserahkan ke workflow tag `v1.1.82`. Bukti host

@@ -455,8 +455,6 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            HorizontalDivider()
-            DndPlaybackControls()
         }
 
         if (section == "display") Panel(

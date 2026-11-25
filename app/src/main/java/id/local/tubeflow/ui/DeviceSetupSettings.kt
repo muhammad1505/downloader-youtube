@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatteryFull
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Wifi
@@ -29,58 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import id.local.tubeflow.core.BatteryOptimization
 import id.local.tubeflow.core.NetworkDns
-import id.local.tubeflow.core.PlaybackDnd
-import id.local.tubeflow.core.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * Jangan Ganggu untuk pemutaran lagu. Izin kebijakan notifikasi diberikan lewat pengaturan sistem,
- * jadi tombol izin dibuka di sini dan statusnya diperiksa ulang setelah pengguna kembali.
- */
-@Composable
-fun DndPlaybackControls() {
-    val context = LocalContext.current
-    var access by remember { mutableStateOf(PlaybackDnd.hasAccess(context)) }
-    ToggleRow(
-        title = "Jangan Ganggu saat memutar",
-        description = "Notifikasi aplikasi lain, termasuk WhatsApp, tidak berbunyi atau bergetar selama lagu diputar. Alarm tetap berbunyi. Filter dikembalikan saat lagu dijeda dan bila aplikasi ditutup.",
-        checked = SettingsStore.dndWhilePlaying,
-        onCheckedChange = { enabled ->
-            SettingsStore.setDndWhilePlaying(context, enabled)
-            access = PlaybackDnd.hasAccess(context)
-            if (enabled && !access) runCatching {
-                context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-            }
-        },
-    )
-    if (!access) {
-        Text(
-            "Akses Jangan Ganggu belum diberikan. Tanpa akses ini TubeFlow tidak boleh menyenyapkan notifikasi apa pun.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-        ActionButton(
-            "Izinkan akses Jangan Ganggu",
-            { runCatching { context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } },
-            icon = Icons.Outlined.Notifications,
-            fillWidth = true,
-        )
-        ActionButton(
-            "Periksa ulang akses",
-            { access = PlaybackDnd.hasAccess(context) },
-            icon = Icons.Outlined.Refresh,
-            emphasis = ActionEmphasis.Quiet,
-        )
-    } else {
-        Text(
-            "Akses Jangan Ganggu tersedia. TubeFlow memasang filter “hanya alarm” saat lagu berjalan, bukan senyap total.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 /** Langkah optimasi baterai dan autostart sesuai merek HP yang sedang dipakai. */
 @Composable

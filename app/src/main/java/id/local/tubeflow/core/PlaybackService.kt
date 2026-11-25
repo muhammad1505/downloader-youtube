@@ -213,8 +213,6 @@ class PlaybackService : Service() {
     }
 
     private fun renderLock(state: PlayerViewModel.State) {
-        // Hanya lagu yang memegang Jangan Ganggu; jeda/stop dan proses mati mengembalikan filter.
-        if (state.playing) PlaybackDnd.hold(this) else PlaybackDnd.release(this)
         playing = state.playing
         handler.removeCallbacks(renew)
         if (state.playing) { holdWakeLock(); handler.postDelayed(renew, RENEW_MS) } else releaseWakeLock()
@@ -295,7 +293,6 @@ class PlaybackService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
-        PlaybackDnd.release(this)
         instance = null
         playing = false
         handler.removeCallbacks(renew)

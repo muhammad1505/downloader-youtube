@@ -39,16 +39,6 @@ object SettingsStore {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit { putBoolean("artwork_accent", enabled) }
     }
 
-    /** Jangan Ganggu selama lagu diputar; butuh akses kebijakan notifikasi dari pengguna. */
-    var dndWhilePlaying by mutableStateOf(false); private set
-
-    fun setDndWhilePlaying(context: Context, enabled: Boolean) {
-        dndWhilePlaying = enabled
-        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .edit { putBoolean("dnd_while_playing", enabled) }
-        if (!enabled) PlaybackDnd.release(context)
-    }
-
     var resumeAfterInterruption by mutableStateOf(true); private set
 
     fun setResumeAfterInterruption(context: Context, enabled: Boolean) {
@@ -139,7 +129,6 @@ object SettingsStore {
         PlaybackPower.initialize(context)
         resumeAfterInterruption = prefs.getBoolean("resume_interruption", true)
         hideAlertsWhileWatching = prefs.getBoolean("hide_alerts_watching", false)
-        dndWhilePlaying = prefs.getBoolean("dnd_while_playing", false)
         autoRename = prefs.getBoolean("smart_rename", true)
         autoTag = prefs.getBoolean("smart_tag", true)
         autoArtwork = prefs.getBoolean("smart_artwork", true)
