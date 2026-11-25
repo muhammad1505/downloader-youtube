@@ -3,10 +3,10 @@
     "versionCode": 99,
     "versionName": "1.1.84",
     "highlights": [
-      "Panduan baterai kini hanya ada di Pengaturan → Baterai & latar belakang dan membuka Info aplikasi TubeFlow, bukan dialog pengecualian langsung. Dari sana atur Baterai/Aktivitas latar belakang dan Autostart sesuai merek HP; tidak ada lagi tombol optimasi ganda di menu Pemutaran.",
-      "Izin REQUEST_IGNORE_BATTERY_OPTIMIZATIONS dihapus dari APK. Izin ini dibatasi Google dan termasuk pemicu yang sering dilaporkan Play Protect pada APK sideload; TubeFlow tetap membaca status pengecualian tanpa memintanya langsung.",
+      "Panduan baterai hanya ada di Baterai & latar belakang dan membuka Info aplikasi TubeFlow. Atur Baterai/Aktivitas latar belakang dan Autostart di sana; tombol ganda di Pemutaran dihapus.",
+      "Izin REQUEST_IGNORE_BATTERY_OPTIMIZATIONS dihapus dari APK karena dibatasi Google dan sering memicu peringatan Play Protect pada APK sideload. Status pengecualian tetap dibaca.",
       "Tombol Buka Private DNS tidak lagi gagal diam-diam di ColorOS/realme: aplikasi mencoba layar Private DNS, lalu Jaringan & internet, lalu Setelan, dan memberi pesan bila harus memilih Private DNS manual.",
-      "Koleksi dan Riwayat memeriksa keberadaan berkas sebelum memutar audio/video. Baris yang terbukti hilang dibersihkan otomatis, sedangkan berkas yang hanya tidak dapat diperiksa (izin berubah/provider sibuk) tidak dihapus."
+      "Koleksi dan Riwayat memeriksa keberadaan berkas sebelum memutar audio/video. Baris yang terbukti hilang dibersihkan, sedangkan berkas yang hanya tidak dapat diperiksa (izin berubah/provider sibuk) tidak dihapus."
     ]
   },
   {

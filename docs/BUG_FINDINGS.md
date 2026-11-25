@@ -1313,8 +1313,9 @@ atau kategori lain) belum dapat dipastikan. Pemeriksaan APK 1.1.83 menunjukkan
 tidak ada `READ_SMS`/`RECEIVE_SMS`, layanan aksesibilitas, notification listener,
 atau `REQUEST_INSTALL_PACKAGES`; APK ditandatangani kunci produksi dan memakai
 target SDK 37. Pemicu yang paling mungkin adalah izin
-`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` yang baru ditambahkan pada 1.1.83:
-Google membatasi izin ini dan scanner menyebutnya sebagai pola riskware.
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` yang masuk sejak 1.1.82/code97 (pengguna
+melompat dari 1.1.80 ke 1.1.83): Google membatasi izin ini dan scanner
+menyebutnya sebagai pola riskware.
 
 Perbaikan 1.1.84 menghapus izin tersebut dari manifest dan tidak lagi membuka
 dialog `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Panduan baterai sekarang

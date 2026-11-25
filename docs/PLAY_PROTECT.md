@@ -16,12 +16,13 @@ persis belum diterima, jadi statusnya belum boleh disebut "false positive" atau
 - SHA-256 APK 1.1.83:
   `9a86ced6a78fbd9dce41a159bc7198bc6ba3d38498cddae5a97d4969c6a2a868`.
 
-Izin yang paling menonjol pada 1.1.83 adalah
-`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (baru) dan
-`ACCESS_NOTIFICATION_POLICY` (dipakai fitur Jangan Ganggu opsional). Google
-membatasi izin pengecualian baterai langsung; pola itu sering masuk kategori
-riskware pada scanner. Karena itu 1.1.84 menghapus izin tersebut dan tidak lagi
-membuka dialog pengecualian langsung.
+Izin yang paling menonjol adalah `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (masuk
+sejak 1.1.82/code97, bukan 1.1.83) dan `ACCESS_NOTIFICATION_POLICY` (dipakai
+fitur Jangan Ganggu opsional). Google membatasi izin pengecualian baterai
+langsung; pola itu sering masuk kategori riskware pada scanner. Karena itu
+1.1.84 menghapus izin tersebut dan tidak lagi membuka dialog pengecualian
+langsung. Bila pengguna melompat dari 1.1.80 ke 1.1.83, kedua izin baru itu
+memang pertama kali terlihat oleh Play Protect pada pemindaian 1.1.83.
 
 ## Perubahan 1.1.84
 
