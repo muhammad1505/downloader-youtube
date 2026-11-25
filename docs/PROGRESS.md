@@ -29,7 +29,9 @@ yang tertahan di memori.
   dan `onDestroy`.
 - **Bukti.** CI **Android tests** untuk commit `6359c9a` lulus (unit Kotlin, lint release,
   106 tes host Python); regresi sapuan ditambah di `MediaSweepTest`. Patch **1.1.85/code100**
-  membawa perubahan ini ke APK; build rilis dijalankan dari tag `v1.1.85`. Uji perangkat dan
+  diterbitkan lewat tag `v1.1.85`: workflow **Release APK arm64** lulus dan APK
+  `TubeFlow-1.1.85-arm64-v8a-release.apk` berukuran **77.049.117 byte** dengan SHA-256
+  `c8db2c0b183db249c1e419ef2e9ea12588f7d2311d5a16c200428dd9b5009520`. Uji perangkat dan
   pengukuran profiler memori belum dilakukan.
 
 ## Play Protect, baterai, DNS, dan berkas hilang — 1.1.84/code99, 25 November 2026
