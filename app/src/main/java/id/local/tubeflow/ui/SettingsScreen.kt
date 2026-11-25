@@ -799,8 +799,6 @@ fun SettingsScreen(
 
         if (section == "playback" && Build.VERSION.SDK_INT >= 31) BluetoothAutoPlaySettings()
 
-        if (section == "playback") BatteryAutoPlaySettings()
-
         if (section == "about") Panel(title = "Privasi") {
             Text(
                 "Riwayat dan antrean tersimpan di HP kamu. Download menggunakan koneksi perangkat langsung ke penyedia konten, tanpa server perantara.",
@@ -956,45 +954,5 @@ private fun BluetoothAutoPlaySettings() {
                 emphasis = ActionEmphasis.Quiet,
             )
         }
-    }
-}
-
-/**
- * Status pengecualian baterai dibaca ulang setiap layar kembali aktif karena pengguna mengubahnya
- * di dialog sistem, bukan di dalam aplikasi.
- */
-@Composable
-private fun BatteryAutoPlaySettings() {
-    val context = LocalContext.current
-    var exempt by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf(id.local.tubeflow.core.BatteryExemption.isExempt(context))
-    }
-    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(owner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                exempt = id.local.tubeflow.core.BatteryExemption.isExempt(context)
-            }
-        }
-        owner.lifecycle.addObserver(observer)
-        onDispose { owner.lifecycle.removeObserver(observer) }
-    }
-    Panel(
-        title = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.battery_unrestricted_title),
-        description = androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.battery_unrestricted_description),
-    ) {
-        Text(
-            androidx.compose.ui.res.stringResource(
-                if (exempt) id.local.tubeflow.R.string.battery_unrestricted_on
-                else id.local.tubeflow.R.string.battery_unrestricted_off
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        ActionButton(
-            androidx.compose.ui.res.stringResource(id.local.tubeflow.R.string.battery_unrestricted_action),
-            { id.local.tubeflow.core.BatteryExemption.open(context) },
-            icon = Icons.Outlined.Settings,
-            emphasis = ActionEmphasis.Secondary,
-        )
     }
 }

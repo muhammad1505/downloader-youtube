@@ -52,6 +52,28 @@ class MediaRepository(private val context: Context) {
     private suspend fun removeCatalog(uri: String) = database.withTransaction {
         database.personal().removeMedia(uri); dao.remove(uri)
     }
+    private suspend fun removeMissing(item: MediaItem) {
+        removeCatalog(item.uri)
+        dao.event(MediaEvent(jobId = item.jobId.orEmpty(), action = "UNAVAILABLE", kind = item.kind,
+            platformId = item.platformId, at = System.currentTimeMillis()))
+    }
+    /**
+     * Satu pemeriksaan kehadiran yang dipakai pemindaian, validasi latar, dan preflight pemutaran.
+     * Hanya [MediaAvailability.State.MISSING] yang menghapus baris; DENIED/UNKNOWN tidak pernah
+     * dianggap bukti file hilang.
+     */
+    private suspend fun validatePresence(item: MediaItem): MediaAvailability.State {
+        val state = MediaAvailability.probe(context, item)
+        when (state) {
+            MediaAvailability.State.MISSING -> removeMissing(item)
+            MediaAvailability.State.DENIED -> if (item.availability != "ACCESS_DENIED")
+                dao.put(item.copy(availability = "ACCESS_DENIED", checkedAt = System.currentTimeMillis()))
+            MediaAvailability.State.PRESENT -> if (item.availability != "AVAILABLE")
+                index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder)
+            MediaAvailability.State.UNKNOWN -> Unit
+        }
+        return state
+    }
     private fun displayName(raw: String): String = resolver.query(raw.toUri(), arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
         require(c.moveToFirst()) { "File tidak tersedia." }; c.getString(0).orEmpty()
     } ?: error("Nama file tidak dapat dibaca.")
@@ -499,9 +521,8 @@ class MediaRepository(private val context: Context) {
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             if (old != null) {
-                if (MediaAvailability.probe(context,old) == MediaAvailability.State.MISSING) {
-                    removeCatalog(old.uri)
-                    dao.event(MediaEvent(jobId=old.jobId.orEmpty(),action="UNAVAILABLE",kind=old.kind,platformId=old.platformId,at=System.currentTimeMillis()))
+                if (MediaAvailability.probe(context, old) == MediaAvailability.State.MISSING) {
+                    removeMissing(old)
                     return
                 }
                 val availability = if (error is SecurityException) "ACCESS_DENIED" else "UNAVAILABLE"
@@ -521,7 +542,12 @@ class MediaRepository(private val context: Context) {
         var checked = 0; var failed = 0
         var unreadableSources = 0
         val rows = mutableListOf<Triple<String, String, String>>()
+        // Folder yang pemindaiannya selesai dan nama yang benar-benar terlihat. Baris katalog di
+        // folder ini yang namanya tidak terlihat adalah kandidat hilang, bukan bukti hilang.
+        val scannedFolders = mutableSetOf<String>()
+        val discovered = mutableSetOf<Pair<String, String>>()
         fun add(uri: String, name: String, folder: String) {
+            discovered += folder to name
             if (rows.none { it.second == name && it.third == folder }) {
                 require(rows.size < 4000) { "Folder terlalu besar; impor file pilihan." }
                 rows += Triple(uri, name, folder)
@@ -538,6 +564,8 @@ class MediaRepository(private val context: Context) {
                 arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME, MediaStore.Downloads.RELATIVE_PATH),
                 "(${MediaStore.Downloads.RELATIVE_PATH} = ? OR ${MediaStore.Downloads.RELATIVE_PATH} LIKE ? ESCAPE '\\') AND ${MediaStore.Downloads.IS_PENDING} = 0",
                 arrayOf(folder, "$escaped%"), null)?.use { c ->
+                // Query berhasil membuktikan folder ini terbaca meski hasilnya kosong.
+                scannedFolders += folder.trimEnd('/')
                 while (c.moveToNext()) add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/'))
             } ?: throw FileNotFoundException("Folder belum dapat dibaca.")
         } catch (error: Exception) { storeError = error; unreadableSources++ }
@@ -551,17 +579,21 @@ class MediaRepository(private val context: Context) {
             extras = SettingsStore.collectionFolders,
         )
         var treeError: Exception? = null
+        val unreadableTrees = mutableListOf<String>()
         for (source in sources) {
             val root = source.tree.toUri()
             val rootId = CollectionFolders.documentId(source.tree)
                 ?: runCatching { DocumentsContract.getTreeDocumentId(root) }.getOrNull()
             if (rootId == null) {
                 unreadableSources++
+                unreadableTrees += source.tree
                 if (treeError == null) treeError = IllegalArgumentException("Folder koleksi tidak valid.")
                 continue
             }
             fun walk(id: String, folder: String, depth: Int) {
                 require(depth <= 8 && rows.size < 4000) { "Batas pemindaian folder tercapai." }
+                // Folder kosong tetap dihitung terbaca; baris lama di dalamnya harus diperiksa.
+                scannedFolders += folder
                 resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(root, id), arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
                     while (c.moveToNext()) {
                         if (c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) walk(c.getString(0), "$folder/${c.getString(1)}", depth + 1)
@@ -571,6 +603,7 @@ class MediaRepository(private val context: Context) {
             }
             try { walk(rootId, source.label, 0) } catch (error: Exception) {
                 unreadableSources++
+                unreadableTrees += source.tree
                 if (treeError == null) treeError = error
             }
         }
@@ -586,6 +619,24 @@ class MediaRepository(private val context: Context) {
         if (validateExisting) {
             for (item in dao.oldest(4000)) if (item.checkedAt < System.currentTimeMillis() - 1000) {
                 try { index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder); } catch (_: Exception) { failed++ }
+            }
+        } else {
+            // Penyegaran otomatis tidak mengindeks ulang semua baris, tetapi baris yang foldernya
+            // selesai dipindai dan namanya tidak lagi terlihat harus diperiksa. Ini menangkap file
+            // yang dihapus dari aplikasi lain tanpa menunggu rotasi checkedAt.
+            val catalog = dao.all()
+            val candidates = LinkedHashMap<String, MediaItem>()
+            MediaSweep.unconfirmed(catalog, scannedFolders, discovered).forEach { candidates[it.uri] = it }
+            if (unreadableTrees.isNotEmpty()) {
+                val prefixes = unreadableTrees.map { CollectionFolders.normalize(it) + "/document/" }
+                catalog.forEach { item ->
+                    val access = CollectionFolders.normalize(item.location)
+                    if (prefixes.any { access.startsWith(it) || item.uri.startsWith(it) }) candidates[item.uri] = item
+                }
+            }
+            for (item in candidates.values) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                try { validatePresence(item) } catch (_: Exception) { failed++ }
             }
         }
         ScanSummary(checked, failed, rows.size, unreadableSources)
@@ -633,21 +684,20 @@ class MediaRepository(private val context: Context) {
         for (item in dao.oldest(if (force) 4000 else 100)) {
             checked += item.uri
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            when (MediaAvailability.probe(context,item)) {
-                MediaAvailability.State.MISSING -> {
-                    removeCatalog(item.uri)
-                    dao.event(MediaEvent(jobId=item.jobId.orEmpty(),action="UNAVAILABLE",kind=item.kind,platformId=item.platformId,at=System.currentTimeMillis()))
-                }
-                MediaAvailability.State.DENIED -> if (item.availability != "ACCESS_DENIED")
-                    dao.put(item.copy(availability="ACCESS_DENIED",checkedAt=System.currentTimeMillis()))
-                MediaAvailability.State.PRESENT -> if (item.availability != "AVAILABLE")
-                    index(item.location,item.jobId?.let { database.downloads().get(it) },item.folder)
-
-                MediaAvailability.State.UNKNOWN -> Unit // Failure to inspect is never proof of deletion.
-            }
+            try { validatePresence(item) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { }
         }
         // Rotate the bounded window without invalidating observers once per healthy file.
         checked.chunked(500).forEach { dao.checked(it,System.currentTimeMillis()) }
+    } }
+
+    /**
+     * Preflight tepat sebelum memutar: berkas yang terbukti hilang dibersihkan dari katalog agar
+     * pemutar tidak mencoba membuka dokumen yang sudah tidak ada. Provider yang tidak pasti
+     * (DENIED/UNKNOWN) tetap diizinkan mencoba supaya gangguan sementara tidak memblokir pemutaran.
+     */
+    suspend fun checkPlayback(raw: String, kind: String = ""): MediaAvailability.State = withContext(Dispatchers.IO) { operations.withLock {
+        val item = dao.get(canonical(raw)) ?: dao.getByAccess(raw)
+        if (item != null) validatePresence(item) else MediaAvailability.probe(context, raw, kind)
     } }
 
     suspend fun refresh(raw: String) = withContext(Dispatchers.IO) { operations.withLock {

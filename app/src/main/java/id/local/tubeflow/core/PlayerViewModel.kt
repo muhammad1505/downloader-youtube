@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioAttributes
-import android.media.AudioDeviceCallback
-import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
@@ -59,15 +57,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         fun hasRestorableSession(context: Context): Boolean =
             context.getSharedPreferences("player-last", 0).getBoolean("session_active", false)
 
-        /** Jenis output yang memicu auto-play: headset kabel, TWS/Bluetooth, dan USB audio. */
-        private val AUTOPLAY_OUTPUTS = setOf(
-            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
-            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-            android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
-            android.media.AudioDeviceInfo.TYPE_USB_DEVICE,
-        )
     }
     data class Track(val uri: String, val title: String, val artist: String = "", val cover: String = "", val lyricUri: String? = null)
     data class State(val track: Track? = null, val loading: Boolean = false, val playing: Boolean = false,
@@ -156,7 +145,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     private val sessionStore = PlayerSessionStore(application)
     private var lastCheckpoint = 0L
-    private val initialOutputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.id }.toMutableSet()
     private val fx = application.getSharedPreferences("player-fx", 0)
     private var speed = fx.getFloat("speed", 1f).coerceIn(0.25f, 3f)
     // Acak/ulangi adalah preferensi pengguna, bukan milik satu antrean. Antrean baru mewarisinya,
@@ -190,40 +178,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) { if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) pause() }
     }
-    /** Headset/TWS baru tersambung: musik yang sedang berhenti dilanjutkan otomatis tanpa sentuhan layar. */
-    private val devices = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
-            val added = addedDevices.filter { it.isSink && it.type in AUTOPLAY_OUTPUTS && it.id !in initialOutputs }
-            if (added.isNotEmpty()) {
-                android.util.Log.i("TubeFlow-autoload", "audio output connected")
-                AppLog.info(LogCategory.PLAYER,
-                    "Output audio tersambung (tipe ${added.joinToString { it.type.toString() }}): auto-play diminta.")
-                PlaybackService.requestAutoPlay(getApplication<Application>())
-            }
-        }
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) { removedDevices.forEach { initialOutputs.remove(it.id) } }
-    }
-    /** Pemicu cadangan: sebagian perangkat lebih cepat melaporkan aksi headset/Bluetooth daripada AudioDeviceCallback. */
-    private val devicePlug = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val action = intent?.action
-            val plugState = intent?.getIntExtra("state", -1) ?: -1
-            val profileState = intent?.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1) ?: -1
-            android.util.Log.d("TubeFlow-autoload", "runtime connection action=$action state=$plugState/$profileState sticky=$isInitialStickyBroadcast")
-            AppLog.info(LogCategory.PLAYER,
-                "Broadcast sambungan $action (state=$plugState/$profileState, sticky=$isInitialStickyBroadcast).")
-            when (action) {
-                Intent.ACTION_HEADSET_PLUG -> if (!isInitialStickyBroadcast && plugState == 1) {
-                    AppLog.info(LogCategory.PLAYER, "Headset kabel tersambung: auto-play diminta.")
-                    PlaybackService.requestAutoPlay(getApplication<Application>())
-                }
-                ACTION_BT_A2DP, ACTION_BT_HEADSET -> if (profileState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
-                    AppLog.info(LogCategory.PLAYER, "Bluetooth tersambung: auto-play diminta.")
-                    PlaybackService.requestAutoPlay(getApplication<Application>())
-                }
-            }
-        }
-    }
+
     /** Called only after PlaybackService has entered the foreground. */
     internal suspend fun resumeForConnectedDevice() {
         if (_state.value.playing) {
@@ -351,11 +306,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) { sessionStore.writePending() }
         viewModelScope.launch { restorePlaybackSession() }
         ContextCompat.registerReceiver(application, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
-        ContextCompat.registerReceiver(application, devicePlug, IntentFilter(Intent.ACTION_HEADSET_PLUG).apply {
-            addAction(ACTION_BT_A2DP)
-            addAction(ACTION_BT_HEADSET)
-        }, ContextCompat.RECEIVER_EXPORTED)
-        manager.registerAudioDeviceCallback(devices, handler)
         manager.registerAudioPlaybackCallback(playbackActivity, handler)
         // Satu titik sinkron service, termasuk seek ketika jeda dan progres per detik.
         viewModelScope.launch {
@@ -763,8 +713,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         token.incrementAndGet()
         if (active === this) active = null
         getApplication<Application>().unregisterReceiver(noisy)
-        runCatching { getApplication<Application>().unregisterReceiver(devicePlug) }
-        manager.unregisterAudioDeviceCallback(devices)
         manager.unregisterAudioPlaybackCallback(playbackActivity)
         PlaybackService.sync(getApplication<Application>(), State())
         handler.post { handler.removeCallbacks(sleepTick); release(); thread.quitSafely() }

@@ -10,7 +10,9 @@ import android.provider.OpenableColumns
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import java.io.File
+import java.io.FileNotFoundException
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 
 /** Only proven absence removes a catalogue row; an inaccessible provider is not a deleted file. */
 internal object MediaAvailability {
@@ -23,12 +25,38 @@ internal object MediaAvailability {
         else -> State.UNKNOWN
     }
 
+    /**
+     * Provider SAF membungkus dokumen yang sudah hilang sebagai `IllegalArgumentException`, dengan
+     * `FileNotFoundException` di rantai penyebab. Hanya bukti itu yang boleh menghapus baris katalog;
+     * kegagalan provider lain tetap UNKNOWN dan izin yang dicabut tetap DENIED.
+     */
+    internal fun classifyFailure(error: Throwable, readAllowed: Boolean): State {
+        if (!readAllowed) return State.DENIED
+        var current: Throwable? = error
+        val seen = mutableSetOf<Throwable>()
+        while (current != null && seen.add(current)) {
+            when (current) {
+                is SecurityException -> return State.DENIED
+                is FileNotFoundException, is NoSuchFileException -> return State.MISSING
+            }
+            if (current.message?.contains("Missing file", ignoreCase = true) == true) return State.MISSING
+            current = current.cause
+        }
+        return State.UNKNOWN
+    }
+
+    fun probe(context: Context, item: MediaItem): State = probe(context, item.location, item.kind)
+
     @Suppress("DEPRECATION")
-    fun probe(context: Context, item: MediaItem): State {
-        val uri = item.location.toUri()
+    fun probe(context: Context, raw: String, kind: String): State {
+        val uri = raw.toUri()
+        if (uri.scheme == "file") {
+            val path = uri.path ?: return State.UNKNOWN
+            return if (File(path).exists()) State.PRESENT else State.MISSING
+        }
         val granted = if (uri.authority == "media") {
             val permission = if (Build.VERSION.SDK_INT >= 33) {
-                if (item.kind == "AUDIO") android.Manifest.permission.READ_MEDIA_AUDIO else android.Manifest.permission.READ_MEDIA_VIDEO
+                if (kind == "AUDIO") android.Manifest.permission.READ_MEDIA_AUDIO else android.Manifest.permission.READ_MEDIA_VIDEO
             } else android.Manifest.permission.READ_EXTERNAL_STORAGE
             val broadRead = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
             // Downloads owned by another installation may be hidden even with media permission.
@@ -53,7 +81,22 @@ internal object MediaAvailability {
                     State.PRESENT
                 }
             } ?: State.UNKNOWN
-        } catch (_: SecurityException) { State.DENIED }
-          catch (_: Exception) { State.UNKNOWN }
+        } catch (error: Exception) { classifyFailure(error, granted) }
+    }
+}
+
+/** Keputusan murni untuk merekonsiliasi baris katalog dengan isi folder yang baru dipindai. */
+internal object MediaSweep {
+    /**
+     * Baris yang foldernya selesai dipindai tetapi nama berkasnya tidak terlihat. Kandidat ini masih
+     * harus diperiksa kehadirannya; folder yang tidak dapat dipindai tidak boleh masuk karena
+     * ketidakhadiran hasil bukan bukti file dihapus.
+     */
+    fun unconfirmed(
+        catalog: List<MediaItem>,
+        scannedFolders: Set<String>,
+        discovered: Set<Pair<String, String>>,
+    ): List<MediaItem> = catalog.filter { item ->
+        item.folder in scannedFolders && (item.folder to item.displayName) !in discovered
     }
 }

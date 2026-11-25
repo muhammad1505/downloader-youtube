@@ -55,4 +55,16 @@ class NetworkDnsTest {
         )
         assertNull(NetworkDns.candidates().first().latencyMs)
     }
+
+    @Test
+    fun privateDnsFallsBackFromDirectScreenToNetworkSettings() {
+        assertEquals(
+            listOf(
+                "android.settings.PRIVATE_DNS_SETTINGS",
+                "android.settings.WIRELESS_SETTINGS",
+                "android.settings.SETTINGS",
+            ),
+            NetworkDns.privateDnsActions(),
+        )
+    }
 }

@@ -12,6 +12,22 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 
+/** Kebijakan murni agar keputusan "baru tersambung" dapat diuji tanpa perangkat/Android. */
+internal object HeadsetAutoPlayPolicy {
+    /** Jenis output yang memicu auto-play: headset kabel, TWS/Bluetooth, dan USB audio. */
+    private val OUTPUT_TYPES = setOf(
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_USB_DEVICE,
+    )
+
+    fun shouldAutoPlay(type: Int, id: Int, initialOutputs: Set<Int>): Boolean =
+        type in OUTPUT_TYPES && id !in initialOutputs
+}
+
 /**
  * Pemantau sambungan audio milik proses, bukan milik Activity/ViewModel.
  *
@@ -21,20 +37,6 @@ import androidx.core.content.ContextCompat
  * tetap memakai receiver manifest agar proses mati pun dapat dibangunkan.
  */
 internal object HeadsetAutoPlayMonitor {
-    /** Jenis output yang memicu auto-play: headset kabel, TWS/Bluetooth, dan USB audio. */
-    private val AUTOPLAY_OUTPUT_TYPES = setOf(
-        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-        AudioDeviceInfo.TYPE_USB_HEADSET,
-        AudioDeviceInfo.TYPE_USB_DEVICE,
-    )
-
-    /** Murni agar keputusan "baru tersambung" dapat diuji tanpa perangkat. */
-    internal fun shouldAutoPlay(type: Int, id: Int, initialOutputs: Set<Int>): Boolean =
-        type in AUTOPLAY_OUTPUT_TYPES && id !in initialOutputs
-
     private var registered = false
     private lateinit var app: Application
     private lateinit var manager: AudioManager
@@ -44,7 +46,7 @@ internal object HeadsetAutoPlayMonitor {
     private val devices = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
             val connected = addedDevices.filter {
-                it.isSink && shouldAutoPlay(it.type, it.id, initialOutputs)
+                it.isSink && HeadsetAutoPlayPolicy.shouldAutoPlay(it.type, it.id, initialOutputs)
             }
             if (connected.isEmpty()) return
             initialOutputs += connected.map { it.id }

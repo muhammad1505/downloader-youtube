@@ -45,11 +45,6 @@
     <string name="watch_alerts_description">Saat video penuh diputar, notifikasi aplikasi lain tidak melayang di atas film. Notifikasi tetap masuk ke panel; TubeFlow hanya menahan bunyi dan tampilan melayangnya lewat mode Jangan Ganggu, lalu mengembalikan pengaturan sebelumnya saat video dijeda atau ditutup.</string>
     <string name="watch_alerts_ready">Izin Jangan Ganggu tersedia. Filter interupsi dipulihkan otomatis saat menonton selesai.</string>
     <string name="watch_alerts_permission_missing">Izin akses Jangan Ganggu belum diberikan, jadi pilihan ini belum berpengaruh. Berikan di Pengaturan → Jangan Ganggu → Akses aplikasi.</string>
-    <string name="battery_unrestricted_title">Jangan batasi baterai</string>
-    <string name="battery_unrestricted_description">Auto-play saat headset tersambung bergantung pada proses yang masih boleh dibangunkan sistem. Penghemat baterai HP sering menghentikan TubeFlow sehingga lagu baru berbunyi setelah aplikasi dibuka.</string>
-    <string name="battery_unrestricted_on">TubeFlow sudah dikecualikan dari pembatasan baterai.</string>
-    <string name="battery_unrestricted_off">TubeFlow masih dibatasi penghemat baterai. Auto-play headset bisa terlambat atau tidak berjalan.</string>
-    <string name="battery_unrestricted_action">Buka pengaturan baterai</string>
     <string name="failure_details">Detail error</string>
     <string name="failure_copy">Salin detail error</string>
     <string name="failure_copied">Tersalin</string>

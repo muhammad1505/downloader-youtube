@@ -2,6 +2,32 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 18 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Play Protect, baterai, DNS, dan berkas hilang — 1.1.84/code99, 25 November 2026
+
+Pengguna melaporkan Play Protect menandai APK 1.1.83 sebagai berbahaya, tombol
+optimasi baterai ganda dengan navigasi yang salah, Private DNS tidak terbuka,
+dan berkas Koleksi/Riwayat yang sudah dihapus masih dicoba diputar.
+
+- **Play Protect.** Izin `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dihapus karena
+  dibatasi Google dan sering menjadi pemicu riskware. Manifest tidak memakai
+  SMS, aksesibilitas, notification listener, atau pemasangan APK; target SDK 37
+  dan sertifikat produksi tetap. Teks peringatan persis belum diterima, jadi
+  status malware belum dapat dipastikan. Rincian dan langkah verifikasi ada di
+  [PLAY_PROTECT](PLAY_PROTECT.md).
+- **Baterai.** Kartu baterai di menu Pemutaran dihapus. Satu panel di Baterai &
+  latar belakang membuka Info aplikasi, menampilkan status pengecualian, dan
+  menyediakan tombol autostart OEM bila activity-nya tersedia. Tidak ada lagi
+  dialog pengecualian langsung.
+- **DNS.** Tombol Private DNS mencoba aksi langsung, lalu Jaringan & internet,
+  lalu Setelan; kegagalan tidak lagi ditelan `runCatching` tanpa pesan.
+- **Berkas hilang.** Pemindaian otomatis merekonsiliasi baris di folder yang
+  selesai dipindai, dan pemutaran melakukan preflight. Hanya bukti
+  `FileNotFoundException`/`NoSuchFileException`/"Missing file" yang menghapus
+  baris; izin dicabut (`DENIED`) dan kegagalan tak pasti (`UNKNOWN`) dipertahankan.
+- **Auto-play headset.** Monitor proses-wide sudah berjalan dari
+  `TubeFlowApplication`; kebijakan tipe output dipisah ke `HeadsetAutoPlayPolicy`
+  agar dapat diuji tanpa Android.
+
 ## Hapus folder Koleksi dan rilis 1.1.82/code97 — 18 November 2026
 
 Pengguna melaporkan "gagal hapus folder di Koleksi": berkas terhapus tetapi direktorinya tetap ada.

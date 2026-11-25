@@ -8,8 +8,9 @@
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
- <!-- Auto-play headset butuh proses yang boleh dibangunkan; tombolnya hanya membuka dialog sistem. -->
- <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+ <!-- Pengecualian baterai TIDAK diminta lewat izin langsung: panduan membuka Info aplikasi.
+      Izin REQUEST_IGNORE_BATTERY_OPTIMIZATIONS sengaja tidak dideklarasikan karena dibatasi
+      Google dan dapat memicu peringatan Play Protect pada APK sideload. -->
  <!-- Tanpa izin ini TubeFlow tidak muncul di daftar akses Jangan Ganggu Android dan
       isNotificationPolicyAccessGranted selalu false, sehingga opsi tahan notifikasi tidak bekerja. -->
  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>

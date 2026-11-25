@@ -576,12 +576,18 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
                         searchLyrics = { library.openLyrics(it) },
                         play = { list, index ->
                             val job = list.getOrNull(index)
-                            if (job?.mode == MediaMode.VIDEO) {
-                                val (entries, start) = VideoPlayback.videoEntries(list, job.id, nameOf = { raw -> displayName(context, raw.toUri()) })
-                                playVideo(entries, start)
-                            } else {
-                                job?.let { player.playJobs(listOf(it), 0) }
-                            }
+                            val uri = job?.outputUri
+                            if (job != null && !uri.isNullOrBlank()) {
+                                appScope.launch {
+                                    // Riwayat dapat menunjuk berkas yang sudah dihapus. Periksa dulu
+                                    // agar pemutar video/audio tidak dibuka dengan URI yang hilang.
+                                    if (!library.canPlay(uri, if (job.mode == MediaMode.VIDEO) "VIDEO" else "AUDIO")) return@launch
+                                    if (job.mode == MediaMode.VIDEO) {
+                                        val (entries, start) = VideoPlayback.videoEntries(list, job.id, nameOf = { raw -> displayName(context, raw.toUri()) })
+                                        playVideo(entries, start)
+                                    } else player.playJobs(listOf(job), 0)
+                                }
+                            } else appScope.launch { snackbar.showSnackbar("Berkas ini tidak tersedia di penyimpanan.") }
                         },
                         clearCompleted = { model.clearCompleted() },
                         enqueue = { player.enqueue(it) },

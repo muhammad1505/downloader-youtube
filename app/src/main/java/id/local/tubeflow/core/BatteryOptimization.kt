@@ -12,9 +12,9 @@ import java.util.Locale
  * Pintasan pengecualian optimasi baterai dan autostart sesuai merek HP.
  *
  * Android tidak punya satu layar standar untuk autostart; tiap OEM memakai activity berbeda dan
- * pengguna harus mengaktifkannya sendiri. Yang dapat dilakukan aplikasi adalah membuka layar yang
- * tepat dan menjelaskan langkahnya. Langkah ini penting agar unduhan latar dan auto-play headset
- * tidak diputus saat layar mati, termasuk pada realme/ColorOS.
+ * pengguna harus mengaktifkannya sendiri. TubeFlow membuka Info aplikasi (dan layar autostart OEM
+ * bila tersedia) lalu menjelaskan langkahnya. Dialog pengecualian baterai langsung tidak dipakai:
+ * izinnya dibatasi Google dan navigasinya sering salah pada realme/ColorOS.
  */
 internal object BatteryOptimization {
     enum class Family { REALME, OPPO, XIAOMI, VIVO, HUAWEI, SAMSUNG, OTHER }
@@ -145,10 +145,8 @@ internal object BatteryOptimization {
         return listOf(maker, model, "Android $android").filter { it.isNotBlank() }.joinToString(" · ")
     }
 
-    /** Status dan dialog pengecualian memakai jalur yang sama dengan panel Pemutaran. */
+    /** Status pengecualian dibaca tanpa membuka dialog sistem; panduan memakai Info aplikasi. */
     fun isIgnoring(context: Context): Boolean = BatteryExemption.isExempt(context)
-
-    fun openExemption(context: Context) = BatteryExemption.open(context)
 
     /** Layanan autostart OEM yang terpasang, atau null bila tidak ada. */
     fun autostartIntent(context: Context): Intent? {

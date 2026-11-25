@@ -129,10 +129,15 @@ fun MediaLibraryScreen(
     } }
     // Video diputar di pemutar Media3 dalam aplikasi; audio tetap memakai PlayerViewModel.
     fun playVideo(item: MediaItem) {
-        val (entries, index) = VideoPlayback.videoEntries(media, item.uri, sidecars = { entry ->
-            entry.jobId?.let { completedJobs[it]?.sidecarUris }
-        }, nameOf = { raw -> displayName(context, raw.toUri()) })
-        if (entries.isEmpty()) open(item) else onPlayVideo(entries, index)
+        scope.launch {
+            // Baris Koleksi bisa tertinggal setelah berkas dihapus dari aplikasi lain. Periksa
+            // tepat sebelum membuka ExoPlayer agar galat IO tidak muncul sebagai kegagalan pemutar.
+            if (!model.canPlay(item.location, item.kind)) return@launch
+            val (entries, index) = VideoPlayback.videoEntries(media, item.uri, sidecars = { entry ->
+                entry.jobId?.let { completedJobs[it]?.sidecarUris }
+            }, nameOf = { raw -> displayName(context, raw.toUri()) })
+            if (entries.isEmpty()) open(item) else onPlayVideo(entries, index)
+        }
     }
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(UiSpacing.screen), verticalArrangement = Arrangement.spacedBy(UiSpacing.item),
@@ -228,7 +233,7 @@ fun MediaLibraryScreen(
                 val quickActions = rowQuickActions(item.kind == "AUDIO", available, favorite)
                 val onAction: (MediaActionKind) -> Unit = { kind ->
                     when (kind) {
-                        MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item)
+                        MediaActionKind.PLAY -> if (item.kind == "AUDIO") model.playItem(player, item) else playVideo(item)
                         MediaActionKind.OPEN -> open(item)
                         MediaActionKind.SHARE -> open(item, share = true)
                         MediaActionKind.FAVORITE_ADD -> model.addToPlaylist(item, PersonalLibrary.FAVORITES)
@@ -272,7 +277,7 @@ fun MediaLibraryScreen(
                         }
                     },
                     // Satu tap = seluruh daftar masuk antrean audio, mulai dari item ini; video memutar antrean video.
-                    onClick = { if (item.kind == "AUDIO") model.playSelection(player, item.uri) else playVideo(item) },
+                    onClick = { if (item.kind == "AUDIO") model.playItem(player, item) else playVideo(item) },
                 ) {
                     MediaActionBar(
                         audio = item.kind == "AUDIO",

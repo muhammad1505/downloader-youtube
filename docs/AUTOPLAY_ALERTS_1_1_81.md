@@ -6,6 +6,12 @@ Laporan pengguna 16 November 2026 dari log aplikasi 1.1.80/code95 (Realme RMX182
 video, dan pertanyaan apakah perlu menu "jangan batasi baterai". Versi dinaikkan ke
 **1.1.81/code96** dengan lima sorotan changelog.
 
+> **Diperbarui 1.1.84/code99.** Izin `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dan dialog
+> pengecualian langsung dihapus karena dibatasi Google dan menjadi kandidat pemicu peringatan
+> Play Protect. Panduan baterai kini hanya membuka Info aplikasi; lihat
+> [PLAY_PROTECT](PLAY_PROTECT.md) dan [PROGRESS](PROGRESS.md). Bagian 4 di bawah adalah catatan
+> historis 1.1.81, bukan perilaku aplikasi saat ini.
+
 ## 1. Bukti dari log
 
 - `ERROR` berulang `ERROR_CODE_IO_UNSPECIFIED` pada 15 November 14:20 untuk

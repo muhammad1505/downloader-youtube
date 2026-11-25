@@ -2,6 +2,7 @@ package id.local.tubeflow.core
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.provider.Settings
 import java.io.ByteArrayOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -27,6 +28,16 @@ internal object NetworkDns {
         "Cloudflare" to "one.one.one.one",
         "Google" to "dns.google",
         "Quad9" to "dns.quad9.net",
+    )
+
+    /**
+     * Urutan layar yang dicoba tombol Private DNS. Aksi khusus tidak selalu ada di ColorOS/realme,
+     * jadi pengguna tetap diarahkan ke Jaringan & internet atau Setelan, bukan gagal diam-diam.
+     */
+    fun privateDnsActions(): List<String> = listOf(
+        "android.settings.PRIVATE_DNS_SETTINGS",
+        Settings.ACTION_WIRELESS_SETTINGS,
+        Settings.ACTION_SETTINGS,
     )
 
     /** Resolver aktif dari jaringan yang terhubung; daftar kosong berarti belum terbaca. */

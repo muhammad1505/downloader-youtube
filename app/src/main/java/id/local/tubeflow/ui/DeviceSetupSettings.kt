@@ -2,7 +2,7 @@ package id.local.tubeflow.ui
 
 import android.content.Intent
 import android.os.Build
-import android.provider.Settings as AndroidSettings
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatteryFull
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Icon
@@ -39,6 +40,17 @@ fun BatterySetupPanel() {
     val guidance = remember { BatteryOptimization.guidanceForDevice() }
     var ignoring by remember { mutableStateOf(BatteryOptimization.isIgnoring(context)) }
     var autostart by remember { mutableStateOf(BatteryOptimization.autostartIntent(context)) }
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                ignoring = BatteryOptimization.isIgnoring(context)
+                autostart = BatteryOptimization.autostartIntent(context)
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
     Panel(
         title = "Optimasi baterai · ${guidance.label}",
         description = guidance.summary,
@@ -58,25 +70,20 @@ fun BatterySetupPanel() {
             }
         }
         ActionButton(
-            text = if (ignoring) "Buka daftar optimasi baterai" else "Matikan optimasi baterai",
-            onClick = {
-                BatteryOptimization.openExemption(context)
-                ignoring = BatteryOptimization.isIgnoring(context)
-            },
-            icon = Icons.Outlined.BatteryFull,
+            text = "Buka info aplikasi TubeFlow",
+            onClick = { runCatching { context.startActivity(BatteryOptimization.appInfoIntent(context)) } },
+            icon = Icons.Outlined.Settings,
             emphasis = ActionEmphasis.Secondary,
             fillWidth = true,
         )
-        ActionButton(
-            text = if (autostart != null) "Buka Autostart ${guidance.label}" else "Buka info aplikasi",
-            onClick = {
-                val intent = autostart ?: BatteryOptimization.appInfoIntent(context)
-                runCatching { context.startActivity(intent) }
-                autostart = BatteryOptimization.autostartIntent(context)
-            },
-            icon = Icons.Outlined.Refresh,
-            fillWidth = true,
-        )
+        autostart?.let { target ->
+            ActionButton(
+                text = "Buka Autostart ${guidance.label}",
+                onClick = { runCatching { context.startActivity(target) } },
+                icon = Icons.Outlined.Refresh,
+                fillWidth = true,
+            )
+        }
         guidance.steps.forEachIndexed { index, step ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${index + 1}.", style = MaterialTheme.typography.bodySmall,
@@ -86,7 +93,7 @@ fun BatterySetupPanel() {
             }
         }
         Text(
-            "Menu tiap merek berbeda. Bila nama menu tidak sama, cari kata “baterai”, “autostart”, atau “latar belakang” di pengaturan. Perubahan berlaku untuk unduhan dan auto-play headset.",
+            "Di Info aplikasi, buka Baterai atau Aktivitas latar belakang, pilih Jangan optimalkan/Tanpa batasan, lalu atur Autostart. Menu tiap merek berbeda; bila nama menu tidak sama, cari kata “baterai”, “autostart”, atau “latar belakang”.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -161,13 +168,39 @@ fun DnsSetupPanel() {
         }
         ActionButton(
             "Buka Private DNS",
-            // Konstanta ini tidak tersedia di SDK 37; aksi yang sama memakai string resmi Android.
-            { runCatching { context.startActivity(Intent("android.settings.PRIVATE_DNS_SETTINGS")) } },
+            {
+                // ColorOS/realme tidak selalu menyediakan aksi Private DNS langsung. Coba layar
+                // khusus, lalu Jaringan & internet, lalu Setelan; jangan menelan kegagalan diam-diam.
+                val actions = NetworkDns.privateDnsActions()
+                var openedAt = -1
+                for ((index, action) in actions.withIndex()) {
+                    // Jangan memakai resolveActivity sebagai syarat: pembatasan visibilitas paket
+                    // Android 11+ dapat mengembalikan null untuk intent Setelan yang sebenarnya
+                    // dapat dibuka. Cukup coba startActivity dan lanjut ke fallback bila gagal.
+                    val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (runCatching { context.startActivity(intent) }.isSuccess) {
+                        openedAt = index
+                        break
+                    }
+                }
+                when {
+                    openedAt < 0 -> Toast.makeText(
+                        context,
+                        "Pengaturan jaringan tidak dapat dibuka di perangkat ini.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    openedAt > 0 -> Toast.makeText(
+                        context,
+                        "Private DNS langsung tidak tersedia; membuka pengaturan jaringan. Pilih Private DNS di sana.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
             icon = Icons.Outlined.Wifi,
             fillWidth = true,
         )
         Text(
-            "Pilih “Nama host penyedia DNS privat”, lalu isi salah satu nama di atas. Mode otomatis memakai DNS jaringan; mematikan Private DNS mengembalikan setelan sebelumnya.",
+            "Pilih “Nama host penyedia DNS privat”, lalu isi salah satu nama di atas. Bila layar langsung tidak tersedia, tombol membuka Jaringan & internet; pilih Private DNS di sana. Mode otomatis memakai DNS jaringan; mematikan Private DNS mengembalikan setelan sebelumnya.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

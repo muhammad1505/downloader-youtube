@@ -6,7 +6,16 @@ Pemeriksaan lanjutan logika download lirik menambahkan **BUG-013 dan BUG-014**, 
 
 Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md), dengan ID OPT-001 sampai OPT-008, urutan kerja, dependensi bug, dan kriteria selesai.
 
-## Status aktual — 18 November 2026
+## Status aktual — 25 November 2026
+
+Kandidat **1.1.84/code99** menindaklanjuti laporan Play Protect, tombol optimasi baterai ganda,
+Private DNS yang tidak terbuka, dan baris Koleksi/Riwayat yang masih menunjuk berkas terhapus.
+Izin `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dihapus dan panduan baterai dialihkan ke Info aplikasi
+(BUG-107/108), tombol Private DNS memakai fallback berjenjang (BUG-109), dan pemutaran melakukan
+preflight kehadiran berkas (BUG-110). Gate rilis tetap diserahkan ke CI pada tag `v1.1.84`; build
+lokal tidak dijalankan.
+
+## Status sebelumnya — 18 November 2026
 
 Kandidat **1.1.82/code97** menggabungkan tiga perbaikan yang belum masuk APK 1.1.81: hapus folder
 Koleksi kini menghapus direktorinya setelah berkas dan subfolder dibersihkan (BUG-106), izin
@@ -57,6 +66,10 @@ laporan versi yang lebih baru mengutamakannya. Tidak ada klaim semua bug selesai
 | BUG-104 | TubeFlow tidak muncul di daftar akses Jangan Ganggu Android karena `ACCESS_NOTIFICATION_POLICY` belum dideklarasikan di manifest, sehingga `isNotificationPolicyAccessGranted` selalu false dan opsi tahan notifikasi tidak pernah bekerja pada APK 1.1.81. Diperbaiki setelah rilis: izin ditambahkan, status di Pengaturan dibaca ulang saat layar kembali aktif, dan regresi host memeriksa manifest. |
 | BUG-105 | Auto-play headset kabel masih bisa hilang karena pemeriksaan `loading` kedua di dalam perencanaan (`withContext(engineDispatcher)`) kembali tanpa percobaan ulang, saat pemulihan sesi baru dimulai setelah batas tunggu awal. Perencanaan kini diulang (poll 100 ms, maksimal 3 detik) dan setiap broadcast sambungan dicatat beserta `action`/`state`/`sticky`. |
 | BUG-106 | Hapus folder di Koleksi hanya menghapus berkas sehingga direktori kosong tertinggal di penyimpanan. 18 Nov: `deleteFolder` kini menghapus berkas folder beserta subfoldernya, lalu menghapus direktori lewat grant SAF bila ada izin tulis dan direktorinya terbukti tidak berisi berkas lain. Uji host dan emulator Pixel 4 (Android 10) lulus; lihat [DEVICE_TEST](DEVICE_TEST.md). |
+| BUG-107 | Play Protect menandai APK sideload 1.1.83 sebagai berbahaya. 25 Nov: izin `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dihapus karena dibatasi Google dan sering menjadi pemicu riskware; manifest tidak memakai SMS, aksesibilitas, atau notification listener, target SDK 37, dan APK ditandatangani kunci produksi. Teks peringatan persis belum diterima; bila masih muncul, klasifikasinya perlu dipastikan sebelum appeal. Lihat [PLAY_PROTECT](PLAY_PROTECT.md). |
+| BUG-108 | Aksi optimasi baterai muncul di dua tempat (Baterai dan Pemutaran) dan dialog sistem sering membuka layar yang salah di ColorOS. 1.1.84 menyisakan satu panel di Baterai & latar belakang yang membuka Info aplikasi; kartu baterai di Pemutaran dihapus. |
+| BUG-109 | Tombol Buka Private DNS tidak membuka apa pun di realme/ColorOS karena aksi `android.settings.PRIVATE_DNS_SETTINGS` tidak tersedia dan kegagalan ditelan `runCatching`. 1.1.84 mencoba aksi langsung, lalu `ACTION_WIRELESS_SETTINGS`, lalu `ACTION_SETTINGS`, dan menampilkan pesan bila pengguna harus memilih Private DNS manual. |
+| BUG-110 | Baris Koleksi/Riwayat yang berkasnya sudah dihapus dari aplikasi lain masih dibuka ke pemutar dan berakhir dengan galat IO. 1.1.84 merekonsiliasi hasil pemindaian otomatis, memakai satu `validatePresence`, dan memeriksa berkas sebelum memutar; hanya `MISSING` yang menghapus baris, `DENIED`/`UNKNOWN` dipertahankan. |
 
 Pekerjaan 1.1.45 dan batas pengujiannya dicatat di
 [laporan player/lampiran](MEDIA_POLISH_1_1_45.md). Tabel berikut mempertahankan
@@ -1291,3 +1304,68 @@ MediaStore tanpa grant — direktori benar-benar hilang pada dua kasus pertama,
 sedangkan kasus ketiga mempertahankan direktori dengan pesan yang jujur. Provider
 selain external storage, folder baca-saja, berkas non-media di dalam folder, dan
 unduhan berjalan belum diuji. Rincian: [DEVICE_TEST](DEVICE_TEST.md).
+
+## BUG-107 — P1: Play Protect menandai APK sideload sebagai berbahaya
+
+Dilaporkan 25 November 2026 setelah pengguna memasang APK 1.1.83. Teks
+peringatan persis belum diterima, jadi klasifikasi PHA (riskware, uncommon,
+atau kategori lain) belum dapat dipastikan. Pemeriksaan APK 1.1.83 menunjukkan
+tidak ada `READ_SMS`/`RECEIVE_SMS`, layanan aksesibilitas, notification listener,
+atau `REQUEST_INSTALL_PACKAGES`; APK ditandatangani kunci produksi dan memakai
+target SDK 37. Pemicu yang paling mungkin adalah izin
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` yang baru ditambahkan pada 1.1.83:
+Google membatasi izin ini dan scanner menyebutnya sebagai pola riskware.
+
+Perbaikan 1.1.84 menghapus izin tersebut dari manifest dan tidak lagi membuka
+dialog `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Panduan baterai sekarang
+membuka Info aplikasi agar pengguna mengatur Baterai/Aktivitas latar belakang
+dan Autostart sendiri. Izin `ACCESS_NOTIFICATION_POLICY` tetap ada karena fitur
+Jangan Ganggu opsional membutuhkannya dan bukan notification listener; bila
+peringatan Play Protect masih muncul, izin ini menjadi kandidat berikutnya.
+
+Bila peringatan berlanjut, pengguna perlu mengirim teks/screenshot persis.
+Peringatan "Play Protect hasn't seen an app from this developer before" bukan
+klasifikasi malware dan tidak dapat dihilangkan dengan perubahan izin; appeal
+atau pemindaian ulang diperlukan. Jangan menonaktifkan Play Protect. Rincian
+verifikasi ada di [PLAY_PROTECT](PLAY_PROTECT.md).
+
+## BUG-108 — P2: Aksi optimasi baterai ganda dan navigasi salah
+
+Dilaporkan 25 November 2026. Panel Baterai & latar belakang menampilkan tombol
+"Matikan optimasi baterai" yang membuka dialog pengecualian langsung, sedangkan
+panel Pemutaran menampilkan tombol serupa. Di realme/ColorOS dialog itu sering
+membuka layar yang salah, dan pengguna melihat dua jalan untuk hal yang sama.
+
+Perbaikan 1.1.84 menghapus kartu baterai dari Pemutaran dan menyisakan satu
+panel di Baterai & latar belakang. Panel itu menampilkan status pengecualian,
+tombol "Buka info aplikasi TubeFlow", tombol autostart OEM bila activity-nya
+tersedia, dan langkah per merek. Tidak ada lagi permintaan izin langsung.
+
+## BUG-109 — P2: Tombol Private DNS tidak membuka layar apa pun
+
+Dilaporkan 25 November 2026. Tombol "Buka Private DNS" memakai
+`Intent("android.settings.PRIVATE_DNS_SETTINGS")` di dalam `runCatching`, sehingga
+`ActivityNotFoundException` ditelan dan tidak ada umpan balik. Realme 3/ColorOS
+tidak menyediakan activity dengan aksi itu.
+
+Perbaikan 1.1.84 mencoba tiga aksi berurutan: layar Private DNS langsung,
+`Settings.ACTION_WIRELESS_SETTINGS`, lalu `Settings.ACTION_SETTINGS`. Setiap
+langkah memeriksa `resolveActivity` dan menangkap kegagalan; bila memakai
+fallback, pengguna diberi tahu untuk memilih Private DNS di Jaringan & internet.
+Regresi: `NetworkDnsTest.privateDnsFallsBackFromDirectScreenToNetworkSettings`.
+
+## BUG-110 — P2: Baris katalog lama dibuka ke pemutar setelah berkas hilang
+
+Dilaporkan 25 November 2026. Koleksi dan Riwayat masih menampilkan baris yang
+berkasnya sudah dihapus dari aplikasi lain. Pemutaran gagal dengan galat IO,
+bukan pesan yang menyebut berkas hilang.
+
+Perbaikan: `MediaAvailability` mengklasifikasikan `FileNotFoundException`,
+`NoSuchFileException`, dan cause "Missing file" sebagai `MISSING`; izin yang
+dicabut tetap `DENIED`; kegagalan lain `UNKNOWN`. `MediaRepository.scan` yang
+tidak memvalidasi seluruh katalog tetap merekonsiliasi baris di folder yang
+selesai dipindai lewat `MediaSweep.unconfirmed`, lalu memeriksa kehadirannya.
+`checkPlayback` dipakai sebelum audio/video dibuka; hanya `MISSING` yang
+menghapus baris, sedangkan `DENIED`/`UNKNOWN` tetap dicoba agar gangguan
+sementara tidak memblokir pemutaran. Regresi: `MediaAvailabilityTest`,
+`MediaSweepTest`, dan `HeadsetAutoPlayMonitorTest`.

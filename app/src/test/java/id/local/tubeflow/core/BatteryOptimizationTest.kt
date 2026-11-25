@@ -1,8 +1,10 @@
 package id.local.tubeflow.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class BatteryOptimizationTest {
     @Test
@@ -37,5 +39,18 @@ class BatteryOptimizationTest {
             val guidance = BatteryOptimization.guidance(family.name, family.name)
             assertTrue(family.name, guidance.steps.isNotEmpty())
         }
+    }
+
+    @Test
+    fun manifestDoesNotRequestDirectBatteryExemption() {
+        val manifest = listOf(
+            File("src/main/AndroidManifest.xml"),
+            File("app/src/main/AndroidManifest.xml"),
+        ).first { it.isFile }.readText()
+        // Komentar boleh menyebut izin ini; yang dilarang adalah deklarasi uses-permission.
+        assertFalse(
+            Regex("""<uses-permission[^>]*REQUEST_IGNORE_BATTERY_OPTIMIZATIONS""")
+                .containsMatchIn(manifest),
+        )
     }
 }

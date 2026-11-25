@@ -146,6 +146,36 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
             catch (_: Exception) { _message.value = "Daftar belum dapat diputar. Periksa akses file lalu coba lagi." }
         }
     }
+    /**
+     * Preflight pemutaran dari kartu Koleksi/Riwayat. Baris yang terbukti hilang sudah dibersihkan
+     * oleh repository; pengguna mendapat pesan yang menyebut sebabnya, bukan galat IO ExoPlayer.
+     */
+    suspend fun canPlay(uri: String, kind: String): Boolean {
+        return try {
+            when (repository.checkPlayback(uri, kind)) {
+                MediaAvailability.State.MISSING -> {
+                    _message.value = "Berkas sudah dihapus dari penyimpanan."
+                    false
+                }
+                MediaAvailability.State.DENIED -> {
+                    _message.value = "Izin akses berkas ini berubah. Periksa izin penyimpanan lalu coba lagi."
+                    false
+                }
+                MediaAvailability.State.PRESENT, MediaAvailability.State.UNKNOWN -> true
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
+            // Pemeriksaan yang gagal bukan bukti berkas hilang; biarkan pemutar mencoba.
+            AppLog.warn(LogCategory.LIBRARY, "Pemeriksaan berkas sebelum diputar gagal.", error)
+            true
+        }
+    }
+    /** Putar satu lagu setelah memastikan berkasnya masih ada; antrean tetap diambil dari filter aktif. */
+    fun playItem(player: PlayerViewModel, item: MediaItem) {
+        viewModelScope.launch {
+            if (canPlay(item.location, item.kind)) playSelection(player, item.uri)
+        }
+    }
     fun filter(value: Filter) { filter.value = value.copy(limit = 100) }
     fun more() { filter.update { it.copy(limit = (it.limit + 100).coerceAtMost(3000)) } }
     fun period(days: Int) { since.value = DashboardCharts.since(days, java.time.LocalDate.now(), java.time.ZoneId.systemDefault()) }
