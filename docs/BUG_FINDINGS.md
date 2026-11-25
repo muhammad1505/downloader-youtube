@@ -22,6 +22,8 @@ berkas, dan pemeriksaan presensi berkala mengindeks ulang metadata/sampul di set
 Preflight kini membaca tanpa kunci, pemeriksaan berkala hanya memulihkan tanda `AVAILABLE`,
 sapuan otomatis dijarangkan ke 30 detik dengan dedup O(1) dan proyeksi empat kolom. Regresi
 ada di `MediaSweepTest`; CI **Android tests** commit `6359c9a` lulus, uji perangkat belum.
+Patch **1.1.85/code100** membawa perbaikan ini ke APK; gate rilis memakai workflow yang sama
+pada commit versi, dan APK ARM64 dibangun dari tag `v1.1.85`.
 
 ## Status sebelumnya — 18 November 2026
 

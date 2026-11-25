@@ -1,5 +1,15 @@
 [
   {
+    "versionCode": 100,
+    "versionName": "1.1.85",
+    "highlights": [
+      "Koleksi terasa lebih ringan: pemeriksaan ketersediaan berkas tidak lagi membaca ulang metadata dan sampul setiap kali layar dibuka, dan sapuan otomatis dijarangkan agar baterai lebih hemat.",
+      "Tombol Putar langsung merespons meski aplikasi sedang memindai folder. Sebelumnya aksi bisa terasa tidak jalan sampai pemindaian selesai.",
+      "Berkas yang dihapus dari aplikasi lain di subfolder Download/TubeFlow kini ikut dibersihkan dari Koleksi, bukan hanya yang ada di folder utama.",
+      "Pemindaian katalog memakai kueri ringan, jadi perangkat dengan koleksi besar tidak lagi memuat seluruh data berkas hanya untuk memeriksa ketersediaan."
+    ]
+  },
+  {
     "versionCode": 99,
     "versionName": "1.1.84",
     "highlights": [

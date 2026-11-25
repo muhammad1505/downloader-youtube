@@ -2,7 +2,7 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 25 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
-## Optimasi beban Koleksi dan siklus pemutar — 25 November 2026
+## Optimasi beban Koleksi dan siklus pemutar — 1.1.85/code100, 25 November 2026
 
 Laporan pengguna setelah 1.1.84: aplikasi terasa menguras resource dan sebagian aksi
 pemutaran seperti tidak berfungsi. Penelusuran kode menemukan beban berulang, bukan objek
@@ -28,7 +28,8 @@ yang tertahan di memori.
   `observePlayback`, dan `renew` di `PlaybackService` semuanya dibatalkan pada jeda, stop,
   dan `onDestroy`.
 - **Bukti.** CI **Android tests** untuk commit `6359c9a` lulus (unit Kotlin, lint release,
-  106 tes host Python); regresi sapuan ditambah di `MediaSweepTest`. Uji perangkat dan
+  106 tes host Python); regresi sapuan ditambah di `MediaSweepTest`. Patch **1.1.85/code100**
+  membawa perubahan ini ke APK; build rilis dijalankan dari tag `v1.1.85`. Uji perangkat dan
   pengukuran profiler memori belum dilakukan.
 
 ## Play Protect, baterai, DNS, dan berkas hilang — 1.1.84/code99, 25 November 2026
