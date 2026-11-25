@@ -58,6 +58,20 @@ class MediaSweepTest {
     }
 
     @Test
+    fun projectedRowMatchesFailedSourceThroughAccessUri() {
+        val access = "content://com.android.externalstorage.documents/tree/primary%3AMusik/document/primary%3AMusik%2Fx.mp3"
+        assertTrue(MediaSweep.needsCheck(
+            uri = "content://media/external/file/7",
+            folder = "Musik",
+            displayName = "x.mp3",
+            access = access,
+            scannedFolders = emptySet(),
+            discovered = emptySet(),
+            unreadablePrefixes = listOf("content://com.android.externalstorage.documents/tree/primary%3AMusik/document/"),
+        ))
+    }
+
+    @Test
     fun sameNameInAnotherFolderDoesNotCountAsDiscovered() {
         val row = item("same.mp3", "Download/TubeFlow")
         val candidates = MediaSweep.unconfirmed(

@@ -2,6 +2,35 @@
 
 Dimulai **9 Oktober 2026**, diperbarui sampai 25 November 2026. Dokumen ini melengkapi [BUG_FINDINGS.md](BUG_FINDINGS.md) (temuan) dan [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) (usulan): berisi keputusan desain yang diambil saat perbaikan, bukti yang sudah dikumpulkan, dan sisa pekerjaan agar serah-terima tidak mengulang investigasi.
 
+## Optimasi beban Koleksi dan siklus pemutar — 25 November 2026
+
+Laporan pengguna setelah 1.1.84: aplikasi terasa menguras resource dan sebagian aksi
+pemutaran seperti tidak berfungsi. Penelusuran kode menemukan beban berulang, bukan objek
+yang tertahan di memori.
+
+- **Preflight pemutaran.** `checkPlayback` dulu mengambil `MediaFileOperations.mutex` yang
+  sama dengan sapuan/rename, sehingga tap Putar menunggu sapuan selesai. Pemeriksaan
+  kehadiran kini membaca tanpa kunci; pembersihan baris yang terbukti hilang tetap di dalam
+  kunci dan diverifikasi ulang (aman terhadap rename yang sedang berjalan).
+- **Pemeriksaan presensi.** `validatePresence` memanggil `index()` (MediaMetadataRetriever,
+  dekode bitmap sampul, tulis JPEG, `CacheBudget.prune`) untuk setiap baris yang kembali
+  PRESENT. Pemeriksaan berkala dan sapuan otomatis kini hanya memulihkan tanda AVAILABLE
+  lewat satu update baris; indeks ulang penuh hanya pada pindai eksplisit.
+- **Frekuensi.** Sapuan otomatis 5 → 30 detik dan pemeriksaan presensi otomatis dibatasi
+  10 detik sekali; permintaan eksplisit dari layar memakai `force = true`.
+- **Pindai.** Dedup baris memakai `HashSet` (O(1), bukan O(n²)), setiap folder hasil kueri
+  MediaStore ditandai selesai dipindai termasuk subfolder, dan sapuan katalog memakai
+  proyeksi empat kolom (`CatalogSweepRow`) alih-alih `dao.all()`.
+- **Audit siklus pemutar.** `PlayerViewModel` adalah engine singleton proses (`obtain()`),
+  jadi `onCleared()` memang tidak dipakai jalur UI; receiver `noisy`, callback playback, dan
+  HandlerThread hidup selama proses dan dihentikan lewat `release()`/`quitSafely()`.
+  Tidak ditemukan loop atau pendengar yang menyala tanpa henti: `tick`, `sleepTick`,
+  `observePlayback`, dan `renew` di `PlaybackService` semuanya dibatalkan pada jeda, stop,
+  dan `onDestroy`.
+- **Bukti.** CI **Android tests** untuk commit `6359c9a` lulus (unit Kotlin, lint release,
+  106 tes host Python); regresi sapuan ditambah di `MediaSweepTest`. Uji perangkat dan
+  pengukuran profiler memori belum dilakukan.
+
 ## Play Protect, baterai, DNS, dan berkas hilang — 1.1.84/code99, 25 November 2026
 
 Pengguna melaporkan Play Protect menandai APK 1.1.83 sebagai berbahaya, tombol
@@ -27,6 +56,15 @@ dan berkas Koleksi/Riwayat yang sudah dihapus masih dicoba diputar.
 - **Auto-play headset.** Monitor proses-wide sudah berjalan dari
   `TubeFlowApplication`; kebijakan tipe output dipisah ke `HeadsetAutoPlayPolicy`
   agar dapat diuji tanpa Android.
+- **Rilis.** `v1.1.84` lulus CI **Android tests** (unit Kotlin, lint release,
+  106 tes host Python) dan workflow **Release APK arm64**. APK
+  `TubeFlow-1.1.84-arm64-v8a-release.apk` berukuran **77.045.393 byte**, SHA-256
+  `41bd4575dd9ca0f2909faf3c81b1dde3cfb2ce6e05c42318b9c218bb56d28340`.
+  Inspeksi host: paket `id.local.tubeflow`, versi 1.1.84 (99), minSdk 29,
+  targetSdk 37, signature v2, 18 izin, dan
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` tidak ada. Artefak Actions 0; aset
+  rilis lama dipangkas sesuai kebijakan tiga rilis terbaru. Uji perangkat dan
+  pemindaian ulang Play Protect belum dilakukan.
 
 ## Hapus folder Koleksi dan rilis 1.1.82/code97 — 18 November 2026
 

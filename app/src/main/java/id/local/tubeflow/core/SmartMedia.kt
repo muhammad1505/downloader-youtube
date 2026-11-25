@@ -60,6 +60,9 @@ data class DailyCount(val day: String, val count: Long)
 data class PlatformCount(val platformId: String, val count: Long)
 data class FolderCount(val folder: String, val count: Long)
 
+/** Proyeksi ringan untuk sapuan katalog: cukup empat kolom tanpa memuat seluruh isi MediaItem. */
+data class CatalogSweepRow(val uri: String, val folder: String, val displayName: String, val accessUri: String)
+
 @Dao
 interface MediaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(item: MediaItem)
@@ -73,6 +76,8 @@ interface MediaDao {
     @Query("SELECT * FROM media_items ORDER BY checkedAt ASC LIMIT :limit") suspend fun oldest(limit: Int): List<MediaItem>
     /** Dipakai pelepasan folder koleksi untuk memeriksa prefix URI akses tanpa menyentuh file. */
     @Query("SELECT * FROM media_items") suspend fun all(): List<MediaItem>
+    // Katalog untuk penyegaran otomatis: hanya kolom yang dipakai memilih kandidat hilang.
+    @Query("SELECT uri, folder, displayName, accessUri FROM media_items") suspend fun sweepRows(): List<CatalogSweepRow>
     // Koleksi utuh untuk antrean auto-play: lagu tersedia dalam urutan koleksi (terbaru lebih dulu).
     @Query("SELECT * FROM media_items WHERE kind = 'AUDIO' AND availability = 'AVAILABLE' ORDER BY addedAt DESC, title COLLATE NOCASE ASC") suspend fun availableAudio(): List<MediaItem>
     // Alat massal bekerja pada seleksi eksplisit; batasnya sama dengan daftar putar eksplisit.

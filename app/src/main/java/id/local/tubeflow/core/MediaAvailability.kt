@@ -103,7 +103,14 @@ internal object MediaSweep {
         item: MediaItem,
         scannedFolders: Set<String>,
         discovered: Set<Pair<String, String>>,
-    ): Boolean = item.folder in scannedFolders && (item.folder to item.displayName) !in discovered
+    ): Boolean = isUnconfirmed(item.folder, item.displayName, scannedFolders, discovered)
+
+    fun isUnconfirmed(
+        folder: String,
+        displayName: String,
+        scannedFolders: Set<String>,
+        discovered: Set<Pair<String, String>>,
+    ): Boolean = folder in scannedFolders && (folder to displayName) !in discovered
 
     /**
      * Baris yang perlu diperiksa pada penyegaran otomatis: namanya tidak terlihat di folder yang
@@ -115,10 +122,22 @@ internal object MediaSweep {
         scannedFolders: Set<String>,
         discovered: Set<Pair<String, String>>,
         unreadablePrefixes: List<String>,
+    ): Boolean = needsCheck(item.uri, item.folder, item.displayName, item.location,
+        scannedFolders, discovered, unreadablePrefixes)
+
+    /** Varian proyeksi ringan: sapuan otomatis tidak perlu memuat seluruh kolom [MediaItem]. */
+    fun needsCheck(
+        uri: String,
+        folder: String,
+        displayName: String,
+        access: String,
+        scannedFolders: Set<String>,
+        discovered: Set<Pair<String, String>>,
+        unreadablePrefixes: List<String>,
     ): Boolean {
-        if (isUnconfirmed(item, scannedFolders, discovered)) return true
+        if (isUnconfirmed(folder, displayName, scannedFolders, discovered)) return true
         if (unreadablePrefixes.isEmpty()) return false
-        val access = CollectionFolders.normalize(item.location)
-        return unreadablePrefixes.any { access.startsWith(it) || item.uri.startsWith(it) }
+        val normalized = CollectionFolders.normalize(access)
+        return unreadablePrefixes.any { normalized.startsWith(it) || uri.startsWith(it) }
     }
 }

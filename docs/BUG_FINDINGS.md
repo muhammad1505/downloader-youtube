@@ -8,12 +8,20 @@ Usulan fitur dan optimasi lanjutan dicatat di [DEVELOPMENT_ROADMAP.md](DEVELOPME
 
 ## Status aktual — 25 November 2026
 
-Kandidat **1.1.84/code99** menindaklanjuti laporan Play Protect, tombol optimasi baterai ganda,
+Rilis **1.1.84/code99** menindaklanjuti laporan Play Protect, tombol optimasi baterai ganda,
 Private DNS yang tidak terbuka, dan baris Koleksi/Riwayat yang masih menunjuk berkas terhapus.
 Izin `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dihapus dan panduan baterai dialihkan ke Info aplikasi
 (BUG-107/108), tombol Private DNS memakai fallback berjenjang (BUG-109), dan pemutaran melakukan
-preflight kehadiran berkas (BUG-110). Gate rilis tetap diserahkan ke CI pada tag `v1.1.84`; build
-lokal tidak dijalankan.
+preflight kehadiran berkas (BUG-110). CI pada tag `v1.1.84` lulus; APK ARM64 ber-SHA-256
+`41bd4575dd9ca0f2909faf3c81b1dde3cfb2ce6e05c42318b9c218bb56d28340` dengan 18 izin tanpa
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Uji perangkat dan pemindaian ulang Play Protect belum
+dilakukan; build lokal tidak dijalankan.
+
+BUG-111 (pasca-rilis 1.1.84) menutup keluhan resource: tap Putar bisa menunggu kunci operasi
+berkas, dan pemeriksaan presensi berkala mengindeks ulang metadata/sampul di setiap sapuan.
+Preflight kini membaca tanpa kunci, pemeriksaan berkala hanya memulihkan tanda `AVAILABLE`,
+sapuan otomatis dijarangkan ke 30 detik dengan dedup O(1) dan proyeksi empat kolom. Regresi
+ada di `MediaSweepTest`; CI **Android tests** commit `6359c9a` lulus, uji perangkat belum.
 
 ## Status sebelumnya — 18 November 2026
 

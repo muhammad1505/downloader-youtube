@@ -639,14 +639,16 @@ class MediaRepository(private val context: Context) {
             // selesai dipindai dan namanya tidak lagi terlihat harus diperiksa. Ini menangkap file
             // yang dihapus dari aplikasi lain tanpa menunggu rotasi checkedAt.
             val prefixes = unreadableTrees.map { CollectionFolders.normalize(it) + "/document/" }
-            val catalog = dao.all()
-            val candidates = LinkedHashMap<String, MediaItem>()
-            // Satu lintasan untuk kedua aturan; dulu katalog penuh diiterasi lagi per sumber gagal.
-            for (item in catalog) {
-                if (MediaSweep.needsCheck(item, scannedFolders, discovered, prefixes)) candidates[item.uri] = item
+            // Proyeksi empat kolom, bukan seluruh MediaItem: sapuan ini berjalan berulang tiap kali
+            // layar Koleksi dibuka, jadi alokasi katalognya harus sekecil mungkin.
+            val candidates = ArrayList<CatalogSweepRow>()
+            for (row in dao.sweepRows()) {
+                if (MediaSweep.needsCheck(row.uri, row.folder, row.displayName, row.accessUri.ifBlank { row.uri },
+                        scannedFolders, discovered, prefixes)) candidates += row
             }
-            for (item in candidates.values) {
+            for (row in candidates) {
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val item = dao.get(row.uri) ?: continue
                 // Tanpa indeks ulang penuh: sapuan ini berjalan berulang saat layar Koleksi dibuka.
                 try { validatePresence(item, reindex = false) } catch (_: Exception) { failed++ }
             }

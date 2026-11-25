@@ -5,6 +5,16 @@ pada 25 November 2026 setelah memasang APK **1.1.83/code98**. Teks peringatan
 persis belum diterima, jadi statusnya belum boleh disebut "false positive" atau
 "malware" tanpa bukti.
 
+## Fakta APK 1.1.84
+
+- Paket `id.local.tubeflow`, versionCode 99, versionName 1.1.84.
+- Target SDK 37, min SDK 29, hanya ABI arm64-v8a yang dipublikasikan.
+- Ditandatangani kunci produksi (bukan sertifikat debug); signature v2 dan
+  zipalign 16 KB lulus di CI.
+- 18 izin; `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` tidak ada.
+- SHA-256 APK 1.1.84:
+  `41bd4575dd9ca0f2909faf3c81b1dde3cfb2ce6e05c42318b9c218bb56d28340`.
+
 ## Fakta APK 1.1.83
 
 - Paket `id.local.tubeflow`, versionCode 98, versionName 1.1.83.
@@ -37,6 +47,7 @@ memang pertama kali terlihat oleh Play Protect pada pemindaian 1.1.83.
 
 ```bash
 sha256sum TubeFlow-1.1.84-arm64-v8a-release.apk
+# harus 41bd4575dd9ca0f2909faf3c81b1dde3cfb2ce6e05c42318b9c218bb56d28340
 unzip -p TubeFlow-1.1.84-arm64-v8a-release.apk AndroidManifest.xml >/dev/null
 ```
 
@@ -68,6 +79,6 @@ Peringatan Play Protect dapat dipicu oleh reputasi aplikasi, sertifikat yang
 belum dikenal, atau analisis dinamis, bukan hanya izin. TubeFlow juga memuat
 engine yt-dlp dan memperbaruinya dari rilis resmi GitHub dengan verifikasi
 SHA-256; pembaruan itu bukan pemasangan APK, tetapi tetap merupakan pemuatan kode
-saat runtime yang dapat menaikkan skor heuristik. Perubahan 1.1.84 menghilangkan
-satu pemicu yang paling mungkin; belum ada bukti bahwa peringatan hilang sampai
-APK 1.1.84 dipindai ulang di perangkat yang sama.
+saat runtime yang dapat menaikkan skor heuristik. 1.1.84 sudah dirilis dan
+izin baterai langsung sudah terbukti tidak ada di APK, tetapi belum ada bukti
+bahwa peringatan hilang sampai APK 1.1.84 dipindai ulang di perangkat yang sama.
