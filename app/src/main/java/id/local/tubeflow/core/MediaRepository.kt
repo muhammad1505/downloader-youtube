@@ -695,7 +695,7 @@ class MediaRepository(private val context: Context) {
      * pemutar tidak mencoba membuka dokumen yang sudah tidak ada. Provider yang tidak pasti
      * (DENIED/UNKNOWN) tetap diizinkan mencoba supaya gangguan sementara tidak memblokir pemutaran.
      */
-    suspend fun checkPlayback(raw: String, kind: String = ""): MediaAvailability.State = withContext(Dispatchers.IO) { operations.withLock {
+    internal suspend fun checkPlayback(raw: String, kind: String = ""): MediaAvailability.State = withContext(Dispatchers.IO) { operations.withLock {
         val item = dao.get(canonical(raw)) ?: dao.getByAccess(raw)
         if (item != null) validatePresence(item) else MediaAvailability.probe(context, raw, kind)
     } }
