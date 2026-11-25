@@ -96,7 +96,29 @@ internal object MediaSweep {
         catalog: List<MediaItem>,
         scannedFolders: Set<String>,
         discovered: Set<Pair<String, String>>,
-    ): List<MediaItem> = catalog.filter { item ->
-        item.folder in scannedFolders && (item.folder to item.displayName) !in discovered
+    ): List<MediaItem> = catalog.filter { isUnconfirmed(it, scannedFolders, discovered) }
+
+    /** Satu baris yang namanya tidak terlihat di folder yang pemindaiannya selesai. */
+    fun isUnconfirmed(
+        item: MediaItem,
+        scannedFolders: Set<String>,
+        discovered: Set<Pair<String, String>>,
+    ): Boolean = item.folder in scannedFolders && (item.folder to item.displayName) !in discovered
+
+    /**
+     * Baris yang perlu diperiksa pada penyegaran otomatis: namanya tidak terlihat di folder yang
+     * selesai dipindai, atau lokasinya berada di sumber yang baru gagal dipindai — hasil kosong di
+     * sumber gagal bukan bukti file hilang, tetapi barisnya tetap harus dipastikan kehadirannya.
+     */
+    fun needsCheck(
+        item: MediaItem,
+        scannedFolders: Set<String>,
+        discovered: Set<Pair<String, String>>,
+        unreadablePrefixes: List<String>,
+    ): Boolean {
+        if (isUnconfirmed(item, scannedFolders, discovered)) return true
+        if (unreadablePrefixes.isEmpty()) return false
+        val access = CollectionFolders.normalize(item.location)
+        return unreadablePrefixes.any { access.startsWith(it) || item.uri.startsWith(it) }
     }
 }

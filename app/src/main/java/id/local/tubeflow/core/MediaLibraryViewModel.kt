@@ -15,7 +15,11 @@ import android.provider.DocumentsContract
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
-    private companion object { const val AUTO_SCAN_INTERVAL_MS = 5_000L }
+    private companion object {
+        const val AUTO_SCAN_INTERVAL_MS = 30_000L
+        /** Jeda minimum pemeriksaan presensi otomatis; MediaStore menulis terus selama unduhan. */
+        const val AVAILABILITY_MIN_INTERVAL_MS = 10_000L
+    }
     private val database = DownloadDatabase.get(app)
     private val dao = database.media()
     val repository = MediaRepository(app)
@@ -110,9 +114,16 @@ class MediaLibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
     private var availabilityCheck: Job? = null
     private var availabilityRequested = false
+    private var lastAvailabilityAt = 0L
     private var autoScan: Job? = null
     private var lastAutoScanAt = 0L
-    fun validateAvailability() {
+    fun validateAvailability(force: Boolean = false) {
+        // Setiap perubahan MediaStore (termasuk baris sementara saat unduhan berjalan) memicu
+        // pemeriksaan; tanpa jeda, aplikasi terus membuka dokumen selama layar terbuka. Permintaan
+        // eksplisit dari layar memakai force agar statusnya tetap segar saat dibuka.
+        val now = System.currentTimeMillis()
+        if (!force && now - lastAvailabilityAt < AVAILABILITY_MIN_INTERVAL_MS) return
+        lastAvailabilityAt = now
         // Calls and this flag belong to Main; retain events arriving during provider I/O.
         availabilityRequested = true
         if (availabilityCheck?.isActive == true) return

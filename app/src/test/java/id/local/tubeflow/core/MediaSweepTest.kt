@@ -1,6 +1,8 @@
 package id.local.tubeflow.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MediaSweepTest {
@@ -34,6 +36,25 @@ class MediaSweepTest {
             discovered = emptySet(),
         )
         assertEquals(emptyList<MediaItem>(), candidates)
+    }
+
+    @Test
+    fun rowInUnreadableTreeIsStillChecked() {
+        val access = "content://com.android.externalstorage.documents/tree/primary%3AMusik/document/primary%3AMusik%2Fhidden.mp3"
+        val row = item("hidden.mp3", "Other").copy(accessUri = access, uri = access)
+        val prefixes = listOf("content://com.android.externalstorage.documents/tree/primary%3AMusik/document/")
+        assertTrue(MediaSweep.needsCheck(row, emptySet(), emptySet(), prefixes))
+    }
+
+    @Test
+    fun confirmedRowOutsideFailureIsNotChecked() {
+        val row = item("kept.mp3", "Download/TubeFlow")
+        assertFalse(MediaSweep.needsCheck(
+            item = row,
+            scannedFolders = setOf("Download/TubeFlow"),
+            discovered = setOf("Download/TubeFlow" to "kept.mp3"),
+            unreadablePrefixes = listOf("content://other/document/"),
+        ))
     }
 
     @Test

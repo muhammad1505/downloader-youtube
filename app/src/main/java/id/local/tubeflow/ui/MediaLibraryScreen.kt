@@ -49,7 +49,7 @@ fun MediaLibraryScreen(
 ) {
     LaunchedEffect(Unit) {
         model.refreshCatalogIfStale()
-        model.validateAvailability()
+        model.validateAvailability(force = true)
     }
     val media by model.items.collectAsStateWithLifecycle()
     val playlists by model.playlists.collectAsStateWithLifecycle()

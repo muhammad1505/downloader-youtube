@@ -53,7 +53,7 @@ fun MediaDashboardScreen(model: MediaLibraryViewModel, jobs: List<DownloadJob>, 
         DashboardCharts.points(daily, period, today, SettingsStore.analyticsSince, java.time.ZoneId.systemDefault())
     }
     val jobCounts = remember(jobs) { jobs.groupingBy { it.state }.eachCount() }
-    LaunchedEffect(Unit) { model.validateAvailability() }
+    LaunchedEffect(Unit) { model.validateAvailability(force = true) }
     LaunchedEffect(period) { model.period(period) }
     val finished = counts.firstOrNull { it.action == "COMPLETED" }?.count ?: 0
     val failed = counts.firstOrNull { it.action == "FAILED" }?.count ?: 0

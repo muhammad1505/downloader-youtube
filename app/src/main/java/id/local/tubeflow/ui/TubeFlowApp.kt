@@ -215,7 +215,7 @@ fun TubeFlowApp(model: DownloadViewModel, library: MediaLibraryViewModel, player
         val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
             if (event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 library.refreshCatalogIfStale()
-                library.validateAvailability()
+                library.validateAvailability(force = true)
             }
         }
         libraryOwner.lifecycle.addObserver(observer)

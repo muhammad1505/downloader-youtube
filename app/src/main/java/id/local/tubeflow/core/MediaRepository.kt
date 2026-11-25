@@ -62,14 +62,20 @@ class MediaRepository(private val context: Context) {
      * Hanya [MediaAvailability.State.MISSING] yang menghapus baris; DENIED/UNKNOWN tidak pernah
      * dianggap bukti file hilang.
      */
-    private suspend fun validatePresence(item: MediaItem): MediaAvailability.State {
+    private suspend fun validatePresence(item: MediaItem, reindex: Boolean = true): MediaAvailability.State {
         val state = MediaAvailability.probe(context, item)
         when (state) {
             MediaAvailability.State.MISSING -> removeMissing(item)
             MediaAvailability.State.DENIED -> if (item.availability != "ACCESS_DENIED")
                 dao.put(item.copy(availability = "ACCESS_DENIED", checkedAt = System.currentTimeMillis()))
-            MediaAvailability.State.PRESENT -> if (item.availability != "AVAILABLE")
-                index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder)
+            // Pemeriksaan berkala cukup memulihkan tanda AVAILABLE lewat satu update baris. Dulu
+            // setiap baris yang sempat tidak tersedia dibaca ulang metadatanya (MediaMetadataRetriever
+            // + dekode bitmap sampul) pada tiap sapuan, dan itulah beban CPU/memori yang menumpuk.
+            MediaAvailability.State.PRESENT -> when {
+                item.availability == "AVAILABLE" -> Unit
+                !reindex -> dao.put(item.copy(availability = "AVAILABLE", checkedAt = System.currentTimeMillis()))
+                else -> index(item.location, item.jobId?.let { database.downloads().get(it) }, item.folder)
+            }
             MediaAvailability.State.UNKNOWN -> Unit
         }
         return state
@@ -546,9 +552,11 @@ class MediaRepository(private val context: Context) {
         // folder ini yang namanya tidak terlihat adalah kandidat hilang, bukan bukti hilang.
         val scannedFolders = mutableSetOf<String>()
         val discovered = mutableSetOf<Pair<String, String>>()
+        val seenRows = HashSet<Pair<String, String>>()
         fun add(uri: String, name: String, folder: String) {
             discovered += folder to name
-            if (rows.none { it.second == name && it.third == folder }) {
+            // Dedup O(1): daftar sampai 4000 baris tidak lagi dibandingkan kuadratik per berkas.
+            if (seenRows.add(folder to name)) {
                 require(rows.size < 4000) { "Folder terlalu besar; impor file pilihan." }
                 rows += Triple(uri, name, folder)
             }
@@ -566,7 +574,13 @@ class MediaRepository(private val context: Context) {
                 arrayOf(folder, "$escaped%"), null)?.use { c ->
                 // Query berhasil membuktikan folder ini terbaca meski hasilnya kosong.
                 scannedFolders += folder.trimEnd('/')
-                while (c.moveToNext()) add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getString(2).orEmpty().trimEnd('/'))
+                while (c.moveToNext()) {
+                    // Kueri ini membaca seluruh subfolder sekaligus, jadi setiap folder hasilnya
+                    // sudah selesai dipindai dan baris lama di dalamnya layak diperiksa.
+                    val rowFolder = c.getString(2).orEmpty().trimEnd('/')
+                    if (rowFolder.isNotBlank()) scannedFolders += rowFolder
+                    add(ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), rowFolder)
+                }
             } ?: throw FileNotFoundException("Folder belum dapat dibaca.")
         } catch (error: Exception) { storeError = error; unreadableSources++ }
         // Sumber SAF: folder bawaan (bila pernah diberi grant), folder output pilihan, lalu folder
@@ -624,19 +638,17 @@ class MediaRepository(private val context: Context) {
             // Penyegaran otomatis tidak mengindeks ulang semua baris, tetapi baris yang foldernya
             // selesai dipindai dan namanya tidak lagi terlihat harus diperiksa. Ini menangkap file
             // yang dihapus dari aplikasi lain tanpa menunggu rotasi checkedAt.
+            val prefixes = unreadableTrees.map { CollectionFolders.normalize(it) + "/document/" }
             val catalog = dao.all()
             val candidates = LinkedHashMap<String, MediaItem>()
-            MediaSweep.unconfirmed(catalog, scannedFolders, discovered).forEach { candidates[it.uri] = it }
-            if (unreadableTrees.isNotEmpty()) {
-                val prefixes = unreadableTrees.map { CollectionFolders.normalize(it) + "/document/" }
-                catalog.forEach { item ->
-                    val access = CollectionFolders.normalize(item.location)
-                    if (prefixes.any { access.startsWith(it) || item.uri.startsWith(it) }) candidates[item.uri] = item
-                }
+            // Satu lintasan untuk kedua aturan; dulu katalog penuh diiterasi lagi per sumber gagal.
+            for (item in catalog) {
+                if (MediaSweep.needsCheck(item, scannedFolders, discovered, prefixes)) candidates[item.uri] = item
             }
             for (item in candidates.values) {
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                try { validatePresence(item) } catch (_: Exception) { failed++ }
+                // Tanpa indeks ulang penuh: sapuan ini berjalan berulang saat layar Koleksi dibuka.
+                try { validatePresence(item, reindex = false) } catch (_: Exception) { failed++ }
             }
         }
         ScanSummary(checked, failed, rows.size, unreadableSources)
@@ -684,7 +696,7 @@ class MediaRepository(private val context: Context) {
         for (item in dao.oldest(if (force) 4000 else 100)) {
             checked += item.uri
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            try { validatePresence(item) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { }
+            try { validatePresence(item, reindex = false) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { }
         }
         // Rotate the bounded window without invalidating observers once per healthy file.
         checked.chunked(500).forEach { dao.checked(it,System.currentTimeMillis()) }
@@ -695,10 +707,20 @@ class MediaRepository(private val context: Context) {
      * pemutar tidak mencoba membuka dokumen yang sudah tidak ada. Provider yang tidak pasti
      * (DENIED/UNKNOWN) tetap diizinkan mencoba supaya gangguan sementara tidak memblokir pemutaran.
      */
-    internal suspend fun checkPlayback(raw: String, kind: String = ""): MediaAvailability.State = withContext(Dispatchers.IO) { operations.withLock {
+    internal suspend fun checkPlayback(raw: String, kind: String = ""): MediaAvailability.State = withContext(Dispatchers.IO) {
+        // Preflight tidak boleh mengantre di kunci operasi berkas: sapuan atau rename yang panjang
+        // membuat tap Putar terasa mati. Pemeriksaan kehadiran hanya membaca, sehingga bebas kunci;
+        // pembersihan baris yang terbukti hilang tetap diambil di dalam kunci dan diverifikasi ulang.
         val item = dao.get(canonical(raw)) ?: dao.getByAccess(raw)
-        if (item != null) validatePresence(item) else MediaAvailability.probe(context, raw, kind)
-    } }
+            ?: return@withContext MediaAvailability.probe(context, raw, kind)
+        val state = MediaAvailability.probe(context, item)
+        when {
+            state == MediaAvailability.State.MISSING -> operations.withLock { validatePresence(item, reindex = false) }
+            state == MediaAvailability.State.PRESENT && item.availability != "AVAILABLE" ->
+                dao.put(item.copy(availability = "AVAILABLE", checkedAt = System.currentTimeMillis()))
+        }
+        state
+    }
 
     suspend fun refresh(raw: String) = withContext(Dispatchers.IO) { operations.withLock {
         (dao.get(canonical(raw)) ?: dao.getByAccess(raw))?.let { index(it.location, it.jobId?.let { id -> database.downloads().get(id) }, it.folder) }
