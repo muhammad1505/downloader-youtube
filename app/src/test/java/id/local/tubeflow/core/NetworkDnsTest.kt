@@ -12,8 +12,8 @@ class NetworkDnsTest {
         assertEquals(0x34, query[1].toInt())
         assertEquals(0x01, query[2].toInt()) // recursion desired
         assertEquals(0x00, query[3].toInt())
-        assertEquals(1, query[4].toInt()) // QDCOUNT
-        assertEquals(0, query[5].toInt())
+        assertEquals(0, query[4].toInt()) // QDCOUNT byte tinggi
+        assertEquals(1, query[5].toInt()) // QDCOUNT byte rendah
         assertEquals(0, query[6].toInt()) // ANCOUNT
         assertEquals(0, query[11].toInt()) // ARCOUNT
         assertEquals(3, query[12].toInt()) // label "www"

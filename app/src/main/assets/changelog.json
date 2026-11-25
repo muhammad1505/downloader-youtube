@@ -13,7 +13,7 @@
     "versionCode": 97,
     "versionName": "1.1.82",
     "highlights": [
-      "Hapus folder di Koleksi kini benar-benar menghapus direktorinya di penyimpanan: berkas di folder dan subfoldernya dihapus lebih dulu, subfolder kosong dibersihkan, lalu direktorinya. Bila folder hanya memberi izin baca atau berada di luar folder yang bisa ditulis TubeFlow, direktori dibiarkan dan alasannya ditampilkan.",
+      "Hapus folder di Koleksi kini benar-benar menghapus direktorinya: berkas dan subfolder dihapus lebih dulu, lalu direktorinya. Bila izin hanya baca, direktori dibiarkan dan alasannya ditampilkan.",
       "Konfirmasi hapus folder menyebut bahwa subfolder, lirik, dan thumbnail ikut terhapus permanen; menu folder kini bernama Hapus folder, bukan Hapus isi folder.",
       "TubeFlow kembali muncul di daftar akses Jangan Ganggu Android, jadi opsi menahan notifikasi melayang saat menonton film bisa dinyalakan.",
       "Auto-play saat headset kabel tersambung tidak lagi hilang bila sesi pemutar baru dipulihkan: permintaan diulang sampai 3 detik dan setiap sambungan tercatat di Pengaturan → Log aplikasi."
