@@ -161,7 +161,8 @@ fun DnsSetupPanel() {
         }
         ActionButton(
             "Buka Private DNS",
-            { runCatching { context.startActivity(Intent(AndroidSettings.ACTION_PRIVATE_DNS_SETTINGS)) } },
+            // Konstanta ini tidak tersedia di SDK 37; aksi yang sama memakai string resmi Android.
+            { runCatching { context.startActivity(Intent("android.settings.PRIVATE_DNS_SETTINGS")) } },
             icon = Icons.Outlined.Wifi,
             fillWidth = true,
         )
