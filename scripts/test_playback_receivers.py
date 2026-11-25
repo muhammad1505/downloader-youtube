@@ -32,13 +32,15 @@ class PlaybackReceiversTest(unittest.TestCase):
         self.assertEqual('false', service.get(ANDROID + 'exported'))
         self.assertEqual('mediaPlayback', service.get(ANDROID + 'foregroundServiceType'))
 
-    def test_battery_and_notification_policy_permissions_are_declared(self):
+    def test_notification_policy_permission_is_declared_without_battery_exemption(self):
         # Tanpa ACCESS_NOTIFICATION_POLICY aplikasi tidak muncul di daftar akses Jangan Ganggu
-        # sehingga opsi menahan notifikasi saat menonton tidak pernah bisa aktif.
+        # sehingga opsi menahan notifikasi saat menonton tidak pernah bisa aktif. Sebaliknya,
+        # REQUEST_IGNORE_BATTERY_OPTIMIZATIONS sengaja tidak diminta langsung karena dibatasi
+        # Google dan menjadi kandidat pemicu peringatan Play Protect pada APK sideload.
         manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
         permissions = {p.get(ANDROID + 'name') for p in manifest.findall('uses-permission')}
         self.assertIn('android.permission.ACCESS_NOTIFICATION_POLICY', permissions)
-        self.assertIn('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', permissions)
+        self.assertNotIn('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', permissions)
 
     def test_connection_permissions_cover_old_and_new_bluetooth_without_discovery(self):
         manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
@@ -50,11 +52,12 @@ class PlaybackReceiversTest(unittest.TestCase):
         source = (ROOT / 'app/src/main/java/id/local/tubeflow/TubeFlowApplication.kt').read_text(encoding='utf-8')
         self.assertIn('HeadsetAutoPlayMonitor.start(this)', source)
 
-    def test_dnd_and_battery_permissions_are_declared(self):
-        manifest = ET.parse(ROOT / 'app/src/main/AndroidManifest.xml').getroot()
-        permissions = {p.get(ANDROID + 'name') for p in manifest.findall('uses-permission')}
-        self.assertIn('android.permission.ACCESS_NOTIFICATION_POLICY', permissions)
-        self.assertIn('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', permissions)
+    def test_direct_battery_exemption_dialog_is_not_used(self):
+        sources = '\n'.join(
+            path.read_text(encoding='utf-8')
+            for path in (ROOT / 'app/src/main/java').rglob('*.kt')
+        )
+        self.assertNotIn('ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', sources)
 
 
 if __name__ == '__main__':
